@@ -1,0 +1,7 @@
+﻿This project keeps the canonical QLab OSC Dictionary copy at:
+
+references/qlab/QLab's OSC Dictionary.txt
+
+The qlab-osc-guide skill also contains its own bundled snapshot under:
+
+skills/qlab-osc-guide/references/qlab-osc-dictionary.txt

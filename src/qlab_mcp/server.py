@@ -18,6 +18,7 @@ from .models import (
     SelectedCuesResult,
     WorkspaceCueInventoryResult,
     WorkspaceListResult,
+    WorkspaceOverviewResult,
 )
 from .qlab import QLabReader
 
@@ -59,8 +60,10 @@ mcp = FastMCP(
     "QLab Cue Reader",
     instructions=(
         "Use these tools to read QLab 5 workspace and cue information over OSC. "
-        "All tools are read-only and require an explicit workspace_id except qlab_get_workspaces. "
-        "Start with qlab_get_workspaces, then prefer ID/shallow inventory tools before requesting detailed cue data."
+        "All tools are read-only. Most tools require an explicit workspace_id; "
+        "qlab_get_workspaces and qlab_get_workspace_overview can orient from the currently open workspace. "
+        "Start with qlab_get_workspace_overview for a bounded first-pass show summary, "
+        "then use focused ID/detail tools for deeper inspection."
     ),
 )
 
@@ -73,6 +76,49 @@ def _reader() -> QLabReader:
 def qlab_get_workspaces() -> WorkspaceListResult:
     """Return the open QLab workspaces so a client can choose a workspace_id."""
     return WorkspaceListResult.model_validate(_reader().get_workspaces())
+
+
+@mcp.tool
+def qlab_get_workspace_overview(
+    workspace_id: Annotated[
+        str | None,
+        Field(
+            description=(
+                "QLab workspace unique ID or OSC-compatible display name. "
+                "When omitted, exactly one workspace must be open."
+            ),
+        ),
+    ] = None,
+    max_depth: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=5,
+            description="How many child layers to inspect with shallow OSC reads. Use 0 for cue lists only.",
+        ),
+    ] = 2,
+    max_cues: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=1000,
+            description="Maximum number of cue/list/group nodes to include in the overview tree.",
+        ),
+    ] = 200,
+    include_selected_and_running: Annotated[
+        bool,
+        Field(description="When true, include shallow selected and running-or-paused cue snapshots."),
+    ] = True,
+) -> WorkspaceOverviewResult:
+    """Return a bounded first-pass summary of a QLab workspace for orientation."""
+    return WorkspaceOverviewResult.model_validate(
+        _reader().get_workspace_overview(
+            workspace_id=workspace_id,
+            max_depth=max_depth,
+            max_cues=max_cues,
+            include_selected_and_running=include_selected_and_running,
+        )
+    )
 
 
 @mcp.tool

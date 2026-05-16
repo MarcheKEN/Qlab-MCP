@@ -135,6 +135,97 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["cue_ids"], ["list-id", "cue-id"])
         self.assertNotIn("cues", result)
 
+    def test_workspace_overview_returns_bounded_first_pass_summary(self) -> None:
+        list_id = "11111111-1111-4111-8111-111111111111"
+        group_id = "22222222-2222-4222-8222-222222222222"
+        cue_id = "33333333-3333-4333-8333-333333333333"
+        responses = {
+            "/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5", "port": 53000}],
+            "/workspace/ws-1/cueLists/shallow": [
+                {
+                    "uniqueID": list_id,
+                    "number": "",
+                    "name": "Main",
+                    "displayName": "Main",
+                    "type": "Cue List",
+                    "armed": True,
+                    "flagged": False,
+                    "colorName": "none",
+                }
+            ],
+            "/workspace/ws-1/cueLists/uniqueIDs": [
+                {
+                    "uniqueID": list_id,
+                    "cues": [
+                        {"uniqueID": group_id, "cues": [{"uniqueID": cue_id, "cues": []}]},
+                    ],
+                }
+            ],
+            f"/workspace/ws-1/cue_id/{list_id}/children/shallow": [
+                {
+                    "uniqueID": group_id,
+                    "name": "Looks",
+                    "displayName": "Looks",
+                    "type": "Group",
+                    "armed": True,
+                    "flagged": True,
+                    "colorName": "red",
+                }
+            ],
+            f"/workspace/ws-1/cue_id/{group_id}/children/shallow": [
+                {
+                    "uniqueID": cue_id,
+                    "name": "Warm wash",
+                    "displayName": "Warm wash",
+                    "type": "Light",
+                    "armed": False,
+                    "flagged": False,
+                    "colorName": "blue",
+                }
+            ],
+            "/workspace/ws-1/selectedCues/shallow": [],
+            "/workspace/ws-1/runningOrPausedCues/shallow": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_overview(max_depth=2, max_cues=10)
+
+        self.assertEqual(result["workspace_id"], "ws-1")
+        self.assertEqual(result["workspace"]["displayName"], "demo.qlab5")
+        self.assertEqual(result["cue_count"], 3)
+        self.assertEqual(result["stats"]["cue_lists"], 1)
+        self.assertEqual(result["stats"]["inspected_cues"], 3)
+        self.assertEqual(result["stats"]["types"], {"Cue List": 1, "Group": 1, "Light": 1})
+        self.assertEqual(result["stats"]["armed"], 2)
+        self.assertEqual(result["stats"]["disarmed"], 1)
+        self.assertEqual(result["stats"]["flagged"], 1)
+        self.assertFalse(result["limits"]["truncated"])
+        self.assertEqual(result["cue_lists"][0]["label"], "Main")
+        self.assertEqual(result["cue_lists"][0]["children"][0]["children"][0]["displayName"], "Warm wash")
+        self.assertEqual(result["selected_cues"], [])
+        self.assertEqual(result["running_cues"], [])
+
+    def test_workspace_overview_marks_depth_truncation(self) -> None:
+        responses = {
+            "/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5", "port": 53000}],
+            "/workspace/ws-1/cueLists/shallow": [
+                {"uniqueID": "list-id", "name": "Main", "type": "Cue List", "armed": True, "flagged": False}
+            ],
+            "/workspace/ws-1/cueLists/uniqueIDs": ["list-id", "child-id"],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_overview("ws-1", max_depth=0, max_cues=10, include_selected_and_running=False)
+
+        self.assertTrue(result["limits"]["truncated"])
+        self.assertEqual(result["limits"]["truncation_reasons"], ["max_depth"])
+        self.assertTrue(result["cue_lists"][0]["children_truncated"])
+        self.assertIsNone(result["selected_cues"])
+        self.assertIsNone(result["running_cues"])
+        self.assertNotIn("/workspace/ws-1/selectedCues/shallow", server.received)
+
     def test_workspace_cue_inventory_can_include_basic_details(self) -> None:
         responses = {"/workspace/ws-1/cueLists/uniqueIDs": ["1B11984A-3EBC-4A9C-A004-B9E3AA32DA6B"]}
         cue_id = "1B11984A-3EBC-4A9C-A004-B9E3AA32DA6B"

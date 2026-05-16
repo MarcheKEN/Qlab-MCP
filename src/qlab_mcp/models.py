@@ -30,6 +30,21 @@ class CueIdsResult(BaseModel):
     cue_ids: list[str]
 
 
+class WorkspaceOverviewResult(BaseModel):
+    """Bounded first-pass overview of a QLab workspace."""
+
+    workspace_id: str
+    workspace: Any
+    cue_count: int
+    cue_lists: list[dict[str, Any]]
+    selected_cues: Any = None
+    running_cues: Any = None
+    stats: dict[str, Any]
+    limits: dict[str, Any]
+    warnings: list[str]
+    errors: dict[str, str] | None = None
+
+
 class WorkspaceCueInventoryResult(BaseModel):
     """Workspace cue inventory, with optional details."""
 

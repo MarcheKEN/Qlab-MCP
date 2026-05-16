@@ -5,6 +5,7 @@ Read-only FastMCP server for QLab 5 cue information over OSC.
 ## What this first phase supports
 
 - List open QLab workspaces.
+- Build a bounded first-pass workspace overview for orientation.
 - Read cue lists and cue carts for an explicit workspace.
 - Read all cue unique IDs in a workspace through `/cueLists/uniqueIDs`.
 - Build a workspace cue inventory, optionally with detail profiles for every cue.
@@ -20,6 +21,7 @@ This phase does not expose playback, editing, deletion, raw OSC, patches/setting
 ## Tool overview
 
 - `qlab_get_workspaces()`
+- `qlab_get_workspace_overview(workspace_id=None, max_depth=2, max_cues=200, include_selected_and_running=True)`
 - `qlab_get_cue_lists(workspace_id, include_children=True)`
 - `qlab_get_workspace_cue_ids(workspace_id, include_children=True)`
 - `qlab_get_workspace_cue_inventory(workspace_id, include_details=False, detail_profile="basic")`
@@ -30,7 +32,9 @@ This phase does not expose playback, editing, deletion, raw OSC, patches/setting
 - `qlab_get_cue_values(workspace_id, cue_ref, keys=[...])` - keys must be allowlisted read-only cue properties.
 - `qlab_read_cue_property(workspace_id, cue_ref, property_path)`
 
-For a full workspace scan, start with `qlab_get_workspace_cue_inventory(..., include_details=False)` to get IDs cheaply. Then call `qlab_get_cue_details` or `qlab_get_cue_values` only for the cues that need deeper inspection. This avoids very large UDP replies.
+For first-pass orientation, start with `qlab_get_workspace_overview(...)`. It uses shallow child reads and explicit limits so a client can understand the workspace shape, top cue lists, selected/running state, type counts, and truncation status without requesting every property of every cue.
+
+For a full ID scan, use `qlab_get_workspace_cue_inventory(..., include_details=False)` to get IDs cheaply. Then call `qlab_get_cue_details` or `qlab_get_cue_values` only for the cues that need deeper inspection. This avoids very large UDP replies.
 
 ## Configuration
 
@@ -65,11 +69,12 @@ uv run fastmcp run src/qlab_mcp/server.py:mcp
 2. Open or create a workspace with at least one cue list and one cue.
 3. Enable OSC access for the workspace if needed.
 4. Call `qlab_get_workspaces` and copy the workspace `uniqueID`.
-5. Call `qlab_get_workspace_cue_ids` with that `workspace_id`.
-6. Call `qlab_get_workspace_cue_inventory` with `include_details=true` and `detail_profile="basic"`.
-7. Select a cue in QLab and call `qlab_get_selected_cues`.
-8. Run or pause a cue and call `qlab_get_running_cues`.
-9. Call `qlab_get_cue_values` for a known cue number, for example with keys `name`, `type`, and `duration`.
+5. Call `qlab_get_workspace_overview` with that `workspace_id`, or omit `workspace_id` if exactly one workspace is open.
+6. Call `qlab_get_workspace_cue_ids` with that `workspace_id`.
+7. Call `qlab_get_workspace_cue_inventory` with `include_details=true` and `detail_profile="basic"`.
+8. Select a cue in QLab and call `qlab_get_selected_cues`.
+9. Run or pause a cue and call `qlab_get_running_cues`.
+10. Call `qlab_get_cue_values` for a known cue number, for example with keys `name`, `type`, and `duration`.
 
 For passcode-protected workspaces, set `QLAB_PASSCODE` before starting the MCP.
 

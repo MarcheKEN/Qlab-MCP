@@ -47,9 +47,23 @@ def _looks_like_unique_id(value: str) -> bool:
 def _normalize_id_list(value: Any) -> list[str]:
     if value is None:
         return []
-    if not isinstance(value, list):
-        raise ValueError("QLab cue ID response must be a list")
-    return [str(item) for item in value]
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        cue_ids: list[str] = []
+        unique_id = value.get("uniqueID")
+        if unique_id is not None:
+            cue_ids.append(str(unique_id))
+        children = value.get("cues")
+        if children is not None:
+            cue_ids.extend(_normalize_id_list(children))
+        return cue_ids
+    if isinstance(value, list):
+        cue_ids: list[str] = []
+        for item in value:
+            cue_ids.extend(_normalize_id_list(item))
+        return cue_ids
+    raise ValueError("QLab cue ID response must be a list, object, or string")
 
 
 class QLabReader:

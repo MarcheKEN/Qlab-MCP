@@ -108,6 +108,24 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["cue_ids"], ["list-id", "cue-id"])
         self.assertEqual(server.received, ["/workspace/ws-1/cueLists/uniqueIDs"])
 
+    def test_workspace_cue_ids_flattens_nested_qlab_response(self) -> None:
+        qlab_response = [
+            {
+                "uniqueID": "list-id",
+                "cues": [
+                    {"uniqueID": "group-id", "cues": [{"uniqueID": "cue-id", "cues": []}]},
+                    {"uniqueID": "sibling-id", "cues": []},
+                ],
+            }
+        ]
+        with FakeQlabOscServer({"/workspace/ws-1/cueLists/uniqueIDs": qlab_response}) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_cue_ids("ws-1")
+
+        self.assertEqual(result["cue_count"], 4)
+        self.assertEqual(result["cue_ids"], ["list-id", "group-id", "cue-id", "sibling-id"])
+
     def test_workspace_cue_inventory_can_return_ids_only(self) -> None:
         with FakeQlabOscServer({"/workspace/ws-1/cueLists/uniqueIDs": ["list-id", "cue-id"]}) as server:
             reader = QLabReader(client_for(server))

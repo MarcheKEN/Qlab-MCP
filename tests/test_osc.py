@@ -41,6 +41,25 @@ class OscMessageTests(unittest.TestCase):
         with self.assertRaises(OscProtocolError):
             QLabOscClient._parse_reply(packet)
 
+    def test_unrelated_messages_can_be_ignored_while_waiting_for_reply(self) -> None:
+        non_reply = encode_message("/updates/workspace/ws-1", "{}")
+        other_reply = encode_message("/reply/workspace/ws-1/cue/2/name", json.dumps({"status": "ok", "data": "Other"}))
+
+        self.assertIsNone(
+            QLabOscClient._parse_reply(
+                non_reply,
+                expected_address="/workspace/ws-1/cue/1/name",
+                ignore_unrelated=True,
+            )
+        )
+        self.assertIsNone(
+            QLabOscClient._parse_reply(
+                other_reply,
+                expected_address="/workspace/ws-1/cue/1/name",
+                ignore_unrelated=True,
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

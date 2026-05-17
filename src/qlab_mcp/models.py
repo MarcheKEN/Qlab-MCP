@@ -7,77 +7,57 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class WorkspaceListResult(BaseModel):
-    """Open QLab workspaces."""
+class QlabConnectionCheckResult(BaseModel):
+    """Operational readiness check for QLab OSC access."""
 
-    workspaces: Any = Field(description="QLab workspace data returned by /workspaces.")
-    status: str = Field(description="QLab reply status.")
-
-
-class CueListsResult(BaseModel):
-    """Cue lists and carts in a workspace."""
-
-    workspace_id: str
-    cue_lists: Any
-
-
-class CueIdsResult(BaseModel):
-    """Unique cue IDs in a workspace."""
-
-    workspace_id: str
-    include_children: bool
-    cue_count: int
-    cue_ids: list[str]
+    ok: bool
+    status: str
+    qlab_reachable: bool
+    workspace_available: bool
+    workspace_readable: bool
+    workspace_id: str | None = None
+    workspace_name: str | None = None
+    qlab_version: str | None = None
+    workspace_count: int
+    available_workspaces: list[dict[str, Any]]
+    passcode_configured: bool
+    passcode_status: str | None = None
+    message: str
+    connection: dict[str, Any]
+    permissions: dict[str, Any]
+    capabilities: dict[str, Any]
+    checks: dict[str, Any]
+    warnings: list[str] = Field(default_factory=list)
 
 
 class WorkspaceOverviewResult(BaseModel):
-    """Bounded first-pass overview of a QLab workspace."""
+    """Bounded structural map of a QLab workspace."""
 
     workspace_id: str
     workspace: Any
     cue_count: int
+    summary: dict[str, Any]
     cue_lists: list[dict[str, Any]]
-    selected_cues: Any = None
-    running_cues: Any = None
-    stats: dict[str, Any]
     limits: dict[str, Any]
     warnings: list[str]
     errors: dict[str, str] | None = None
+    live_state: dict[str, Any] | None = None
 
 
-class WorkspaceCueInventoryResult(BaseModel):
-    """Workspace cue inventory, with optional details."""
+class CueQueryResult(BaseModel):
+    """Filtered cue query result."""
 
     workspace_id: str
-    cue_count: int
-    cue_ids: list[str]
-    detail_profile: str | None = None
-    cues: list[dict[str, Any]] | None = None
+    filters: list[dict[str, Any]]
+    profile: str
+    scanned_count: int
+    matched_count: int
+    returned_count: int
+    total_cue_ids: int
+    truncated: bool
+    limits: dict[str, Any]
+    cues: list[dict[str, Any]]
     errors: dict[str, str] | None = None
-
-
-class SelectedCuesResult(BaseModel):
-    """Selected cues in a workspace."""
-
-    workspace_id: str
-    selected_cues: Any
-
-
-class RunningCuesResult(BaseModel):
-    """Running or paused cues in a workspace."""
-
-    workspace_id: str
-    running_cues: Any
-
-
-class CueChildrenResult(BaseModel):
-    """Children of a cue list, cart, or group."""
-
-    workspace_id: str
-    cue_ref: str
-    children: Any
-    ids_only: bool
-    shallow: bool
 
 
 class CueDetailsResult(BaseModel):
@@ -88,21 +68,3 @@ class CueDetailsResult(BaseModel):
     profile: str
     properties: dict[str, Any]
     errors: dict[str, str] | None = None
-
-
-class CueValuesResult(BaseModel):
-    """Custom read-only cue values."""
-
-    workspace_id: str
-    cue_ref: str
-    keys: list[str]
-    values: Any
-
-
-class CuePropertyResult(BaseModel):
-    """One read-only cue property."""
-
-    workspace_id: str
-    cue_ref: str
-    property: str
-    value: Any

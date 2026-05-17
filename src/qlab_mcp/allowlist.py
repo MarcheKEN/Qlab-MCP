@@ -147,7 +147,68 @@ READ_ONLY_CUE_PROPERTIES = (
     | TYPE_SPECIFIC_PROPERTIES
 )
 
+SENSITIVE_CUE_PROPERTIES = {
+    "notes",
+    "fileTarget",
+    "scriptSource",
+}
+
+BASIC_SAFE_PROFILE = (
+    "uniqueID",
+    "number",
+    "name",
+    "displayName",
+    "type",
+    "armed",
+    "flagged",
+    "colorName",
+)
+
+TECHNICAL_PROFILE = (
+    *BASIC_SAFE_PROFILE,
+    "notes",
+    "parent",
+    "cartPosition",
+    "duration",
+    "preWait",
+    "postWait",
+    "isRunning",
+    "isPaused",
+    "isLoaded",
+    "isBroken",
+    "isWarning",
+    "hasFileTargets",
+    "hasCueTargets",
+    "fileTarget",
+    "cueTargetID",
+    "cueTargetNumber",
+    "targetMode",
+    "patchTargetID",
+    "audioOutputPatchName",
+    "stageName",
+    "networkPatchName",
+    "message",
+    "messageError",
+    "lightCommandText",
+)
+
+HEALTH_PROFILE = (
+    *BASIC_SAFE_PROFILE,
+    "isBroken",
+    "isWarning",
+    "isRunning",
+    "isPaused",
+    "isLoaded",
+    "hasFileTargets",
+    "hasCueTargets",
+    "fileTarget",
+    "cueTargetNumber",
+    "patchTargetID",
+    "messageError",
+)
+
 PROFILE_PROPERTIES = {
+    "basic_safe": BASIC_SAFE_PROFILE,
     "basic": (
         "uniqueID",
         "number",
@@ -159,6 +220,8 @@ PROFILE_PROPERTIES = {
         "colorName",
         "notes",
     ),
+    "technical": tuple(dict.fromkeys(TECHNICAL_PROFILE)),
+    "health": tuple(dict.fromkeys(HEALTH_PROFILE)),
     "timing": (
         "duration",
         "currentDuration",
@@ -230,13 +293,16 @@ def validate_property_path(property_path: str) -> str:
 
 def properties_for_profile(profile: str) -> tuple[str, ...]:
     normalized = profile.strip().lower()
-    if normalized == "full":
+    if normalized in {"full", "full_sensitive"}:
         merged: list[str] = []
         for key in ("basic", "timing", "status", "targets", "group", "type_specific"):
             merged.extend(PROFILE_PROPERTIES[key])
-        return tuple(dict.fromkeys(merged))
+        properties = tuple(dict.fromkeys(merged))
+        if normalized == "full":
+            return tuple(prop for prop in properties if prop not in SENSITIVE_CUE_PROPERTIES)
+        return properties
     if normalized not in PROFILE_PROPERTIES:
-        allowed = ", ".join([*PROFILE_PROPERTIES.keys(), "full"])
+        allowed = ", ".join([*PROFILE_PROPERTIES.keys(), "full", "full_sensitive"])
         raise UnsafeCuePropertyError(f"Unknown cue detail profile {profile!r}; use one of: {allowed}")
     return PROFILE_PROPERTIES[normalized]
 

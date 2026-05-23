@@ -12,12 +12,15 @@ from .models import (
     CueDetailsResult,
     CueQueryResult,
     QlabConnectionCheckResult,
+    WorkspaceSettingDetailsResult,
     WorkspaceOverviewResult,
+    WorkspaceSettingsResult,
 )
 from .qlab import QLabReader
 
 
 CueProfile = Literal[
+    "auto",
     "basic_safe",
     "basic",
     "technical",
@@ -34,15 +37,41 @@ CueQueryFilter = Literal[
     "type",
     "flagged",
     "armed",
+    "disarmed",
     "isBroken",
     "isWarning",
     "isRunning",
     "isPaused",
+    "isLoaded",
+    "isOverridden",
+    "isAuditioning",
     "colorName",
     "name_contains",
     "number_prefix",
     "cue_list_id",
     "parent_id",
+    "hasFileTargets",
+    "hasCueTargets",
+    "skipIfDisarmed",
+    "autoLoad",
+    "continueMode",
+    "hasPreWait",
+    "hasPostWait",
+    "hasDuration",
+]
+WorkspaceSettingsSection = Literal["audio", "video", "network", "midi", "light", "general"]
+WorkspaceSettingsProfile = Literal["safe", "technical"]
+WorkspaceSettingDetailKind = Literal[
+    "all",
+    "output_patch",
+    "input_patch",
+    "audio_map",
+    "route",
+    "stage",
+    "video_input_patch",
+    "network_patch",
+    "midi_patch",
+    "light_patch",
 ]
 
 WorkspaceId = Annotated[
@@ -81,9 +110,13 @@ Start with qlab_check_connection to verify QLab, workspace candidates, passcode,
 
 Then use qlab_get_workspace_overview for a bounded show map.
 
-Use qlab_query_cues for filtered cue searches, then qlab_get_cue_details for one cue that needs deeper inspection.
+Use qlab_get_workspace_settings when you need compact infrastructure/settings inventory such as patches, stages, routes, MIDI, network, or light availability. It is the default settings map and avoids heavy light-patch dumps.
 
-The public interface is intentionally limited to these four tools. Internal OSC reads for workspaces, cue lists, children, and values are composed behind them.
+Use qlab_get_workspace_setting_details after settings when you need one specific patch, stage, route, map, or light patch. Use profile="safe" first for compact normalized details; use profile="technical" only when raw routing/device diagnostics are justified.
+
+Use qlab_query_cues for filtered cue searches across up to 500 cues, then qlab_get_cue_details for one cue that needs deeper inspection.
+
+The public interface is intentionally limited to six read-only tools. Internal OSC reads for workspaces, cue lists, children, values, and settings are composed behind them.
 """,
 )
 
@@ -159,11 +192,11 @@ def qlab_get_workspace_overview(
             ge=1,
             le=1000,
             description=(
-                "Maximum cue/list/group nodes to include before marking the overview as truncated. "
-                "Keeps large shows from producing oversized UDP replies."
+                "Maximum cue/list/group nodes to include in the bounded tree preview before marking it as truncated. "
+                "Defaults to 1000 so large workspaces can be mapped while cue_index stays compact."
             ),
         ),
-    ] = 200,
+    ] = 1000,
     include_live_state: Annotated[
         bool,
         Field(
@@ -173,6 +206,26 @@ def qlab_get_workspace_overview(
             )
         ),
     ] = False,
+    include_cue_index: Annotated[
+        bool,
+        Field(
+            description=(
+                "When true, add a compact complete cue_index with columns and rows. "
+                "Keep enabled when an agent needs a full workspace map beyond the bounded tree preview."
+            )
+        ),
+    ] = True,
+    max_index_cues: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=5000,
+            description=(
+                "Maximum cue IDs to include in cue_index before marking the index as truncated. "
+                "This does not change the bounded tree preview limits."
+            ),
+        ),
+    ] = 1000,
 ) -> WorkspaceOverviewResult:
     """Map what the QLab show contains and how cue lists, groups, and cues are organized.
 
@@ -184,6 +237,99 @@ def qlab_get_workspace_overview(
             max_depth=max_depth,
             max_cues=max_cues,
             include_live_state=include_live_state,
+            include_cue_index=include_cue_index,
+            max_index_cues=max_index_cues,
+        )
+    )
+
+
+@mcp.tool(
+    title="Get QLab Workspace Settings",
+    tags={"qlab", "settings", "patches", "routing", "inventory", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+)
+def qlab_get_workspace_settings(
+    workspace_id: WorkspaceId,
+    sections: Annotated[
+        list[WorkspaceSettingsSection] | None,
+        Field(
+            description=(
+                "Workspace settings sections to inspect. Use audio, video, network, midi, light, and/or general. "
+                "When omitted, all sections are read."
+            ),
+        ),
+    ] = None,
+) -> WorkspaceSettingsResult:
+    """Return compact read-only QLab Workspace Settings infrastructure inventory.
+
+    Use this after the overview when an agent needs audio patches/maps, video stages/routes, network patches,
+    MIDI patches, light availability, or general workspace settings. This is the default settings map:
+    it returns names, IDs, counts, relationships, connection state, and redaction metadata, but it does not
+    read the full light patch or raw hardware payloads.
+    """
+    return WorkspaceSettingsResult.model_validate(
+        _reader().get_workspace_settings(
+            workspace_id=workspace_id,
+            sections=sections,
+        )
+    )
+
+
+@mcp.tool(
+    title="Get QLab Workspace Setting Details",
+    tags={"qlab", "settings", "patches", "routing", "details", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+)
+def qlab_get_workspace_setting_details(
+    workspace_id: WorkspaceId,
+    section: Annotated[
+        WorkspaceSettingsSection,
+        Field(description="Workspace settings section to inspect in detail."),
+    ],
+    kind: Annotated[
+        WorkspaceSettingDetailKind | None,
+        Field(
+            description=(
+                "Specific settings item kind. Use all, output_patch, input_patch, audio_map, route, stage, "
+                "video_input_patch, network_patch, midi_patch, or light_patch. Defaults to all except light, "
+                "where it defaults to light_patch."
+            ),
+        ),
+    ] = None,
+    ref: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Optional settings item name or uniqueID. If omitted for a kind with multiple candidates, "
+                "the tool returns choices instead of guessing."
+            ),
+        ),
+    ] = None,
+    profile: Annotated[
+        WorkspaceSettingsProfile,
+        Field(
+            description=(
+                "Read-only detail profile. safe returns compact normalized details suitable for normal agent use. "
+                "technical can include diagnostic IPs, ports, interfaces, device details, raw routes, regions, "
+                "geometry, mesh/warp, audio-map levels, and light-patch payloads. Passcodes are always redacted."
+            ),
+        ),
+    ] = "safe",
+) -> WorkspaceSettingDetailsResult:
+    """Return read-only details for one workspace setting item.
+
+    Use this after qlab_get_workspace_settings when a specific patch, stage, route, map, or light patch needs
+    deeper inspection. The default safe profile summarizes large structures: light patches become instrument
+    indexes, video stages become stage/region/route summaries, and audio maps omit long level arrays. Use
+    technical only for explicit low-level audits.
+    """
+    return WorkspaceSettingDetailsResult.model_validate(
+        _reader().get_workspace_setting_details(
+            workspace_id=workspace_id,
+            section=section,
+            kind=kind,
+            ref=ref,
+            profile=profile,
         )
     )
 
@@ -199,8 +345,10 @@ def qlab_query_cues(
         CueQueryFilter,
         Field(
             description=(
-                "Required first filter. Supported filters: type, flagged, armed, isBroken, isWarning, "
-                "isRunning, isPaused, colorName, name_contains, number_prefix, cue_list_id, parent_id."
+                "Required first filter. Supported filters: type, flagged, armed, disarmed, isBroken, isWarning, "
+                "isRunning, isPaused, isLoaded, isOverridden, isAuditioning, colorName, name_contains, "
+                "number_prefix, cue_list_id, parent_id, hasFileTargets, hasCueTargets, skipIfDisarmed, "
+                "autoLoad, continueMode, hasPreWait, hasPostWait, hasDuration."
             ),
         ),
     ],
@@ -208,8 +356,8 @@ def qlab_query_cues(
         Any,
         Field(
             description=(
-                "Value for primary_filter. Use booleans for flagged/armed/isBroken/isWarning/isRunning/isPaused; "
-                "strings for type, colorName, name_contains, number_prefix, cue_list_id, or parent_id."
+                "Value for primary_filter. Use booleans for state/target/timing-presence filters; "
+                "strings for type, colorName, name_contains, number_prefix, cue_list_id, parent_id, or continueMode."
             ),
         ),
     ],
@@ -227,7 +375,8 @@ def qlab_query_cues(
         Field(
             description=(
                 "Read-only data profile to return for matching cues. Default basic_safe gives compact identity/status; "
-                "health adds warning/broken state; full_sensitive can expose notes, paths, or scripts."
+                "health/targets add warning, target, and file-target presence without paths; "
+                "technical/full_sensitive can expose notes, paths, scripts, or heavy stage payloads."
             ),
         ),
     ] = "basic_safe",
@@ -235,22 +384,24 @@ def qlab_query_cues(
         int,
         Field(
             ge=1,
-            le=1000,
+            le=500,
             description="Maximum matching cues to return. Scanning may continue past this to report matched_count.",
         ),
-    ] = 100,
+    ] = 500,
     max_cues_scanned: Annotated[
         int,
         Field(
             ge=1,
-            le=5000,
+            le=500,
             description="Maximum cue IDs to scan from cueLists/uniqueIDs before marking the result truncated.",
         ),
-    ] = 1000,
+    ] = 500,
 ) -> CueQueryResult:
     """Search many QLab cues with one required filter plus optional AND filters.
 
-    Use this after the overview to find cue sets such as Audio cues, flagged cues, warnings, or named/numbered ranges.
+    Use this after the overview to find cue sets such as Audio cues, Light cues, flagged cues, broken cues,
+    warnings, media-target cues, cue-target transport cues, or named/numbered ranges. Results are capped at
+    500 returned matches and 500 scanned cue IDs so agents can inspect large shows without unbounded reads.
     """
     return CueQueryResult.model_validate(
         _reader().query_cues(
@@ -277,15 +428,16 @@ def qlab_get_cue_details(
         CueProfile,
         Field(
             description=(
-                "Read-only detail profile. Use basic_safe for normal inspection, health for warnings/broken cues, "
-                "technical for notes/targets/routing, and full_sensitive only for deep audits."
+                "Read-only detail profile. Use auto for safe type-aware sections, health for warnings/broken cues, "
+                "targets for target IDs without file paths, technical for notes/targets/routing/paths, "
+                "and full_sensitive only for deep audits."
             )
         ),
-    ] = "basic_safe",
+    ] = "auto",
 ) -> CueDetailsResult:
     """Return batched read-only details for one cue using QLab valuesForKeys when possible.
 
-    Use basic_safe for normal inspection, health for warnings, and technical/full_sensitive only when justified.
+    Use auto for safe type-aware inspection, health for warnings, and technical/full_sensitive only when justified.
     """
     return CueDetailsResult.model_validate(_reader().get_cue_details(workspace_id, cue_ref, profile))
 

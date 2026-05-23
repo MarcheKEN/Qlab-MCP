@@ -39,6 +39,7 @@ TIMING_PROPERTIES = {
     "postWaitElapsed",
     "percentPostWaitElapsed",
     "maxTimeInCueSequence",
+    "continueMode",
     "timecodeTrigger",
     "timecodeTrigger/text",
 }
@@ -136,6 +137,13 @@ TYPE_SPECIFIC_PROPERTIES = {
     "timecodeString",
     "timecodeFormat",
     "scriptSource",
+    "alwaysCollate",
+    "subcontroller",
+}
+
+HEAVY_CUE_PROPERTIES = {
+    "stage",
+    "stage/regions",
 }
 
 READ_ONLY_CUE_PROPERTIES = (
@@ -164,6 +172,45 @@ BASIC_SAFE_PROFILE = (
     "colorName",
 )
 
+AUTO_COMMON_PROFILE = (
+    "uniqueID",
+    "number",
+    "name",
+    "displayName",
+    "listName",
+    "type",
+    "colorName",
+    "secondColorName",
+    "useSecondColor",
+    "parent",
+    "cartPosition",
+    "armed",
+    "flagged",
+    "isRunning",
+    "isPaused",
+    "isLoaded",
+    "isBroken",
+    "isWarning",
+    "isActionRunning",
+    "isAuditioning",
+    "isOverridden",
+    "skipIfDisarmed",
+    "autoLoad",
+    "preWait",
+    "duration",
+    "postWait",
+    "continueMode",
+    "timecodeTrigger",
+    "timecodeTrigger/text",
+    "hasFileTargets",
+    "hasCueTargets",
+    "cueTargetID",
+    "cueTargetNumber",
+    "targetMode",
+    "patchTargetID",
+    "audioMapTargetID",
+)
+
 TECHNICAL_PROFILE = (
     *BASIC_SAFE_PROFILE,
     "notes",
@@ -185,7 +232,9 @@ TECHNICAL_PROFILE = (
     "targetMode",
     "patchTargetID",
     "audioOutputPatchName",
+    "stage",
     "stageName",
+    "stage/regions",
     "networkPatchName",
     "message",
     "messageError",
@@ -201,13 +250,13 @@ HEALTH_PROFILE = (
     "isLoaded",
     "hasFileTargets",
     "hasCueTargets",
-    "fileTarget",
     "cueTargetNumber",
     "patchTargetID",
     "messageError",
 )
 
 PROFILE_PROPERTIES = {
+    "auto": AUTO_COMMON_PROFILE,
     "basic_safe": BASIC_SAFE_PROFILE,
     "basic": (
         "uniqueID",
@@ -243,15 +292,17 @@ PROFILE_PROPERTIES = {
         "isActionRunning",
     ),
     "targets": (
-        "fileTarget",
+        "hasFileTargets",
+        "hasCueTargets",
         "cueTargetID",
         "cueTargetNumber",
         "currentCueTargetID",
         "targetMode",
         "patchTargetID",
+        "audioMapTargetID",
     ),
     "group": tuple(sorted(GROUP_PROPERTIES)),
-    "type_specific": tuple(sorted(TYPE_SPECIFIC_PROPERTIES)),
+    "type_specific": tuple(sorted(TYPE_SPECIFIC_PROPERTIES - SENSITIVE_CUE_PROPERTIES - HEAVY_CUE_PROPERTIES)),
 }
 
 BLOCKED_VALUE_KEYS = {
@@ -293,14 +344,18 @@ def validate_property_path(property_path: str) -> str:
 
 def properties_for_profile(profile: str) -> tuple[str, ...]:
     normalized = profile.strip().lower()
-    if normalized in {"full", "full_sensitive"}:
+    if normalized == "full_sensitive":
+        merged: list[str] = []
+        for key in ("basic", "timing", "status", "targets", "group", "type_specific"):
+            merged.extend(PROFILE_PROPERTIES[key])
+        merged.extend(sorted(SENSITIVE_CUE_PROPERTIES | HEAVY_CUE_PROPERTIES))
+        return tuple(dict.fromkeys(merged))
+    if normalized == "full":
         merged: list[str] = []
         for key in ("basic", "timing", "status", "targets", "group", "type_specific"):
             merged.extend(PROFILE_PROPERTIES[key])
         properties = tuple(dict.fromkeys(merged))
-        if normalized == "full":
-            return tuple(prop for prop in properties if prop not in SENSITIVE_CUE_PROPERTIES)
-        return properties
+        return tuple(prop for prop in properties if prop not in SENSITIVE_CUE_PROPERTIES and prop not in HEAVY_CUE_PROPERTIES)
     if normalized not in PROFILE_PROPERTIES:
         allowed = ", ".join([*PROFILE_PROPERTIES.keys(), "full", "full_sensitive"])
         raise UnsafeCuePropertyError(f"Unknown cue detail profile {profile!r}; use one of: {allowed}")

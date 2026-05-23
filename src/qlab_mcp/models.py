@@ -38,10 +38,37 @@ class WorkspaceOverviewResult(BaseModel):
     cue_count: int
     summary: dict[str, Any]
     cue_lists: list[dict[str, Any]]
+    cue_index: dict[str, Any] | None = None
     limits: dict[str, Any]
     warnings: list[str]
     errors: dict[str, str] | None = None
     live_state: dict[str, Any] | None = None
+
+
+class WorkspaceSettingsResult(BaseModel):
+    """Read-only infrastructure/settings inventory for a QLab workspace."""
+
+    workspace_id: str
+    profile: str
+    sections: dict[str, Any]
+    summary: dict[str, Any]
+    redactions: list[dict[str, str]] = Field(default_factory=list)
+    errors: dict[str, str] | None = None
+
+
+class WorkspaceSettingDetailsResult(BaseModel):
+    """Read-only safe or technical details for one QLab workspace setting item."""
+
+    workspace_id: str
+    section: str
+    kind: str
+    ref: str | None = None
+    profile: str
+    details: Any = None
+    choices: list[dict[str, Any]] = Field(default_factory=list)
+    redactions: list[dict[str, str]] = Field(default_factory=list)
+    errors: dict[str, str] | None = None
+    message: str | None = None
 
 
 class CueQueryResult(BaseModel):
@@ -66,5 +93,9 @@ class CueDetailsResult(BaseModel):
     workspace_id: str
     cue_ref: str
     profile: str
+    cue_type: str | None = None
     properties: dict[str, Any]
+    sections: dict[str, dict[str, Any]] | None = None
     errors: dict[str, str] | None = None
+    active_count: int | None = None
+    message: str | None = None

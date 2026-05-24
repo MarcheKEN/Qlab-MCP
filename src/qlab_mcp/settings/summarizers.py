@@ -381,47 +381,6 @@ def _light_definition_summary(definition: Any) -> dict[str, Any]:
     return summary
 
 
-LIGHT_PATCH_SHEET_COLUMNS = [
-    "name",
-    "comment",
-    "patched",
-    "conflicted",
-    "definition",
-    "manufacturer",
-    "address",
-    "addresses",
-    "output",
-    "output_type",
-    "universe",
-    "subnet",
-    "net",
-    "device",
-    "parameter_count",
-    "parameter_names",
-]
-LIGHT_PATCH_SHEET_TECHNICAL_COLUMNS = {
-    "address",
-    "addresses",
-    "output",
-    "output_type",
-    "universe",
-    "subnet",
-    "net",
-    "device",
-}
-LIGHT_PATCH_FIELD_KEYS = {
-    "address": ("address", "dmxAddress", "startAddress", "startChannel", "channel"),
-    "addresses": ("addresses", "dmxAddresses", "channels"),
-    "output": ("output", "outputName"),
-    "output_type": ("outputType", "outputKind"),
-    "universe": ("universe", "artNetUniverse"),
-    "subnet": ("subnet", "subNet"),
-    "net": ("net", "artNetNet"),
-    "device": ("device", "deviceName", "deviceID", "usbDevice", "usbDeviceName"),
-}
-LIGHT_PATCH_CONTAINER_KEYS = ("patch", "output", "dmx", "artNet", "artnet", "usb")
-
-
 def _first_present_case_insensitive(mapping: dict[str, Any], keys: tuple[str, ...]) -> Any:
     for key in keys:
         if key in mapping and mapping[key] not in (None, ""):
@@ -433,48 +392,8 @@ def _first_present_case_insensitive(mapping: dict[str, Any], keys: tuple[str, ..
     return None
 
 
-def _light_patch_search_contexts(item: dict[str, Any]) -> list[tuple[dict[str, Any], bool]]:
-    contexts: list[tuple[dict[str, Any], bool]] = [(item, False)]
-    for key in LIGHT_PATCH_CONTAINER_KEYS:
-        nested = _first_present_case_insensitive(item, (key,))
-        if isinstance(nested, dict):
-            contexts.append((nested, key.casefold() == "output"))
-    return contexts
-
-
-def _compact_light_patch_value(value: Any) -> Any:
-    if isinstance(value, dict):
-        summary = _basic_item_summary(value)
-        if summary:
-            return summary
-        scalar_items = {key: item for key, item in value.items() if not isinstance(item, (dict, list))}
-        return scalar_items or None
-    if isinstance(value, list) and any(isinstance(item, dict) for item in value):
-        return [_compact_light_patch_value(item) for item in value]
-    return value
-
-
-def _light_patch_field(item: dict[str, Any], field: str) -> Any:
-    for context, is_output_context in _light_patch_search_contexts(item):
-        value = _first_present_case_insensitive(context, LIGHT_PATCH_FIELD_KEYS[field])
-        if value is not None:
-            return _compact_light_patch_value(value)
-        if field == "output_type" and is_output_context:
-            value = _first_present_case_insensitive(context, ("type", "kind"))
-            if value is not None:
-                return _compact_light_patch_value(value)
-    return None
-
-
 def _light_patch_conflicted(item: dict[str, Any]) -> Any:
-    value = _first_present_case_insensitive(item, ("conflicted", "conflict", "conflicts"))
-    if value is not None:
-        return value
-    for context, _is_output_context in _light_patch_search_contexts(item)[1:]:
-        value = _first_present_case_insensitive(context, ("conflicted", "conflict", "conflicts"))
-        if value is not None:
-            return value
-    return None
+    return _first_present_case_insensitive(item, ("conflicted", "conflict", "conflicts"))
 
 
 def _light_instrument_summary(item: Any) -> dict[str, Any]:
@@ -503,48 +422,6 @@ def _light_instrument_summary(item: Any) -> dict[str, Any]:
         if parameter_names:
             summary["parameter_names"] = parameter_names
     return summary
-
-
-def _light_patch_sheet_row(item: Any) -> dict[str, Any]:
-    summary = _light_instrument_summary(item)
-    definition = summary.get("definition")
-    row = {
-        "name": summary.get("name"),
-        "comment": summary.get("comment"),
-        "patched": summary.get("patched"),
-        "conflicted": summary.get("conflicted"),
-        "definition": definition.get("name") if isinstance(definition, dict) else None,
-        "manufacturer": definition.get("manufacturer") if isinstance(definition, dict) else None,
-        "address": None,
-        "addresses": None,
-        "output": None,
-        "output_type": None,
-        "universe": None,
-        "subnet": None,
-        "net": None,
-        "device": None,
-        "parameter_count": summary.get("parameter_count"),
-        "parameter_names": summary.get("parameter_names", []),
-    }
-    if isinstance(item, dict):
-        for field in LIGHT_PATCH_SHEET_TECHNICAL_COLUMNS:
-            row[field] = _light_patch_field(item, field)
-    return row
-
-
-def _light_patch_sheet(value: Any) -> dict[str, Any]:
-    rows_as_dicts = [_light_patch_sheet_row(item) for item in _light_instruments(value)]
-    missing_columns = [
-        column
-        for column in LIGHT_PATCH_SHEET_TECHNICAL_COLUMNS
-        if all(row.get(column) in (None, "", [], {}) for row in rows_as_dicts)
-    ]
-    return {
-        "source": "settings/light/patch",
-        "columns": LIGHT_PATCH_SHEET_COLUMNS,
-        "rows": [[row.get(column) for column in LIGHT_PATCH_SHEET_COLUMNS] for row in rows_as_dicts],
-        "missing_columns": sorted(missing_columns),
-    }
 
 
 def _summarize_light_patch_detail(value: Any) -> dict[str, Any]:

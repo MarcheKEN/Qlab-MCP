@@ -36,6 +36,10 @@ Internal readers are grouped by responsibility:
 - `src/qlab_mcp/settings/` handles workspace settings, summarizers, and redaction.
 - `src/qlab_mcp/runtime/` handles shared reader runtime helpers such as connection diagnostics and read cache.
 
+Project-local agent skills and transcript scratch files are intentionally not
+part of the runtime package. QLab learning/reference material should live in a
+clear documentation or reference location, not at the package root.
+
 ## Tools
 
 | Tool | Use it for | Default shape |
@@ -156,6 +160,8 @@ Notes:
 - `QLAB_REPLY_PORT=0` is useful for automated tests with a fake OSC server.
 - `QLAB_CACHE_TTL=0` disables the short read cache.
 - Live selected/running/active state bypasses the cache.
+- Queries using live state filters such as `isRunning`, `isPaused`, `isLoaded`,
+  `isOverridden`, or `isAuditioning` bypass the cache.
 - Sensitive `technical` and `full_sensitive` reads bypass the cache.
 
 ## Run

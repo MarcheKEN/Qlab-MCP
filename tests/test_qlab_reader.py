@@ -385,6 +385,45 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(client.requests.count("/workspace/ws-1/runningOrPausedCues/shallow"), 2)
         self.assertEqual(client.requests.count(f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys"), 2)
 
+    def test_query_cues_bypasses_cache_for_live_state_filters(self) -> None:
+        shared_read_cache().clear()
+        cue_id = "11111111-1111-4111-8111-111111111111"
+
+        class CountingClient:
+            config = QLabConfig(cache_ttl=10)
+
+            def __init__(self) -> None:
+                self.requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.requests.append(address)
+                if address == "/workspace/ws-1/cueLists/uniqueIDs":
+                    return SimpleNamespace(data=[cue_id], status="ok")
+                return SimpleNamespace(
+                    data={
+                        "uniqueID": cue_id,
+                        "number": "1",
+                        "name": "Intro",
+                        "displayName": "1 Intro",
+                        "listName": "Main",
+                        "type": "Audio",
+                        "armed": True,
+                        "flagged": False,
+                        "colorName": "none",
+                        "isRunning": True,
+                    },
+                    status="ok",
+                )
+
+        client = CountingClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        reader.query_cues("ws-1", "isRunning", True)
+        reader.query_cues("ws-1", "isRunning", True)
+
+        self.assertEqual(client.requests.count("/workspace/ws-1/cueLists/uniqueIDs"), 2)
+        self.assertEqual(client.requests.count(f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys"), 2)
+
     def test_workspace_overview_returns_bounded_first_pass_summary(self) -> None:
         list_id = "11111111-1111-4111-8111-111111111111"
         group_id = "22222222-2222-4222-8222-222222222222"

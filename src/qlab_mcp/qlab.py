@@ -180,12 +180,14 @@ class QLabReader(
         cue_ref: str,
         keys: list[str],
         cache_profile: str | None = None,
+        cacheable: bool = True,
     ) -> dict[str, Any]:
         normalized_keys = validate_value_keys(keys)
         data = self._request_data(
             _cue_address(workspace_id, cue_ref, "valuesForKeys"),
             json.dumps(normalized_keys),
             workspace_id=workspace_id,
+            cacheable=cacheable,
             cache_profile=cache_profile,
         )
         return {

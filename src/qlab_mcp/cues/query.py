@@ -36,6 +36,13 @@ QUERY_FILTERS = {
     "hasPostWait",
     "hasDuration",
 }
+LIVE_STATE_QUERY_FILTERS = {
+    "isRunning",
+    "isPaused",
+    "isLoaded",
+    "isOverridden",
+    "isAuditioning",
+}
 QUERY_FILTER_PROPERTIES = {
     "type": ("type",),
     "flagged": ("flagged",),
@@ -103,6 +110,9 @@ def _normalize_optional_filters(filters: list[dict[str, Any]] | None) -> list[di
             raise ValueError("optional_filters entries require a string filter")
         normalized_filters.append(_normalize_query_filter(filter_name, item.get("value")))
     return normalized_filters
+
+def _query_uses_live_state(filters: list[dict[str, Any]]) -> bool:
+    return any(query_filter["filter"] in LIVE_STATE_QUERY_FILTERS for query_filter in filters)
 
 def _parse_bool_filter(value: Any) -> bool:
     if isinstance(value, bool):
@@ -193,10 +203,12 @@ class CueQueryMixin:
             _normalize_query_filter(primary_filter, primary_value),
             *_normalize_optional_filters(optional_filters),
         ]
+        cacheable = not _query_uses_live_state(filters)
 
         cue_ref_data = self._request_data(
             _workspace_address(workspace_id, "cueLists/uniqueIDs"),
             workspace_id=workspace_id,
+            cacheable=cacheable,
             cache_profile=profile,
         )
         cue_refs = _flatten_cue_refs(cue_ref_data)
@@ -217,7 +229,13 @@ class CueQueryMixin:
                 continue
             scanned_count += 1
             try:
-                values = self.read_cue_values(workspace_id, str(cue_id), keys, cache_profile=profile)["values"]
+                values = self.read_cue_values(
+                    workspace_id,
+                    str(cue_id),
+                    keys,
+                    cache_profile=profile,
+                    cacheable=cacheable,
+                )["values"]
                 if not isinstance(values, dict):
                     raise ValueError("QLab valuesForKeys response must be an object")
             except Exception as exc:

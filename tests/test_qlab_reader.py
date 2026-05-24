@@ -1148,6 +1148,12 @@ class QLabReaderTests(unittest.TestCase):
                                 "comment": "L-101",
                                 "patched": True,
                                 "conflicted": False,
+                                "address": 101,
+                                "output": "Art-Net",
+                                "universe": 2,
+                                "subNet": 1,
+                                "net": 0,
+                                "deviceName": "Lighting Node",
                                 "definition": {
                                     "manufacturer": "Generic",
                                     "name": "Dimmer",
@@ -1165,6 +1171,12 @@ class QLabReaderTests(unittest.TestCase):
                                         "comment": "L-101",
                                         "patched": True,
                                         "conflicted": False,
+                                        "address": 101,
+                                        "output": "Art-Net",
+                                        "universe": 2,
+                                        "subNet": 1,
+                                        "net": 0,
+                                        "deviceName": "Lighting Node",
                                         "definition": {
                                             "manufacturer": "Generic",
                                             "name": "Dimmer",
@@ -1193,6 +1205,153 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["details"]["definition_counts"], {"Generic Dimmer": 1})
         self.assertNotIn('"large": "payload"', serialized)
         self.assertNotIn("\"patch\"", serialized)
+        self.assertNotIn("\"patch_sheet\"", serialized)
+        self.assertNotIn("Lighting Node", serialized)
+        self.assertNotIn("\"universe\"", serialized)
+        self.assertNotIn("\"subnet\"", serialized)
+        self.assertNotIn("\"net\"", serialized)
+
+    def test_workspace_setting_details_technical_light_patch_returns_patch_sheet(self) -> None:
+        class FallbackClient:
+            config = QLabConfig()
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                raise OscTimeoutError("udp too small")
+
+            def request_tcp(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                return SimpleNamespace(
+                    data={
+                        "instruments": [
+                            {
+                                "name": "LX 1",
+                                "comment": "front special",
+                                "patched": True,
+                                "conflicted": True,
+                                "address": 101,
+                                "output": "Art-Net A",
+                                "outputKind": "Art-Net",
+                                "artNet": {"universe": 2, "subNet": 1, "net": 0},
+                                "definition": {
+                                    "manufacturer": "Generic",
+                                    "name": "Dimmer",
+                                    "parameters": {"0": {"name": "intensity"}},
+                                },
+                                "parameters": [{"name": "intensity", "definitionParameter": {"large": "payload"}}],
+                            },
+                            {
+                                "name": "USB 1",
+                                "patched": True,
+                                "conflicts": ["201"],
+                                "addresses": [201, 202],
+                                "output": {"name": "USB Output A", "type": "USB"},
+                                "usb": {"deviceName": "ENTTEC USB Pro"},
+                                "definition": {"manufacturer": "Generic", "name": "Two Channel"},
+                                "parameters": [{"name": "intensity"}, {"name": "strobe"}],
+                            },
+                            {
+                                "name": "Unpatched",
+                                "patched": False,
+                                "definition": {"name": "Dimmer"},
+                            },
+                        ],
+                        "groups": [{"name": "All"}],
+                    }
+                )
+
+        reader = QLabReader(FallbackClient())  # type: ignore[arg-type]
+
+        result = reader.get_workspace_setting_details(
+            "ws-1",
+            section="light",
+            kind="light_patch",
+            profile="technical",
+        )
+
+        self.assertEqual(result["profile"], "technical")
+        self.assertIn("patch", result["details"])
+        self.assertIn("patch_sheet", result["details"])
+        patch_sheet = result["details"]["patch_sheet"]
+        columns = patch_sheet["columns"]
+        rows = patch_sheet["rows"]
+        self.assertEqual(patch_sheet["source"], "settings/light/patch")
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(
+            columns,
+            [
+                "name",
+                "comment",
+                "patched",
+                "conflicted",
+                "definition",
+                "manufacturer",
+                "address",
+                "addresses",
+                "output",
+                "output_type",
+                "universe",
+                "subnet",
+                "net",
+                "device",
+                "parameter_count",
+                "parameter_names",
+            ],
+        )
+        artnet = dict(zip(columns, rows[0], strict=False))
+        usb = dict(zip(columns, rows[1], strict=False))
+        unpatched = dict(zip(columns, rows[2], strict=False))
+        self.assertEqual(artnet["address"], 101)
+        self.assertEqual(artnet["output"], "Art-Net A")
+        self.assertEqual(artnet["output_type"], "Art-Net")
+        self.assertEqual(artnet["universe"], 2)
+        self.assertEqual(artnet["subnet"], 1)
+        self.assertEqual(artnet["net"], 0)
+        self.assertEqual(usb["addresses"], [201, 202])
+        self.assertEqual(usb["output"], {"name": "USB Output A", "type": "USB"})
+        self.assertEqual(usb["output_type"], "USB")
+        self.assertEqual(usb["device"], "ENTTEC USB Pro")
+        self.assertEqual(usb["conflicted"], ["201"])
+        self.assertFalse(unpatched["patched"])
+        self.assertIsNone(unpatched["address"])
+        self.assertEqual(patch_sheet["missing_columns"], [])
+        self.assertIn('"large": "payload"', json.dumps(result))
+
+    def test_workspace_setting_details_technical_light_patch_reports_missing_patch_sheet_columns(self) -> None:
+        class FallbackClient:
+            config = QLabConfig()
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                raise OscTimeoutError("udp too small")
+
+            def request_tcp(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                return SimpleNamespace(
+                    data={
+                        "instruments": [
+                            {
+                                "name": "Unpatched",
+                                "patched": False,
+                                "definition": {"name": "Dimmer"},
+                            }
+                        ],
+                    }
+                )
+
+        reader = QLabReader(FallbackClient())  # type: ignore[arg-type]
+
+        result = reader.get_workspace_setting_details(
+            "ws-1",
+            section="light",
+            kind="light_patch",
+            profile="technical",
+        )
+
+        patch_sheet = result["details"]["patch_sheet"]
+        self.assertEqual(
+            patch_sheet["missing_columns"],
+            ["address", "addresses", "device", "net", "output", "output_type", "subnet", "universe"],
+        )
+        row = dict(zip(patch_sheet["columns"], patch_sheet["rows"][0], strict=False))
+        self.assertFalse(row["patched"])
+        self.assertIsNone(row["address"])
 
     def test_workspace_setting_details_safe_patch_kinds_return_normalized_summaries(self) -> None:
         responses = {

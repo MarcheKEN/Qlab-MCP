@@ -11,6 +11,7 @@ from .summarizers import (
     _basic_item_summary,
     _collection_items,
     _first_present,
+    _light_patch_sheet,
     _select_setting_item,
     _summarize_audio_map,
     _summarize_audio_map_detail,
@@ -342,6 +343,7 @@ class WorkspaceSettingsMixin:
                 summary["read_transport_meaning"] = TCP_FALLBACK_MEANING
         return {
             "summary": summary,
+            "patch_sheet": _light_patch_sheet(patch),
             "patch": _redact_payload(
                 patch,
                 section="light",

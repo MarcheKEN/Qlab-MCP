@@ -3,8 +3,20 @@ from __future__ import annotations
 import asyncio
 
 from fastmcp import Client
+from fastmcp.exceptions import ToolError
 
-from qlab_mcp.server import mcp
+from qlab_mcp.errors import QLabReplyError
+from qlab_mcp.server import (
+    CHECK_CONNECTION_TIMEOUT,
+    CUE_DETAILS_TIMEOUT,
+    QUERY_CUES_TIMEOUT,
+    WORKSPACE_OVERVIEW_TIMEOUT,
+    WORKSPACE_SETTING_DETAILS_TIMEOUT,
+    WORKSPACE_SETTINGS_TIMEOUT,
+    _run_tool,
+    mcp,
+    qlab_query_cues,
+)
 
 
 def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -> None:
@@ -69,3 +81,58 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert details.title == "Get QLab Cue Details"
     assert "valuesForKeys" in details.description
     assert details.annotations.readOnlyHint is True
+
+
+def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
+    async def tool_timeouts():
+        return {
+            name: (await mcp.get_tool(name)).timeout
+            for name in (
+                "qlab_check_connection",
+                "qlab_get_workspace_overview",
+                "qlab_get_workspace_settings",
+                "qlab_get_workspace_setting_details",
+                "qlab_query_cues",
+                "qlab_get_cue_details",
+            )
+        }
+
+    assert mcp._mask_error_details is True
+    assert asyncio.run(tool_timeouts()) == {
+        "qlab_check_connection": CHECK_CONNECTION_TIMEOUT,
+        "qlab_get_workspace_overview": WORKSPACE_OVERVIEW_TIMEOUT,
+        "qlab_get_workspace_settings": WORKSPACE_SETTINGS_TIMEOUT,
+        "qlab_get_workspace_setting_details": WORKSPACE_SETTING_DETAILS_TIMEOUT,
+        "qlab_query_cues": QUERY_CUES_TIMEOUT,
+        "qlab_get_cue_details": CUE_DETAILS_TIMEOUT,
+    }
+
+
+def test_expected_tool_errors_are_sanitized() -> None:
+    def denied_with_sensitive_payload() -> None:
+        raise QLabReplyError(
+            "denied",
+            {"fileTarget": "/Users/stage/secret.wav", "passcode": "1234"},
+            "/workspace/ws-1/settings/network/patchList",
+        )
+
+    try:
+        _run_tool(denied_with_sensitive_payload)
+    except ToolError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("Expected ToolError")
+
+    assert "denied" in message
+    assert "secret.wav" not in message
+    assert "1234" not in message
+    assert "patchList" not in message
+
+
+def test_tool_wrapper_converts_validation_errors_to_tool_error() -> None:
+    try:
+        qlab_query_cues("ws-1", "type", "Audio", max_results=0)
+    except ToolError as exc:
+        assert "max_results must be 1 or greater" in str(exc)
+    else:
+        raise AssertionError("Expected ToolError")

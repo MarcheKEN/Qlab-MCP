@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from collections.abc import Callable
+from typing import Annotated, Any, Literal, TypeVar
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from .errors import (
+    OscProtocolError,
+    OscTimeoutError,
+    QLabMcpError,
+    QLabReplyError,
+    UnsafeCuePropertyError,
+)
 from .models import (
     CueDetailsResult,
     CueQueryResult,
@@ -103,10 +112,19 @@ READ_ONLY_QLAB_TOOL = ToolAnnotations(
     idempotentHint=True,
     openWorldHint=True,
 )
+CHECK_CONNECTION_TIMEOUT = 6.0
+WORKSPACE_OVERVIEW_TIMEOUT = 45.0
+WORKSPACE_SETTINGS_TIMEOUT = 30.0
+WORKSPACE_SETTING_DETAILS_TIMEOUT = 60.0
+QUERY_CUES_TIMEOUT = 60.0
+CUE_DETAILS_TIMEOUT = 20.0
+
+T = TypeVar("T")
 
 
 mcp = FastMCP(
     "QLab Cue Reader",
+    mask_error_details=True,
     instructions="""
 Use these tools to read QLab 5 workspace and cue information over OSC.
 
@@ -131,10 +149,35 @@ def _reader() -> QLabReader:
     return QLabReader()
 
 
+def _safe_tool_error_message(exc: QLabMcpError | ValueError) -> str:
+    if isinstance(exc, QLabReplyError):
+        if exc.status == "denied":
+            return (
+                "QLab denied a read-only OSC request. Check the workspace passcode, OSC permissions, "
+                "or accept the connection prompt in QLab."
+            )
+        return f"QLab returned status {exc.status!r} for a read-only OSC request."
+    if isinstance(exc, OscTimeoutError):
+        return "Timed out waiting for QLab to reply over OSC. Check that QLab is running and OSC is enabled."
+    if isinstance(exc, OscProtocolError):
+        return "QLab returned an invalid or unexpected OSC reply."
+    if isinstance(exc, UnsafeCuePropertyError):
+        return "The requested cue property or profile is not allowed for read-only access."
+    return str(exc)
+
+
+def _run_tool(factory: Callable[[], T]) -> T:
+    try:
+        return factory()
+    except (QLabMcpError, ValueError) as exc:
+        raise ToolError(_safe_tool_error_message(exc)) from exc
+
+
 @mcp.tool(
     title="Check QLab Connection",
     tags={"qlab", "diagnostics", "orientation", "safe-read"},
     annotations=READ_ONLY_QLAB_TOOL,
+    timeout=CHECK_CONNECTION_TIMEOUT,
 )
 def qlab_check_connection(
     workspace_id: Annotated[
@@ -161,8 +204,10 @@ def qlab_check_connection(
 
     Use this before the overview; it reports safe permission evidence and explains edit/control limits.
     """
-    return QlabConnectionCheckResult.model_validate(
-        _reader().check_connection(workspace_id=workspace_id, require_read_access=require_read_access)
+    return _run_tool(
+        lambda: QlabConnectionCheckResult.model_validate(
+            _reader().check_connection(workspace_id=workspace_id, require_read_access=require_read_access)
+        )
     )
 
 
@@ -170,6 +215,7 @@ def qlab_check_connection(
     title="Get QLab Workspace Overview",
     tags={"qlab", "orientation", "structure", "safe-read"},
     annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_OVERVIEW_TIMEOUT,
 )
 def qlab_get_workspace_overview(
     workspace_id: Annotated[
@@ -246,15 +292,17 @@ def qlab_get_workspace_overview(
 
     Use this as the first structural read after selecting a workspace; it is bounded and shallow by default.
     """
-    return WorkspaceOverviewResult.model_validate(
-        _reader().get_workspace_overview(
-            workspace_id=workspace_id,
-            max_depth=max_depth,
-            max_cues=max_cues,
-            include_live_state=include_live_state,
-            include_cue_index=include_cue_index,
-            max_index_cues=max_index_cues,
-            cue_index_profile=cue_index_profile,
+    return _run_tool(
+        lambda: WorkspaceOverviewResult.model_validate(
+            _reader().get_workspace_overview(
+                workspace_id=workspace_id,
+                max_depth=max_depth,
+                max_cues=max_cues,
+                include_live_state=include_live_state,
+                include_cue_index=include_cue_index,
+                max_index_cues=max_index_cues,
+                cue_index_profile=cue_index_profile,
+            )
         )
     )
 
@@ -263,6 +311,7 @@ def qlab_get_workspace_overview(
     title="Get QLab Workspace Settings",
     tags={"qlab", "settings", "patches", "routing", "inventory", "safe-read"},
     annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
 )
 def qlab_get_workspace_settings(
     workspace_id: WorkspaceId,
@@ -283,10 +332,12 @@ def qlab_get_workspace_settings(
     it returns names, IDs, counts, relationships, connection state, and redaction metadata, but it does not
     read the full light patch or raw hardware payloads.
     """
-    return WorkspaceSettingsResult.model_validate(
-        _reader().get_workspace_settings(
-            workspace_id=workspace_id,
-            sections=sections,
+    return _run_tool(
+        lambda: WorkspaceSettingsResult.model_validate(
+            _reader().get_workspace_settings(
+                workspace_id=workspace_id,
+                sections=sections,
+            )
         )
     )
 
@@ -295,6 +346,7 @@ def qlab_get_workspace_settings(
     title="Get QLab Workspace Setting Details",
     tags={"qlab", "settings", "patches", "routing", "details", "safe-read"},
     annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTING_DETAILS_TIMEOUT,
 )
 def qlab_get_workspace_setting_details(
     workspace_id: WorkspaceId,
@@ -339,13 +391,15 @@ def qlab_get_workspace_setting_details(
     indexes, video stages become stage/region/route summaries, and audio maps omit long level arrays. Use
     technical only for explicit low-level audits.
     """
-    return WorkspaceSettingDetailsResult.model_validate(
-        _reader().get_workspace_setting_details(
-            workspace_id=workspace_id,
-            section=section,
-            kind=kind,
-            ref=ref,
-            profile=profile,
+    return _run_tool(
+        lambda: WorkspaceSettingDetailsResult.model_validate(
+            _reader().get_workspace_setting_details(
+                workspace_id=workspace_id,
+                section=section,
+                kind=kind,
+                ref=ref,
+                profile=profile,
+            )
         )
     )
 
@@ -354,6 +408,7 @@ def qlab_get_workspace_setting_details(
     title="Query QLab Cues",
     tags={"qlab", "query", "inventory", "details", "safe-read"},
     annotations=READ_ONLY_QLAB_TOOL,
+    timeout=QUERY_CUES_TIMEOUT,
 )
 def qlab_query_cues(
     workspace_id: WorkspaceId,
@@ -421,15 +476,17 @@ def qlab_query_cues(
     500 returned matches and 500 scanned cue IDs by default so agents stay compact. Callers can explicitly
     raise either limit up to 5000 for large shows; truncation metadata reports incomplete scans or result caps.
     """
-    return CueQueryResult.model_validate(
-        _reader().query_cues(
-            workspace_id=workspace_id,
-            primary_filter=primary_filter,
-            primary_value=primary_value,
-            optional_filters=optional_filters,
-            profile=profile,
-            max_results=max_results,
-            max_cues_scanned=max_cues_scanned,
+    return _run_tool(
+        lambda: CueQueryResult.model_validate(
+            _reader().query_cues(
+                workspace_id=workspace_id,
+                primary_filter=primary_filter,
+                primary_value=primary_value,
+                optional_filters=optional_filters,
+                profile=profile,
+                max_results=max_results,
+                max_cues_scanned=max_cues_scanned,
+            )
         )
     )
 
@@ -438,6 +495,7 @@ def qlab_query_cues(
     title="Get QLab Cue Details",
     tags={"qlab", "details", "diagnostics", "safe-read"},
     annotations=READ_ONLY_QLAB_TOOL,
+    timeout=CUE_DETAILS_TIMEOUT,
 )
 def qlab_get_cue_details(
     workspace_id: WorkspaceId,
@@ -457,7 +515,11 @@ def qlab_get_cue_details(
 
     Use auto for safe type-aware inspection, health for warnings, and technical/full_sensitive only when justified.
     """
-    return CueDetailsResult.model_validate(_reader().get_cue_details(workspace_id, cue_ref, profile))
+    return _run_tool(
+        lambda: CueDetailsResult.model_validate(
+            _reader().get_cue_details(workspace_id, cue_ref, profile)
+        )
+    )
 
 
 def main() -> None:

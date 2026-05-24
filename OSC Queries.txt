@@ -1,7 +1,0 @@
-﻿This project keeps the canonical OSC Queries copy at:
-
-references/qlab/OSC Queries.txt
-
-The qlab-osc-guide skill also contains its own bundled snapshot under:
-
-skills/qlab-osc-guide/references/osc-queries.txt

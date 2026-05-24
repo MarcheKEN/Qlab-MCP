@@ -1,4 +1,0 @@
-interface:
-  display_name: "QLab 5 Manual"
-  short_description: "Navigate and apply QLab 5 documentation"
-  default_prompt: "Use $qlab-5-manual to help me understand how QLab 5 works using the official manual."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "FastMCP Python"
-  short_description: "Build Python MCP servers with FastMCP"
-  default_prompt: "Use $fastmcp-python to help me build, test, or understand a FastMCP Python MCP server."

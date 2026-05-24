@@ -12,6 +12,7 @@ class QLabConfig:
     osc_port: int = 53000
     reply_port: int = 53001
     timeout: float = 2.0
+    cache_ttl: float = 10.0
     passcode: str | None = None
 
     @classmethod
@@ -21,5 +22,6 @@ class QLabConfig:
             osc_port=int(os.getenv("QLAB_OSC_PORT", "53000")),
             reply_port=int(os.getenv("QLAB_REPLY_PORT", "53001")),
             timeout=float(os.getenv("QLAB_TIMEOUT", "2.0")),
+            cache_ttl=float(os.getenv("QLAB_CACHE_TTL", "10.0")),
             passcode=os.getenv("QLAB_PASSCODE") or None,
         )

@@ -9,9 +9,9 @@ import threading
 import time
 from typing import Any
 
-from .config import QLabConfig
-from .errors import OscProtocolError, OscTimeoutError, QLabReplyError
-from .osc import decode_message, encode_message
+from ..config import QLabConfig
+from ..errors import OscProtocolError, OscTimeoutError, QLabReplyError
+from .messages import decode_message, encode_message
 
 
 SLIP_END = 0xC0

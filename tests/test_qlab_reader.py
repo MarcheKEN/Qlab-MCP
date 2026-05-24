@@ -643,6 +643,10 @@ class QLabReaderTests(unittest.TestCase):
                 [cue_id, "1.1", "Warm wash", "Warm wash", "Light", "Warm wash", list_id, group_id, 2, False, True, "blue", True, False, 2, "auto_follow"],
             ],
         )
+        self.assertEqual(result["editorial_health"]["source"], "cue_index")
+        self.assertEqual(result["editorial_health"]["inspected_cues"], 3)
+        self.assertEqual(result["editorial_health"]["number_empty"]["count"], 1)
+        self.assertEqual(result["editorial_health"]["ambiguous_label"]["count"], 0)
 
     def test_workspace_overview_cue_index_minimal_profile_is_default(self) -> None:
         cue_id = "11111111-1111-4111-8111-111111111111"
@@ -672,10 +676,58 @@ class QLabReaderTests(unittest.TestCase):
             ["uniqueID", "number", "name", "displayName", "type", "listName", "cue_list_id", "parent_id", "depth"],
         )
         self.assertEqual(result["cue_index"]["rows"], [[cue_id, "1", "Intro", "1 Intro", "Audio", "Main", None, None, 0]])
+        self.assertEqual(result["editorial_health"]["name_empty"]["count"], 0)
         self.assertEqual(
             json.loads(server.received_args[-1][0]),
             ["uniqueID", "number", "name", "displayName", "type", "listName"],
         )
+
+    def test_workspace_overview_editorial_health_finds_empty_duplicate_and_ambiguous_labels(self) -> None:
+        cue_1 = "11111111-1111-4111-8111-111111111111"
+        cue_2 = "22222222-2222-4222-8222-222222222222"
+        cue_3 = "33333333-3333-4333-8333-333333333333"
+        responses = {
+            "/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5", "port": 53000}],
+            "/workspace/ws-1/cueLists/shallow": [],
+            "/workspace/ws-1/cueLists/uniqueIDs": [cue_1, cue_2, cue_3],
+            f"/workspace/ws-1/cue_id/{cue_1}/valuesForKeys": {
+                "uniqueID": cue_1,
+                "number": "",
+                "name": "",
+                "displayName": "",
+                "type": "Audio",
+                "listName": "Main",
+            },
+            f"/workspace/ws-1/cue_id/{cue_2}/valuesForKeys": {
+                "uniqueID": cue_2,
+                "number": "1",
+                "name": "Hit",
+                "displayName": "Hit",
+                "type": "Audio",
+                "listName": "Main",
+            },
+            f"/workspace/ws-1/cue_id/{cue_3}/valuesForKeys": {
+                "uniqueID": cue_3,
+                "number": "1",
+                "name": "Hit",
+                "displayName": "¿?",
+                "type": "Audio",
+                "listName": "Main",
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_overview("ws-1")
+
+        editorial = result["editorial_health"]
+        self.assertEqual(editorial["name_empty"]["count"], 1)
+        self.assertEqual(editorial["displayName_empty"]["count"], 1)
+        self.assertEqual(editorial["number_empty"]["count"], 1)
+        self.assertEqual(editorial["ambiguous_label"]["count"], 1)
+        self.assertEqual(editorial["duplicate_names"]["group_count"], 1)
+        self.assertEqual(editorial["duplicate_names"]["cue_count"], 2)
+        self.assertEqual(editorial["duplicate_numbers"]["group_count"], 1)
 
     def test_workspace_overview_marks_cue_index_truncation(self) -> None:
         cue_1 = "11111111-1111-4111-8111-111111111111"
@@ -866,6 +918,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertNotIn("SECRET-SERIAL", serialized)
         self.assertNotIn("SECRET-HANDLE", serialized)
         self.assertNotIn("1234", serialized)
+        self.assertTrue(all("impact" in redaction for redaction in result["redactions"]))
         self.assertEqual(
             server.received,
             [
@@ -906,6 +959,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertNotIn("9999", serialized)
         self.assertEqual(result["details"]["destinations"][0]["passcode"], "[redacted]")
         self.assertEqual(result["redactions"][0]["reason"], "credential")
+        self.assertIn("credential", result["redactions"][0]["impact"])
         self.assertEqual(server.received, ["/workspace/ws-1/settings/network/patchList"])
 
     def test_workspace_settings_overview_skips_light_patch(self) -> None:
@@ -1132,11 +1186,12 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["profile"], "safe")
         self.assertEqual(result["details"]["summary"]["instrument_count"], 1)
         self.assertEqual(result["details"]["summary"]["read_transport"], "tcp_fallback")
+        self.assertIn("large response", result["details"]["summary"]["read_transport_meaning"])
         self.assertEqual(result["details"]["groups"][0]["instrument_names"], ["1"])
         self.assertEqual(result["details"]["instrument_index"]["rows"][0][0], "1")
         self.assertEqual(len(result["details"]["instrument_index"]["rows"]), 1)
         self.assertEqual(result["details"]["definition_counts"], {"Generic Dimmer": 1})
-        self.assertNotIn("large", serialized)
+        self.assertNotIn('"large": "payload"', serialized)
         self.assertNotIn("\"patch\"", serialized)
 
     def test_workspace_setting_details_safe_patch_kinds_return_normalized_summaries(self) -> None:
@@ -1266,6 +1321,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIsNone(result["errors"])
         self.assertEqual(result["details"]["summary"]["instrument_count"], 1)
         self.assertEqual(result["details"]["summary"]["read_transport"], "tcp_fallback")
+        self.assertIn("does not imply output failure", result["details"]["summary"]["read_transport_meaning"])
 
     def test_workspace_setting_details_light_patch_tcp_fallback_handles_large_payload(self) -> None:
         class FallbackClient:
@@ -1293,6 +1349,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIsNone(result["errors"])
         self.assertEqual(result["details"]["summary"]["instrument_count"], 250)
         self.assertEqual(result["details"]["summary"]["read_transport"], "tcp_fallback")
+        self.assertIn("TCP was used", result["details"]["summary"]["read_transport_meaning"])
         self.assertEqual(len(result["details"]["instrument_index"]["rows"]), 250)
 
     def test_agent_style_read_flow(self) -> None:
@@ -1615,6 +1672,64 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["cues"][0]["uniqueID"], cue_1)
         self.assertEqual(result["cues"][0]["continueMode"], "auto_follow")
         self.assertEqual(result["cues"][0]["continueModeLabel"], "auto_follow")
+
+    def test_query_cues_supports_editorial_health_filters(self) -> None:
+        cue_1 = "11111111-1111-4111-8111-111111111111"
+        cue_2 = "22222222-2222-4222-8222-222222222222"
+        cue_3 = "33333333-3333-4333-8333-333333333333"
+        responses = {
+            "/workspace/ws-1/cueLists/uniqueIDs": [cue_1, cue_2, cue_3],
+            f"/workspace/ws-1/cue_id/{cue_1}/valuesForKeys": {
+                "uniqueID": cue_1,
+                "number": "",
+                "name": "",
+                "displayName": "",
+                "type": "Audio",
+                "armed": True,
+                "flagged": False,
+                "isBroken": False,
+            },
+            f"/workspace/ws-1/cue_id/{cue_2}/valuesForKeys": {
+                "uniqueID": cue_2,
+                "number": "1",
+                "name": "Clean",
+                "displayName": "1 Clean",
+                "type": "Audio",
+                "armed": True,
+                "flagged": False,
+                "isBroken": False,
+            },
+            f"/workspace/ws-1/cue_id/{cue_3}/valuesForKeys": {
+                "uniqueID": cue_3,
+                "number": "2",
+                "name": "Flagged",
+                "displayName": "¿?",
+                "type": "Audio",
+                "armed": True,
+                "flagged": True,
+                "isBroken": False,
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            empty = reader.query_cues("ws-1", "name_empty", True)
+            clean = reader.query_cues(
+                "ws-1",
+                "type",
+                "Audio",
+                optional_filters=[{"filter": "name_empty", "value": False}],
+            )
+            ambiguous = reader.query_cues("ws-1", "ambiguous_label", True)
+            flagged_or_broken = reader.query_cues("ws-1", "flagged_or_broken", True)
+
+        self.assertEqual(empty["matched_count"], 1)
+        self.assertEqual(empty["cues"][0]["uniqueID"], cue_1)
+        self.assertEqual(clean["matched_count"], 2)
+        self.assertEqual(ambiguous["matched_count"], 1)
+        self.assertEqual(ambiguous["cues"][0]["uniqueID"], cue_3)
+        self.assertEqual(flagged_or_broken["matched_count"], 1)
+        self.assertEqual(flagged_or_broken["cues"][0]["uniqueID"], cue_3)
 
     def test_query_cues_no_results_is_not_an_error(self) -> None:
         cue_id = "11111111-1111-4111-8111-111111111111"
@@ -2161,6 +2276,8 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["properties"]["fileTargetPresent"])
         self.assertNotIn("fileTarget", result["properties"])
         self.assertEqual(result["properties"]["health_summary"]["status"], "broken")
+        self.assertIn("file_target_present_but_broken", result["properties"]["health_summary"]["probable_causes"])
+        self.assertEqual(result["properties"]["health_summary"]["confidence"], "derived")
 
     def test_targets_profile_redacts_file_target_but_reports_presence(self) -> None:
         responses = {
@@ -2187,19 +2304,28 @@ class QLabReaderTests(unittest.TestCase):
                 {"type": "Cue List", "isBroken": True, "isWarning": False},
                 "broken",
                 "Container reports",
+                "broken_child_cue_likely",
             ),
             (
                 {"type": "Network", "isBroken": False, "isWarning": False, "messageError": "Bad OSC"},
                 "attention",
                 "Network/message error",
+                "network_message_error",
+            ),
+            (
+                {"type": "Light", "isBroken": True, "isWarning": False},
+                "broken",
+                "Light cue reports",
+                "light_cue_reported_broken",
             ),
             (
                 {"type": "Audio", "isBroken": False, "isWarning": False},
                 "ok",
                 None,
+                None,
             ),
         ]
-        for values, status, message_fragment in cases:
+        for values, status, message_fragment, probable_cause in cases:
             with self.subTest(status=status):
                 responses = {"/workspace/ws-1/cue/10/valuesForKeys": values}
                 with FakeQlabOscServer(responses) as server:
@@ -2209,10 +2335,15 @@ class QLabReaderTests(unittest.TestCase):
 
                 summary = result["properties"]["health_summary"]
                 self.assertEqual(summary["status"], status)
+                self.assertEqual(summary["confidence"], "derived")
+                self.assertIn("evidence", summary)
                 if message_fragment is None:
                     self.assertEqual(summary["messages"], [])
                 else:
                     self.assertIn(message_fragment, summary["messages"][0])
+                    self.assertIn(probable_cause, summary["probable_causes"])
+                    self.assertTrue(summary["diagnostic_hints"])
+                    self.assertTrue(summary["needs_human_check"])
 
     def test_technical_profile_can_return_file_target(self) -> None:
         responses = {

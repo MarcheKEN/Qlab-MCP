@@ -39,6 +39,7 @@ class WorkspaceOverviewResult(BaseModel):
     summary: dict[str, Any]
     cue_lists: list[dict[str, Any]]
     cue_index: dict[str, Any] | None = None
+    editorial_health: dict[str, Any] | None = None
     limits: dict[str, Any]
     warnings: list[str]
     errors: dict[str, str] | None = None

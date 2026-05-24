@@ -60,6 +60,8 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert query.inputSchema["properties"]["max_results"]["maximum"] == 5000
     assert query.inputSchema["properties"]["max_cues_scanned"]["default"] == 500
     assert query.inputSchema["properties"]["max_cues_scanned"]["maximum"] == 5000
+    query_filters = set(query.inputSchema["properties"]["primary_filter"]["enum"])
+    assert {"name_empty", "displayName_empty", "number_empty", "ambiguous_label", "flagged_or_broken"} <= query_filters
     assert query.annotations.readOnlyHint is True
     assert query.annotations.destructiveHint is False
 

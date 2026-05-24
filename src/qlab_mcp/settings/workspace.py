@@ -28,6 +28,10 @@ from .summarizers import (
 
 WORKSPACE_SETTINGS_SECTIONS = ("audio", "video", "network", "midi", "light", "general")
 WORKSPACE_SETTINGS_PROFILES = {"safe", "technical"}
+TCP_FALLBACK_MEANING = (
+    "TCP was used to retrieve a large response after UDP could not return it; "
+    "this does not imply output failure, missing controllers, or degraded physical playback."
+)
 WORKSPACE_SETTING_DETAIL_KINDS = {
     "all",
     "output_patch",
@@ -327,11 +331,15 @@ class WorkspaceSettingsMixin:
             detail = _summarize_light_patch_detail(patch)
             if read_transport:
                 detail["summary"]["read_transport"] = read_transport
+                if read_transport == "tcp_fallback":
+                    detail["summary"]["read_transport_meaning"] = TCP_FALLBACK_MEANING
             return detail
 
         summary = _summarize_light_patch(patch)
         if read_transport:
             summary["read_transport"] = read_transport
+            if read_transport == "tcp_fallback":
+                summary["read_transport_meaning"] = TCP_FALLBACK_MEANING
         return {
             "summary": summary,
             "patch": _redact_payload(

@@ -251,23 +251,58 @@ def _health_summary(values: dict[str, Any]) -> dict[str, Any] | None:
 
     is_broken = _coerce_qlab_bool(values.get("isBroken")) is True
     is_warning = _coerce_qlab_bool(values.get("isWarning")) is True
+    file_target_present = _coerce_qlab_bool(values.get("fileTargetPresent")) is True
     cue_type = str(values.get("type") or "").strip()
     normalized_type = cue_type.casefold()
     messages: list[str] = []
+    evidence: list[str] = []
+    probable_causes: list[str] = []
+    diagnostic_hints: list[str] = []
+    needs_human_check: list[str] = []
+
+    if cue_type:
+        evidence.append(f"type={cue_type}")
+    if has_broken:
+        evidence.append(f"isBroken={str(is_broken).lower()}")
+    if has_warning:
+        evidence.append(f"isWarning={str(is_warning).lower()}")
+    if "fileTargetPresent" in values:
+        evidence.append(f"fileTargetPresent={str(file_target_present).lower()}")
 
     if is_broken and normalized_type in {"cue list", "cue cart", "group"}:
         messages.append("Container reports a broken state, likely inherited from one or more broken child cues.")
-    elif is_broken and values.get("fileTargetPresent"):
+        probable_causes.append("broken_child_cue_likely")
+        diagnostic_hints.append("Query or expand child cues with isBroken=true before editing the container.")
+        needs_human_check.append("Open QLab Workspace Status or expand the container to confirm which child cue is broken.")
+    elif is_broken and file_target_present:
         messages.append("File target exists but the cue is broken; likely missing, unavailable, or incompatible media.")
+        probable_causes.append("file_target_present_but_broken")
+        diagnostic_hints.append("Inspect the cue with profile='technical' only if the exact media path is needed.")
+        needs_human_check.append("Check that the media volume is mounted and the target file is reachable and supported by QLab.")
+    elif is_broken and normalized_type == "light":
+        messages.append("Light cue reports a broken state.")
+        probable_causes.append("light_cue_reported_broken")
+        diagnostic_hints.append("Inspect the light cue command and the workspace light patch before changing cues.")
+        needs_human_check.append("Check QLab license, light patch, and physical DMX/Art-Net/sACN output in QLab.")
     elif is_broken:
         messages.append("Cue reports a broken state.")
+        probable_causes.append("cue_reported_broken")
+        diagnostic_hints.append("Inspect the cue with profile='auto' or 'technical' to gather type-specific context.")
+        needs_human_check.append("Open QLab Workspace Status for the exact human-facing reason.")
 
     if is_warning:
         messages.append("Cue reports a warning state.")
+        probable_causes.append("cue_reported_warning")
+        diagnostic_hints.append("Review this cue in QLab before assuming the warning affects playback.")
+        needs_human_check.append("Decide whether this warning is operationally relevant for the show.")
 
     message_error = values.get("messageError")
     if message_error not in (None, ""):
+        evidence.append("messageError_present")
         messages.append(f"Network/message error reported: {message_error}")
+        probable_causes.append("network_message_error")
+        diagnostic_hints.append("Inspect the network patch and message payload before assuming the receiver is reachable.")
+        needs_human_check.append("Confirm the target application or device receives the network message.")
 
     if is_broken and is_warning:
         status = "broken_warning"
@@ -280,7 +315,15 @@ def _health_summary(values: dict[str, Any]) -> dict[str, Any] | None:
     else:
         status = "ok"
 
-    return {"status": status, "messages": messages}
+    return {
+        "status": status,
+        "messages": messages,
+        "evidence": evidence,
+        "probable_causes": probable_causes,
+        "diagnostic_hints": diagnostic_hints,
+        "needs_human_check": needs_human_check,
+        "confidence": "derived",
+    }
 
 
 def _normalized_cue_type(cue_type: Any) -> str:

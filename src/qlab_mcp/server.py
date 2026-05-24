@@ -59,6 +59,11 @@ CueQueryFilter = Literal[
     "hasPreWait",
     "hasPostWait",
     "hasDuration",
+    "name_empty",
+    "displayName_empty",
+    "number_empty",
+    "ambiguous_label",
+    "flagged_or_broken",
 ]
 WorkspaceSettingsSection = Literal["audio", "video", "network", "midi", "light", "general"]
 WorkspaceSettingsProfile = Literal["safe", "technical"]
@@ -359,7 +364,8 @@ def qlab_query_cues(
                 "Required first filter. Supported filters: type, flagged, armed, disarmed, isBroken, isWarning, "
                 "isRunning, isPaused, isLoaded, isOverridden, isAuditioning, colorName, name_contains, "
                 "number_prefix, cue_list_id, parent_id, hasFileTargets, hasCueTargets, skipIfDisarmed, "
-                "autoLoad, continueMode, hasPreWait, hasPostWait, hasDuration."
+                "autoLoad, continueMode, hasPreWait, hasPostWait, hasDuration, name_empty, "
+                "displayName_empty, number_empty, ambiguous_label, flagged_or_broken."
             ),
         ),
     ],

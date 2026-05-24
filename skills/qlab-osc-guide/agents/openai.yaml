@@ -1,4 +1,0 @@
-interface:
-  display_name: "QLab OSC Guide"
-  short_description: "Use QLab OSC dictionary and query references"
-  default_prompt: "Use $qlab-osc-guide to help me build or understand QLab OSC messages from the included references."

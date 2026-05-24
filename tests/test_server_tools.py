@@ -32,6 +32,8 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     overview = tools["qlab_get_workspace_overview"]
     assert overview.title == "Get QLab Workspace Overview"
     assert "first structural read" in overview.description
+    assert overview.inputSchema["properties"]["cue_index_profile"]["default"] == "minimal"
+    assert overview.inputSchema["properties"]["max_index_cues"]["maximum"] == 5000
     assert overview.annotations.readOnlyHint is True
     assert overview.annotations.destructiveHint is False
     assert overview.annotations.idempotentHint is True
@@ -55,9 +57,9 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert query.title == "Query QLab Cues"
     assert "optional AND filters" in query.description
     assert query.inputSchema["properties"]["max_results"]["default"] == 500
-    assert query.inputSchema["properties"]["max_results"]["maximum"] == 500
+    assert query.inputSchema["properties"]["max_results"]["maximum"] == 5000
     assert query.inputSchema["properties"]["max_cues_scanned"]["default"] == 500
-    assert query.inputSchema["properties"]["max_cues_scanned"]["maximum"] == 500
+    assert query.inputSchema["properties"]["max_cues_scanned"]["maximum"] == 5000
     assert query.annotations.readOnlyHint is True
     assert query.annotations.destructiveHint is False
 

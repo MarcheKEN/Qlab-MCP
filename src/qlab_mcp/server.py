@@ -33,6 +33,7 @@ CueProfile = Literal[
     "full",
     "full_sensitive",
 ]
+CueIndexProfile = Literal["minimal", "health"]
 CueQueryFilter = Literal[
     "type",
     "flagged",
@@ -114,7 +115,7 @@ Use qlab_get_workspace_settings when you need compact infrastructure/settings in
 
 Use qlab_get_workspace_setting_details after settings when you need one specific patch, stage, route, map, or light patch. Use profile="safe" first for compact normalized details; use profile="technical" only when raw routing/device diagnostics are justified.
 
-Use qlab_query_cues for filtered cue searches across up to 500 cues, then qlab_get_cue_details for one cue that needs deeper inspection.
+Use qlab_query_cues for filtered cue searches across up to 500 cues by default, or up to 5000 cues when a caller explicitly raises the scan limit, then qlab_get_cue_details for one cue that needs deeper inspection.
 
 The public interface is intentionally limited to six read-only tools. Internal OSC reads for workspaces, cue lists, children, values, and settings are composed behind them.
 """,
@@ -226,6 +227,15 @@ def qlab_get_workspace_overview(
             ),
         ),
     ] = 1000,
+    cue_index_profile: Annotated[
+        CueIndexProfile,
+        Field(
+            description=(
+                "Cue index shape. minimal returns identity and position columns; health adds armed, flagged, "
+                "color, broken/warning, and continue-mode diagnostics."
+            ),
+        ),
+    ] = "minimal",
 ) -> WorkspaceOverviewResult:
     """Map what the QLab show contains and how cue lists, groups, and cues are organized.
 
@@ -239,6 +249,7 @@ def qlab_get_workspace_overview(
             include_live_state=include_live_state,
             include_cue_index=include_cue_index,
             max_index_cues=max_index_cues,
+            cue_index_profile=cue_index_profile,
         )
     )
 
@@ -384,7 +395,7 @@ def qlab_query_cues(
         int,
         Field(
             ge=1,
-            le=500,
+            le=5000,
             description="Maximum matching cues to return. Scanning may continue past this to report matched_count.",
         ),
     ] = 500,
@@ -392,7 +403,7 @@ def qlab_query_cues(
         int,
         Field(
             ge=1,
-            le=500,
+            le=5000,
             description="Maximum cue IDs to scan from cueLists/uniqueIDs before marking the result truncated.",
         ),
     ] = 500,
@@ -401,7 +412,8 @@ def qlab_query_cues(
 
     Use this after the overview to find cue sets such as Audio cues, Light cues, flagged cues, broken cues,
     warnings, media-target cues, cue-target transport cues, or named/numbered ranges. Results are capped at
-    500 returned matches and 500 scanned cue IDs so agents can inspect large shows without unbounded reads.
+    500 returned matches and 500 scanned cue IDs by default so agents stay compact. Callers can explicitly
+    raise either limit up to 5000 for large shows; truncation metadata reports incomplete scans or result caps.
     """
     return CueQueryResult.model_validate(
         _reader().query_cues(

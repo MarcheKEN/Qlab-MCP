@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import struct
 from typing import Any
 
-from .errors import OscProtocolError
+from ..errors import OscProtocolError
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from qlab_mcp.client import QLabOscClient, _slip_decode, _slip_encode
+from qlab_mcp.osc.client import QLabOscClient, _slip_decode, _slip_encode
 from qlab_mcp.errors import OscProtocolError
 from qlab_mcp.osc import decode_message, encode_message
 

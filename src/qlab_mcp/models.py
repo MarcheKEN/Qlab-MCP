@@ -82,6 +82,9 @@ class CueQueryResult(BaseModel):
     returned_count: int
     total_cue_ids: int
     truncated: bool
+    truncation_reasons: list[str] = Field(default_factory=list)
+    scanned_all_cues: bool
+    result_limited: bool
     limits: dict[str, Any]
     cues: list[dict[str, Any]]
     errors: dict[str, str] | None = None

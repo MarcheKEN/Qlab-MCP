@@ -12,11 +12,12 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from qlab_mcp.allowlist import properties_for_profile, validate_property_path, validate_value_keys
-from qlab_mcp.client import QLabOscClient
+from qlab_mcp.osc.client import QLabOscClient
 from qlab_mcp.config import QLabConfig
 from qlab_mcp.errors import OscTimeoutError, QLabReplyError, UnsafeCuePropertyError
 from qlab_mcp.osc import decode_message, encode_message
 from qlab_mcp.qlab import QLabReader
+from qlab_mcp.runtime.read_cache import shared_read_cache
 
 
 class FakeQlabOscServer:
@@ -81,6 +82,9 @@ def client_for(server: FakeQlabOscServer, timeout: float = 0.25) -> QLabOscClien
 
 
 class QLabReaderTests(unittest.TestCase):
+    def setUp(self) -> None:
+        shared_read_cache().clear()
+
     def test_get_workspaces(self) -> None:
         workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5", "port": 53000}]
         with FakeQlabOscServer({"/workspaces": workspaces}) as server:
@@ -281,6 +285,106 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["cue_ids"], ["list-id", "cue-id"])
         self.assertNotIn("cues", result)
 
+    def test_read_cache_reuses_workspace_cue_ids_between_overview_and_query(self) -> None:
+        cue_id = "11111111-1111-4111-8111-111111111111"
+
+        class CountingClient:
+            config = QLabConfig(cache_ttl=10)
+
+            def __init__(self) -> None:
+                self.requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.requests.append(address)
+                responses = {
+                    "/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}],
+                    "/workspace/ws-1/cueLists/shallow": [],
+                    "/workspace/ws-1/cueLists/uniqueIDs": [cue_id],
+                    f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys": {
+                        "uniqueID": cue_id,
+                        "number": "1",
+                        "name": "Intro",
+                        "displayName": "1 Intro",
+                        "listName": "Main",
+                        "type": "Audio",
+                        "armed": True,
+                        "flagged": False,
+                        "colorName": "none",
+                    },
+                }
+                return SimpleNamespace(data=responses[address], status="ok")
+
+        client = CountingClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        reader.get_workspace_overview("ws-1", include_cue_index=False)
+        reader.query_cues("ws-1", "type", "Audio")
+
+        self.assertEqual(client.requests.count("/workspace/ws-1/cueLists/uniqueIDs"), 1)
+
+    def test_read_cache_can_be_disabled_with_zero_ttl(self) -> None:
+        class CountingClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def __init__(self) -> None:
+                self.requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.requests.append(address)
+                return SimpleNamespace(data=["cue-id"], status="ok")
+
+        client = CountingClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        reader.get_workspace_cue_ids("ws-1")
+        reader.get_workspace_cue_ids("ws-1")
+
+        self.assertEqual(client.requests, ["/workspace/ws-1/cueLists/uniqueIDs", "/workspace/ws-1/cueLists/uniqueIDs"])
+
+    def test_read_cache_bypasses_live_state_and_sensitive_profiles(self) -> None:
+        cue_id = "11111111-1111-4111-8111-111111111111"
+
+        class CountingClient:
+            config = QLabConfig(cache_ttl=10)
+
+            def __init__(self) -> None:
+                self.requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.requests.append(address)
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(data=[], status="ok")
+                if address == "/workspace/ws-1/cueLists/uniqueIDs":
+                    return SimpleNamespace(data=[cue_id], status="ok")
+                if address in {"/workspace/ws-1/selectedCues/shallow", "/workspace/ws-1/runningOrPausedCues/shallow"}:
+                    return SimpleNamespace(data=[], status="ok")
+                return SimpleNamespace(
+                    data={
+                        "uniqueID": cue_id,
+                        "number": "1",
+                        "name": "Intro",
+                        "displayName": "1 Intro",
+                        "type": "Audio",
+                        "notes": "private note",
+                        "fileTarget": "/private/media.wav",
+                    },
+                    status="ok",
+                )
+
+        client = CountingClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        reader.get_workspace_overview("ws-1", include_live_state=True, include_cue_index=False)
+        reader.get_workspace_overview("ws-1", include_live_state=True, include_cue_index=False)
+        reader.get_cue_details("ws-1", cue_id, "technical")
+        reader.get_cue_details("ws-1", cue_id, "technical")
+
+        self.assertEqual(client.requests.count("/workspace/ws-1/selectedCues/shallow"), 2)
+        self.assertEqual(client.requests.count("/workspace/ws-1/runningOrPausedCues/shallow"), 2)
+        self.assertEqual(client.requests.count(f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys"), 2)
+
     def test_workspace_overview_returns_bounded_first_pass_summary(self) -> None:
         list_id = "11111111-1111-4111-8111-111111111111"
         group_id = "22222222-2222-4222-8222-222222222222"
@@ -425,10 +529,17 @@ class QLabReaderTests(unittest.TestCase):
         with FakeQlabOscServer(responses) as server:
             reader = QLabReader(client_for(server))
 
-            result = reader.get_workspace_overview("ws-1", max_depth=0, max_cues=1, max_index_cues=10)
+            result = reader.get_workspace_overview(
+                "ws-1",
+                max_depth=0,
+                max_cues=1,
+                max_index_cues=10,
+                cue_index_profile="health",
+            )
 
         self.assertTrue(result["limits"]["truncated"])
         self.assertEqual(len(result["cue_lists"]), 1)
+        self.assertEqual(result["cue_index"]["profile"], "health")
         self.assertEqual(result["cue_index"]["columns"], [
             "uniqueID",
             "number",
@@ -458,6 +569,39 @@ class QLabReaderTests(unittest.TestCase):
                 [group_id, "1", "Looks", "Looks", "Group", "Looks", list_id, list_id, 1, True, False, "red", False, False, 1, "auto_continue"],
                 [cue_id, "1.1", "Warm wash", "Warm wash", "Light", "Warm wash", list_id, group_id, 2, False, True, "blue", True, False, 2, "auto_follow"],
             ],
+        )
+
+    def test_workspace_overview_cue_index_minimal_profile_is_default(self) -> None:
+        cue_id = "11111111-1111-4111-8111-111111111111"
+        responses = {
+            "/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5", "port": 53000}],
+            "/workspace/ws-1/cueLists/shallow": [],
+            "/workspace/ws-1/cueLists/uniqueIDs": [cue_id],
+            f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys": {
+                "uniqueID": cue_id,
+                "number": "1",
+                "name": "Intro",
+                "displayName": "1 Intro",
+                "type": "Audio",
+                "listName": "Main",
+                "armed": False,
+                "isBroken": True,
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_overview("ws-1")
+
+        self.assertEqual(result["cue_index"]["profile"], "minimal")
+        self.assertEqual(
+            result["cue_index"]["columns"],
+            ["uniqueID", "number", "name", "displayName", "type", "listName", "cue_list_id", "parent_id", "depth"],
+        )
+        self.assertEqual(result["cue_index"]["rows"], [[cue_id, "1", "Intro", "1 Intro", "Audio", "Main", None, None, 0]])
+        self.assertEqual(
+            json.loads(server.received_args[-1][0]),
+            ["uniqueID", "number", "name", "displayName", "type", "listName"],
         )
 
     def test_workspace_overview_marks_cue_index_truncation(self) -> None:
@@ -1050,6 +1194,93 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["details"]["summary"]["instrument_count"], 1)
         self.assertEqual(result["details"]["summary"]["read_transport"], "tcp_fallback")
 
+    def test_workspace_setting_details_light_patch_tcp_fallback_handles_large_payload(self) -> None:
+        class FallbackClient:
+            config = QLabConfig()
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                raise OscTimeoutError("udp too small")
+
+            def request_tcp(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                return SimpleNamespace(
+                    data={
+                        "instruments": [
+                            {"name": str(index), "patched": True, "definition": {"name": "Dimmer"}}
+                            for index in range(250)
+                        ],
+                        "groups": [{"name": "All"}],
+                        "definitions": [{"name": "Dimmer"}],
+                    }
+                )
+
+        reader = QLabReader(FallbackClient())  # type: ignore[arg-type]
+
+        result = reader.get_workspace_setting_details("ws-1", section="light", kind="light_patch")
+
+        self.assertIsNone(result["errors"])
+        self.assertEqual(result["details"]["summary"]["instrument_count"], 250)
+        self.assertEqual(result["details"]["summary"]["read_transport"], "tcp_fallback")
+        self.assertEqual(len(result["details"]["instrument_index"]["rows"]), 250)
+
+    def test_agent_style_read_flow(self) -> None:
+        cue_id = "11111111-1111-4111-8111-111111111111"
+
+        class FlowClient:
+            config = QLabConfig(cache_ttl=10)
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(
+                        data=[{"uniqueID": "list-1", "name": "Main", "type": "Cue List", "armed": True}],
+                        status="ok",
+                    )
+                if address == "/workspace/ws-1/cueLists/uniqueIDs":
+                    return SimpleNamespace(data=[cue_id], status="ok")
+                if address == "/workspace/ws-1/settings/network/patchList":
+                    return SimpleNamespace(
+                        data=[{"uniqueID": "net-1", "name": "OSC Out", "host": "10.0.0.5", "port": 53000}],
+                        status="ok",
+                    )
+                if address == f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys":
+                    return SimpleNamespace(
+                        data={
+                            "uniqueID": cue_id,
+                            "number": "1",
+                            "name": "Intro",
+                            "displayName": "1 Intro",
+                            "listName": "Main",
+                            "type": "Audio",
+                            "armed": True,
+                            "flagged": False,
+                            "colorName": "green",
+                            "isBroken": False,
+                            "isWarning": False,
+                            "hasFileTargets": True,
+                            "audioOutputPatchName": "Main Out",
+                            "audioOutputPatchID": "patch-1",
+                        },
+                        status="ok",
+                    )
+                raise AssertionError(f"Unexpected request: {address}")
+
+        reader = QLabReader(FlowClient())  # type: ignore[arg-type]
+
+        check = reader.check_connection("ws-1")
+        overview = reader.get_workspace_overview("ws-1", include_cue_index=False)
+        settings = reader.get_workspace_settings("ws-1", sections=["network"])
+        query = reader.query_cues("ws-1", "type", "Audio")
+        details = reader.get_cue_details("ws-1", cue_id)
+        setting_details = reader.get_workspace_setting_details("ws-1", "network", "network_patch")
+
+        self.assertEqual(check["status"], "ready")
+        self.assertEqual(overview["cue_count"], 1)
+        self.assertEqual(settings["sections"]["network"]["patches"][0]["name"], "OSC Out")
+        self.assertEqual(query["returned_count"], 1)
+        self.assertEqual(details["sections"]["type_specific"]["audioOutputPatchName"], "Main Out")
+        self.assertEqual(setting_details["details"]["uniqueID"], "net-1")
+
     def test_query_cues_filters_by_type(self) -> None:
         list_id = "11111111-1111-4111-8111-111111111111"
         audio_id = "22222222-2222-4222-8222-222222222222"
@@ -1103,6 +1334,9 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["matched_count"], 1)
         self.assertEqual(result["returned_count"], 1)
         self.assertFalse(result["truncated"])
+        self.assertEqual(result["truncation_reasons"], [])
+        self.assertTrue(result["scanned_all_cues"])
+        self.assertFalse(result["result_limited"])
         self.assertEqual(result["cues"][0]["uniqueID"], audio_id)
         self.assertEqual(result["cues"][0]["cue_list_id"], list_id)
         self.assertEqual(result["cues"][0]["depth"], 1)
@@ -1380,9 +1614,54 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result_limit["matched_count"], 3)
         self.assertEqual(result_limit["returned_count"], 1)
         self.assertTrue(result_limit["truncated"])
+        self.assertEqual(result_limit["truncation_reasons"], ["max_results"])
+        self.assertTrue(result_limit["scanned_all_cues"])
+        self.assertTrue(result_limit["result_limited"])
         self.assertEqual(scan_limit["scanned_count"], 2)
         self.assertEqual(scan_limit["total_cue_ids"], 3)
         self.assertTrue(scan_limit["truncated"])
+        self.assertEqual(scan_limit["truncation_reasons"], ["max_cues_scanned"])
+        self.assertFalse(scan_limit["scanned_all_cues"])
+        self.assertFalse(scan_limit["result_limited"])
+
+    def test_query_cues_can_scan_more_than_default_when_explicitly_raised(self) -> None:
+        cue_ids = [f"{index:032d}-aaaa-bbbb-cccc-{index:012d}" for index in range(501)]
+
+        class CountingClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def __init__(self) -> None:
+                self.requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.requests.append(address)
+                if address == "/workspace/ws-1/cueLists/uniqueIDs":
+                    return SimpleNamespace(data=cue_ids, status="ok")
+                return SimpleNamespace(
+                    data={
+                        "uniqueID": address.split("/cue_id/", 1)[1].split("/", 1)[0],
+                        "number": "1",
+                        "name": "Audio",
+                        "displayName": "Audio",
+                        "listName": "Main",
+                        "type": "Audio",
+                        "armed": True,
+                        "flagged": False,
+                        "colorName": "none",
+                    },
+                    status="ok",
+                )
+
+        client = CountingClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        result = reader.query_cues("ws-1", "type", "Audio", max_results=501, max_cues_scanned=501)
+
+        self.assertEqual(result["scanned_count"], 501)
+        self.assertEqual(result["matched_count"], 501)
+        self.assertEqual(result["returned_count"], 501)
+        self.assertFalse(result["truncated"])
+        self.assertEqual(result["limits"], {"max_results": 501, "max_cues_scanned": 501})
 
     def test_query_cues_health_redacts_file_target_but_reports_presence(self) -> None:
         cue_id = "11111111-1111-4111-8111-111111111111"

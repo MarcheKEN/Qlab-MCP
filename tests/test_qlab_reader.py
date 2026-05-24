@@ -424,6 +424,40 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(client.requests.count("/workspace/ws-1/cueLists/uniqueIDs"), 2)
         self.assertEqual(client.requests.count(f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys"), 2)
 
+    def test_active_cue_details_bypass_cache(self) -> None:
+        shared_read_cache().clear()
+
+        class CountingClient:
+            config = QLabConfig(cache_ttl=10)
+
+            def __init__(self) -> None:
+                self.requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.requests.append(address)
+                return SimpleNamespace(
+                    data={
+                        "uniqueID": "active-id",
+                        "number": "1",
+                        "name": "Active",
+                        "displayName": "1 Active",
+                        "listName": "Main",
+                        "type": "Audio",
+                        "armed": True,
+                        "flagged": False,
+                        "colorName": "none",
+                    },
+                    status="ok",
+                )
+
+        client = CountingClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        reader.get_cue_details("ws-1", "active", "auto")
+        reader.get_cue_details("ws-1", "active", "auto")
+
+        self.assertEqual(client.requests.count("/workspace/ws-1/cue/active/valuesForKeys"), 4)
+
     def test_workspace_overview_returns_bounded_first_pass_summary(self) -> None:
         list_id = "11111111-1111-4111-8111-111111111111"
         group_id = "22222222-2222-4222-8222-222222222222"

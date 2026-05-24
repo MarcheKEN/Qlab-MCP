@@ -25,12 +25,19 @@ class CueDetailsMixin:
         errors: dict[str, str],
         error_key: str = "valuesForKeys",
         profile: str | None = None,
+        cacheable: bool = True,
     ) -> dict[str, Any]:
         if not keys:
             return {}
         normalized_keys = validate_value_keys(keys)
         try:
-            batched_values = self.read_cue_values(workspace_id, cue_ref, normalized_keys, cache_profile=profile)["values"]
+            batched_values = self.read_cue_values(
+                workspace_id,
+                cue_ref,
+                normalized_keys,
+                cache_profile=profile,
+                cacheable=cacheable,
+            )["values"]
             if not isinstance(batched_values, dict):
                 raise ValueError("QLab valuesForKeys response must be an object")
             return batched_values
@@ -49,7 +56,13 @@ class CueDetailsMixin:
         common_keys = list(properties_for_profile("auto"))
         if _is_active_cue_ref(cue_ref):
             try:
-                active_values = self.read_cue_values(workspace_id, cue_ref, common_keys, cache_profile="auto")["values"]
+                active_values = self.read_cue_values(
+                    workspace_id,
+                    cue_ref,
+                    common_keys,
+                    cache_profile="auto",
+                    cacheable=False,
+                )["values"]
                 if not isinstance(active_values, dict):
                     raise ValueError("QLab valuesForKeys response must be an object")
                 values = active_values
@@ -65,6 +78,7 @@ class CueDetailsMixin:
             key for key in _auto_type_specific_keys(values.get("type")) if key not in values
         ]
         if type_specific_keys:
+            cacheable = not _is_active_cue_ref(cue_ref)
             type_specific_values = self._read_cue_values_with_fallback(
                 workspace_id,
                 cue_ref,
@@ -72,6 +86,7 @@ class CueDetailsMixin:
                 errors,
                 error_key="valuesForKeys:type_specific",
                 profile="auto",
+                cacheable=cacheable,
             )
             values.update(type_specific_values)
             values = _derive_profile_fields("auto", values)
@@ -110,7 +125,13 @@ class CueDetailsMixin:
         errors: dict[str, str] = {}
         if _is_active_cue_ref(cue_ref):
             try:
-                values = self.read_cue_values(workspace_id, cue_ref, keys, cache_profile=profile)["values"]
+                values = self.read_cue_values(
+                    workspace_id,
+                    cue_ref,
+                    keys,
+                    cache_profile=profile,
+                    cacheable=False,
+                )["values"]
                 if not isinstance(values, dict):
                     raise ValueError("QLab valuesForKeys response must be an object")
             except QLabReplyError as exc:

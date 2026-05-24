@@ -381,13 +381,31 @@ def _light_definition_summary(definition: Any) -> dict[str, Any]:
     return summary
 
 
+def _first_present_case_insensitive(mapping: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        if key in mapping and mapping[key] not in (None, ""):
+            return mapping[key]
+    normalized_keys = {key.casefold(): key for key in keys}
+    for key, value in mapping.items():
+        if str(key).casefold() in normalized_keys and value not in (None, ""):
+            return value
+    return None
+
+
+def _light_patch_conflicted(item: dict[str, Any]) -> Any:
+    return _first_present_case_insensitive(item, ("conflicted", "conflict", "conflicts"))
+
+
 def _light_instrument_summary(item: Any) -> dict[str, Any]:
     summary = _basic_item_summary(item)
     if not isinstance(item, dict):
         return summary
-    for key in ("comment", "patched", "conflicted"):
+    for key in ("comment", "patched"):
         if key in item:
             summary[key] = item[key]
+    conflicted = _light_patch_conflicted(item)
+    if conflicted is not None:
+        summary["conflicted"] = conflicted
     definition = _light_definition_summary(item.get("definition"))
     if definition:
         summary["definition"] = definition

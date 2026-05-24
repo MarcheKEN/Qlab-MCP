@@ -57,6 +57,8 @@ The server is designed to make everything accessible without dumping everything
 at once.
 
 - Overview gives a bounded tree and a compact cue index.
+- When cue_index is enabled, overview also derives editorial health from that
+  index: empty labels, duplicate names/numbers, and ambiguous placeholders.
 - Settings gives infrastructure summaries without heavy raw payloads.
 - Details tools go deeper only when the caller asks for a specific cue or setting.
 - `technical` and `full_sensitive` are explicit audit modes, not normal defaults.
@@ -82,6 +84,19 @@ Results report whether they are complete with:
 The default is `minimal`, so orientation stays fast and readable. Use `health`
 when you need a diagnostic map of the whole show.
 
+## Diagnostic Context
+
+QLab reports cue and workspace fields; the MCP derives cautious summaries from
+those fields; physical output still needs a human check. A broken cue summary
+can include evidence, probable causes, diagnostic hints, and checks such as
+mounting media, opening QLab Workspace Status, or checking DMX/Art-Net/sACN
+output. These are derived hints, not claims about the actual room output.
+
+The MCP reconstructs health from OSC-readable fields such as `isBroken`,
+`isWarning`, cue type, targets, message errors, and settings. It does not claim
+to read the full Workspace Status window directly because QLab's documented OSC
+dictionary does not expose a single complete Workspace Status warnings endpoint.
+
 ## Privacy And Safety
 
 All public tools are read-only.
@@ -96,6 +111,14 @@ audio-map levels, light patch payloads, and routing payloads.
 
 `full_sensitive` is deeper still. It can expose cue notes, local media paths,
 scripts, and heavy stage payloads. Use it only when that exposure is intentional.
+
+`auto` is designed to be useful for technical inspection and may include compact
+type-specific fields such as `lightCommandText`. Use `basic_safe` or `health`
+when you want a stricter privacy posture.
+
+Redaction records include an `impact` field so agents can tell which conclusions
+are limited, such as exact network destination, display identity, route details,
+or hidden credentials.
 
 ## Tool Signatures
 
@@ -131,6 +154,11 @@ Common filters:
 - `hasPreWait`
 - `hasPostWait`
 - `hasDuration`
+- `name_empty`
+- `displayName_empty`
+- `number_empty`
+- `ambiguous_label`
+- `flagged_or_broken`
 
 Example:
 
@@ -198,5 +226,7 @@ qlab_get_workspace_setting_details(section="light", kind="light_patch")
 
 The expected safe result should summarize the light patch. If the UDP reply is
 too large, the result should still succeed through `read_transport="tcp_fallback"`.
+That means TCP was used to retrieve a large response; it does not imply output
+failure, missing controllers, or degraded physical playback.
 
 For passcode-protected workspaces, set `QLAB_PASSCODE` before starting the MCP.

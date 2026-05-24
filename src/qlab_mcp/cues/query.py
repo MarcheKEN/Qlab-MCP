@@ -6,6 +6,7 @@ from typing import Any
 
 from ..allowlist import properties_for_profile, validate_value_keys
 from ..osc.addressing import _clean_workspace_id, _workspace_address
+from .editorial import _is_ambiguous_label, _is_empty_text
 from .profiles import _coerce_qlab_bool, _derive_profile_fields, _is_positive_number
 from .refs import _flatten_cue_refs
 
@@ -35,6 +36,11 @@ QUERY_FILTERS = {
     "hasPreWait",
     "hasPostWait",
     "hasDuration",
+    "name_empty",
+    "displayName_empty",
+    "number_empty",
+    "ambiguous_label",
+    "flagged_or_broken",
 }
 LIVE_STATE_QUERY_FILTERS = {
     "isRunning",
@@ -68,6 +74,11 @@ QUERY_FILTER_PROPERTIES = {
     "hasPreWait": ("preWait",),
     "hasPostWait": ("postWait",),
     "hasDuration": ("duration",),
+    "name_empty": ("name",),
+    "displayName_empty": ("displayName",),
+    "number_empty": ("number",),
+    "ambiguous_label": ("name", "displayName", "listName", "number", "type"),
+    "flagged_or_broken": ("flagged", "isBroken"),
 }
 QUERY_BASE_PROPERTIES = (
     "uniqueID",
@@ -166,6 +177,18 @@ def _cue_matches_filter(cue: dict[str, Any], cue_ref: dict[str, Any], query_filt
         return _is_positive_number(cue.get("postWait")) is _parse_bool_filter(expected)
     if filter_name == "hasDuration":
         return _is_positive_number(cue.get("duration")) is _parse_bool_filter(expected)
+    if filter_name == "name_empty":
+        return _is_empty_text(cue.get("name")) is _parse_bool_filter(expected)
+    if filter_name == "displayName_empty":
+        return _is_empty_text(cue.get("displayName")) is _parse_bool_filter(expected)
+    if filter_name == "number_empty":
+        return _is_empty_text(cue.get("number")) is _parse_bool_filter(expected)
+    if filter_name == "ambiguous_label":
+        return _is_ambiguous_label(cue) is _parse_bool_filter(expected)
+    if filter_name == "flagged_or_broken":
+        flagged = _coerce_qlab_bool(cue.get("flagged")) is True
+        broken = _coerce_qlab_bool(cue.get("isBroken")) is True
+        return (flagged or broken) is _parse_bool_filter(expected)
     if filter_name == "name_contains":
         needle = str(expected or "").casefold()
         haystack = " ".join(str(cue.get(key) or "") for key in ("name", "displayName", "listName")).casefold()

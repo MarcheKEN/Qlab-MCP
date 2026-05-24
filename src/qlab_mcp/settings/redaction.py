@@ -44,6 +44,12 @@ SAFE_DEVICE_REDACT_KEYS = {
     "serialnumber",
 }
 REDACTED_VALUE = "[redacted]"
+REDACTION_IMPACTS = {
+    "credential": "Sensitive credential value is hidden; authentication details cannot be audited from this response.",
+    "network_destination": "Network destination details are hidden; exact host, IP, port, or interface cannot be verified.",
+    "device_or_route_detail": "Device or route details are hidden; exact hardware, display, or routing identity cannot be verified.",
+    "video_destination": "Video destination details are hidden; exact display, screen, or route endpoint cannot be verified.",
+}
 
 
 def _normalize_key_name(value: str) -> str:
@@ -128,7 +134,14 @@ def _redact_payload(
             reason = _redaction_reason(section, str(key), profile)
             if reason is not None:
                 redacted[key] = REDACTED_VALUE
-                redactions.append({"section": section, "path": child_path, "reason": reason})
+                redactions.append(
+                    {
+                        "section": section,
+                        "path": child_path,
+                        "reason": reason,
+                        "impact": REDACTION_IMPACTS.get(reason, "Redacted value limits conclusions at this path."),
+                    }
+                )
             else:
                 redacted[key] = _redact_payload(
                     nested,

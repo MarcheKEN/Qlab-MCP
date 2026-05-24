@@ -6,6 +6,7 @@ from typing import Any
 
 from ..allowlist import validate_value_keys
 from ..osc.addressing import _clean_workspace_id, _normalize_id_list, _workspace_address
+from .editorial import editorial_health_from_index
 from .index import (
     _cue_index_row,
     cue_index_columns,
@@ -289,4 +290,8 @@ class CueOverviewMixin:
                 "max_index_cues": max_index_cues,
                 "errors": index_errors or None,
             }
+            result["editorial_health"] = editorial_health_from_index(
+                result["cue_index"]["columns"],
+                index_rows,
+            )
         return result

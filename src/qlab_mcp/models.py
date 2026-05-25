@@ -103,3 +103,37 @@ class CueDetailsResult(BaseModel):
     errors: dict[str, str] | None = None
     active_count: int | None = None
     message: str | None = None
+
+
+class WriteReadinessResult(BaseModel):
+    """Non-mutating readiness check for gated QLab write mode."""
+
+    ok: bool
+    status: str
+    workspace_id: str
+    write_enabled: bool
+    dry_run_default: bool
+    passcode_configured: bool
+    capabilities: dict[str, Any]
+    checks: dict[str, Any]
+    blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    message: str
+
+
+class CreateCueResult(BaseModel):
+    """Result for gated cue creation or dry-run planning."""
+
+    ok: bool
+    status: str
+    workspace_id: str
+    cue_type: str
+    dry_run: bool
+    created_cue_id: str | None = None
+    placement: dict[str, Any] | None = None
+    properties: dict[str, Any] = Field(default_factory=dict)
+    planned_operations: list[dict[str, Any]] = Field(default_factory=list)
+    executed_operations: list[dict[str, Any]] = Field(default_factory=list)
+    verification: dict[str, Any] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    message: str

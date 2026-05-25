@@ -1,8 +1,8 @@
-"""Read-only QLab cue information operations.
+"""QLab workspace inspection facade plus gated write-mode entry points.
 
 This module remains the public compatibility facade. Implementation lives in
 focused modules for overview, query, cue details, workspace settings, redaction,
-and short-lived read caching.
+short-lived read caching, and the disabled-by-default write-mode preface.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from .cues.overview import CueOverviewMixin
 from .cues.query import CueQueryMixin
 from .runtime.read_cache import cache_profile_is_safe, client_cache_namespace, shared_read_cache
 from .settings.workspace import WorkspaceSettingsMixin
+from .write import QLabWriteMixin
 
 
 class QLabReader(
@@ -33,6 +34,7 @@ class QLabReader(
     WorkspaceSettingsMixin,
     CueQueryMixin,
     CueDetailsMixin,
+    QLabWriteMixin,
 ):
     def __init__(self, client: QLabOscClient | None = None):
         self.client = client or QLabOscClient()

@@ -1,11 +1,16 @@
 # QLab MCP
 
-A read-only FastMCP server for inspecting QLab 5 workspaces over OSC.
+A FastMCP server for inspecting QLab 5 workspaces over OSC, with an optional
+gated write-mode preface for dry-run cue creation.
 
 This project helps an agent understand what is inside an open QLab workspace:
 cues, cue lists, cue health, workspace settings, patches, routes, stages, MIDI,
-network, and light infrastructure. It does not expose playback, editing,
-deletion, raw OSC, or other mutating commands.
+network, and light infrastructure. The default inspector mode does not expose
+playback, editing, deletion, raw OSC, or mutating commands.
+
+By default the server remains read-only. Write mode is disabled unless
+`QLAB_ENABLE_WRITE=true`, and cue creation defaults to dry-run unless
+`QLAB_WRITE_DRY_RUN_DEFAULT=false`.
 
 ## Best First Flow
 
@@ -25,7 +30,7 @@ when you know exactly what needs inspection.
 
 The public entry points stay at the package root:
 
-- `src/qlab_mcp/server.py` exposes the six FastMCP tools.
+- `src/qlab_mcp/server.py` exposes the six inspector tools plus two gated write-mode tools.
 - `src/qlab_mcp/qlab.py` keeps the compatibility facade for `QLabReader`.
 - `src/qlab_mcp/models.py`, `config.py`, `errors.py`, and `allowlist.py` hold shared API types and policy.
 
@@ -35,6 +40,8 @@ Internal readers are grouped by responsibility:
 - `src/qlab_mcp/cues/` handles overview, indexing, querying, profiles, and cue details.
 - `src/qlab_mcp/settings/` handles workspace settings, summarizers, and redaction.
 - `src/qlab_mcp/runtime/` handles shared reader runtime helpers such as connection diagnostics and read cache.
+- `src/qlab_mcp/write/` handles disabled-by-default write readiness, allowlists,
+  and gated mutating OSC operations.
 
 Project-local agent skills and transcript scratch files are intentionally not
 part of the runtime package. QLab learning/reference material should live in a
@@ -50,6 +57,8 @@ clear documentation or reference location, not at the package root.
 | `qlab_get_workspace_setting_details` | Inspect one patch, route, stage, map, MIDI/network item, or light patch. | `safe` profile |
 | `qlab_query_cues` | Search cues by type, state, color, name, number prefix, targets, timing, or health. | Up to 500 scanned/returned cues |
 | `qlab_get_cue_details` | Inspect one cue after finding it in overview or query results. | `auto` profile |
+| `qlab_check_write_readiness` | Check disabled-by-default write-mode readiness without mutation. | Safety/readiness report |
+| `qlab_create_cue` | Dry-run or create one blank allowlisted cue with safe initial properties. | Dry-run by default |
 
 ## Compact By Default
 
@@ -99,7 +108,8 @@ dictionary does not expose a single complete Workspace Status warnings endpoint.
 
 ## Privacy And Safety
 
-All public tools are read-only.
+The six inspector tools are read-only. The two write-mode tools are separate,
+gated, and disabled by default.
 
 `safe` is the normal profile. It is meant for agent use and redacts sensitive
 infrastructure where possible: destinations, routes, devices, passcodes,
@@ -120,6 +130,22 @@ Redaction records include an `impact` field so agents can tell which conclusions
 are limited, such as exact network destination, display identity, route details,
 or hidden credentials.
 
+Write mode is deliberately narrow:
+
+- `QLAB_PASSCODE` is a server-side credential and is never a tool argument.
+- `qlab_check_write_readiness` does not mutate anything.
+- `qlab_create_cue` is blocked unless `QLAB_ENABLE_WRITE=true` and
+  `QLAB_PASSCODE` is configured.
+- `dry_run` defaults to true through `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
+- Real writes bypass and clear the read cache before verifying fresh cue details.
+- Only blank cue creation is allowed in this preface.
+- Allowed cue types are `audio`, `video`, `text`, `light`, `network`, `midi`,
+  `timecode`, `group`, `wait`, and `memo`.
+- Allowed initial properties are `name`, `number`, `armed`, `flagged`,
+  `colorName`, `preWait`, `postWait`, `duration`, and `continueMode`.
+- Playback control, raw OSC, target edits, file paths, scripts, routing changes,
+  GO, stop, panic, playhead control, and existing-cue editing are not exposed.
+
 ## Tool Signatures
 
 ```text
@@ -129,6 +155,8 @@ qlab_get_workspace_settings(workspace_id, sections=None)
 qlab_get_workspace_setting_details(workspace_id, section, kind=None, ref=None, profile="safe")
 qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=None, profile="basic_safe", max_results=500, max_cues_scanned=500)
 qlab_get_cue_details(workspace_id, cue_ref, profile="auto")
+qlab_check_write_readiness(workspace_id)
+qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
 ```
 
 ## Query Filters
@@ -179,6 +207,8 @@ QLAB_REPLY_PORT=53001
 QLAB_TIMEOUT=2.0
 QLAB_CACHE_TTL=10.0
 QLAB_PASSCODE=
+QLAB_ENABLE_WRITE=false
+QLAB_WRITE_DRY_RUN_DEFAULT=true
 ```
 
 Notes:
@@ -191,6 +221,8 @@ Notes:
 - Queries using live state filters such as `isRunning`, `isPaused`, `isLoaded`,
   `isOverridden`, or `isAuditioning` bypass the cache.
 - Sensitive `technical` and `full_sensitive` reads bypass the cache.
+- Write mode is disabled by default. When enabled, real writes require
+  `QLAB_PASSCODE` and bypass/clear the read cache before fresh verification.
 
 ## Run
 
@@ -230,3 +262,12 @@ That means TCP was used to retrieve a large response; it does not imply output
 failure, missing controllers, or degraded physical playback.
 
 For passcode-protected workspaces, set `QLAB_PASSCODE` before starting the MCP.
+
+For write-mode smoke checks on a copy of a workspace:
+
+1. Set `QLAB_ENABLE_WRITE=true`.
+2. Keep `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
+3. Set `QLAB_PASSCODE` on the server.
+4. Call `qlab_check_write_readiness(workspace_id=...)`.
+5. Call `qlab_create_cue(..., dry_run=true)` and inspect `planned_operations`.
+6. Only then call `qlab_create_cue(..., dry_run=false)` on a safe test workspace.

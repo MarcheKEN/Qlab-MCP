@@ -437,8 +437,9 @@ class WorkspaceConnectionMixin:
                 "message": "QLab is reachable and a workspace is available; read access was not checked.",
             }
 
+        read_address = _workspace_address(resolved_workspace_id, "cueLists/shallow")
         try:
-            cue_lists = self.get_cue_lists(resolved_workspace_id, include_children=False)["cue_lists"]
+            cue_lists = self.client.request(read_address).data
         except QLabReplyError as exc:
             passcode_status = exc.status
             checks["read_access"] = {
@@ -448,13 +449,14 @@ class WorkspaceConnectionMixin:
                 "data": exc.data,
                 "error": str(exc),
             }
-            permissions["view"] = {
-                **permissions["view"],
-                "ok": False,
-                "status": exc.status,
-                "address": exc.address,
-                "error": str(exc),
-            }
+            if permissions["view"]["status"] != "confirmed":
+                permissions["view"] = {
+                    **permissions["view"],
+                    "ok": False,
+                    "status": exc.status,
+                    "address": exc.address,
+                    "error": str(exc),
+                }
             return {
                 **base_result,
                 "passcode_status": passcode_status,
@@ -464,26 +466,30 @@ class WorkspaceConnectionMixin:
                 else "QLab is reachable, but the workspace read check failed.",
             }
         except OscTimeoutError as exc:
-            checks["read_access"] = {"ok": False, "status": "timeout", "error": str(exc)}
-            permissions["view"] = {
-                **permissions["view"],
-                "ok": False,
-                "status": "timeout",
-                "error": str(exc),
-            }
+            checks["read_access"] = {"ok": False, "status": "timeout", "address": read_address, "error": str(exc)}
+            if permissions["view"]["status"] != "confirmed":
+                permissions["view"] = {
+                    **permissions["view"],
+                    "ok": False,
+                    "status": "timeout",
+                    "address": read_address,
+                    "error": str(exc),
+                }
             return {
                 **base_result,
                 "status": "workspace_read_timeout",
                 "message": "QLab is reachable, but the workspace read check timed out.",
             }
         except Exception as exc:
-            checks["read_access"] = {"ok": False, "status": "error", "error": str(exc)}
-            permissions["view"] = {
-                **permissions["view"],
-                "ok": False,
-                "status": "error",
-                "error": str(exc),
-            }
+            checks["read_access"] = {"ok": False, "status": "error", "address": read_address, "error": str(exc)}
+            if permissions["view"]["status"] != "confirmed":
+                permissions["view"] = {
+                    **permissions["view"],
+                    "ok": False,
+                    "status": "error",
+                    "address": read_address,
+                    "error": str(exc),
+                }
             return {
                 **base_result,
                 "status": "workspace_read_error",
@@ -495,14 +501,22 @@ class WorkspaceConnectionMixin:
             "method": "cueLists/shallow",
             "cue_list_count": len(cue_lists) if isinstance(cue_lists, list) else None,
         }
-        permissions["view"] = {
-            "ok": True,
-            "status": "confirmed",
-            "method": "cueLists/shallow",
-            "source": "cueLists/shallow",
-            "safe_to_probe": True,
-            "cue_list_count": len(cue_lists) if isinstance(cue_lists, list) else None,
-        }
+        if permissions["view"]["status"] == "confirmed" and permissions["view"].get("source") == "/connect":
+            permissions["view"] = {
+                **permissions["view"],
+                "read_probe": "confirmed",
+                "read_method": "cueLists/shallow",
+                "cue_list_count": len(cue_lists) if isinstance(cue_lists, list) else None,
+            }
+        else:
+            permissions["view"] = {
+                "ok": True,
+                "status": "confirmed",
+                "method": "cueLists/shallow",
+                "source": "cueLists/shallow",
+                "safe_to_probe": True,
+                "cue_list_count": len(cue_lists) if isinstance(cue_lists, list) else None,
+            }
         capabilities.update(
             {
                 "read_workspace": True,

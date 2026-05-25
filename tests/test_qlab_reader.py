@@ -4,6 +4,7 @@ import json
 import socket
 import sys
 import threading
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -200,6 +201,43 @@ class QLabReaderTests(unittest.TestCase):
             [
                 "/workspaces",
                 "/workspace/ws-1/connect",
+                "/workspace/ws-1/cueLists/shallow",
+            ],
+        )
+
+    def test_check_connection_preserves_connect_view_when_read_probe_times_out(self) -> None:
+        workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]
+        responses = {
+            "/workspaces": workspaces,
+            "/workspace/ws-1/connect": "ok:view|edit",
+            "/workspace/ws-1/cueLists/shallow": lambda _message: time.sleep(0.2),
+        }
+        with FakeQlabOscServer(responses) as server:
+            assert server.port is not None
+            config = QLabConfig(
+                host="127.0.0.1",
+                osc_port=server.port,
+                reply_port=0,
+                timeout=0.05,
+                passcode="5983",
+            )
+            reader = QLabReader(QLabOscClient(config))
+
+            result = reader.check_connection()
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "workspace_read_timeout")
+        self.assertFalse(result["workspace_readable"])
+        self.assertEqual(result["connect_scopes"]["scopes"], ["view", "edit"])
+        self.assertTrue(result["permissions"]["view"]["ok"])
+        self.assertEqual(result["permissions"]["view"]["status"], "confirmed")
+        self.assertEqual(result["permissions"]["view"]["source"], "/connect")
+        self.assertEqual(result["checks"]["read_access"]["status"], "timeout")
+        self.assertEqual(result["checks"]["read_access"]["address"], "/workspace/ws-1/cueLists/shallow")
+        self.assertEqual(
+            server.received,
+            [
+                "/workspaces",
                 "/workspace/ws-1/connect",
                 "/workspace/ws-1/cueLists/shallow",
             ],

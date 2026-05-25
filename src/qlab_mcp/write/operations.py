@@ -23,7 +23,7 @@ class QLabWriteMixin:
         dry_run: bool | None = None,
         after_cue_id: str | None = None,
     ) -> dict[str, Any]:
-        workspace = ensure_write_ready(self, workspace_id)
+        workspace = _clean_workspace_id(workspace_id)
         qlab_cue_type = validate_writable_cue_type(cue_type)
         normalized_properties = validate_write_properties(properties)
         effective_dry_run = resolve_dry_run(self, dry_run)
@@ -53,6 +53,8 @@ class QLabWriteMixin:
                 ],
                 "message": "Dry run succeeded; review planned_operations before disabling dry_run.",
             }
+
+        workspace = ensure_write_ready(self, workspace)
 
         read_cache = getattr(self, "_read_cache", shared_read_cache())
         read_cache.clear()

@@ -92,16 +92,10 @@ WorkspaceSettingDetailKind = Literal[
     "light_patch",
 ]
 WritableCueType = Literal[
-    "audio",
-    "video",
-    "text",
-    "light",
-    "network",
-    "midi",
-    "timecode",
+    "memo",
     "group",
     "wait",
-    "memo",
+    "audio",
 ]
 
 WorkspaceId = Annotated[
@@ -153,7 +147,7 @@ Use these tools to read QLab 5 workspace and cue information over OSC.
 
 The six inspector tools are read-only and intentionally avoid playback, editing, deletion, and raw OSC.
 Write mode is a separate gated preface: it is disabled unless QLAB_ENABLE_WRITE=true, defaults to dry-run,
-requires QLAB_PASSCODE on the server, and currently only supports basic cue creation.
+requires QLAB_PASSCODE on the server plus edit confirmed by /connect, and currently only supports basic cue creation.
 
 Start with qlab_check_connection to verify QLab, workspace candidates, passcode, and read access.
 
@@ -229,7 +223,7 @@ def qlab_check_connection(
 ) -> QlabConnectionCheckResult:
     """Check whether QLab, workspace resolution, passcode, and safe read access are ready.
 
-    Use this before the overview; it reports safe permission evidence and explains edit/control limits.
+    Use this before the overview; it reports /connect permission scopes plus safe read access.
     """
     return _run_tool(
         lambda: QlabConnectionCheckResult.model_validate(
@@ -561,8 +555,7 @@ def qlab_check_write_readiness(
     """Check local write-mode readiness without sending any mutating OSC commands.
 
     This verifies QLAB_ENABLE_WRITE, required workspace_id, server-side QLAB_PASSCODE presence,
-    planned write capabilities, and explains why QLab edit permission cannot be proven without
-    a real mutating command.
+    planned write capabilities, and edit permission confirmed by QLab /connect scopes.
     """
     return _run_tool(
         lambda: WriteReadinessResult.model_validate(
@@ -583,8 +576,7 @@ def qlab_create_cue(
         WritableCueType,
         Field(
             description=(
-                "Cue type to create. This preface allows only blank, non-control cue types: "
-                "audio, video, text, light, network, midi, timecode, group, wait, or memo."
+                "Cue type to create. This preface allows only blank memo, group, wait, or audio cues."
             ),
         ),
     ],
@@ -618,7 +610,8 @@ def qlab_create_cue(
 ) -> CreateCueResult:
     """Create one blank allowlisted cue or return a dry-run plan.
 
-    Write mode must be enabled by QLAB_ENABLE_WRITE and the server must have QLAB_PASSCODE configured.
+    Real creation requires QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, and edit confirmed by /connect.
+    Dry-run planning never sends mutating OSC.
     This tool never exposes playback control, raw OSC, target edits, scripts, routing, or media paths.
     """
     return _run_tool(

@@ -41,7 +41,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     check = tools["qlab_check_connection"]
     assert check.title == "Check QLab Connection"
     assert "passcode" in check.description
-    assert "edit/control" in check.description
+    assert "/connect permission scopes" in check.description
     assert check.annotations.readOnlyHint is True
     assert check.annotations.destructiveHint is False
 
@@ -100,16 +100,10 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert create.annotations.destructiveHint is False
     assert create.annotations.idempotentHint is False
     assert create.inputSchema["properties"]["cue_type"]["enum"] == [
-        "audio",
-        "video",
-        "text",
-        "light",
-        "network",
-        "midi",
-        "timecode",
+        "memo",
         "group",
         "wait",
-        "memo",
+        "audio",
     ]
     assert "dry_run" in create.inputSchema["properties"]
     assert "workspace_id" in create.inputSchema["required"]

@@ -8,16 +8,10 @@ from ..errors import UnsafeWriteOperationError
 
 
 WRITABLE_CUE_TYPES: dict[str, str] = {
-    "audio": "Audio",
-    "video": "Video",
-    "text": "Text",
-    "light": "Light",
-    "network": "Network",
-    "midi": "MIDI",
-    "timecode": "Timecode",
+    "memo": "Memo",
     "group": "Group",
     "wait": "Wait",
-    "memo": "Memo",
+    "audio": "Audio",
 }
 
 WRITABLE_CUE_PROPERTIES = (

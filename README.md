@@ -133,14 +133,17 @@ or hidden credentials.
 Write mode is deliberately narrow:
 
 - `QLAB_PASSCODE` is a server-side credential and is never a tool argument.
+- `qlab_check_connection` uses `/connect` as the source of truth for
+  `view`, `edit`, and `control` permission scopes when `QLAB_PASSCODE` is set.
 - `qlab_check_write_readiness` does not mutate anything.
 - `qlab_create_cue` is blocked unless `QLAB_ENABLE_WRITE=true` and
-  `QLAB_PASSCODE` is configured.
+  `QLAB_PASSCODE` is configured, and `/connect` confirms `edit`.
 - `dry_run` defaults to true through `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
+- `qlab_create_cue(..., dry_run=true)` is planning-only and can run without
+  enabling write mode or configuring a passcode.
 - Real writes bypass and clear the read cache before verifying fresh cue details.
 - Only blank cue creation is allowed in this preface.
-- Allowed cue types are `audio`, `video`, `text`, `light`, `network`, `midi`,
-  `timecode`, `group`, `wait`, and `memo`.
+- Allowed cue types are `memo`, `group`, `wait`, and `audio`.
 - Allowed initial properties are `name`, `number`, `armed`, `flagged`,
   `colorName`, `preWait`, `postWait`, `duration`, and `continueMode`.
 - Playback control, raw OSC, target edits, file paths, scripts, routing changes,
@@ -222,7 +225,8 @@ Notes:
   `isOverridden`, or `isAuditioning` bypass the cache.
 - Sensitive `technical` and `full_sensitive` reads bypass the cache.
 - Write mode is disabled by default. When enabled, real writes require
-  `QLAB_PASSCODE` and bypass/clear the read cache before fresh verification.
+  `QLAB_PASSCODE`, `edit` confirmed by `/connect`, and bypass/clear the read
+  cache before fresh verification.
 
 ## Run
 
@@ -268,6 +272,7 @@ For write-mode smoke checks on a copy of a workspace:
 1. Set `QLAB_ENABLE_WRITE=true`.
 2. Keep `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
 3. Set `QLAB_PASSCODE` on the server.
-4. Call `qlab_check_write_readiness(workspace_id=...)`.
+4. Call `qlab_check_write_readiness(workspace_id=...)` and confirm `edit` is
+   granted by `/connect`.
 5. Call `qlab_create_cue(..., dry_run=true)` and inspect `planned_operations`.
 6. Only then call `qlab_create_cue(..., dry_run=false)` on a safe test workspace.

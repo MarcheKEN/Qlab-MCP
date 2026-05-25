@@ -17,6 +17,7 @@ from qlab_mcp.config import QLabConfig
 from qlab_mcp.errors import OscTimeoutError, QLabReplyError, UnsafeCuePropertyError
 from qlab_mcp.osc import decode_message, encode_message
 from qlab_mcp.qlab import QLabReader
+from qlab_mcp.runtime.connection import parse_connect_scopes
 from qlab_mcp.runtime.read_cache import shared_read_cache
 
 
@@ -81,6 +82,33 @@ def client_for(server: FakeQlabOscServer, timeout: float = 0.25) -> QLabOscClien
     return QLabOscClient(QLabConfig(host="127.0.0.1", osc_port=server.port, reply_port=0, timeout=timeout))
 
 
+class ConnectScopeTests(unittest.TestCase):
+    def test_parse_connect_scope_combinations(self) -> None:
+        cases = {
+            "ok:view": ["view"],
+            "ok:view|edit": ["view", "edit"],
+            "ok:view|control": ["view", "control"],
+            "ok:view|edit|control": ["view", "edit", "control"],
+        }
+
+        for raw, scopes in cases.items():
+            with self.subTest(raw=raw):
+                result = parse_connect_scopes(raw)
+                self.assertTrue(result["ok"])
+                self.assertEqual(result["status"], "confirmed")
+                self.assertEqual(result["scopes"], scopes)
+
+    def test_parse_connect_scope_unavailable_shapes(self) -> None:
+        unknown = parse_connect_scopes("ok:admin")
+        missing = parse_connect_scopes("ok")
+
+        self.assertFalse(unknown["ok"])
+        self.assertEqual(unknown["status"], "scope_unavailable")
+        self.assertEqual(unknown["unknown_scopes"], ["admin"])
+        self.assertFalse(missing["ok"])
+        self.assertEqual(missing["status"], "scope_unavailable")
+
+
 class QLabReaderTests(unittest.TestCase):
     def setUp(self) -> None:
         shared_read_cache().clear()
@@ -126,15 +154,56 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["capabilities"]["cue_details"])
         self.assertIsNone(result["capabilities"]["edit"])
         self.assertIsNone(result["capabilities"]["control"])
+        self.assertEqual(result["connect_scopes"]["status"], "not_checked")
         self.assertTrue(result["permissions"]["view"]["ok"])
         self.assertEqual(result["permissions"]["view"]["status"], "confirmed")
         self.assertTrue(result["permissions"]["view"]["safe_to_probe"])
         self.assertIsNone(result["permissions"]["edit"]["ok"])
         self.assertIsNone(result["permissions"]["control"]["ok"])
-        self.assertFalse(result["permissions"]["edit"]["safe_to_probe"])
-        self.assertFalse(result["permissions"]["control"]["safe_to_probe"])
-        self.assertIn("Edit and control permissions", result["warnings"][0])
+        self.assertTrue(result["permissions"]["edit"]["safe_to_probe"])
+        self.assertTrue(result["permissions"]["control"]["safe_to_probe"])
+        self.assertIn("QLAB_PASSCODE is not configured", result["warnings"][0])
         self.assertEqual(server.received, ["/workspaces", "/workspace/ws-1/cueLists/shallow"])
+
+    def test_check_connection_parses_connect_scopes(self) -> None:
+        workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5", "version": "5.5.10"}]
+        responses = {
+            "/workspaces": workspaces,
+            "/workspace/ws-1/connect": "ok:view|edit",
+            "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-1", "name": "Main"}],
+        }
+        with FakeQlabOscServer(responses) as server:
+            assert server.port is not None
+            config = QLabConfig(
+                host="127.0.0.1",
+                osc_port=server.port,
+                reply_port=0,
+                timeout=0.25,
+                passcode="5983",
+            )
+            reader = QLabReader(QLabOscClient(config))
+
+            result = reader.check_connection()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["connect_scopes"]["status"], "confirmed")
+        self.assertEqual(result["connect_scopes"]["scopes"], ["view", "edit"])
+        self.assertTrue(result["permissions"]["edit"]["ok"])
+        self.assertEqual(result["permissions"]["edit"]["status"], "confirmed")
+        self.assertFalse(result["permissions"]["control"]["ok"])
+        self.assertEqual(result["permissions"]["control"]["status"], "not_granted")
+        self.assertTrue(result["capabilities"]["edit"])
+        self.assertFalse(result["capabilities"]["control"])
+        self.assertEqual(result["warnings"], [])
+        self.assertEqual(
+            server.received,
+            [
+                "/workspaces",
+                "/workspace/ws-1/connect",
+                "/workspace/ws-1/connect",
+                "/workspace/ws-1/cueLists/shallow",
+            ],
+        )
 
     def test_check_connection_reports_no_workspace(self) -> None:
         with FakeQlabOscServer({"/workspaces": []}) as server:

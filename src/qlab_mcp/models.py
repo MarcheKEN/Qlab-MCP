@@ -22,6 +22,7 @@ class QlabConnectionCheckResult(BaseModel):
     available_workspaces: list[dict[str, Any]]
     passcode_configured: bool
     passcode_status: str | None = None
+    connect_scopes: dict[str, Any] | None = None
     message: str
     connection: dict[str, Any]
     permissions: dict[str, Any]

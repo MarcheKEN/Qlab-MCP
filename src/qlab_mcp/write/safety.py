@@ -6,13 +6,12 @@ from typing import Any
 
 from ..errors import OscTimeoutError, QLabReplyError, UnsafeWriteOperationError
 from ..osc.addressing import _clean_workspace_id
+from ..runtime.connection import check_connect_scopes
 from .allowlist import planned_write_capabilities
 
 
 EDIT_PERMISSION_NOTE = (
-    "QLab edit permission cannot be proven without sending a mutating OSC command. "
-    "This readiness check only verifies local write configuration, passcode presence, "
-    "and workspace resolution through non-mutating reads."
+    "QLab edit permission must be confirmed by /connect before real write commands can run."
 )
 
 
@@ -24,7 +23,7 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
     passcode_configured = bool(getattr(config, "passcode", None))
     capabilities = planned_write_capabilities(dry_run_default)
     blockers: list[str] = []
-    warnings = [EDIT_PERMISSION_NOTE]
+    warnings: list[str] = []
     checks: dict[str, Any] = {
         "write_enabled": {"ok": write_enabled, "env": "QLAB_ENABLE_WRITE"},
         "workspace_id": {"ok": True, "required": True, "workspace_id": workspace},
@@ -36,9 +35,11 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
         "edit_permission": {
             "ok": None,
             "status": "not_checked",
-            "safe_to_probe": False,
+            "source": "/connect",
+            "safe_to_probe": True,
             "reason": EDIT_PERMISSION_NOTE,
         },
+        "connect": None,
         "workspace_resolution": {"ok": None, "status": "not_checked"},
     }
 
@@ -119,13 +120,40 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
         "workspace_id": workspace_info.get("uniqueID") or workspace,
         "workspace_name": workspace_info.get("displayName") or workspace_info.get("name"),
     }
+    connect_scopes = check_connect_scopes(reader.client, workspace)
+    checks["connect"] = connect_scopes
+    edit_confirmed = connect_scopes.get("status") == "confirmed" and "edit" in (connect_scopes.get("scopes") or [])
+    edit_status = "confirmed" if edit_confirmed else "not_granted"
+    if not edit_confirmed and connect_scopes.get("status") not in {"confirmed", None}:
+        edit_status = str(connect_scopes.get("status"))
+    checks["edit_permission"] = {
+        "ok": edit_confirmed,
+        "status": edit_status,
+        "source": "/connect",
+        "safe_to_probe": True,
+        "scopes": connect_scopes.get("scopes") or [],
+        "connect_status": connect_scopes.get("status"),
+    }
+    if not edit_confirmed:
+        blockers.append("edit_not_confirmed")
+        return _readiness_result(
+            ok=False,
+            status="edit_not_confirmed",
+            message="QLab write mode is not ready; /connect did not confirm edit permission.",
+            workspace_id=workspace,
+            write_enabled=write_enabled,
+            dry_run_default=dry_run_default,
+            passcode_configured=passcode_configured,
+            capabilities=capabilities,
+            checks=checks,
+            blockers=blockers,
+            warnings=warnings,
+        )
+
     return _readiness_result(
         ok=True,
         status="ready",
-        message=(
-            "QLab write mode is enabled and locally ready. Real edit permission is still only proven "
-            "by the first mutating command, so prefer dry_run before creating cues."
-        ),
+        message="QLab write mode is enabled and /connect confirmed edit permission.",
         workspace_id=workspace,
         write_enabled=write_enabled,
         dry_run_default=dry_run_default,
@@ -144,6 +172,9 @@ def ensure_write_ready(reader: Any, workspace_id: str) -> str:
         raise UnsafeWriteOperationError("Write mode is disabled. Set QLAB_ENABLE_WRITE=true to enable gated writes.")
     if not bool(getattr(config, "passcode", None)):
         raise UnsafeWriteOperationError("QLAB_PASSCODE must be configured on the server before write mode can run.")
+    readiness = check_write_readiness(reader, workspace)
+    if not readiness["ok"]:
+        raise UnsafeWriteOperationError(readiness["message"])
     return workspace
 
 

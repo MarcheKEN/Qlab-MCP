@@ -2358,6 +2358,28 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(server.received_args[0], ("5983",))
         self.assertEqual(len(set(server.received_client_ports)), 1)
 
+    def test_passcode_connect_is_reused_for_following_workspace_requests(self) -> None:
+        responses = {
+            "/workspace/ws-1/connect": "ok:view|edit",
+            "/workspace/ws-1/showMode": False,
+        }
+        with FakeQlabOscServer(responses) as server:
+            assert server.port is not None
+            config = QLabConfig(
+                host="127.0.0.1",
+                osc_port=server.port,
+                reply_port=0,
+                timeout=0.25,
+                passcode="5983",
+            )
+            client = QLabOscClient(config)
+
+            client.request("/workspace/ws-1/connect", "5983")
+            reply = client.request("/workspace/ws-1/showMode", workspace_id="ws-1")
+
+        self.assertFalse(reply.data)
+        self.assertEqual(server.received, ["/workspace/ws-1/connect", "/workspace/ws-1/showMode"])
+
     def test_timeout_raises(self) -> None:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.bind(("127.0.0.1", 0))

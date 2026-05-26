@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from qlab_mcp.config import QLabConfig
-from qlab_mcp.errors import QLabReplyError, UnsafeWriteOperationError
+from qlab_mcp.errors import OscTimeoutError, QLabReplyError, UnsafeWriteOperationError
 from qlab_mcp.qlab import QLabReader
 from qlab_mcp.runtime.read_cache import shared_read_cache
 
@@ -23,6 +23,7 @@ class FakeWriteClient:
         show_mode_data: Any = False,
         show_mode_status: str = "ok",
         fail_set_property: str | None = None,
+        timeout_set_property: str | None = None,
         missing_cue: bool = False,
     ):
         self.config = config
@@ -42,6 +43,7 @@ class FakeWriteClient:
         self.show_mode_data = show_mode_data
         self.show_mode_status = show_mode_status
         self.fail_set_property = fail_set_property
+        self.timeout_set_property = timeout_set_property
         self.missing_cue = missing_cue
         self.created = False
         self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
@@ -75,6 +77,8 @@ class FakeWriteClient:
             if property_name == self.fail_set_property:
                 raise QLabReplyError("error", f"Failed setting {property_name}", address)
             self.cue_values[property_name] = args[0] if args else None
+            if property_name == self.timeout_set_property:
+                raise OscTimeoutError(f"Timed out waiting for QLab reply to {address}")
             return SimpleNamespace(data=None, status="ok")
         raise AssertionError(f"Unexpected fake write request: {address}")
 
@@ -407,6 +411,26 @@ def test_update_cue_real_updates_and_verifies_fresh_details() -> None:
     assert "/workspace/ws-1/showMode" in addresses
     assert f"/workspace/ws-1/cue_id/{cue_id}/name" in addresses
     assert f"/workspace/ws-1/cue_id/{cue_id}/armed" in addresses
+
+
+def test_update_cue_real_accepts_setter_timeout_when_after_read_confirms_value() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass", cache_ttl=10),
+        existing_cue_id=cue_id,
+        timeout_set_property="flagged",
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cue("ws-1", cue_id, {"flagged": True}, dry_run=False)
+
+    assert result["ok"] is True
+    assert result["status"] == "updated"
+    assert result["after"]["flagged"] is True
+    assert result["diff"]["flagged"] == {"before": False, "requested": True, "after": True}
+    assert result["errors"] is None
+    assert result["executed_operations"][0]["status"] == "timeout_pending_verification"
+    assert result["warnings"] == ["One or more setters did not reply, but fresh after-read confirmed requested values."]
 
 
 def test_update_cue_real_resolves_number_to_unique_id_for_setters() -> None:

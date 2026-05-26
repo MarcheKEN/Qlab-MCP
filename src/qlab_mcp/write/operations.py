@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..errors import UnsafeWriteOperationError
-from ..osc.addressing import _clean_cue_ref, _clean_workspace_id, _cue_address, _workspace_address
+from ..errors import OscTimeoutError, UnsafeWriteOperationError
+from ..osc.addressing import (
+    _clean_cue_ref,
+    _clean_workspace_id,
+    _cue_address,
+    _normalize_id_list,
+    _workspace_address,
+)
 from ..runtime.read_cache import shared_read_cache
 from .allowlist import validate_writable_cue_type, validate_write_properties
 from .safety import check_write_readiness, ensure_write_ready, resolve_dry_run
@@ -60,39 +66,71 @@ class QLabWriteMixin:
         read_cache.clear()
 
         executed_operations: list[dict[str, Any]] = []
+        warnings: list[str] = []
+        errors: dict[str, str] = {}
+        before_ids = _try_workspace_cue_ids(self, workspace)
         new_address = _workspace_address(workspace, "new")
-        new_reply = self.client.request(new_address, qlab_cue_type, workspace_id=workspace)
-        created_cue_id = _extract_created_cue_id(new_reply.data)
+        try:
+            new_reply = self.client.request(new_address, qlab_cue_type)
+            created_cue_id = _extract_created_cue_id(new_reply.data)
+            new_status = new_reply.status
+        except OscTimeoutError as exc:
+            created_cue_id = _resolve_created_cue_after_timeout(self, workspace, before_ids)
+            new_status = "timeout_confirmed_by_fresh_read"
+            warnings.append(f"QLab did not reply to /new, but a fresh cue ID diff found created cue {created_cue_id}.")
+            if created_cue_id is None:
+                raise UnsafeWriteOperationError(f"QLab did not reply to /new and the created cue could not be identified: {exc}") from exc
         executed_operations.append(
             {
                 "operation": "new",
                 "address": new_address,
                 "args": [qlab_cue_type],
-                "status": new_reply.status,
+                "status": new_status,
                 "created_cue_id": created_cue_id,
             }
         )
 
         for key, value in normalized_properties.items():
             address = _cue_id_address(workspace, created_cue_id, key)
-            reply = self.client.request(address, value, workspace_id=workspace)
+            try:
+                reply = self.client.request(address, value)
+                status = reply.status
+                error = None
+            except OscTimeoutError as exc:
+                status = "timeout_pending_verification"
+                error = str(exc)
+                warnings.append(f"QLab did not reply to setter {key}; fresh verification is authoritative.")
+            except Exception as exc:
+                errors[key] = str(exc)
+                break
             executed_operations.append(
                 {
                     "operation": "set_property",
                     "property": key,
                     "address": address,
                     "args": [value],
-                    "status": reply.status,
+                    "status": status,
+                    **({"error": error} if error else {}),
                 }
             )
 
         read_cache.clear()
         verification = self.get_cue_details(workspace, created_cue_id, "auto")
         read_cache.clear()
+        verification_properties = verification.get("properties") if isinstance(verification, dict) else {}
+        verified = _properties_match(verification_properties, normalized_properties)
+        if errors or not verified:
+            status = "verification_failed"
+            ok = False
+            message = "Cue create command was sent, but fresh verification did not confirm all requested properties."
+        else:
+            status = "created"
+            ok = True
+            message = "Cue created, safe initial properties applied, and cue details read back fresh."
 
         return {
-            "ok": True,
-            "status": "created",
+            "ok": ok,
+            "status": status,
             "workspace_id": workspace,
             "cue_type": qlab_cue_type,
             "dry_run": False,
@@ -102,8 +140,9 @@ class QLabWriteMixin:
             "planned_operations": planned_operations,
             "executed_operations": executed_operations,
             "verification": verification,
-            "warnings": [],
-            "message": "Cue created, safe initial properties applied, and cue details read back fresh.",
+            "errors": errors or None,
+            "warnings": warnings,
+            "message": message,
         }
 
     def update_cue(
@@ -175,10 +214,17 @@ class QLabWriteMixin:
 
         executed_operations: list[dict[str, Any]] = []
         errors: dict[str, str] = {}
+        setter_timeouts: dict[str, str] = {}
         for key, value in normalized_properties.items():
             address = _cue_id_address(workspace, resolved_cue_id, key)
             try:
-                reply = self.client.request(address, value, workspace_id=workspace)
+                reply = self.client.request(address, value)
+                status = reply.status
+                error = None
+            except OscTimeoutError as exc:
+                setter_timeouts[key] = str(exc)
+                status = "timeout_pending_verification"
+                error = str(exc)
             except Exception as exc:
                 errors[key] = str(exc)
                 break
@@ -188,7 +234,8 @@ class QLabWriteMixin:
                     "property": key,
                     "address": address,
                     "args": [value],
-                    "status": reply.status,
+                    "status": status,
+                    **({"error": error} if error else {}),
                 }
             )
 
@@ -201,8 +248,13 @@ class QLabWriteMixin:
             after_errors["verification"] = str(exc)
         read_cache.clear()
 
-        all_errors = {**errors, **after_errors}
-        failed = bool(errors)
+        confirmed_by_after = _properties_match(after, normalized_properties)
+        unconfirmed_timeouts = {} if confirmed_by_after else setter_timeouts
+        all_errors = {**errors, **unconfirmed_timeouts, **after_errors}
+        warnings = []
+        if setter_timeouts and confirmed_by_after:
+            warnings.append("One or more setters did not reply, but fresh after-read confirmed requested values.")
+        failed = bool(errors) or bool(unconfirmed_timeouts)
         verification_failed = bool(after_errors) and not failed
         status = "partial_failed" if failed else "verification_failed" if verification_failed else "updated"
         if failed:
@@ -230,7 +282,7 @@ class QLabWriteMixin:
             "executed_operations": executed_operations,
             "verification": verification,
             "errors": all_errors or None,
-            "warnings": [],
+            "warnings": warnings,
             "message": message,
         }
 
@@ -362,6 +414,30 @@ def _try_read_update_values(
         return values, {}
     except Exception as exc:
         return None, {"read_before": str(exc)}
+
+
+def _try_workspace_cue_ids(reader: Any, workspace_id: str) -> list[str] | None:
+    try:
+        reply = reader.client.request(_workspace_address(workspace_id, "cueLists/uniqueIDs"))
+        return _normalize_id_list(reply.data)
+    except Exception:
+        return None
+
+
+def _resolve_created_cue_after_timeout(reader: Any, workspace_id: str, before_ids: list[str] | None) -> str | None:
+    if before_ids is None:
+        return None
+    after_ids = _try_workspace_cue_ids(reader, workspace_id)
+    if after_ids is None:
+        return None
+    created = [cue_id for cue_id in after_ids if cue_id not in set(before_ids)]
+    return created[0] if len(created) == 1 else None
+
+
+def _properties_match(values: Any, requested: dict[str, Any]) -> bool:
+    if not isinstance(values, dict):
+        return False
+    return all(values.get(key) == value for key, value in requested.items())
 
 
 def _diff_properties(

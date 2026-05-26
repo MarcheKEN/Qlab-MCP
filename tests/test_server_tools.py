@@ -11,6 +11,7 @@ from qlab_mcp.server import (
     CREATE_CUE_TIMEOUT,
     CUE_DETAILS_TIMEOUT,
     QUERY_CUES_TIMEOUT,
+    UPDATE_CUE_TIMEOUT,
     WORKSPACE_OVERVIEW_TIMEOUT,
     WORKSPACE_SETTING_DETAILS_TIMEOUT,
     WORKSPACE_SETTINGS_TIMEOUT,
@@ -36,6 +37,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_get_cue_details",
         "qlab_check_write_readiness",
         "qlab_create_cue",
+        "qlab_update_cue",
     }
 
     check = tools["qlab_check_connection"]
@@ -109,6 +111,16 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "workspace_id" in create.inputSchema["required"]
     assert "cue_type" in create.inputSchema["required"]
 
+    update = tools["qlab_update_cue"]
+    assert update.title == "Update QLab Cue"
+    assert "Dry-run planning" in update.description
+    assert update.annotations.readOnlyHint is False
+    assert update.annotations.destructiveHint is False
+    assert update.annotations.idempotentHint is False
+    assert "workspace_id" in update.inputSchema["required"]
+    assert "cue_ref" in update.inputSchema["required"]
+    assert "properties" in update.inputSchema["required"]
+
 
 def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
     async def tool_timeouts():
@@ -123,6 +135,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
                 "qlab_get_cue_details",
                 "qlab_check_write_readiness",
                 "qlab_create_cue",
+                "qlab_update_cue",
             )
         }
 
@@ -136,6 +149,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
         "qlab_get_cue_details": CUE_DETAILS_TIMEOUT,
         "qlab_check_write_readiness": WRITE_READINESS_TIMEOUT,
         "qlab_create_cue": CREATE_CUE_TIMEOUT,
+        "qlab_update_cue": UPDATE_CUE_TIMEOUT,
     }
 
 

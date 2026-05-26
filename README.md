@@ -30,7 +30,7 @@ when you know exactly what needs inspection.
 
 The public entry points stay at the package root:
 
-- `src/qlab_mcp/server.py` exposes the six inspector tools plus two gated write-mode tools.
+- `src/qlab_mcp/server.py` exposes the six inspector tools plus three gated write-mode tools.
 - `src/qlab_mcp/qlab.py` keeps the compatibility facade for `QLabReader`.
 - `src/qlab_mcp/models.py`, `config.py`, `errors.py`, and `allowlist.py` hold shared API types and policy.
 
@@ -59,6 +59,7 @@ clear documentation or reference location, not at the package root.
 | `qlab_get_cue_details` | Inspect one cue after finding it in overview or query results. | `auto` profile |
 | `qlab_check_write_readiness` | Check disabled-by-default write-mode readiness without mutation. | Safety/readiness report |
 | `qlab_create_cue` | Dry-run or create one blank allowlisted cue with safe initial properties. | Dry-run by default |
+| `qlab_update_cue` | Dry-run or update one concrete cue with safe common properties. | Dry-run by default |
 
 ## Compact By Default
 
@@ -138,19 +139,19 @@ Write mode is deliberately narrow:
 - `qlab_check_connection` and `qlab_get_workspace_overview` read `/showMode`
   so callers can tell whether the workspace is in Edit Mode or Show Mode.
 - `qlab_check_write_readiness` does not mutate anything.
-- `qlab_create_cue` is blocked unless `QLAB_ENABLE_WRITE=true` and
+- `qlab_create_cue` and `qlab_update_cue` are blocked unless `QLAB_ENABLE_WRITE=true` and
   `QLAB_PASSCODE` is configured, `/connect` confirms `edit`, and `/showMode`
   confirms the workspace is in Edit Mode.
 - `dry_run` defaults to true through `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
-- `qlab_create_cue(..., dry_run=true)` is planning-only and can run without
-  enabling write mode or configuring a passcode.
+- `qlab_create_cue(..., dry_run=true)` and `qlab_update_cue(..., dry_run=true)`
+  are planning-only and can run without enabling write mode or configuring a passcode.
 - Real writes bypass and clear the read cache before verifying fresh cue details.
 - Only blank cue creation is allowed in this preface.
 - Allowed cue types are `memo`, `group`, `wait`, and `audio`.
-- Allowed initial properties are `name`, `number`, `armed`, `flagged`,
+- Allowed initial/update properties are `name`, `number`, `armed`, `flagged`,
   `colorName`, `preWait`, `postWait`, `duration`, and `continueMode`.
 - Playback control, raw OSC, target edits, file paths, scripts, routing changes,
-  GO, stop, panic, playhead control, and existing-cue editing are not exposed.
+  GO, stop, panic, playhead control, batch editing, and ambiguous selected/active edits are not exposed.
 
 ## Tool Signatures
 
@@ -163,6 +164,7 @@ qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=No
 qlab_get_cue_details(workspace_id, cue_ref, profile="auto")
 qlab_check_write_readiness(workspace_id)
 qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
+qlab_update_cue(workspace_id, cue_ref, properties, dry_run=None)
 ```
 
 ## Query Filters

@@ -23,6 +23,7 @@ from .models import (
     CueDetailsResult,
     CueQueryResult,
     QlabConnectionCheckResult,
+    UpdateCueResult,
     WriteReadinessResult,
     WorkspaceSettingDetailsResult,
     WorkspaceOverviewResult,
@@ -135,6 +136,7 @@ QUERY_CUES_TIMEOUT = 60.0
 CUE_DETAILS_TIMEOUT = 20.0
 WRITE_READINESS_TIMEOUT = 6.0
 CREATE_CUE_TIMEOUT = 30.0
+UPDATE_CUE_TIMEOUT = 30.0
 
 T = TypeVar("T")
 
@@ -147,7 +149,7 @@ Use these tools to read QLab 5 workspace and cue information over OSC.
 
 The six inspector tools are read-only and intentionally avoid playback, editing, deletion, and raw OSC.
 Write mode is a separate gated preface: it is disabled unless QLAB_ENABLE_WRITE=true, defaults to dry-run,
-requires QLAB_PASSCODE on the server plus edit confirmed by /connect, and currently only supports basic cue creation.
+requires QLAB_PASSCODE on the server plus edit confirmed by /connect, and currently only supports basic cue creation and safe cue updates.
 
 Start with qlab_check_connection to verify QLab, workspace candidates, passcode, and read access.
 
@@ -159,7 +161,7 @@ Use qlab_get_workspace_setting_details after settings when you need one specific
 
 Use qlab_query_cues for filtered cue searches across up to 500 cues by default, or up to 5000 cues when a caller explicitly raises the scan limit, then qlab_get_cue_details for one cue that needs deeper inspection.
 
-For write preflight, call qlab_check_write_readiness with an explicit workspace_id. Only call qlab_create_cue after reviewing dry_run output. This server does not expose GO, stop, panic, raw OSC, existing-cue editing, or playback control.
+For write preflight, call qlab_check_write_readiness with an explicit workspace_id. Only call qlab_create_cue or qlab_update_cue after reviewing dry_run output. This server does not expose GO, stop, panic, raw OSC, batch editing, or playback control.
 """,
 )
 
@@ -622,6 +624,61 @@ def qlab_create_cue(
                 properties=properties,
                 dry_run=dry_run,
                 after_cue_id=after_cue_id,
+            )
+        )
+    )
+
+
+@mcp.tool(
+    title="Update QLab Cue",
+    tags={"qlab", "write-mode", "cue-update", "gated-write"},
+    annotations=GATED_CREATE_QLAB_TOOL,
+    timeout=UPDATE_CUE_TIMEOUT,
+)
+def qlab_update_cue(
+    workspace_id: WorkspaceId,
+    cue_ref: Annotated[
+        str,
+        Field(
+            min_length=1,
+            description=(
+                "Concrete cue number or unique ID. selected, active, playhead, and playbackPosition "
+                "are not accepted for updates."
+            ),
+        ),
+    ],
+    properties: Annotated[
+        dict[str, Any],
+        Field(
+            description=(
+                "Safe cue properties to update. Allowed keys: name, number, armed, flagged, colorName, "
+                "preWait, postWait, duration, and continueMode."
+            ),
+        ),
+    ],
+    dry_run: Annotated[
+        bool | None,
+        Field(
+            description=(
+                "When true, plan and diff the update but send no mutating commands. "
+                "When omitted, QLAB_WRITE_DRY_RUN_DEFAULT is used and defaults to true."
+            ),
+        ),
+    ] = None,
+) -> UpdateCueResult:
+    """Update one existing cue with safe common properties or return a dry-run plan.
+
+    Real updates require QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
+    Dry-run planning never sends mutating OSC.
+    This tool never edits targets, files, scripts, routing, playback, raw OSC, or multiple cues.
+    """
+    return _run_tool(
+        lambda: UpdateCueResult.model_validate(
+            _reader().update_cue(
+                workspace_id=workspace_id,
+                cue_ref=cue_ref,
+                properties=properties,
+                dry_run=dry_run,
             )
         )
     )

@@ -139,3 +139,23 @@ class CreateCueResult(BaseModel):
     verification: dict[str, Any] | None = None
     warnings: list[str] = Field(default_factory=list)
     message: str
+
+
+class UpdateCueResult(BaseModel):
+    """Result for gated cue update or dry-run planning."""
+
+    ok: bool
+    status: str
+    workspace_id: str
+    cue_ref: str
+    dry_run: bool
+    properties: dict[str, Any] = Field(default_factory=dict)
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+    diff: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    planned_operations: list[dict[str, Any]] = Field(default_factory=list)
+    executed_operations: list[dict[str, Any]] = Field(default_factory=list)
+    verification: dict[str, Any] | None = None
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    message: str

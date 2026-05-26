@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from qlab_mcp.config import QLabConfig
-from qlab_mcp.errors import UnsafeWriteOperationError
+from qlab_mcp.errors import QLabReplyError, UnsafeWriteOperationError
 from qlab_mcp.qlab import QLabReader
 from qlab_mcp.runtime.read_cache import shared_read_cache
 
@@ -16,17 +16,33 @@ class FakeWriteClient:
         self,
         config: QLabConfig,
         created_cue_id: str | None = None,
+        existing_cue_id: str | None = None,
+        cue_values: dict[str, Any] | None = None,
         connect_data: str = "ok:view|edit",
         connect_status: str = "ok",
         show_mode_data: Any = False,
         show_mode_status: str = "ok",
+        fail_set_property: str | None = None,
+        missing_cue: bool = False,
     ):
         self.config = config
         self.created_cue_id = created_cue_id
+        self.existing_cue_id = existing_cue_id
+        self.cue_values = cue_values or {
+            "uniqueID": existing_cue_id or created_cue_id,
+            "number": "1",
+            "name": "Stale",
+            "displayName": "1 Stale",
+            "type": "Memo",
+            "armed": True,
+            "flagged": False,
+        }
         self.connect_data = connect_data
         self.connect_status = connect_status
         self.show_mode_data = show_mode_data
         self.show_mode_status = show_mode_status
+        self.fail_set_property = fail_set_property
+        self.missing_cue = missing_cue
         self.created = False
         self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
 
@@ -40,22 +56,25 @@ class FakeWriteClient:
             return SimpleNamespace(data=self.show_mode_data, status=self.show_mode_status)
         if address == "/workspace/ws-1/new":
             self.created = True
+            self.cue_values["uniqueID"] = self.created_cue_id
             return SimpleNamespace(data={"uniqueID": self.created_cue_id}, status="ok")
-        if self.created_cue_id and address.startswith(f"/workspace/ws-1/cue_id/{self.created_cue_id}/"):
+        known_ids = {value for value in (self.created_cue_id, self.existing_cue_id) if value}
+        if any(address.startswith(f"/workspace/ws-1/cue_id/{cue_id}/") for cue_id in known_ids) or address.startswith(
+            "/workspace/ws-1/cue/1/"
+        ):
+            if self.missing_cue:
+                raise QLabReplyError("error", "No cue found", address)
             if address.endswith("/valuesForKeys"):
-                name = "Created" if self.created else "Stale"
+                if self.created and self.created_cue_id:
+                    self.cue_values["name"] = self.cue_values.get("name", "Created")
                 return SimpleNamespace(
-                    data={
-                        "uniqueID": self.created_cue_id,
-                        "number": "1",
-                        "name": name,
-                        "displayName": f"1 {name}",
-                        "type": "Memo",
-                        "armed": True,
-                        "flagged": False,
-                    },
+                    data=dict(self.cue_values),
                     status="ok",
                 )
+            property_name = address.rsplit("/", 1)[1]
+            if property_name == self.fail_set_property:
+                raise QLabReplyError("error", f"Failed setting {property_name}", address)
+            self.cue_values[property_name] = args[0] if args else None
             return SimpleNamespace(data=None, status="ok")
         raise AssertionError(f"Unexpected fake write request: {address}")
 
@@ -297,3 +316,114 @@ def test_create_cue_real_creates_applies_properties_and_verifies_fresh_details()
     assert f"/workspace/ws-1/cue_id/{cue_id}/armed" in addresses
     assert f"/workspace/ws-1/cue_id/{cue_id}/continueMode" in addresses
     assert addresses.count(f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys") >= 2
+
+
+def test_update_cue_dry_run_sends_no_mutating_osc() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None), existing_cue_id=cue_id)
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cue("ws-1", cue_id, {"name": "New", "armed": False}, dry_run=True)
+
+    assert result["ok"] is True
+    assert result["status"] == "dry_run"
+    assert result["dry_run"] is True
+    assert result["before"]["name"] == "Stale"
+    assert result["diff"]["name"] == {"before": "Stale", "requested": "New"}
+    assert [operation["operation"] for operation in result["planned_operations"]] == [
+        "read_before",
+        "set_property",
+        "set_property",
+        "verify",
+    ]
+    assert [request[0] for request in client.requests] == [f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys"]
+
+
+def test_update_cue_rejects_ambiguous_refs_and_bad_properties_before_osc() -> None:
+    client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"))
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    with pytest.raises(UnsafeWriteOperationError, match="concrete cue"):
+        reader.update_cue("ws-1", "selected", {"name": "Nope"}, dry_run=True)
+
+    with pytest.raises(UnsafeWriteOperationError, match="not allowlisted"):
+        reader.update_cue("ws-1", "1", {"fileTarget": "/tmp/nope.wav"}, dry_run=True)
+
+    assert client.requests == []
+
+
+def test_update_cue_real_blocks_missing_cue_before_setters() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        missing_cue=True,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cue("ws-1", cue_id, {"name": "New"}, dry_run=False)
+
+    assert result["ok"] is False
+    assert result["status"] == "cue_not_found"
+    assert result["executed_operations"] == []
+    assert f"/workspace/ws-1/cue_id/{cue_id}/name" not in [request[0] for request in client.requests]
+
+
+def test_update_cue_real_updates_and_verifies_fresh_details() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass", cache_ttl=10),
+        existing_cue_id=cue_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cue("ws-1", cue_id, {"name": "New", "armed": False}, dry_run=False)
+
+    addresses = [request[0] for request in client.requests]
+    assert result["ok"] is True
+    assert result["status"] == "updated"
+    assert result["before"]["name"] == "Stale"
+    assert result["after"]["name"] == "New"
+    assert result["diff"]["armed"] == {"before": True, "requested": False, "after": False}
+    assert result["verification"]["properties"]["name"] == "New"
+    assert "/workspace/ws-1/connect" in addresses
+    assert "/workspace/ws-1/showMode" in addresses
+    assert f"/workspace/ws-1/cue_id/{cue_id}/name" in addresses
+    assert f"/workspace/ws-1/cue_id/{cue_id}/armed" in addresses
+
+
+def test_update_cue_real_blocks_in_show_mode() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        show_mode_data=True,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    with pytest.raises(UnsafeWriteOperationError, match="Show Mode"):
+        reader.update_cue("ws-1", cue_id, {"name": "New"}, dry_run=False)
+
+    assert [request[0] for request in client.requests] == [
+        "/workspaces",
+        "/workspace/ws-1/connect",
+        "/workspace/ws-1/showMode",
+    ]
+
+
+def test_update_cue_real_reports_partial_failure() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        fail_set_property="armed",
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cue("ws-1", cue_id, {"name": "New", "armed": False}, dry_run=False)
+
+    assert result["ok"] is False
+    assert result["status"] == "partial_failed"
+    assert [operation["property"] for operation in result["executed_operations"]] == ["name"]
+    assert "armed" in result["errors"]
+    assert result["after"]["name"] == "New"

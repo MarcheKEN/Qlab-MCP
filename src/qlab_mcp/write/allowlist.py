@@ -81,7 +81,11 @@ def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
                 "index": "planned_later",
             },
         },
-        "edit_existing_cue": {"planned": False},
+        "edit_existing_cue": {
+            "planned": True,
+            "properties": list(WRITABLE_CUE_PROPERTIES),
+            "dry_run_default": dry_run_default,
+        },
         "playback_control": {"enabled": False},
         "raw_osc": {"enabled": False},
     }

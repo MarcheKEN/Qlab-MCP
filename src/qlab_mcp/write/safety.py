@@ -6,7 +6,7 @@ from typing import Any
 
 from ..errors import OscTimeoutError, QLabReplyError, UnsafeWriteOperationError
 from ..osc.addressing import _clean_workspace_id
-from ..runtime.connection import check_connect_scopes
+from ..runtime.connection import check_connect_scopes, read_workspace_mode
 from .allowlist import planned_write_capabilities
 
 
@@ -40,6 +40,7 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
             "reason": EDIT_PERMISSION_NOTE,
         },
         "connect": None,
+        "show_mode": None,
         "workspace_resolution": {"ok": None, "status": "not_checked"},
     }
 
@@ -150,10 +151,43 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
             warnings=warnings,
         )
 
+    workspace_mode = read_workspace_mode(reader.client, workspace, authenticated=True)
+    checks["show_mode"] = workspace_mode
+    if workspace_mode.get("show_mode") is True:
+        blockers.append("workspace_in_show_mode")
+        return _readiness_result(
+            ok=False,
+            status="workspace_in_show_mode",
+            message="QLab write mode is not ready; the workspace is currently in Show Mode.",
+            workspace_id=workspace,
+            write_enabled=write_enabled,
+            dry_run_default=dry_run_default,
+            passcode_configured=passcode_configured,
+            capabilities=capabilities,
+            checks=checks,
+            blockers=blockers,
+            warnings=warnings,
+        )
+    if workspace_mode.get("ok") is not True:
+        blockers.append("show_mode_unknown")
+        return _readiness_result(
+            ok=False,
+            status="show_mode_unknown",
+            message="QLab write mode is not ready; /showMode could not confirm the workspace is in Edit Mode.",
+            workspace_id=workspace,
+            write_enabled=write_enabled,
+            dry_run_default=dry_run_default,
+            passcode_configured=passcode_configured,
+            capabilities=capabilities,
+            checks=checks,
+            blockers=blockers,
+            warnings=warnings,
+        )
+
     return _readiness_result(
         ok=True,
         status="ready",
-        message="QLab write mode is enabled and /connect confirmed edit permission.",
+        message="QLab write mode is enabled, /connect confirmed edit permission, and the workspace is in Edit Mode.",
         workspace_id=workspace,
         write_enabled=write_enabled,
         dry_run_default=dry_run_default,

@@ -18,7 +18,7 @@ from qlab_mcp.config import QLabConfig
 from qlab_mcp.errors import OscTimeoutError, QLabReplyError, UnsafeCuePropertyError
 from qlab_mcp.osc import decode_message, encode_message
 from qlab_mcp.qlab import QLabReader
-from qlab_mcp.runtime.connection import parse_connect_scopes
+from qlab_mcp.runtime.connection import normalize_workspace_mode, parse_connect_scopes
 from qlab_mcp.runtime.read_cache import shared_read_cache
 
 
@@ -110,6 +110,23 @@ class ConnectScopeTests(unittest.TestCase):
         self.assertEqual(missing["status"], "scope_unavailable")
 
 
+class WorkspaceModeTests(unittest.TestCase):
+    def test_normalize_workspace_mode(self) -> None:
+        show = normalize_workspace_mode(True, "/workspace/ws-1/showMode")
+        edit = normalize_workspace_mode(False, "/workspace/ws-1/showMode")
+        unknown = normalize_workspace_mode("false", "/workspace/ws-1/showMode")
+
+        self.assertTrue(show["ok"])
+        self.assertEqual(show["mode"], "show")
+        self.assertTrue(show["show_mode"])
+        self.assertTrue(edit["ok"])
+        self.assertEqual(edit["mode"], "edit")
+        self.assertFalse(edit["show_mode"])
+        self.assertFalse(unknown["ok"])
+        self.assertEqual(unknown["status"], "unexpected_data")
+        self.assertEqual(unknown["mode"], "unknown")
+
+
 class QLabReaderTests(unittest.TestCase):
     def setUp(self) -> None:
         shared_read_cache().clear()
@@ -128,6 +145,7 @@ class QLabReaderTests(unittest.TestCase):
         workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5", "version": "5.5.10"}]
         responses = {
             "/workspaces": workspaces,
+            "/workspace/ws-1/showMode": False,
             "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-1", "name": "Main"}],
         }
         with FakeQlabOscServer(responses) as server:
@@ -156,6 +174,9 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIsNone(result["capabilities"]["edit"])
         self.assertIsNone(result["capabilities"]["control"])
         self.assertEqual(result["connect_scopes"]["status"], "not_checked")
+        self.assertEqual(result["workspace_mode"]["mode"], "edit")
+        self.assertFalse(result["workspace_mode"]["show_mode"])
+        self.assertEqual(result["checks"]["show_mode"]["status"], "confirmed")
         self.assertTrue(result["permissions"]["view"]["ok"])
         self.assertEqual(result["permissions"]["view"]["status"], "confirmed")
         self.assertTrue(result["permissions"]["view"]["safe_to_probe"])
@@ -164,13 +185,14 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["permissions"]["edit"]["safe_to_probe"])
         self.assertTrue(result["permissions"]["control"]["safe_to_probe"])
         self.assertIn("QLAB_PASSCODE is not configured", result["warnings"][0])
-        self.assertEqual(server.received, ["/workspaces", "/workspace/ws-1/cueLists/shallow"])
+        self.assertEqual(server.received, ["/workspaces", "/workspace/ws-1/showMode", "/workspace/ws-1/cueLists/shallow"])
 
     def test_check_connection_parses_connect_scopes(self) -> None:
         workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5", "version": "5.5.10"}]
         responses = {
             "/workspaces": workspaces,
             "/workspace/ws-1/connect": "ok:view|edit",
+            "/workspace/ws-1/showMode": False,
             "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-1", "name": "Main"}],
         }
         with FakeQlabOscServer(responses) as server:
@@ -189,6 +211,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["connect_scopes"]["status"], "confirmed")
         self.assertEqual(result["connect_scopes"]["scopes"], ["view", "edit"])
+        self.assertEqual(result["workspace_mode"]["mode"], "edit")
         self.assertTrue(result["permissions"]["edit"]["ok"])
         self.assertEqual(result["permissions"]["edit"]["status"], "confirmed")
         self.assertFalse(result["permissions"]["control"]["ok"])
@@ -201,6 +224,7 @@ class QLabReaderTests(unittest.TestCase):
             [
                 "/workspaces",
                 "/workspace/ws-1/connect",
+                "/workspace/ws-1/showMode",
                 "/workspace/ws-1/cueLists/shallow",
             ],
         )
@@ -210,6 +234,7 @@ class QLabReaderTests(unittest.TestCase):
         responses = {
             "/workspaces": workspaces,
             "/workspace/ws-1/connect": "ok:view|edit",
+            "/workspace/ws-1/showMode": False,
             "/workspace/ws-1/cueLists/shallow": lambda _message: time.sleep(0.2),
         }
         with FakeQlabOscServer(responses) as server:
@@ -229,6 +254,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["status"], "workspace_read_timeout")
         self.assertFalse(result["workspace_readable"])
         self.assertEqual(result["connect_scopes"]["scopes"], ["view", "edit"])
+        self.assertEqual(result["workspace_mode"]["mode"], "edit")
         self.assertTrue(result["permissions"]["view"]["ok"])
         self.assertEqual(result["permissions"]["view"]["status"], "confirmed")
         self.assertEqual(result["permissions"]["view"]["source"], "/connect")
@@ -239,6 +265,7 @@ class QLabReaderTests(unittest.TestCase):
             [
                 "/workspaces",
                 "/workspace/ws-1/connect",
+                "/workspace/ws-1/showMode",
                 "/workspace/ws-1/cueLists/shallow",
             ],
         )
@@ -297,7 +324,7 @@ class QLabReaderTests(unittest.TestCase):
 
     def test_check_connection_can_skip_read_access(self) -> None:
         workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]
-        with FakeQlabOscServer({"/workspaces": workspaces}) as server:
+        with FakeQlabOscServer({"/workspaces": workspaces, "/workspace/ws-1/showMode": True}) as server:
             reader = QLabReader(client_for(server))
 
             result = reader.check_connection(require_read_access=False)
@@ -307,9 +334,11 @@ class QLabReaderTests(unittest.TestCase):
         self.assertFalse(result["workspace_readable"])
         self.assertTrue(result["checks"]["read_access"]["skipped"])
         self.assertEqual(result["permissions"]["view"]["status"], "skipped")
+        self.assertEqual(result["workspace_mode"]["mode"], "show")
+        self.assertTrue(result["workspace_mode"]["show_mode"])
         self.assertTrue(result["capabilities"]["resolve_workspace"])
         self.assertFalse(result["capabilities"]["read_workspace"])
-        self.assertEqual(server.received, ["/workspaces"])
+        self.assertEqual(server.received, ["/workspaces", "/workspace/ws-1/showMode"])
 
     def test_check_connection_reports_denied_workspace_read(self) -> None:
         responses = {
@@ -578,6 +607,7 @@ class QLabReaderTests(unittest.TestCase):
                     "port": 53000,
                 }
             ],
+            "/workspace/ws-1/showMode": False,
             "/workspace/ws-1/cueLists/shallow": [
                 {
                     "uniqueID": list_id,
@@ -631,6 +661,9 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["workspace_id"], "ws-1")
         self.assertEqual(result["workspace"]["name"], "demo.qlab5")
         self.assertEqual(result["workspace"]["qlab_version"], "5.5.10")
+        self.assertEqual(result["workspace"]["mode"], "edit")
+        self.assertFalse(result["workspace"]["show_mode"])
+        self.assertEqual(result["workspace"]["mode_check"]["source"], "/showMode")
         self.assertEqual(result["cue_count"], 3)
         self.assertEqual(result["summary"]["cue_lists"], 1)
         self.assertEqual(result["summary"]["inspected_cues"], 3)

@@ -18,11 +18,15 @@ class FakeWriteClient:
         created_cue_id: str | None = None,
         connect_data: str = "ok:view|edit",
         connect_status: str = "ok",
+        show_mode_data: Any = False,
+        show_mode_status: str = "ok",
     ):
         self.config = config
         self.created_cue_id = created_cue_id
         self.connect_data = connect_data
         self.connect_status = connect_status
+        self.show_mode_data = show_mode_data
+        self.show_mode_status = show_mode_status
         self.created = False
         self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
 
@@ -32,6 +36,8 @@ class FakeWriteClient:
             return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
         if address == "/workspace/ws-1/connect":
             return SimpleNamespace(data=self.connect_data, status=self.connect_status)
+        if address == "/workspace/ws-1/showMode":
+            return SimpleNamespace(data=self.show_mode_data, status=self.show_mode_status)
         if address == "/workspace/ws-1/new":
             self.created = True
             return SimpleNamespace(data={"uniqueID": self.created_cue_id}, status="ok")
@@ -103,7 +109,12 @@ def test_check_write_readiness_requires_edit_confirmed_by_connect() -> None:
     assert result["checks"]["workspace_resolution"]["ok"] is True
     assert result["checks"]["edit_permission"]["status"] == "confirmed"
     assert result["checks"]["connect"]["scopes"] == ["view", "edit"]
-    assert client.requests == [("/workspaces", (), None), ("/workspace/ws-1/connect", ("server-pass",), None)]
+    assert result["checks"]["show_mode"]["mode"] == "edit"
+    assert client.requests == [
+        ("/workspaces", (), None),
+        ("/workspace/ws-1/connect", ("server-pass",), None),
+        ("/workspace/ws-1/showMode", (), "ws-1"),
+    ]
 
 
 @pytest.mark.parametrize("connect_data", ["ok:view", "ok:view|control", "ok:admin"])
@@ -117,6 +128,30 @@ def test_check_write_readiness_blocks_without_edit_scope(connect_data: str) -> N
     assert result["status"] == "edit_not_confirmed"
     assert result["blockers"] == ["edit_not_confirmed"]
     assert result["checks"]["edit_permission"]["ok"] is False
+
+
+def test_check_write_readiness_blocks_show_mode() -> None:
+    client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"), show_mode_data=True)
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.check_write_readiness("ws-1")
+
+    assert result["ok"] is False
+    assert result["status"] == "workspace_in_show_mode"
+    assert result["blockers"] == ["workspace_in_show_mode"]
+    assert result["checks"]["show_mode"]["mode"] == "show"
+
+
+def test_check_write_readiness_blocks_unknown_show_mode() -> None:
+    client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"), show_mode_data="nope")
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.check_write_readiness("ws-1")
+
+    assert result["ok"] is False
+    assert result["status"] == "show_mode_unknown"
+    assert result["blockers"] == ["show_mode_unknown"]
+    assert result["checks"]["show_mode"]["status"] == "unexpected_data"
 
 
 def test_create_cue_disabled_blocks_before_osc() -> None:
@@ -214,6 +249,21 @@ def test_create_cue_real_blocks_without_confirmed_edit() -> None:
     assert [request[0] for request in client.requests] == ["/workspaces", "/workspace/ws-1/connect"]
 
 
+def test_create_cue_real_blocks_in_show_mode() -> None:
+    client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"), show_mode_data=True)
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    with pytest.raises(UnsafeWriteOperationError, match="Show Mode"):
+        reader.create_cue("ws-1", "memo", dry_run=False)
+
+    assert [request[0] for request in client.requests] == [
+        "/workspaces",
+        "/workspace/ws-1/connect",
+        "/workspace/ws-1/showMode",
+    ]
+    assert client.requests[-1][2] == "ws-1"
+
+
 def test_create_cue_real_creates_applies_properties_and_verifies_fresh_details() -> None:
     shared_read_cache().clear()
     cue_id = "11111111-1111-4111-8111-111111111111"
@@ -239,6 +289,8 @@ def test_create_cue_real_creates_applies_properties_and_verifies_fresh_details()
     assert result["created_cue_id"] == cue_id
     assert result["verification"]["properties"]["name"] == "Created"
     assert "/workspace/ws-1/connect" in addresses
+    assert "/workspace/ws-1/showMode" in addresses
+    assert next(request[2] for request in client.requests if request[0] == "/workspace/ws-1/showMode") == "ws-1"
     assert "/workspace/ws-1/new" in addresses
     assert f"/workspace/ws-1/cue_id/{cue_id}/name" in addresses
     assert f"/workspace/ws-1/cue_id/{cue_id}/number" in addresses

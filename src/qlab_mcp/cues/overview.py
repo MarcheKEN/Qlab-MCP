@@ -15,7 +15,7 @@ from .index import (
 )
 from .profiles import _derive_profile_fields
 from .refs import _flatten_cue_refs
-from ..runtime.connection import QLAB_VERSION_KEYS
+from ..runtime.connection import QLAB_VERSION_KEYS, read_workspace_mode
 
 
 CONTAINER_CUE_TYPES = {"Cue List", "Cue Cart", "Group"}
@@ -121,6 +121,7 @@ class CueOverviewMixin:
         workspaces = workspaces_result.get("workspaces") or []
         workspace = self._resolve_workspace(workspaces, workspace_id)
         resolved_workspace_id = _clean_workspace_id(workspace.get("uniqueID") or workspace_id or "")
+        workspace_mode = read_workspace_mode(self.client, resolved_workspace_id, authenticated=True)
 
         cue_lists = self.get_cue_lists(resolved_workspace_id, include_children=False)["cue_lists"] or []
         cue_id_data = self._request_data(
@@ -246,9 +247,17 @@ class CueOverviewMixin:
                     + "; increase max_depth or max_cues for a deeper tree scan."
                 )
 
+        workspace_metadata = _workspace_overview_metadata(workspace)
+        workspace_metadata.update(
+            {
+                "mode": workspace_mode.get("mode"),
+                "show_mode": workspace_mode.get("show_mode"),
+                "mode_check": workspace_mode,
+            }
+        )
         result = {
             "workspace_id": resolved_workspace_id,
-            "workspace": _workspace_overview_metadata(workspace),
+            "workspace": workspace_metadata,
             "cue_count": len(cue_ids),
             "summary": summary,
             "cue_lists": overview_cue_lists,

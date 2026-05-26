@@ -216,14 +216,14 @@ def qlab_check_connection(
             description=(
                 "When true, verify that the MCP can read /cueLists/shallow from the workspace. "
                 "Leave true when checking whether the MCP is ready to inspect a show. "
-                "Edit/control scopes are reported as not_checked because proving them requires non-read-only probes."
+                "The result also reports /connect scopes and /showMode Edit/Show state when available."
             )
         ),
     ] = True,
 ) -> QlabConnectionCheckResult:
     """Check whether QLab, workspace resolution, passcode, and safe read access are ready.
 
-    Use this before the overview; it reports /connect permission scopes plus safe read access.
+    Use this before the overview; it reports /connect permission scopes, /showMode state, and safe read access.
     """
     return _run_tool(
         lambda: QlabConnectionCheckResult.model_validate(
@@ -311,7 +311,7 @@ def qlab_get_workspace_overview(
 ) -> WorkspaceOverviewResult:
     """Map what the QLab show contains and how cue lists, groups, and cues are organized.
 
-    Use this as the first structural read after selecting a workspace; it is bounded and shallow by default.
+    Use this as the first structural read after selecting a workspace; it includes Edit/Show mode and is bounded and shallow by default.
     """
     return _run_tool(
         lambda: WorkspaceOverviewResult.model_validate(
@@ -555,7 +555,7 @@ def qlab_check_write_readiness(
     """Check local write-mode readiness without sending any mutating OSC commands.
 
     This verifies QLAB_ENABLE_WRITE, required workspace_id, server-side QLAB_PASSCODE presence,
-    planned write capabilities, and edit permission confirmed by QLab /connect scopes.
+    planned write capabilities, edit permission confirmed by QLab /connect scopes, and Edit Mode from /showMode.
     """
     return _run_tool(
         lambda: WriteReadinessResult.model_validate(
@@ -610,7 +610,7 @@ def qlab_create_cue(
 ) -> CreateCueResult:
     """Create one blank allowlisted cue or return a dry-run plan.
 
-    Real creation requires QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, and edit confirmed by /connect.
+    Real creation requires QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
     Dry-run planning never sends mutating OSC.
     This tool never exposes playback control, raw OSC, target edits, scripts, routing, or media paths.
     """

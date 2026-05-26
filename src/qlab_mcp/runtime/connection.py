@@ -13,6 +13,96 @@ QLAB_VERSION_KEYS = ("qlabVersion", "QLabVersion", "applicationVersion", "versio
 CONNECT_SCOPE_ORDER = ("view", "edit", "control")
 
 
+def normalize_workspace_mode(data: Any, address: str | None = None) -> dict[str, Any]:
+    """Normalize QLab /showMode data into an operational workspace mode."""
+    if isinstance(data, bool):
+        return _workspace_mode_result(
+            ok=True,
+            status="confirmed",
+            show_mode=data,
+            mode="show" if data else "edit",
+            address=address,
+        )
+    return _workspace_mode_result(
+        ok=False,
+        status="unexpected_data",
+        show_mode=None,
+        mode="unknown",
+        address=address,
+        reason="/showMode did not return a boolean value.",
+    )
+
+
+def read_workspace_mode(client: QLabOscClient, workspace_id: str, *, authenticated: bool = False) -> dict[str, Any]:
+    workspace = _clean_workspace_id(workspace_id)
+    address = _workspace_address(workspace, "showMode")
+    try:
+        reply = client.request(address, workspace_id=workspace if authenticated else None)
+    except QLabReplyError as exc:
+        return _workspace_mode_result(
+            ok=False,
+            status=exc.status,
+            show_mode=None,
+            mode="unknown",
+            address=address,
+            error=str(exc),
+        )
+    except OscTimeoutError as exc:
+        return _workspace_mode_result(
+            ok=False,
+            status="timeout",
+            show_mode=None,
+            mode="unknown",
+            address=address,
+            error=str(exc),
+        )
+    except Exception as exc:
+        return _workspace_mode_result(
+            ok=False,
+            status="error",
+            show_mode=None,
+            mode="unknown",
+            address=address,
+            error=str(exc),
+        )
+
+    if reply.status != "ok":
+        return _workspace_mode_result(
+            ok=False,
+            status=reply.status,
+            show_mode=None,
+            mode="unknown",
+            address=address,
+        )
+    return normalize_workspace_mode(reply.data, address=address)
+
+
+def _workspace_mode_result(
+    *,
+    ok: bool,
+    status: str,
+    show_mode: bool | None,
+    mode: str,
+    address: str | None = None,
+    reason: str | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "ok": ok,
+        "status": status,
+        "show_mode": show_mode,
+        "mode": mode,
+        "source": "/showMode",
+    }
+    if address is not None:
+        result["address"] = address
+    if reason:
+        result["reason"] = reason
+    if error:
+        result["error"] = error
+    return result
+
+
 def parse_connect_scopes(data: Any) -> dict[str, Any]:
     """Normalize QLab /connect permission data such as ok:view|edit."""
     if not isinstance(data, str):
@@ -275,6 +365,7 @@ class WorkspaceConnectionMixin:
             "workspaces": None,
             "workspace_resolution": None,
             "connect": None,
+            "show_mode": None,
             "read_access": None,
         }
         base_result: dict[str, Any] = {
@@ -291,6 +382,7 @@ class WorkspaceConnectionMixin:
             "passcode_configured": passcode_configured,
             "passcode_status": None,
             "connect_scopes": None,
+            "workspace_mode": None,
             "message": "",
             "connection": _connection_metadata(self.client),
             "permissions": permissions,
@@ -420,6 +512,10 @@ class WorkspaceConnectionMixin:
                 "status": "workspace_connect_failed",
                 "message": "QLab is reachable, but /connect failed for the requested workspace.",
             }
+
+        workspace_mode = read_workspace_mode(self.client, resolved_workspace_id)
+        checks["show_mode"] = workspace_mode
+        base_result["workspace_mode"] = workspace_mode
 
         if not require_read_access:
             checks["read_access"] = {"ok": None, "skipped": True, "reason": "require_read_access is false"}

@@ -51,8 +51,8 @@ clear documentation or reference location, not at the package root.
 
 | Tool | Use it for | Default shape |
 | --- | --- | --- |
-| `qlab_check_connection` | Confirm QLab is reachable, pick a workspace, and verify safe read access. | Small diagnostic result |
-| `qlab_get_workspace_overview` | Get the show map: cue lists, groups, cue counts, and optional cue index. | Bounded tree plus compact index |
+| `qlab_check_connection` | Confirm QLab is reachable, pick a workspace, verify safe read access, and report Edit/Show mode. | Small diagnostic result |
+| `qlab_get_workspace_overview` | Get the show map, Edit/Show mode, cue lists, groups, cue counts, and optional cue index. | Bounded tree plus compact index |
 | `qlab_get_workspace_settings` | Inventory patches, routes, stages, MIDI, network, light availability, and general settings. | Safe infrastructure summary |
 | `qlab_get_workspace_setting_details` | Inspect one patch, route, stage, map, MIDI/network item, or light patch. | `safe` profile |
 | `qlab_query_cues` | Search cues by type, state, color, name, number prefix, targets, timing, or health. | Up to 500 scanned/returned cues |
@@ -135,9 +135,12 @@ Write mode is deliberately narrow:
 - `QLAB_PASSCODE` is a server-side credential and is never a tool argument.
 - `qlab_check_connection` uses `/connect` as the source of truth for
   `view`, `edit`, and `control` permission scopes when `QLAB_PASSCODE` is set.
+- `qlab_check_connection` and `qlab_get_workspace_overview` read `/showMode`
+  so callers can tell whether the workspace is in Edit Mode or Show Mode.
 - `qlab_check_write_readiness` does not mutate anything.
 - `qlab_create_cue` is blocked unless `QLAB_ENABLE_WRITE=true` and
-  `QLAB_PASSCODE` is configured, and `/connect` confirms `edit`.
+  `QLAB_PASSCODE` is configured, `/connect` confirms `edit`, and `/showMode`
+  confirms the workspace is in Edit Mode.
 - `dry_run` defaults to true through `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
 - `qlab_create_cue(..., dry_run=true)` is planning-only and can run without
   enabling write mode or configuring a passcode.
@@ -225,8 +228,8 @@ Notes:
   `isOverridden`, or `isAuditioning` bypass the cache.
 - Sensitive `technical` and `full_sensitive` reads bypass the cache.
 - Write mode is disabled by default. When enabled, real writes require
-  `QLAB_PASSCODE`, `edit` confirmed by `/connect`, and bypass/clear the read
-  cache before fresh verification.
+  `QLAB_PASSCODE`, `edit` confirmed by `/connect`, Edit Mode confirmed by
+  `/showMode`, and bypass/clear the read cache before fresh verification.
 
 ## Run
 

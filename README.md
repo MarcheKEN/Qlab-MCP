@@ -153,6 +153,9 @@ Write mode is deliberately gated:
   `video_basic`, `camera_basic`, `text_basic`, `light_basic`, `fade_basic`,
   `network_basic`, `midi_basic`, `midi_file_basic`, `timecode_basic`,
   `target_basic`, `reset_basic`, `devamp_basic`, and `script_basic`.
+- Policy summary: all update profiles can exist for planning and targeting,
+  but real write is limited to safe properties only. Dangerous properties are
+  dry-run-only and are blocked when `dry_run=false`.
 - `properties={...}` remains the simple one-argument setter path.
 - `operations=[...]` supports structured setters such as audio levels, crop,
   text colors, and MIDI fields in dry-run plans.

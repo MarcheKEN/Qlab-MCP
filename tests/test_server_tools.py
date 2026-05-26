@@ -119,7 +119,29 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert update.annotations.idempotentHint is False
     assert "workspace_id" in update.inputSchema["required"]
     assert "cue_ref" in update.inputSchema["required"]
-    assert "properties" in update.inputSchema["required"]
+    assert "properties" not in update.inputSchema["required"]
+    assert "operations" in update.inputSchema["properties"]
+    assert update.inputSchema["properties"]["profile"]["enum"] == [
+        "common",
+        "memo_basic",
+        "wait_basic",
+        "group_basic",
+        "audio_basic",
+        "mic_basic",
+        "video_basic",
+        "camera_basic",
+        "text_basic",
+        "light_basic",
+        "fade_basic",
+        "network_basic",
+        "midi_basic",
+        "midi_file_basic",
+        "timecode_basic",
+        "target_basic",
+        "reset_basic",
+        "devamp_basic",
+        "script_basic",
+    ]
 
 
 def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:

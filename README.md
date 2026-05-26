@@ -59,7 +59,7 @@ clear documentation or reference location, not at the package root.
 | `qlab_get_cue_details` | Inspect one cue after finding it in overview or query results. | `auto` profile |
 | `qlab_check_write_readiness` | Check disabled-by-default write-mode readiness without mutation. | Safety/readiness report |
 | `qlab_create_cue` | Dry-run or create one blank allowlisted cue with safe initial properties. | Dry-run by default |
-| `qlab_update_cue` | Dry-run or update one concrete cue with safe common cue properties. | Dry-run by default |
+| `qlab_update_cue` | Dry-run or update one concrete cue through the cue editing registry. | Dry-run by default |
 
 ## Compact By Default
 
@@ -131,7 +131,7 @@ Redaction records include an `impact` field so agents can tell which conclusions
 are limited, such as exact network destination, display identity, route details,
 or hidden credentials.
 
-Write mode is deliberately narrow:
+Write mode is deliberately gated:
 
 - `QLAB_PASSCODE` is a server-side credential and is never a tool argument.
 - `qlab_check_connection` uses `/connect` as the source of truth for
@@ -148,14 +148,26 @@ Write mode is deliberately narrow:
 - Real writes bypass and clear the read cache before verifying fresh cue details.
 - Only blank cue creation is allowed in this preface.
 - Allowed cue types are `memo`, `group`, `wait`, and `audio`.
-- `qlab_update_cue` V1 edits only safe common cue properties, not type-specific cue data.
-- Allowed initial/update properties are `name`, `number`, `armed`, `flagged`,
-  `colorName`, `preWait`, `postWait`, `duration`, and `continueMode`.
-- Type-specific updates for Audio, Video, Light, Fade, Network, MIDI, Script,
-  targets, files, routing, patches, maps, media paths, and video geometry are
-  intentionally out of scope for this PR.
-- Playback control, raw OSC, target edits, file paths, scripts, routing changes,
-  GO, stop, panic, playhead control, batch editing, and ambiguous selected/active edits are not exposed.
+- `qlab_update_cue` uses a registry of cue-family profiles:
+  `common`, `memo_basic`, `wait_basic`, `group_basic`, `audio_basic`, `mic_basic`,
+  `video_basic`, `camera_basic`, `text_basic`, `light_basic`, `fade_basic`,
+  `network_basic`, `midi_basic`, `midi_file_basic`, `timecode_basic`,
+  `target_basic`, `reset_basic`, `devamp_basic`, and `script_basic`.
+- `properties={...}` remains the simple one-argument setter path.
+- `operations=[...]` supports structured setters such as audio levels, crop,
+  text colors, and MIDI fields in dry-run plans.
+- Every cue-family profile can real-write safe one-argument setters with direct
+  fresh readback. This includes common props plus `group_basic` metadata,
+  `audio_basic` transport metadata, `text_basic` simple text formatting,
+  `mic_basic` channel metadata, `video_basic`/`camera_basic` one-axis geometry,
+  `midi_file_basic` playback metadata, and `timecode_basic` metadata.
+- High-risk profiles and unvalidated properties are cataloged for dry-run only:
+  routing, targets, file paths, light commands, network/MIDI output, scripts,
+  audio levels, slices, objects, live variants, text ranges/colors, and
+  multi-argument geometry.
+- Playback control, raw OSC, GO, stop, panic, batch editing, and ambiguous
+  selected/active edits are not exposed. Target edits, file paths, scripts, and
+  routing changes are dry-run-only catalog entries.
 
 ## Tool Signatures
 
@@ -168,7 +180,17 @@ qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=No
 qlab_get_cue_details(workspace_id, cue_ref, profile="auto")
 qlab_check_write_readiness(workspace_id)
 qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
-qlab_update_cue(workspace_id, cue_ref, properties, dry_run=None)
+qlab_update_cue(workspace_id, cue_ref, properties=None, operations=None, profile="common", dry_run=None)
+```
+
+Structured update operations use this shape:
+
+```json
+{
+  "property": "level",
+  "args": {"inChannel": 1, "outChannel": 1, "decibel": -6},
+  "mode": "saved"
+}
 ```
 
 ## Query Filters

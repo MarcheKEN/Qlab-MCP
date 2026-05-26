@@ -47,6 +47,27 @@ CueProfile = Literal[
     "full_sensitive",
 ]
 CueIndexProfile = Literal["minimal", "health"]
+UpdateCueProfile = Literal[
+    "common",
+    "memo_basic",
+    "wait_basic",
+    "group_basic",
+    "audio_basic",
+    "mic_basic",
+    "video_basic",
+    "camera_basic",
+    "text_basic",
+    "light_basic",
+    "fade_basic",
+    "network_basic",
+    "midi_basic",
+    "midi_file_basic",
+    "timecode_basic",
+    "target_basic",
+    "reset_basic",
+    "devamp_basic",
+    "script_basic",
+]
 CueQueryFilter = Literal[
     "type",
     "flagged",
@@ -648,15 +669,33 @@ def qlab_update_cue(
         ),
     ],
     properties: Annotated[
-        dict[str, Any],
+        dict[str, Any] | None,
         Field(
             description=(
-                "Safe common cue properties to update. Allowed keys: name, number, armed, flagged, "
-                "colorName, preWait, postWait, duration, and continueMode. Type-specific properties "
-                "for Audio, Video, Light, Fade, Network, MIDI, Script, targets, files, routing, and media are not included in V1."
+                "Simple property updates for the selected profile. Backward-compatible path for one-argument "
+                "setters such as name, flagged, rate, text, or opacity. Use operations for structured or multi-arg setters."
             ),
         ),
-    ],
+    ] = None,
+    operations: Annotated[
+        list[dict[str, Any]] | None,
+        Field(
+            description=(
+                "Typed update operations for structured QLab OSC setters. Shape: "
+                "{\"property\":\"level\",\"args\":{\"inChannel\":1,\"outChannel\":1,\"decibel\":-6},\"mode\":\"saved\"}. "
+                "mode defaults to saved; live is accepted only for registry entries that support it."
+            ),
+        ),
+    ] = None,
+    profile: Annotated[
+        UpdateCueProfile,
+        Field(
+            description=(
+                "Update profile. All QLab cue families are cataloged. Profiles allow only one-argument, "
+                "fresh-verifiable real writes; higher-risk operations remain dry-run only."
+            ),
+        ),
+    ] = "common",
     dry_run: Annotated[
         bool | None,
         Field(
@@ -667,11 +706,11 @@ def qlab_update_cue(
         ),
     ] = None,
 ) -> UpdateCueResult:
-    """Update one existing cue with safe common cue properties or return a dry-run plan.
+    """Update one existing cue through the cue editing registry, or return a dry-run plan.
 
     Real updates require QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
     Dry-run planning never sends mutating OSC.
-    This V1 never edits targets, files, fades, light commands, network/MIDI messages, scripts, routing, media paths, video geometry, playback, raw OSC, or multiple cues.
+    High-risk profiles and unvalidated properties are cataloged for planning but blocked for real writes.
     """
     return _run_tool(
         lambda: UpdateCueResult.model_validate(
@@ -679,7 +718,9 @@ def qlab_update_cue(
                 workspace_id=workspace_id,
                 cue_ref=cue_ref,
                 properties=properties,
+                operations=operations,
                 dry_run=dry_run,
+                profile=profile,
             )
         )
     )

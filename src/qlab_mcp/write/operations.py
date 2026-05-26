@@ -13,7 +13,16 @@ from ..osc.addressing import (
     _workspace_address,
 )
 from ..runtime.read_cache import shared_read_cache
-from .allowlist import validate_writable_cue_type, validate_write_properties
+from .allowlist import (
+    COMMON_UPDATE_PROFILE,
+    ensure_real_write_allowed,
+    normalize_update_request,
+    read_keys_for_operations,
+    validate_update_profile,
+    validate_update_profile_for_cue,
+    validate_writable_cue_type,
+    validate_write_properties,
+)
 from .safety import check_write_readiness, ensure_write_ready, resolve_dry_run
 
 
@@ -149,34 +158,40 @@ class QLabWriteMixin:
         self,
         workspace_id: str,
         cue_ref: str,
-        properties: dict[str, Any],
+        properties: dict[str, Any] | None = None,
         dry_run: bool | None = None,
+        profile: str | None = None,
+        operations: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         workspace = _clean_workspace_id(workspace_id)
         cue = _clean_update_cue_ref(cue_ref)
-        normalized_properties = validate_write_properties(properties)
-        if not normalized_properties:
-            raise UnsafeWriteOperationError("properties must include at least one allowlisted cue property")
+        update_profile = validate_update_profile(profile or COMMON_UPDATE_PROFILE)
+        normalized_properties, normalized_operations = normalize_update_request(update_profile, properties, operations)
+        update_read_keys = read_keys_for_operations(normalized_operations)
         effective_dry_run = resolve_dry_run(self, dry_run)
-        planned_operations = _planned_update_operations(workspace, cue, normalized_properties)
+        planned_operations = _planned_update_operations(workspace, cue, normalized_operations)
 
         if effective_dry_run:
-            before, errors = _try_read_update_values(self, workspace, cue, normalized_properties)
+            before, errors = _try_read_update_values(self, workspace, cue, update_read_keys)
+            if before is not None:
+                validate_update_profile_for_cue(update_profile, before)
             resolved_cue_id = _resolved_cue_id(before)
             return {
                 "ok": True,
                 "status": "dry_run",
                 "workspace_id": workspace,
                 "cue_ref": cue,
+                "profile": update_profile,
                 "dry_run": True,
                 "properties": normalized_properties,
+                "operations": normalized_operations,
                 "before": before,
                 "after": None,
                 "diff": _diff_properties(before, normalized_properties),
                 "planned_operations": _planned_update_operations(
                     workspace,
                     cue,
-                    normalized_properties,
+                    normalized_operations,
                     resolved_cue_id=resolved_cue_id,
                 ),
                 "executed_operations": [],
@@ -186,11 +201,12 @@ class QLabWriteMixin:
                 "message": "Dry run succeeded; review planned_operations before disabling dry_run.",
             }
 
+        ensure_real_write_allowed(update_profile, normalized_operations)
         workspace = ensure_write_ready(self, workspace)
 
         read_cache = getattr(self, "_read_cache", shared_read_cache())
         read_cache.clear()
-        before, before_errors = _try_read_update_values(self, workspace, cue, normalized_properties)
+        before, before_errors = _try_read_update_values(self, workspace, cue, update_read_keys)
         resolved_cue_id = _resolved_cue_id(before)
         if before is None or not resolved_cue_id:
             read_cache.clear()
@@ -199,8 +215,10 @@ class QLabWriteMixin:
                 "status": "cue_not_found",
                 "workspace_id": workspace,
                 "cue_ref": cue,
+                "profile": update_profile,
                 "dry_run": False,
                 "properties": normalized_properties,
+                "operations": normalized_operations,
                 "before": before,
                 "after": None,
                 "diff": _diff_properties(before, normalized_properties),
@@ -211,14 +229,16 @@ class QLabWriteMixin:
                 "warnings": [],
                 "message": "Cue update was blocked because the target cue could not be read.",
             }
+        validate_update_profile_for_cue(update_profile, before)
 
         executed_operations: list[dict[str, Any]] = []
         errors: dict[str, str] = {}
         setter_timeouts: dict[str, str] = {}
-        for key, value in normalized_properties.items():
-            address = _cue_id_address(workspace, resolved_cue_id, key)
+        for operation in normalized_operations:
+            key = operation["property"]
+            address = _cue_id_address(workspace, resolved_cue_id, operation["path"])
             try:
-                reply = self.client.request(address, value)
+                reply = self.client.request(address, *operation["args"])
                 status = reply.status
                 error = None
             except OscTimeoutError as exc:
@@ -233,14 +253,15 @@ class QLabWriteMixin:
                     "operation": "set_property",
                     "property": key,
                     "address": address,
-                    "args": [value],
+                    "args": operation["args"],
+                    "mode": operation["mode"],
                     "status": status,
                     **({"error": error} if error else {}),
                 }
             )
 
         read_cache.clear()
-        after, after_errors = _try_read_update_values(self, workspace, resolved_cue_id, normalized_properties)
+        after, after_errors = _try_read_update_values(self, workspace, resolved_cue_id, update_read_keys)
         verification = None
         try:
             verification = self.get_cue_details(workspace, resolved_cue_id, "auto")
@@ -268,15 +289,17 @@ class QLabWriteMixin:
             "status": status,
             "workspace_id": workspace,
             "cue_ref": cue,
+            "profile": update_profile,
             "dry_run": False,
             "properties": normalized_properties,
+            "operations": normalized_operations,
             "before": before,
             "after": after,
             "diff": _diff_properties(before, normalized_properties, after),
             "planned_operations": _planned_update_operations(
                 workspace,
                 cue,
-                normalized_properties,
+                normalized_operations,
                 resolved_cue_id=resolved_cue_id,
             ),
             "executed_operations": executed_operations,
@@ -348,7 +371,7 @@ def _planned_create_operations(
 def _planned_update_operations(
     workspace_id: str,
     cue_ref: str,
-    properties: dict[str, Any],
+    update_operations: list[dict[str, Any]],
     resolved_cue_id: str | None = None,
 ) -> list[dict[str, Any]]:
     operations = [
@@ -358,20 +381,24 @@ def _planned_update_operations(
             "cacheable": False,
         }
     ]
-    for key, value in properties.items():
+    for update_operation in update_operations:
         address = (
-            _cue_id_address(workspace_id, resolved_cue_id, key)
+            _cue_id_address(workspace_id, resolved_cue_id, update_operation["path"])
             if resolved_cue_id
-            else _cue_address(workspace_id, cue_ref, key)
+            else _cue_address(workspace_id, cue_ref, update_operation["path"])
         )
-        operations.append(
-            {
-                "operation": "set_property",
-                "property": key,
-                "address": address,
-                "args": [value],
-            }
-        )
+        planned = {
+            "operation": "set_property",
+            "property": update_operation["property"],
+            "address": address,
+            "args": update_operation["args"],
+            "mode": update_operation["mode"],
+            "risk_tier": update_operation["risk_tier"],
+            "real_write_enabled": update_operation["real_write_enabled"],
+        }
+        if update_operation.get("planned_only_reason"):
+            planned["planned_only_reason"] = update_operation["planned_only_reason"]
+        operations.append(planned)
     operations.append(
         {
             "operation": "verify",
@@ -391,21 +418,17 @@ def _resolved_cue_id(values: dict[str, Any] | None) -> str | None:
     return None
 
 
-def _update_read_keys(properties: dict[str, Any]) -> list[str]:
-    return list(dict.fromkeys(["uniqueID", "type", *properties.keys()]))
-
-
 def _try_read_update_values(
     reader: Any,
     workspace_id: str,
     cue_ref: str,
-    properties: dict[str, Any],
+    read_keys: list[str],
 ) -> tuple[dict[str, Any] | None, dict[str, str]]:
     try:
         values = reader.read_cue_values(
             workspace_id,
             cue_ref,
-            _update_read_keys(properties),
+            read_keys,
             cache_profile="basic_safe",
             cacheable=False,
         )["values"]

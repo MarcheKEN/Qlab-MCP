@@ -137,6 +137,7 @@ class CreateCueResult(BaseModel):
     planned_operations: list[dict[str, Any]] = Field(default_factory=list)
     executed_operations: list[dict[str, Any]] = Field(default_factory=list)
     verification: dict[str, Any] | None = None
+    errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
     message: str
 
@@ -148,8 +149,10 @@ class UpdateCueResult(BaseModel):
     status: str
     workspace_id: str
     cue_ref: str
+    profile: str = "common"
     dry_run: bool
     properties: dict[str, Any] = Field(default_factory=dict)
+    operations: list[dict[str, Any]] = Field(default_factory=list)
     before: dict[str, Any] | None = None
     after: dict[str, Any] | None = None
     diff: dict[str, dict[str, Any]] = Field(default_factory=dict)

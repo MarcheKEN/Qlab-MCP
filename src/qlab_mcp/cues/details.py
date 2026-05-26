@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from ..allowlist import properties_for_profile, validate_value_keys
+from ..errors import QLabReplyError
 from ..osc.addressing import _clean_cue_ref, _clean_workspace_id
+from ..write.registry import editable_update_capabilities
 from .profiles import (
     _auto_type_specific_keys,
     _build_auto_sections,
@@ -13,7 +15,6 @@ from .profiles import (
     _empty_auto_sections,
     _is_active_cue_ref,
 )
-from ..errors import QLabReplyError
 
 
 class CueDetailsMixin:
@@ -118,8 +119,14 @@ class CueDetailsMixin:
         return result
 
     def get_cue_details(self, workspace_id: str, cue_ref: str, profile: str = "auto") -> dict[str, Any]:
-        if profile.strip().lower() == "auto":
+        normalized_profile = profile.strip().lower()
+        if normalized_profile == "auto":
             return self._get_auto_cue_details(workspace_id, cue_ref)
+        if normalized_profile == "editable":
+            result = self._get_auto_cue_details(workspace_id, cue_ref)
+            result["profile"] = "editable"
+            result["update_capabilities"] = editable_update_capabilities(result.get("cue_type"))
+            return result
 
         keys = list(properties_for_profile(profile))
         errors: dict[str, str] = {}

@@ -86,6 +86,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     details = tools["qlab_get_cue_details"]
     assert details.title == "Get QLab Cue Details"
     assert "valuesForKeys" in details.description
+    assert "editable" in details.inputSchema["properties"]["profile"]["enum"]
     assert details.annotations.readOnlyHint is True
 
     readiness = tools["qlab_check_write_readiness"]

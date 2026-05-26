@@ -153,6 +153,11 @@ Write mode is deliberately gated:
   `video_basic`, `camera_basic`, `text_basic`, `light_basic`, `fade_basic`,
   `network_basic`, `midi_basic`, `midi_file_basic`, `timecode_basic`,
   `target_basic`, `reset_basic`, `devamp_basic`, and `script_basic`.
+- `qlab_get_cue_details(..., profile="editable")` returns safe current cue
+  details plus `update_capabilities` derived from the same update registry, so
+  agents can choose compatible edit profiles, real-write properties,
+  dry-run-only properties, operation args, validators, and required write gates
+  without sending mutating OSC.
 - Policy summary: all update profiles can exist for planning and targeting,
   but real write is limited to safe properties only. Dangerous properties are
   dry-run-only and are blocked when `dry_run=false`.
@@ -180,7 +185,7 @@ qlab_get_workspace_overview(workspace_id=None, max_depth=2, max_cues=1000, inclu
 qlab_get_workspace_settings(workspace_id, sections=None)
 qlab_get_workspace_setting_details(workspace_id, section, kind=None, ref=None, profile="safe")
 qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=None, profile="basic_safe", max_results=500, max_cues_scanned=500)
-qlab_get_cue_details(workspace_id, cue_ref, profile="auto")
+qlab_get_cue_details(workspace_id, cue_ref, profile="auto")  # profile also supports "editable"
 qlab_check_write_readiness(workspace_id)
 qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
 qlab_update_cue(workspace_id, cue_ref, properties=None, operations=None, profile="common", dry_run=None)

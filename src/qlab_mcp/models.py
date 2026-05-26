@@ -102,6 +102,7 @@ class CueDetailsResult(BaseModel):
     cue_type: str | None = None
     properties: dict[str, Any]
     sections: dict[str, dict[str, Any]] | None = None
+    update_capabilities: dict[str, Any] | None = None
     errors: dict[str, str] | None = None
     active_count: int | None = None
     message: str | None = None

@@ -469,6 +469,13 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
 }
 
 UPDATE_PROFILE_NAMES = tuple(UPDATE_PROFILES)
+WRITE_GATE_REQUIREMENTS = (
+    "QLAB_ENABLE_WRITE",
+    "QLAB_PASSCODE",
+    "edit_scope_via_connect",
+    "edit_mode_via_showMode",
+)
+RISK_TIER_ORDER = {"safe": 0, "medium": 1, "high": 2}
 
 
 def validate_update_profile(profile: str | None) -> str:
@@ -500,6 +507,85 @@ def profile_catalog() -> dict[str, Any]:
             },
         }
         for name, spec in UPDATE_PROFILES.items()
+    }
+
+
+def editable_update_capabilities(cue_type: str | None) -> dict[str, Any]:
+    normalized_type = cue_type.casefold() if isinstance(cue_type, str) else None
+    compatible_profiles = [COMMON_UPDATE_PROFILE]
+    for name, spec in UPDATE_PROFILES.items():
+        if name == COMMON_UPDATE_PROFILE or not spec.cue_types or normalized_type is None:
+            continue
+        if normalized_type in {candidate.casefold() for candidate in spec.cue_types}:
+            compatible_profiles.append(name)
+
+    recommended_profile = compatible_profiles[1] if len(compatible_profiles) > 1 else COMMON_UPDATE_PROFILE
+    catalog = profile_catalog()
+    real_write_details: dict[str, dict[str, Any]] = {}
+    dry_run_only_details: dict[str, dict[str, Any]] = {}
+    operations: dict[str, dict[str, Any]] = {}
+    validators: dict[str, dict[str, str]] = {}
+    planned_only_reason: dict[str, str] = {}
+    max_risk = "safe"
+
+    for profile_name in compatible_profiles:
+        profile = catalog[profile_name]
+        if RISK_TIER_ORDER[profile["risk_tier"]] > RISK_TIER_ORDER[max_risk]:
+            max_risk = profile["risk_tier"]
+        for property_name, prop in profile["properties"].items():
+            prop_summary = {
+                "profiles": [profile_name],
+                "path": prop["path"],
+                "args": prop["args"],
+                "modes": prop["modes"],
+                "risk_tier": prop["risk_tier"],
+                "real_write_enabled": prop["real_write_enabled"],
+                "planned_only_reason": prop["planned_only_reason"],
+            }
+            target = real_write_details if prop["real_write_enabled"] else dry_run_only_details
+            if property_name in target:
+                target[property_name]["profiles"].append(profile_name)
+            else:
+                target[property_name] = prop_summary
+            operations[property_name] = {
+                "property": property_name,
+                "path": prop["path"],
+                "args": prop["args"],
+                "modes": prop["modes"],
+                "risk_tier": prop["risk_tier"],
+                "real_write_enabled": prop["real_write_enabled"],
+                "planned_only_reason": prop["planned_only_reason"],
+            }
+            validators[property_name] = {arg["name"]: arg["validator"] for arg in prop["args"]}
+            if prop["planned_only_reason"]:
+                planned_only_reason[property_name] = prop["planned_only_reason"]
+
+    return {
+        "compatible_profiles": compatible_profiles,
+        "recommended_profile": recommended_profile,
+        "real_write_properties": sorted(real_write_details),
+        "dry_run_only_properties": sorted(dry_run_only_details),
+        "property_details": {
+            "real_write": real_write_details,
+            "dry_run_only": dry_run_only_details,
+        },
+        "operations": operations,
+        "risk_tier": max_risk,
+        "validators": validators,
+        "arg_schema": {
+            "properties": {
+                "type": "object",
+                "description": "Use for one-argument setters only, keyed by property name.",
+                "allowed_properties": sorted(real_write_details | dry_run_only_details),
+            },
+            "operations": {
+                "type": "array",
+                "item_shape": {"property": "string", "args": "object", "mode": "saved|live"},
+                "allowed_operations": sorted(operations),
+            },
+        },
+        "planned_only_reason": planned_only_reason,
+        "requires_write_gates": list(WRITE_GATE_REQUIREMENTS),
     }
 
 

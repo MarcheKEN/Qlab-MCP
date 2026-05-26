@@ -2420,6 +2420,92 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIn("scriptSource", properties_for_profile("full_sensitive"))
         self.assertIn("stage", properties_for_profile("full_sensitive"))
 
+    def test_editable_profile_returns_update_capabilities_for_audio(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "number": "10",
+                "name": "Intro",
+                "displayName": "10 Intro",
+                "type": "Audio",
+                "flagged": False,
+                "colorName": "none",
+                "hasFileTargets": True,
+                "fileTarget": "/Users/example/private/audio.wav",
+                "rate": 1.0,
+                "startTime": 0,
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "editable")
+
+        self.assertEqual(result["profile"], "editable")
+        self.assertEqual(result["cue_type"], "Audio")
+        self.assertNotIn("fileTarget", result["properties"])
+        capabilities = result["update_capabilities"]
+        self.assertEqual(capabilities["compatible_profiles"], ["common", "audio_basic"])
+        self.assertEqual(capabilities["recommended_profile"], "audio_basic")
+        for prop in ("name", "flagged", "colorName", "rate", "startTime"):
+            self.assertIn(prop, capabilities["real_write_properties"])
+        for prop in ("fileTarget", "level", "sliderLevel", "audioOutputPatchID"):
+            self.assertIn(prop, capabilities["dry_run_only_properties"])
+            self.assertNotIn(prop, capabilities["real_write_properties"])
+        self.assertEqual(
+            capabilities["property_details"]["dry_run_only"]["level"]["planned_only_reason"],
+            "audio_levels_can_affect_live_output",
+        )
+        self.assertEqual(
+            capabilities["operations"]["level"]["args"],
+            [
+                {"name": "inChannel", "validator": "positive_int"},
+                {"name": "outChannel", "validator": "positive_int"},
+                {"name": "decibel", "validator": "number"},
+            ],
+        )
+        self.assertFalse(capabilities["operations"]["level"]["real_write_enabled"])
+        self.assertEqual(capabilities["validators"]["level"]["decibel"], "number")
+        self.assertIn("operations", capabilities["arg_schema"])
+        self.assertEqual(
+            capabilities["requires_write_gates"],
+            ["QLAB_ENABLE_WRITE", "QLAB_PASSCODE", "edit_scope_via_connect", "edit_mode_via_showMode"],
+        )
+
+    def test_editable_profile_matches_specific_profiles_by_cue_type(self) -> None:
+        cases = (
+            ("Memo", "memo_basic", ()),
+            ("Text", "text_basic", ("text/format/color",)),
+            ("Network", "network_basic", ("message", "oscMessage")),
+            ("Light", "light_basic", ("lightCommandText", "setLight")),
+            ("Script", "script_basic", ("scriptSource", "scriptText")),
+        )
+        for cue_type, expected_profile, dry_run_props in cases:
+            with self.subTest(cue_type=cue_type):
+                responses = {
+                    "/workspace/ws-1/cue/10/valuesForKeys": {
+                        "uniqueID": "cue-id",
+                        "number": "10",
+                        "name": cue_type,
+                        "displayName": cue_type,
+                        "type": cue_type,
+                    },
+                }
+                with FakeQlabOscServer(responses) as server:
+                    reader = QLabReader(client_for(server))
+
+                    result = reader.get_cue_details("ws-1", "10", "editable")
+
+                capabilities = result["update_capabilities"]
+                self.assertIn("common", capabilities["compatible_profiles"])
+                self.assertIn(expected_profile, capabilities["compatible_profiles"])
+                self.assertEqual(capabilities["recommended_profile"], expected_profile)
+                for profile in capabilities["compatible_profiles"]:
+                    self.assertTrue(profile == "common" or profile == expected_profile)
+                for prop in dry_run_props:
+                    self.assertIn(prop, capabilities["dry_run_only_properties"])
+                    self.assertNotIn(prop, capabilities["real_write_properties"])
+
     def test_health_profile_redacts_file_target_but_reports_presence(self) -> None:
         responses = {
             "/workspace/ws-1/cue/10/valuesForKeys": {

@@ -43,6 +43,7 @@ CueProfile = Literal[
     "targets",
     "group",
     "type_specific",
+    "editable",
     "full",
     "full_sensitive",
 ]
@@ -552,6 +553,7 @@ def qlab_get_cue_details(
             description=(
                 "Read-only detail profile. Use auto for safe type-aware sections, health for warnings/broken cues, "
                 "targets for target IDs without file paths, technical for notes/targets/routing/paths, "
+                "editable for safe details plus qlab_update_cue profile/property capabilities, "
                 "and full_sensitive only for deep audits."
             )
         ),
@@ -559,7 +561,8 @@ def qlab_get_cue_details(
 ) -> CueDetailsResult:
     """Return batched read-only details for one cue using QLab valuesForKeys when possible.
 
-    Use auto for safe type-aware inspection, health for warnings, and technical/full_sensitive only when justified.
+    Use auto for safe type-aware inspection, editable for update capability discovery,
+    health for warnings, and technical/full_sensitive only when justified.
     """
     return _run_tool(
         lambda: CueDetailsResult.model_validate(

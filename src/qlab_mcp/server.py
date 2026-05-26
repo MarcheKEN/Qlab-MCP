@@ -651,8 +651,9 @@ def qlab_update_cue(
         dict[str, Any],
         Field(
             description=(
-                "Safe cue properties to update. Allowed keys: name, number, armed, flagged, colorName, "
-                "preWait, postWait, duration, and continueMode."
+                "Safe common cue properties to update. Allowed keys: name, number, armed, flagged, "
+                "colorName, preWait, postWait, duration, and continueMode. Type-specific properties "
+                "for Audio, Video, Light, Fade, Network, MIDI, Script, targets, files, routing, and media are not included in V1."
             ),
         ),
     ],
@@ -666,11 +667,11 @@ def qlab_update_cue(
         ),
     ] = None,
 ) -> UpdateCueResult:
-    """Update one existing cue with safe common properties or return a dry-run plan.
+    """Update one existing cue with safe common cue properties or return a dry-run plan.
 
     Real updates require QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
     Dry-run planning never sends mutating OSC.
-    This tool never edits targets, files, scripts, routing, playback, raw OSC, or multiple cues.
+    This V1 never edits targets, files, fades, light commands, network/MIDI messages, scripts, routing, media paths, video geometry, playback, raw OSC, or multiple cues.
     """
     return _run_tool(
         lambda: UpdateCueResult.model_validate(

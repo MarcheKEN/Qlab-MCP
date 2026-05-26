@@ -59,7 +59,7 @@ clear documentation or reference location, not at the package root.
 | `qlab_get_cue_details` | Inspect one cue after finding it in overview or query results. | `auto` profile |
 | `qlab_check_write_readiness` | Check disabled-by-default write-mode readiness without mutation. | Safety/readiness report |
 | `qlab_create_cue` | Dry-run or create one blank allowlisted cue with safe initial properties. | Dry-run by default |
-| `qlab_update_cue` | Dry-run or update one concrete cue with safe common properties. | Dry-run by default |
+| `qlab_update_cue` | Dry-run or update one concrete cue with safe common cue properties. | Dry-run by default |
 
 ## Compact By Default
 
@@ -148,8 +148,12 @@ Write mode is deliberately narrow:
 - Real writes bypass and clear the read cache before verifying fresh cue details.
 - Only blank cue creation is allowed in this preface.
 - Allowed cue types are `memo`, `group`, `wait`, and `audio`.
+- `qlab_update_cue` V1 edits only safe common cue properties, not type-specific cue data.
 - Allowed initial/update properties are `name`, `number`, `armed`, `flagged`,
   `colorName`, `preWait`, `postWait`, `duration`, and `continueMode`.
+- Type-specific updates for Audio, Video, Light, Fade, Network, MIDI, Script,
+  targets, files, routing, patches, maps, media paths, and video geometry are
+  intentionally out of scope for this PR.
 - Playback control, raw OSC, target edits, file paths, scripts, routing changes,
   GO, stop, panic, playhead control, batch editing, and ambiguous selected/active edits are not exposed.
 

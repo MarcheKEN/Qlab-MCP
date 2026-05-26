@@ -123,6 +123,7 @@ class QLabWriteMixin:
 
         if effective_dry_run:
             before, errors = _try_read_update_values(self, workspace, cue, normalized_properties)
+            resolved_cue_id = _resolved_cue_id(before)
             return {
                 "ok": True,
                 "status": "dry_run",
@@ -133,7 +134,12 @@ class QLabWriteMixin:
                 "before": before,
                 "after": None,
                 "diff": _diff_properties(before, normalized_properties),
-                "planned_operations": planned_operations,
+                "planned_operations": _planned_update_operations(
+                    workspace,
+                    cue,
+                    normalized_properties,
+                    resolved_cue_id=resolved_cue_id,
+                ),
                 "executed_operations": [],
                 "verification": None,
                 "errors": errors or None,
@@ -146,7 +152,8 @@ class QLabWriteMixin:
         read_cache = getattr(self, "_read_cache", shared_read_cache())
         read_cache.clear()
         before, before_errors = _try_read_update_values(self, workspace, cue, normalized_properties)
-        if before is None or not before.get("uniqueID"):
+        resolved_cue_id = _resolved_cue_id(before)
+        if before is None or not resolved_cue_id:
             read_cache.clear()
             return {
                 "ok": False,
@@ -169,7 +176,7 @@ class QLabWriteMixin:
         executed_operations: list[dict[str, Any]] = []
         errors: dict[str, str] = {}
         for key, value in normalized_properties.items():
-            address = _cue_address(workspace, cue, key)
+            address = _cue_id_address(workspace, resolved_cue_id, key)
             try:
                 reply = self.client.request(address, value, workspace_id=workspace)
             except Exception as exc:
@@ -186,10 +193,10 @@ class QLabWriteMixin:
             )
 
         read_cache.clear()
-        after, after_errors = _try_read_update_values(self, workspace, cue, normalized_properties)
+        after, after_errors = _try_read_update_values(self, workspace, resolved_cue_id, normalized_properties)
         verification = None
         try:
-            verification = self.get_cue_details(workspace, cue, "auto")
+            verification = self.get_cue_details(workspace, resolved_cue_id, "auto")
         except Exception as exc:
             after_errors["verification"] = str(exc)
         read_cache.clear()
@@ -214,7 +221,12 @@ class QLabWriteMixin:
             "before": before,
             "after": after,
             "diff": _diff_properties(before, normalized_properties, after),
-            "planned_operations": planned_operations,
+            "planned_operations": _planned_update_operations(
+                workspace,
+                cue,
+                normalized_properties,
+                resolved_cue_id=resolved_cue_id,
+            ),
             "executed_operations": executed_operations,
             "verification": verification,
             "errors": all_errors or None,
@@ -285,6 +297,7 @@ def _planned_update_operations(
     workspace_id: str,
     cue_ref: str,
     properties: dict[str, Any],
+    resolved_cue_id: str | None = None,
 ) -> list[dict[str, Any]]:
     operations = [
         {
@@ -294,11 +307,16 @@ def _planned_update_operations(
         }
     ]
     for key, value in properties.items():
+        address = (
+            _cue_id_address(workspace_id, resolved_cue_id, key)
+            if resolved_cue_id
+            else _cue_address(workspace_id, cue_ref, key)
+        )
         operations.append(
             {
                 "operation": "set_property",
                 "property": key,
-                "address": _cue_address(workspace_id, cue_ref, key),
+                "address": address,
                 "args": [value],
             }
         )
@@ -310,6 +328,15 @@ def _planned_update_operations(
         }
     )
     return operations
+
+
+def _resolved_cue_id(values: dict[str, Any] | None) -> str | None:
+    if not isinstance(values, dict):
+        return None
+    value = values.get("uniqueID")
+    if isinstance(value, str) and value.strip():
+        return _clean_cue_ref(value)
+    return None
 
 
 def _update_read_keys(properties: dict[str, Any]) -> list[str]:

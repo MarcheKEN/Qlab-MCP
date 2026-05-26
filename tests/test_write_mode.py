@@ -369,6 +369,23 @@ def test_update_cue_real_blocks_missing_cue_before_setters() -> None:
     assert f"/workspace/ws-1/cue_id/{cue_id}/name" not in [request[0] for request in client.requests]
 
 
+def test_update_cue_real_blocks_when_before_has_no_unique_id() -> None:
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=None,
+        cue_values={"number": "1", "name": "Stale", "type": "Memo"},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cue("ws-1", "1", {"name": "New"}, dry_run=False)
+
+    addresses = [request[0] for request in client.requests]
+    assert result["ok"] is False
+    assert result["status"] == "cue_not_found"
+    assert result["executed_operations"] == []
+    assert "/workspace/ws-1/cue/1/name" not in addresses
+
+
 def test_update_cue_real_updates_and_verifies_fresh_details() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = FakeWriteClient(
@@ -390,6 +407,29 @@ def test_update_cue_real_updates_and_verifies_fresh_details() -> None:
     assert "/workspace/ws-1/showMode" in addresses
     assert f"/workspace/ws-1/cue_id/{cue_id}/name" in addresses
     assert f"/workspace/ws-1/cue_id/{cue_id}/armed" in addresses
+
+
+def test_update_cue_real_resolves_number_to_unique_id_for_setters() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cue("ws-1", "1", {"name": "New"}, dry_run=False)
+
+    addresses = [request[0] for request in client.requests]
+    planned_setters = [
+        operation["address"]
+        for operation in result["planned_operations"]
+        if operation["operation"] == "set_property"
+    ]
+    assert result["ok"] is True
+    assert "/workspace/ws-1/cue/1/valuesForKeys" in addresses
+    assert f"/workspace/ws-1/cue_id/{cue_id}/name" in addresses
+    assert "/workspace/ws-1/cue/1/name" not in addresses
+    assert planned_setters == [f"/workspace/ws-1/cue_id/{cue_id}/name"]
 
 
 def test_update_cue_real_blocks_in_show_mode() -> None:

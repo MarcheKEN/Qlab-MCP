@@ -2,9 +2,32 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+
+UpdateCueProfile = Literal[
+    "common",
+    "memo_basic",
+    "wait_basic",
+    "group_basic",
+    "audio_basic",
+    "mic_basic",
+    "video_basic",
+    "camera_basic",
+    "text_basic",
+    "light_basic",
+    "fade_basic",
+    "network_basic",
+    "midi_basic",
+    "midi_file_basic",
+    "timecode_basic",
+    "target_basic",
+    "reset_basic",
+    "devamp_basic",
+    "script_basic",
+]
 
 
 class QlabConnectionCheckResult(BaseModel):
@@ -160,6 +183,52 @@ class UpdateCueResult(BaseModel):
     planned_operations: list[dict[str, Any]] = Field(default_factory=list)
     executed_operations: list[dict[str, Any]] = Field(default_factory=list)
     verification: dict[str, Any] | None = None
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    message: str
+
+
+class CueUpdateInput(BaseModel):
+    """One cue update request inside a batch."""
+
+    cue_ref: str
+    profile: UpdateCueProfile = "common"
+    properties: dict[str, Any] | None = None
+    operations: list[dict[str, Any]] | None = None
+
+
+class UpdateCueItemResult(BaseModel):
+    """Per-cue result for a batch update."""
+
+    cue_ref: str
+    cue_id: str | None = None
+    profile: str = "common"
+    status: str
+    properties: dict[str, Any] = Field(default_factory=dict)
+    operations: list[dict[str, Any]] = Field(default_factory=list)
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+    diff: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    planned_operations: list[dict[str, Any]] = Field(default_factory=list)
+    executed_operations: list[dict[str, Any]] = Field(default_factory=list)
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    debug: dict[str, Any] | None = None
+
+
+class UpdateCuesResult(BaseModel):
+    """Batch result for gated cue updates or dry-run planning."""
+
+    ok: bool
+    status: str
+    workspace_id: str
+    dry_run: bool
+    requested_count: int
+    planned_count: int
+    updated_count: int
+    failed_count: int
+    timeout_confirmed_count: int
+    results: list[UpdateCueItemResult]
     errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
     message: str

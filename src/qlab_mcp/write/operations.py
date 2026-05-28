@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import time
 from typing import Any
 
 from ..errors import OscTimeoutError, UnsafeWriteOperationError
@@ -24,6 +26,10 @@ from .allowlist import (
     validate_write_properties,
 )
 from .safety import check_write_readiness, ensure_write_ready, resolve_dry_run
+
+
+MAX_BATCH_UPDATES = 50
+AFTER_READ_RETRY_DELAYS = (0.2, 0.5, 1.0)
 
 
 class QLabWriteMixin:
@@ -163,151 +169,244 @@ class QLabWriteMixin:
         profile: str | None = None,
         operations: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        """Compatibility wrapper for local Python callers; MCP exposes qlab_update_cues."""
+        batch = self.update_cues(
+            workspace_id,
+            [
+                {
+                    "cue_ref": cue_ref,
+                    "profile": profile or COMMON_UPDATE_PROFILE,
+                    "properties": properties,
+                    "operations": operations,
+                }
+            ],
+            dry_run=dry_run,
+        )
+        item = dict(batch["results"][0])
+        if not batch["ok"] and batch["status"] == "preflight_failed" and item.get("errors") and "profile" in item["errors"]:
+            raise UnsafeWriteOperationError("; ".join(item["errors"].values()))
+        status = item["status"]
+        if item.get("errors") and "cue" in item["errors"]:
+            status = "cue_not_found"
+        if status == "updated_with_confirmed_timeouts":
+            status = "updated"
+        return {
+            "ok": batch["ok"],
+            "status": status,
+            "workspace_id": batch["workspace_id"],
+            "cue_ref": item["cue_ref"],
+            "profile": item["profile"],
+            "dry_run": batch["dry_run"],
+            "properties": item["properties"],
+            "operations": item["operations"],
+            "before": item["before"],
+            "after": item["after"],
+            "diff": item["diff"],
+            "planned_operations": item["planned_operations"],
+            "executed_operations": item["executed_operations"],
+            "verification": {"properties": item["after"]} if item.get("after") else None,
+            "errors": item["errors"],
+            "warnings": item["warnings"],
+            "message": batch["message"],
+        }
+
+    def update_cues(
+        self,
+        workspace_id: str,
+        updates: list[dict[str, Any]],
+        dry_run: bool | None = None,
+    ) -> dict[str, Any]:
         workspace = _clean_workspace_id(workspace_id)
-        cue = _clean_update_cue_ref(cue_ref)
-        update_profile = validate_update_profile(profile or COMMON_UPDATE_PROFILE)
-        normalized_properties, normalized_operations = normalize_update_request(update_profile, properties, operations)
-        update_read_keys = read_keys_for_operations(normalized_operations)
+        if not isinstance(updates, list):
+            raise UnsafeWriteOperationError("updates must be a list")
+        if not updates:
+            raise UnsafeWriteOperationError("updates must include at least one cue update")
+        if len(updates) > MAX_BATCH_UPDATES:
+            raise UnsafeWriteOperationError(f"updates can include at most {MAX_BATCH_UPDATES} cue updates")
         effective_dry_run = resolve_dry_run(self, dry_run)
-        planned_operations = _planned_update_operations(workspace, cue, normalized_operations)
+        items = [_normalize_batch_update_item(raw_update) for raw_update in updates]
 
         if effective_dry_run:
-            before, errors = _try_read_update_values(self, workspace, cue, update_read_keys)
-            if before is not None:
-                validate_update_profile_for_cue(update_profile, before)
-            resolved_cue_id = _resolved_cue_id(before)
-            return {
-                "ok": True,
-                "status": "dry_run",
-                "workspace_id": workspace,
-                "cue_ref": cue,
-                "profile": update_profile,
-                "dry_run": True,
-                "properties": normalized_properties,
-                "operations": normalized_operations,
-                "before": before,
-                "after": None,
-                "diff": _diff_properties(before, normalized_properties),
-                "planned_operations": _planned_update_operations(
-                    workspace,
-                    cue,
-                    normalized_operations,
-                    resolved_cue_id=resolved_cue_id,
-                ),
-                "executed_operations": [],
-                "verification": None,
-                "errors": errors or None,
-                "warnings": ["Dry run only: no mutating OSC commands were sent to QLab."],
-                "message": "Dry run succeeded; review planned_operations before disabling dry_run.",
-            }
+            results = []
+            for item in items:
+                before, errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
+                profile_errors = _validate_profile_for_before(item["profile"], before)
+                errors.update(profile_errors)
+                cue_id = _resolved_cue_id(before)
+                results.append(
+                    _batch_item_result(
+                        workspace,
+                        item,
+                        cue_id=cue_id,
+                        status="dry_run" if not errors else "dry_run_preflight_failed",
+                        before=before,
+                        after=None,
+                        errors=errors or None,
+                        warnings=["Dry run only: no mutating OSC commands were sent to QLab."],
+                    )
+                )
+            failed_count = sum(1 for result in results if result["errors"])
+            return _batch_update_result(
+                workspace,
+                dry_run=True,
+                results=results,
+                status="dry_run" if failed_count == 0 else "preflight_failed",
+                requested_count=len(items),
+                warnings=["Dry run only: no mutating OSC commands were sent to QLab."],
+            )
 
-        ensure_real_write_allowed(update_profile, normalized_operations)
+        for item in items:
+            ensure_real_write_allowed(item["profile"], item["operations"])
         workspace = ensure_write_ready(self, workspace)
 
         read_cache = getattr(self, "_read_cache", shared_read_cache())
         read_cache.clear()
-        before, before_errors = _try_read_update_values(self, workspace, cue, update_read_keys)
-        resolved_cue_id = _resolved_cue_id(before)
-        if before is None or not resolved_cue_id:
-            read_cache.clear()
-            return {
-                "ok": False,
-                "status": "cue_not_found",
-                "workspace_id": workspace,
-                "cue_ref": cue,
-                "profile": update_profile,
-                "dry_run": False,
-                "properties": normalized_properties,
-                "operations": normalized_operations,
-                "before": before,
-                "after": None,
-                "diff": _diff_properties(before, normalized_properties),
-                "planned_operations": planned_operations,
-                "executed_operations": [],
-                "verification": None,
-                "errors": before_errors or {"cue": "Cue could not be read before update."},
-                "warnings": [],
-                "message": "Cue update was blocked because the target cue could not be read.",
-            }
-        validate_update_profile_for_cue(update_profile, before)
-
-        executed_operations: list[dict[str, Any]] = []
-        errors: dict[str, str] = {}
-        setter_timeouts: dict[str, str] = {}
-        for operation in normalized_operations:
-            key = operation["property"]
-            address = _cue_id_address(workspace, resolved_cue_id, operation["path"])
-            try:
-                reply = self.client.request(address, *operation["args"])
-                status = reply.status
-                error = None
-            except OscTimeoutError as exc:
-                setter_timeouts[key] = str(exc)
-                status = "timeout_pending_verification"
-                error = str(exc)
-            except Exception as exc:
-                errors[key] = str(exc)
-                break
-            executed_operations.append(
-                {
-                    "operation": "set_property",
-                    "property": key,
-                    "address": address,
-                    "args": operation["args"],
-                    "mode": operation["mode"],
-                    "status": status,
-                    **({"error": error} if error else {}),
-                }
+        preflight_results: list[dict[str, Any]] = []
+        preflight_ok = True
+        for item in items:
+            before, before_errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
+            resolved_cue_id = _resolved_cue_id(before)
+            errors = dict(before_errors)
+            if before is None or not resolved_cue_id:
+                errors.setdefault("cue", "Cue could not be read before update.")
+            errors.update(_validate_profile_for_before(item["profile"], before))
+            if errors:
+                preflight_ok = False
+            preflight_results.append(
+                _batch_item_result(
+                    workspace,
+                    item,
+                    cue_id=resolved_cue_id,
+                    status="planned" if not errors else "preflight_failed",
+                    before=before,
+                    after=None,
+                    errors=errors or None,
+                    warnings=[],
+                )
             )
 
+        if not preflight_ok:
+            read_cache.clear()
+            return _batch_update_result(
+                workspace,
+                dry_run=False,
+                results=preflight_results,
+                status="preflight_failed",
+                requested_count=len(items),
+                errors={"preflight": "One or more cue updates failed preflight; no setters were sent."},
+            )
+
+        executed_items: list[dict[str, Any]] = []
+        for item, planned in zip(items, preflight_results, strict=True):
+            cue_id = planned["cue_id"]
+            executed_operations: list[dict[str, Any]] = []
+            errors: dict[str, str] = {}
+            setter_timeouts: dict[str, str] = {}
+            for operation in item["operations"]:
+                key = operation["property"]
+                address = _cue_id_address(workspace, cue_id, operation["path"])
+                try:
+                    reply = self.client.request(address, *operation["args"])
+                    status = reply.status
+                    error = None
+                except OscTimeoutError as exc:
+                    setter_timeouts[key] = str(exc)
+                    status = "timeout_pending_verification"
+                    error = str(exc)
+                except Exception as exc:
+                    errors[key] = str(exc)
+                    break
+                executed_operations.append(
+                    {
+                        "operation": "set_property",
+                        "property": key,
+                        "address": address,
+                        "args": operation["args"],
+                        "mode": operation["mode"],
+                        "status": status,
+                        **({"error": error} if error else {}),
+                    }
+                )
+            item_result = dict(planned)
+            item_result["executed_operations"] = executed_operations
+            item_result["_setter_timeouts"] = setter_timeouts
+            item_result["_setter_errors"] = errors
+            executed_items.append(item_result)
+
         read_cache.clear()
-        after, after_errors = _try_read_update_values(self, workspace, resolved_cue_id, update_read_keys)
-        verification = None
-        try:
-            verification = self.get_cue_details(workspace, resolved_cue_id, "auto")
-        except Exception as exc:
-            after_errors["verification"] = str(exc)
+        final_results: list[dict[str, Any]] = []
+        timeout_confirmed_count = 0
+        for item, result in zip(items, executed_items, strict=True):
+            after, after_errors = _try_read_update_values_with_retries(
+                self,
+                workspace,
+                result["cue_id"],
+                item["read_keys"],
+                item["properties"],
+                retry_on_mismatch=bool(result["_setter_timeouts"]),
+            )
+            confirmed_by_after = _properties_match(after, item["properties"])
+            setter_timeouts = result.pop("_setter_timeouts")
+            setter_errors = result.pop("_setter_errors")
+            unconfirmed_timeouts = {} if confirmed_by_after else setter_timeouts
+            value_mismatch = {}
+            if not confirmed_by_after and not setter_errors and not unconfirmed_timeouts and not after_errors:
+                value_mismatch["verification"] = _verification_mismatch_message(after, item["properties"])
+            errors = {**setter_errors, **unconfirmed_timeouts, **after_errors, **value_mismatch}
+            warnings = list(result["warnings"])
+            if setter_timeouts and confirmed_by_after:
+                timeout_confirmed_count += 1
+                warnings.append("One or more setters did not reply, but fresh after-read confirmed requested values.")
+            failed = bool(setter_errors) or bool(unconfirmed_timeouts)
+            verification_failed = (bool(after_errors) or bool(value_mismatch)) and not failed
+            if failed:
+                status = "partial_failed"
+            elif verification_failed:
+                status = "verification_failed"
+            elif setter_timeouts:
+                status = "updated_with_confirmed_timeouts"
+            else:
+                status = "updated"
+            result.update(
+                {
+                    "status": status,
+                    "after": after,
+                    "diff": _diff_properties(result["before"], item["properties"], after),
+                    "errors": errors or None,
+                    "warnings": warnings,
+                }
+            )
+            if _update_debug_enabled():
+                result["debug"] = {
+                    "cue_ref": item["cue_ref"],
+                    "cue_id": result["cue_id"],
+                    "requested_properties": item["properties"],
+                    "after_values": _after_values_for_requested(after, item["properties"]),
+                    "properties_match": confirmed_by_after,
+                    "setter_timeouts": setter_timeouts,
+                    "confirmed_timeouts": bool(setter_timeouts and confirmed_by_after),
+                    "setter_errors": setter_errors,
+                    "final_status": status,
+                }
+            final_results.append(result)
         read_cache.clear()
 
-        confirmed_by_after = _properties_match(after, normalized_properties)
-        unconfirmed_timeouts = {} if confirmed_by_after else setter_timeouts
-        all_errors = {**errors, **unconfirmed_timeouts, **after_errors}
-        warnings = []
-        if setter_timeouts and confirmed_by_after:
-            warnings.append("One or more setters did not reply, but fresh after-read confirmed requested values.")
-        failed = bool(errors) or bool(unconfirmed_timeouts)
-        verification_failed = bool(after_errors) and not failed
-        status = "partial_failed" if failed else "verification_failed" if verification_failed else "updated"
-        if failed:
-            message = "Cue update failed part-way; inspect executed_operations and errors."
-        elif verification_failed:
-            message = "Cue update commands completed, but fresh verification failed."
+        if any(result["status"] == "partial_failed" for result in final_results):
+            status = "partial_failed"
+        elif any(result["status"] == "verification_failed" for result in final_results):
+            status = "verification_failed"
+        elif any(result["status"] == "updated_with_confirmed_timeouts" for result in final_results):
+            status = "updated_with_confirmed_timeouts"
         else:
-            message = "Cue updated, safe properties applied, and cue details read back fresh."
-        return {
-            "ok": not failed and not verification_failed,
-            "status": status,
-            "workspace_id": workspace,
-            "cue_ref": cue,
-            "profile": update_profile,
-            "dry_run": False,
-            "properties": normalized_properties,
-            "operations": normalized_operations,
-            "before": before,
-            "after": after,
-            "diff": _diff_properties(before, normalized_properties, after),
-            "planned_operations": _planned_update_operations(
-                workspace,
-                cue,
-                normalized_operations,
-                resolved_cue_id=resolved_cue_id,
-            ),
-            "executed_operations": executed_operations,
-            "verification": verification,
-            "errors": all_errors or None,
-            "warnings": warnings,
-            "message": message,
-        }
+            status = "updated"
+        return _batch_update_result(
+            workspace,
+            dry_run=False,
+            results=final_results,
+            status=status,
+            requested_count=len(items),
+            timeout_confirmed_count=timeout_confirmed_count,
+        )
 
 
 def _normalize_placement(after_cue_id: str | None) -> dict[str, Any] | None:
@@ -326,6 +425,122 @@ def _clean_update_cue_ref(cue_ref: str) -> str:
     if cue.casefold() in {"selected", "playhead", "playbackposition", "active"}:
         raise UnsafeWriteOperationError("cue_ref for update must be a concrete cue number or unique ID")
     return cue
+
+
+def _normalize_batch_update_item(raw_update: Any) -> dict[str, Any]:
+    if hasattr(raw_update, "model_dump"):
+        raw_update = raw_update.model_dump()
+    if not isinstance(raw_update, dict):
+        raise UnsafeWriteOperationError("each update must be an object")
+    cue = _clean_update_cue_ref(raw_update.get("cue_ref", ""))
+    profile = validate_update_profile(raw_update.get("profile") or COMMON_UPDATE_PROFILE)
+    properties, operations = normalize_update_request(
+        profile,
+        raw_update.get("properties"),
+        raw_update.get("operations"),
+    )
+    return {
+        "cue_ref": cue,
+        "profile": profile,
+        "properties": properties,
+        "operations": operations,
+        "read_keys": read_keys_for_operations(operations),
+    }
+
+
+def _validate_profile_for_before(profile: str, before: dict[str, Any] | None) -> dict[str, str]:
+    if before is None:
+        return {}
+    try:
+        validate_update_profile_for_cue(profile, before)
+    except Exception as exc:
+        return {"profile": str(exc)}
+    return {}
+
+
+def _batch_item_result(
+    workspace_id: str,
+    item: dict[str, Any],
+    *,
+    cue_id: str | None,
+    status: str,
+    before: dict[str, Any] | None,
+    after: dict[str, Any] | None,
+    errors: dict[str, str] | None,
+    warnings: list[str],
+) -> dict[str, Any]:
+    return {
+        "cue_ref": item["cue_ref"],
+        "cue_id": cue_id,
+        "profile": item["profile"],
+        "status": status,
+        "properties": item["properties"],
+        "operations": item["operations"],
+        "before": before,
+        "after": after,
+        "diff": _diff_properties(before, item["properties"], after),
+        "planned_operations": _planned_update_operations(
+            workspace_id,
+            item["cue_ref"],
+            item["operations"],
+            resolved_cue_id=cue_id,
+        ),
+        "executed_operations": [],
+        "errors": errors,
+        "warnings": warnings,
+    }
+
+
+def _batch_update_result(
+    workspace_id: str,
+    *,
+    dry_run: bool,
+    results: list[dict[str, Any]],
+    status: str,
+    requested_count: int,
+    timeout_confirmed_count: int = 0,
+    errors: dict[str, str] | None = None,
+    warnings: list[str] | None = None,
+) -> dict[str, Any]:
+    fixed_results = results
+    failed_count = sum(1 for result in fixed_results if result.get("errors"))
+    updated_count = sum(
+        1
+        for result in fixed_results
+        if result.get("status") in {"updated", "updated_with_confirmed_timeouts"}
+    )
+    planned_count = sum(1 for result in fixed_results if result.get("status") != "preflight_failed")
+    ok = failed_count == 0 and status not in {"preflight_failed", "partial_failed", "verification_failed"}
+    if status == "dry_run":
+        message = "Dry run succeeded; review planned_operations before disabling dry_run."
+    elif status == "preflight_failed":
+        message = "Batch cue update was blocked during preflight; no mutating OSC commands were sent."
+    elif status == "partial_failed":
+        message = "Batch cue update partially failed; inspect per-cue results and errors."
+    elif status == "verification_failed":
+        message = "Batch cue update commands completed, but fresh verification failed."
+    elif status == "updated_with_confirmed_timeouts":
+        message = "Batch cue update completed; some setters timed out but fresh after-reads confirmed requested values."
+    else:
+        message = "Batch cue update completed and fresh after-reads confirmed requested values."
+    global_warnings = list(warnings or [])
+    if status == "updated_with_confirmed_timeouts":
+        global_warnings.append("One or more setters did not reply before timeout, but fresh after-reads confirmed the changes.")
+    return {
+        "ok": ok,
+        "status": status,
+        "workspace_id": workspace_id,
+        "dry_run": dry_run,
+        "requested_count": requested_count,
+        "planned_count": planned_count,
+        "updated_count": updated_count,
+        "failed_count": failed_count,
+        "timeout_confirmed_count": timeout_confirmed_count,
+        "results": fixed_results,
+        "errors": errors,
+        "warnings": global_warnings,
+        "message": message,
+    }
 
 
 def _planned_create_operations(
@@ -439,6 +654,26 @@ def _try_read_update_values(
         return None, {"read_before": str(exc)}
 
 
+def _try_read_update_values_with_retries(
+    reader: Any,
+    workspace_id: str,
+    cue_ref: str,
+    read_keys: list[str],
+    requested: dict[str, Any],
+    *,
+    retry_on_mismatch: bool,
+) -> tuple[dict[str, Any] | None, dict[str, str]]:
+    after, errors = _try_read_update_values(reader, workspace_id, cue_ref, read_keys)
+    if not retry_on_mismatch or _properties_match(after, requested):
+        return after, errors
+    for delay in AFTER_READ_RETRY_DELAYS:
+        time.sleep(delay)
+        after, errors = _try_read_update_values(reader, workspace_id, cue_ref, read_keys)
+        if _properties_match(after, requested):
+            return after, errors
+    return after, errors
+
+
 def _try_workspace_cue_ids(reader: Any, workspace_id: str) -> list[str] | None:
     try:
         reply = reader.client.request(_workspace_address(workspace_id, "cueLists/uniqueIDs"))
@@ -461,6 +696,27 @@ def _properties_match(values: Any, requested: dict[str, Any]) -> bool:
     if not isinstance(values, dict):
         return False
     return all(values.get(key) == value for key, value in requested.items())
+
+
+def _verification_mismatch_message(values: Any, requested: dict[str, Any]) -> str:
+    if not isinstance(values, dict):
+        return "Fresh after-read did not return cue values for verification."
+    mismatches = [
+        {"key": key, "requested": requested_value, "after": values.get(key)}
+        for key, requested_value in requested.items()
+        if values.get(key) != requested_value
+    ]
+    return f"Fresh after-read did not confirm requested values: {mismatches}"
+
+
+def _after_values_for_requested(values: Any, requested: dict[str, Any]) -> dict[str, Any] | None:
+    if not isinstance(values, dict):
+        return None
+    return {key: values.get(key) for key in requested}
+
+
+def _update_debug_enabled() -> bool:
+    return os.getenv("QLAB_UPDATE_DEBUG", "").strip().casefold() in {"1", "true", "yes", "on"}
 
 
 def _diff_properties(

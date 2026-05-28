@@ -59,7 +59,7 @@ clear documentation or reference location, not at the package root.
 | `qlab_get_cue_details` | Inspect one cue after finding it in overview or query results. | `auto` profile |
 | `qlab_check_write_readiness` | Check disabled-by-default write-mode readiness without mutation. | Safety/readiness report |
 | `qlab_create_cue` | Dry-run or create one blank allowlisted cue with safe initial properties. | Dry-run by default |
-| `qlab_update_cue` | Dry-run or update one concrete cue through the cue editing registry. | Dry-run by default |
+| `qlab_update_cues` | Dry-run or update up to 50 concrete cues through the cue editing registry. | Dry-run by default |
 
 ## Compact By Default
 
@@ -139,16 +139,16 @@ Write mode is deliberately gated:
 - `qlab_check_connection` and `qlab_get_workspace_overview` read `/showMode`
   so callers can tell whether the workspace is in Edit Mode or Show Mode.
 - `qlab_check_write_readiness` does not mutate anything.
-- `qlab_create_cue` and `qlab_update_cue` are blocked unless `QLAB_ENABLE_WRITE=true` and
+- `qlab_create_cue` and `qlab_update_cues` are blocked unless `QLAB_ENABLE_WRITE=true` and
   `QLAB_PASSCODE` is configured, `/connect` confirms `edit`, and `/showMode`
   confirms the workspace is in Edit Mode.
 - `dry_run` defaults to true through `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
-- `qlab_create_cue(..., dry_run=true)` and `qlab_update_cue(..., dry_run=true)`
+- `qlab_create_cue(..., dry_run=true)` and `qlab_update_cues(..., dry_run=true)`
   are planning-only and can run without enabling write mode or configuring a passcode.
 - Real writes bypass and clear the read cache before verifying fresh cue details.
 - Only blank cue creation is allowed in this preface.
 - Allowed cue types are `memo`, `group`, `wait`, and `audio`.
-- `qlab_update_cue` uses a registry of cue-family profiles:
+- `qlab_update_cues` uses a registry of cue-family profiles:
   `common`, `memo_basic`, `wait_basic`, `group_basic`, `audio_basic`, `mic_basic`,
   `video_basic`, `camera_basic`, `text_basic`, `light_basic`, `fade_basic`,
   `network_basic`, `midi_basic`, `midi_file_basic`, `timecode_basic`,
@@ -173,7 +173,7 @@ Write mode is deliberately gated:
   routing, targets, file paths, light commands, network/MIDI output, scripts,
   audio levels, slices, objects, live variants, text ranges/colors, and
   multi-argument geometry.
-- Playback control, raw OSC, GO, stop, panic, batch editing, and ambiguous
+- Playback control, raw OSC, GO, stop, panic, and ambiguous
   selected/active edits are not exposed. Target edits, file paths, scripts, and
   routing changes are dry-run-only catalog entries.
 
@@ -188,7 +188,7 @@ qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=No
 qlab_get_cue_details(workspace_id, cue_ref, profile="auto")  # profile also supports "editable"
 qlab_check_write_readiness(workspace_id)
 qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
-qlab_update_cue(workspace_id, cue_ref, properties=None, operations=None, profile="common", dry_run=None)
+qlab_update_cues(workspace_id, updates, dry_run=None)
 ```
 
 Structured update operations use this shape:

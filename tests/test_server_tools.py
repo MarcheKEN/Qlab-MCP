@@ -11,7 +11,7 @@ from qlab_mcp.server import (
     CREATE_CUE_TIMEOUT,
     CUE_DETAILS_TIMEOUT,
     QUERY_CUES_TIMEOUT,
-    UPDATE_CUE_TIMEOUT,
+    UPDATE_CUES_TIMEOUT,
     WORKSPACE_OVERVIEW_TIMEOUT,
     WORKSPACE_SETTING_DETAILS_TIMEOUT,
     WORKSPACE_SETTINGS_TIMEOUT,
@@ -37,7 +37,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_get_cue_details",
         "qlab_check_write_readiness",
         "qlab_create_cue",
-        "qlab_update_cue",
+        "qlab_update_cues",
     }
 
     check = tools["qlab_check_connection"]
@@ -112,37 +112,17 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "workspace_id" in create.inputSchema["required"]
     assert "cue_type" in create.inputSchema["required"]
 
-    update = tools["qlab_update_cue"]
-    assert update.title == "Update QLab Cue"
+    update = tools["qlab_update_cues"]
+    assert update.title == "Update QLab Cues"
     assert "Dry-run planning" in update.description
     assert update.annotations.readOnlyHint is False
     assert update.annotations.destructiveHint is False
     assert update.annotations.idempotentHint is False
     assert "workspace_id" in update.inputSchema["required"]
-    assert "cue_ref" in update.inputSchema["required"]
-    assert "properties" not in update.inputSchema["required"]
-    assert "operations" in update.inputSchema["properties"]
-    assert update.inputSchema["properties"]["profile"]["enum"] == [
-        "common",
-        "memo_basic",
-        "wait_basic",
-        "group_basic",
-        "audio_basic",
-        "mic_basic",
-        "video_basic",
-        "camera_basic",
-        "text_basic",
-        "light_basic",
-        "fade_basic",
-        "network_basic",
-        "midi_basic",
-        "midi_file_basic",
-        "timecode_basic",
-        "target_basic",
-        "reset_basic",
-        "devamp_basic",
-        "script_basic",
-    ]
+    assert "updates" in update.inputSchema["required"]
+    assert "cue_ref" not in update.inputSchema["properties"]
+    assert update.inputSchema["properties"]["updates"]["minItems"] == 1
+    assert update.inputSchema["properties"]["updates"]["maxItems"] == 50
 
 
 def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
@@ -158,7 +138,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
                 "qlab_get_cue_details",
                 "qlab_check_write_readiness",
                 "qlab_create_cue",
-                "qlab_update_cue",
+                "qlab_update_cues",
             )
         }
 
@@ -172,7 +152,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
         "qlab_get_cue_details": CUE_DETAILS_TIMEOUT,
         "qlab_check_write_readiness": WRITE_READINESS_TIMEOUT,
         "qlab_create_cue": CREATE_CUE_TIMEOUT,
-        "qlab_update_cue": UPDATE_CUE_TIMEOUT,
+        "qlab_update_cues": UPDATE_CUES_TIMEOUT,
     }
 
 

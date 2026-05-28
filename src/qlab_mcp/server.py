@@ -21,9 +21,10 @@ from .errors import (
 from .models import (
     CreateCueResult,
     CueDetailsResult,
+    CueUpdateInput,
     CueQueryResult,
     QlabConnectionCheckResult,
-    UpdateCueResult,
+    UpdateCuesResult,
     WriteReadinessResult,
     WorkspaceSettingDetailsResult,
     WorkspaceOverviewResult,
@@ -48,27 +49,6 @@ CueProfile = Literal[
     "full_sensitive",
 ]
 CueIndexProfile = Literal["minimal", "health"]
-UpdateCueProfile = Literal[
-    "common",
-    "memo_basic",
-    "wait_basic",
-    "group_basic",
-    "audio_basic",
-    "mic_basic",
-    "video_basic",
-    "camera_basic",
-    "text_basic",
-    "light_basic",
-    "fade_basic",
-    "network_basic",
-    "midi_basic",
-    "midi_file_basic",
-    "timecode_basic",
-    "target_basic",
-    "reset_basic",
-    "devamp_basic",
-    "script_basic",
-]
 CueQueryFilter = Literal[
     "type",
     "flagged",
@@ -158,7 +138,7 @@ QUERY_CUES_TIMEOUT = 60.0
 CUE_DETAILS_TIMEOUT = 20.0
 WRITE_READINESS_TIMEOUT = 6.0
 CREATE_CUE_TIMEOUT = 30.0
-UPDATE_CUE_TIMEOUT = 30.0
+UPDATE_CUES_TIMEOUT = 180.0
 
 T = TypeVar("T")
 
@@ -185,7 +165,7 @@ Use qlab_get_workspace_setting_details after settings when you need one specific
 
 Use qlab_query_cues for filtered cue searches across up to 500 cues by default, or up to 5000 cues when a caller explicitly raises the scan limit, then qlab_get_cue_details for one cue that needs deeper inspection.
 
-For write preflight, call qlab_check_write_readiness with an explicit workspace_id. Only call qlab_create_cue or qlab_update_cue after reviewing dry_run output. This server does not expose GO, stop, panic, raw OSC, batch editing, or playback control.
+For write preflight, call qlab_check_write_readiness with an explicit workspace_id. Only call qlab_create_cue or qlab_update_cues after reviewing dry_run output. This server does not expose GO, stop, panic, raw OSC, or playback control.
 """,
 )
 
@@ -553,7 +533,7 @@ def qlab_get_cue_details(
             description=(
                 "Read-only detail profile. Use auto for safe type-aware sections, health for warnings/broken cues, "
                 "targets for target IDs without file paths, technical for notes/targets/routing/paths, "
-                "editable for safe details plus qlab_update_cue profile/property capabilities, "
+                "editable for safe details plus qlab_update_cues profile/property capabilities, "
                 "and full_sensitive only for deep audits."
             )
         ),
@@ -656,51 +636,25 @@ def qlab_create_cue(
 
 
 @mcp.tool(
-    title="Update QLab Cue",
+    title="Update QLab Cues",
     tags={"qlab", "write-mode", "cue-update", "gated-write"},
     annotations=GATED_CREATE_QLAB_TOOL,
-    timeout=UPDATE_CUE_TIMEOUT,
+    timeout=UPDATE_CUES_TIMEOUT,
 )
-def qlab_update_cue(
+def qlab_update_cues(
     workspace_id: WorkspaceId,
-    cue_ref: Annotated[
-        str,
+    updates: Annotated[
+        list[CueUpdateInput],
         Field(
             min_length=1,
+            max_length=50,
             description=(
-                "Concrete cue number or unique ID. selected, active, playhead, and playbackPosition "
-                "are not accepted for updates."
+                "Cue updates to plan or apply. Each item has cue_ref, profile, properties, and operations. "
+                "cue_ref must be a concrete cue number or unique ID; selected, active, playhead, and playbackPosition "
+                "are not accepted."
             ),
         ),
     ],
-    properties: Annotated[
-        dict[str, Any] | None,
-        Field(
-            description=(
-                "Simple property updates for the selected profile. Backward-compatible path for one-argument "
-                "setters such as name, flagged, rate, text, or opacity. Use operations for structured or multi-arg setters."
-            ),
-        ),
-    ] = None,
-    operations: Annotated[
-        list[dict[str, Any]] | None,
-        Field(
-            description=(
-                "Typed update operations for structured QLab OSC setters. Shape: "
-                "{\"property\":\"level\",\"args\":{\"inChannel\":1,\"outChannel\":1,\"decibel\":-6},\"mode\":\"saved\"}. "
-                "mode defaults to saved; live is accepted only for registry entries that support it."
-            ),
-        ),
-    ] = None,
-    profile: Annotated[
-        UpdateCueProfile,
-        Field(
-            description=(
-                "Update profile. All QLab cue families are cataloged. Profiles allow only one-argument, "
-                "fresh-verifiable real writes; higher-risk operations remain dry-run only."
-            ),
-        ),
-    ] = "common",
     dry_run: Annotated[
         bool | None,
         Field(
@@ -710,22 +664,20 @@ def qlab_update_cue(
             ),
         ),
     ] = None,
-) -> UpdateCueResult:
-    """Update one existing cue through the cue editing registry, or return a dry-run plan.
+) -> UpdateCuesResult:
+    """Update one or more existing cues through the cue editing registry, or return a dry-run plan.
 
     Real updates require QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
     Dry-run planning never sends mutating OSC.
     High-risk profiles and unvalidated properties are cataloged for planning but blocked for real writes.
+    Batch real writes run all preflight checks before sending any setter and use cue unique IDs for setters.
     """
     return _run_tool(
-        lambda: UpdateCueResult.model_validate(
-            _reader().update_cue(
+        lambda: UpdateCuesResult.model_validate(
+            _reader().update_cues(
                 workspace_id=workspace_id,
-                cue_ref=cue_ref,
-                properties=properties,
-                operations=operations,
+                updates=[update.model_dump() if hasattr(update, "model_dump") else update for update in updates],
                 dry_run=dry_run,
-                profile=profile,
             )
         )
     )

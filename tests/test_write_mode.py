@@ -92,6 +92,83 @@ class FakeWriteClient:
         return address.removeprefix("/workspace/ws-1/cue/1/")
 
 
+class BatchFakeWriteClient:
+    def __init__(
+        self,
+        config: QLabConfig,
+        cues: dict[str, dict[str, Any]],
+        cue_numbers: dict[str, str] | None = None,
+        fail_set_property: tuple[str, str] | None = None,
+        timeout_set_property: tuple[str, str] | None = None,
+        timeout_without_apply: bool = False,
+        timeout_apply_after_reads: int | None = None,
+        ignore_set_property: tuple[str, str] | None = None,
+        missing_refs: set[str] | None = None,
+        show_mode_data: Any = False,
+    ):
+        self.config = config
+        self.cues = {cue_id: dict(values, uniqueID=cue_id) for cue_id, values in cues.items()}
+        self.cue_numbers = cue_numbers or {}
+        self.fail_set_property = fail_set_property
+        self.timeout_set_property = timeout_set_property
+        self.timeout_without_apply = timeout_without_apply
+        self.timeout_apply_after_reads = timeout_apply_after_reads
+        self.ignore_set_property = ignore_set_property
+        self.pending_timeout_applies: dict[tuple[str, str], Any] = {}
+        self.after_read_counts: dict[str, int] = {}
+        self.missing_refs = missing_refs or set()
+        self.show_mode_data = show_mode_data
+        self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
+
+    def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+        self.requests.append((address, args, workspace_id))
+        if address == "/workspaces":
+            return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+        if address == "/workspace/ws-1/connect":
+            return SimpleNamespace(data="ok:view|edit", status="ok")
+        if address == "/workspace/ws-1/showMode":
+            return SimpleNamespace(data=self.show_mode_data, status="ok")
+        cue_id, prop = self._cue_id_and_property(address)
+        if cue_id is None or prop is None:
+            raise AssertionError(f"Unexpected fake batch request: {address}")
+        if cue_id in self.missing_refs:
+            raise QLabReplyError("error", "No cue found", address)
+        if prop == "valuesForKeys":
+            self.after_read_counts[cue_id] = self.after_read_counts.get(cue_id, 0) + 1
+            if self.timeout_apply_after_reads is not None:
+                for (pending_cue_id, pending_prop), pending_value in list(self.pending_timeout_applies.items()):
+                    if pending_cue_id == cue_id and self.after_read_counts[cue_id] >= self.timeout_apply_after_reads:
+                        self.cues[pending_cue_id][pending_prop] = pending_value
+                        del self.pending_timeout_applies[(pending_cue_id, pending_prop)]
+            return SimpleNamespace(data=dict(self.cues[cue_id]), status="ok")
+        if self.fail_set_property == (cue_id, prop):
+            raise QLabReplyError("error", f"Failed setting {prop}", address)
+        if self.timeout_set_property == (cue_id, prop):
+            if not self.timeout_without_apply:
+                if self.timeout_apply_after_reads is None:
+                    self.cues[cue_id][prop] = args[0] if args else None
+                else:
+                    self.pending_timeout_applies[(cue_id, prop)] = args[0] if args else None
+            raise OscTimeoutError(f"Timed out waiting for QLab reply to {address}")
+        if self.ignore_set_property == (cue_id, prop):
+            return SimpleNamespace(data=None, status="ok")
+        self.cues[cue_id][prop] = args[0] if args else None
+        return SimpleNamespace(data=None, status="ok")
+
+    def _cue_id_and_property(self, address: str) -> tuple[str | None, str | None]:
+        cue_id_prefix = "/workspace/ws-1/cue_id/"
+        cue_number_prefix = "/workspace/ws-1/cue/"
+        if address.startswith(cue_id_prefix):
+            rest = address.removeprefix(cue_id_prefix)
+            cue_id, _, prop = rest.partition("/")
+            return cue_id, prop
+        if address.startswith(cue_number_prefix):
+            rest = address.removeprefix(cue_number_prefix)
+            number, _, prop = rest.partition("/")
+            return self.cue_numbers.get(number), prop
+        return None, None
+
+
 def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
     catalog = profile_catalog()
 
@@ -402,6 +479,383 @@ def test_update_cue_dry_run_sends_no_mutating_osc() -> None:
         "verify",
     ]
     assert [request[0] for request in client.requests] == [f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys"]
+
+
+def test_update_cues_batch_dry_run_allows_mixed_profiles() -> None:
+    memo_id = "11111111-1111-4111-8111-111111111111"
+    audio_id = "22222222-2222-4222-8222-222222222222"
+    text_id = "33333333-3333-4333-8333-333333333333"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False, passcode=None),
+        cues={
+            memo_id: {"type": "Memo", "name": "Memo old", "flagged": False},
+            audio_id: {"type": "Audio", "name": "Audio old", "rate": 1.0},
+            text_id: {"type": "Text", "text": "Old", "text/format/fontSize": 24},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": memo_id, "profile": "common", "properties": {"name": "Memo new"}},
+            {"cue_ref": audio_id, "profile": "audio_basic", "properties": {"rate": 1.1}},
+            {"cue_ref": text_id, "profile": "text_basic", "properties": {"text/format/fontSize": 32}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "dry_run"
+    assert result["requested_count"] == 3
+    assert result["planned_count"] == 3
+    assert result["updated_count"] == 0
+    assert [item["profile"] for item in result["results"]] == ["common", "audio_basic", "text_basic"]
+    assert all(item["executed_operations"] == [] for item in result["results"])
+    assert all(request[0].endswith("/valuesForKeys") for request in client.requests)
+
+
+def test_update_cues_single_item_real_uses_unique_id_and_one_readiness_check() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "name": "Old", "flagged": False}},
+        cue_numbers={"1": cue_id},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues("ws-1", [{"cue_ref": "1", "properties": {"name": "New"}}], dry_run=False)
+
+    addresses = [request[0] for request in client.requests]
+    assert result["ok"] is True
+    assert result["status"] == "updated"
+    assert result["updated_count"] == 1
+    assert addresses.count("/workspaces") == 1
+    assert addresses.count("/workspace/ws-1/connect") == 1
+    assert addresses.count("/workspace/ws-1/showMode") == 1
+    assert "/workspace/ws-1/cue/1/valuesForKeys" in addresses
+    assert f"/workspace/ws-1/cue_id/{cue_id}/name" in addresses
+    assert "/workspace/ws-1/cue/1/name" not in addresses
+
+
+def test_update_cues_rejects_empty_and_over_limit() -> None:
+    client = BatchFakeWriteClient(QLabConfig(enable_write=False), cues={})
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    with pytest.raises(UnsafeWriteOperationError, match="at least one"):
+        reader.update_cues("ws-1", [], dry_run=True)
+
+    with pytest.raises(UnsafeWriteOperationError, match="at most 50"):
+        reader.update_cues(
+            "ws-1",
+            [{"cue_ref": str(index), "properties": {"name": "x"}} for index in range(51)],
+            dry_run=True,
+        )
+
+    assert client.requests == []
+
+
+def test_update_cues_real_preflight_failure_blocks_all_setters() -> None:
+    memo_id = "11111111-1111-4111-8111-111111111111"
+    audio_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            memo_id: {"type": "Memo", "name": "Memo old"},
+            audio_id: {"type": "Memo", "rate": 1.0},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": memo_id, "properties": {"name": "Memo new"}},
+            {"cue_ref": audio_id, "profile": "audio_basic", "properties": {"rate": 1.1}},
+        ],
+        dry_run=False,
+    )
+
+    addresses = [request[0] for request in client.requests]
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["failed_count"] == 1
+    assert "Audio cue" in result["results"][1]["errors"]["profile"]
+    assert f"/workspace/ws-1/cue_id/{memo_id}/name" not in addresses
+    assert f"/workspace/ws-1/cue_id/{audio_id}/rate" not in addresses
+
+
+def test_update_cues_real_updates_mixed_safe_profiles() -> None:
+    memo_id = "11111111-1111-4111-8111-111111111111"
+    audio_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            memo_id: {"type": "Memo", "name": "Memo old"},
+            audio_id: {"type": "Audio", "rate": 1.0, "startTime": 0},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": memo_id, "properties": {"name": "Memo new"}},
+            {"cue_ref": audio_id, "profile": "audio_basic", "properties": {"rate": 1.1}},
+        ],
+        dry_run=False,
+    )
+
+    addresses = [request[0] for request in client.requests]
+    assert result["ok"] is True
+    assert result["status"] == "updated"
+    assert result["updated_count"] == 2
+    assert result["failed_count"] == 0
+    assert addresses.count("/workspaces") == 1
+    assert addresses.count("/workspace/ws-1/connect") == 1
+    assert addresses.count("/workspace/ws-1/showMode") == 1
+    assert f"/workspace/ws-1/cue_id/{memo_id}/name" in addresses
+    assert f"/workspace/ws-1/cue_id/{audio_id}/rate" in addresses
+    assert result["results"][0]["after"]["name"] == "Memo new"
+    assert result["results"][1]["after"]["rate"] == 1.1
+
+
+def test_update_cues_real_blocks_dry_run_only_property_before_osc() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Audio"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
+        reader.update_cues(
+            "ws-1",
+            [
+                {
+                    "cue_ref": cue_id,
+                    "profile": "audio_basic",
+                    "operations": [
+                        {"property": "level", "args": {"inChannel": 1, "outChannel": 1, "decibel": -6}}
+                    ],
+                }
+            ],
+            dry_run=False,
+        )
+
+    assert client.requests == []
+
+
+def test_update_cues_real_blocks_missing_cue_before_any_setter() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    missing_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "name": "Old"}, missing_id: {"type": "Memo", "name": "Missing"}},
+        missing_refs={missing_id},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": cue_id, "properties": {"name": "New"}},
+            {"cue_ref": missing_id, "properties": {"name": "Nope"}},
+        ],
+        dry_run=False,
+    )
+
+    addresses = [request[0] for request in client.requests]
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["results"][1]["status"] == "preflight_failed"
+    assert f"/workspace/ws-1/cue_id/{cue_id}/name" not in addresses
+
+
+def test_update_cues_real_timeout_confirmed_by_after_read() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "flagged": False}},
+        timeout_set_property=(cue_id, "flagged"),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues("ws-1", [{"cue_ref": cue_id, "properties": {"flagged": True}}], dry_run=False)
+
+    assert result["ok"] is True
+    assert result["status"] == "updated_with_confirmed_timeouts"
+    assert result["updated_count"] == 1
+    assert result["failed_count"] == 0
+    assert result["timeout_confirmed_count"] == 1
+    assert result["results"][0]["status"] == "updated_with_confirmed_timeouts"
+    assert result["results"][0]["executed_operations"][0]["status"] == "timeout_pending_verification"
+    assert result["results"][0]["after"]["flagged"] is True
+
+
+def test_update_cues_confirmed_timeouts_do_not_count_as_failures_across_batch() -> None:
+    clean_id = "11111111-1111-4111-8111-111111111111"
+    timeout_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            clean_id: {"type": "Memo", "name": "Old clean"},
+            timeout_id: {"type": "Memo", "name": "Old timeout"},
+        },
+        timeout_set_property=(timeout_id, "name"),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": clean_id, "properties": {"name": "New clean"}},
+            {"cue_ref": timeout_id, "properties": {"name": "New timeout"}},
+        ],
+        dry_run=False,
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "updated_with_confirmed_timeouts"
+    assert result["updated_count"] == 2
+    assert result["failed_count"] == 0
+    assert result["timeout_confirmed_count"] == 1
+    assert [item["status"] for item in result["results"]] == ["updated", "updated_with_confirmed_timeouts"]
+    assert result["warnings"]
+
+
+def test_update_cues_unconfirmed_timeout_counts_as_failure() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "flagged": False}},
+        timeout_set_property=(cue_id, "flagged"),
+        timeout_without_apply=True,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues("ws-1", [{"cue_ref": cue_id, "properties": {"flagged": True}}], dry_run=False)
+
+    assert result["ok"] is False
+    assert result["status"] == "partial_failed"
+    assert result["updated_count"] == 0
+    assert result["failed_count"] == 1
+    assert result["timeout_confirmed_count"] == 0
+    assert result["results"][0]["status"] == "partial_failed"
+    assert "flagged" in result["results"][0]["errors"]
+
+
+def test_update_cues_retries_after_read_for_late_timeout_application() -> None:
+    cues = {
+        f"{index:08d}-1111-4111-8111-111111111111": {"type": "Memo", "name": f"Old {index}"}
+        for index in range(30)
+    }
+    timeout_id = list(cues)[17]
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        timeout_set_property=(timeout_id, "name"),
+        timeout_apply_after_reads=3,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": cue_id, "properties": {"name": f"[CODEX30] {index}"}}
+            for index, cue_id in enumerate(cues)
+        ],
+        dry_run=False,
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "updated_with_confirmed_timeouts"
+    assert result["updated_count"] == 30
+    assert result["failed_count"] == 0
+    assert result["timeout_confirmed_count"] == 1
+    assert result["results"][17]["status"] == "updated_with_confirmed_timeouts"
+
+
+def test_update_cues_after_read_mismatch_reports_requested_and_after_values() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "name": "Old"}},
+        ignore_set_property=(cue_id, "name"),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues("ws-1", [{"cue_ref": cue_id, "properties": {"name": "New"}}], dry_run=False)
+
+    assert result["ok"] is False
+    assert result["status"] == "verification_failed"
+    assert result["updated_count"] == 0
+    assert result["failed_count"] == 1
+    assert result["results"][0]["status"] == "verification_failed"
+    assert "requested" in result["results"][0]["errors"]["verification"]
+    assert "after" in result["results"][0]["errors"]["verification"]
+
+
+def test_update_cues_mixed_clean_confirmed_timeout_and_real_error_counts_only_error() -> None:
+    clean_id = "11111111-1111-4111-8111-111111111111"
+    timeout_id = "22222222-2222-4222-8222-222222222222"
+    error_id = "33333333-3333-4333-8333-333333333333"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            clean_id: {"type": "Memo", "name": "Old clean"},
+            timeout_id: {"type": "Memo", "flagged": False},
+            error_id: {"type": "Memo", "armed": True},
+        },
+        timeout_set_property=(timeout_id, "flagged"),
+        fail_set_property=(error_id, "armed"),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": clean_id, "properties": {"name": "New clean"}},
+            {"cue_ref": timeout_id, "properties": {"flagged": True}},
+            {"cue_ref": error_id, "properties": {"armed": False}},
+        ],
+        dry_run=False,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "partial_failed"
+    assert result["updated_count"] == 2
+    assert result["failed_count"] == 1
+    assert result["timeout_confirmed_count"] == 1
+    assert [item["status"] for item in result["results"]] == [
+        "updated",
+        "updated_with_confirmed_timeouts",
+        "partial_failed",
+    ]
+    assert "armed" in result["results"][2]["errors"]
+
+
+def test_update_cues_real_reports_partial_failure_during_execution() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "name": "Old", "armed": True}},
+        fail_set_property=(cue_id, "armed"),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "properties": {"name": "New", "armed": False}}],
+        dry_run=False,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "partial_failed"
+    assert result["failed_count"] == 1
+    assert [operation["property"] for operation in result["results"][0]["executed_operations"]] == ["name"]
+    assert "armed" in result["results"][0]["errors"]
+    assert result["results"][0]["after"]["name"] == "New"
 
 
 def test_update_cue_rejects_ambiguous_refs_and_bad_properties_before_osc() -> None:

@@ -8,11 +8,14 @@ from fastmcp.exceptions import ToolError
 from qlab_mcp.errors import QLabReplyError
 from qlab_mcp.server import (
     CHECK_CONNECTION_TIMEOUT,
+    CREATE_CUE_TIMEOUT,
     CUE_DETAILS_TIMEOUT,
     QUERY_CUES_TIMEOUT,
+    UPDATE_CUES_TIMEOUT,
     WORKSPACE_OVERVIEW_TIMEOUT,
     WORKSPACE_SETTING_DETAILS_TIMEOUT,
     WORKSPACE_SETTINGS_TIMEOUT,
+    WRITE_READINESS_TIMEOUT,
     _run_tool,
     mcp,
     qlab_query_cues,
@@ -32,12 +35,15 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_get_workspace_setting_details",
         "qlab_query_cues",
         "qlab_get_cue_details",
+        "qlab_check_write_readiness",
+        "qlab_create_cue",
+        "qlab_update_cues",
     }
 
     check = tools["qlab_check_connection"]
     assert check.title == "Check QLab Connection"
     assert "passcode" in check.description
-    assert "edit/control" in check.description
+    assert "/connect permission scopes" in check.description
     assert check.annotations.readOnlyHint is True
     assert check.annotations.destructiveHint is False
 
@@ -80,7 +86,43 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     details = tools["qlab_get_cue_details"]
     assert details.title == "Get QLab Cue Details"
     assert "valuesForKeys" in details.description
+    assert "editable" in details.inputSchema["properties"]["profile"]["enum"]
     assert details.annotations.readOnlyHint is True
+
+    readiness = tools["qlab_check_write_readiness"]
+    assert readiness.title == "Check QLab Write Readiness"
+    assert "without sending any mutating OSC commands" in readiness.description
+    assert readiness.annotations.readOnlyHint is True
+    assert readiness.annotations.destructiveHint is False
+    assert "workspace_id" in readiness.inputSchema["required"]
+
+    create = tools["qlab_create_cue"]
+    assert create.title == "Create QLab Cue"
+    assert "dry-run plan" in create.description
+    assert create.annotations.readOnlyHint is False
+    assert create.annotations.destructiveHint is False
+    assert create.annotations.idempotentHint is False
+    assert create.inputSchema["properties"]["cue_type"]["enum"] == [
+        "memo",
+        "group",
+        "wait",
+        "audio",
+    ]
+    assert "dry_run" in create.inputSchema["properties"]
+    assert "workspace_id" in create.inputSchema["required"]
+    assert "cue_type" in create.inputSchema["required"]
+
+    update = tools["qlab_update_cues"]
+    assert update.title == "Update QLab Cues"
+    assert "Dry-run planning" in update.description
+    assert update.annotations.readOnlyHint is False
+    assert update.annotations.destructiveHint is False
+    assert update.annotations.idempotentHint is False
+    assert "workspace_id" in update.inputSchema["required"]
+    assert "updates" in update.inputSchema["required"]
+    assert "cue_ref" not in update.inputSchema["properties"]
+    assert update.inputSchema["properties"]["updates"]["minItems"] == 1
+    assert update.inputSchema["properties"]["updates"]["maxItems"] == 50
 
 
 def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
@@ -94,6 +136,9 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
                 "qlab_get_workspace_setting_details",
                 "qlab_query_cues",
                 "qlab_get_cue_details",
+                "qlab_check_write_readiness",
+                "qlab_create_cue",
+                "qlab_update_cues",
             )
         }
 
@@ -105,6 +150,9 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
         "qlab_get_workspace_setting_details": WORKSPACE_SETTING_DETAILS_TIMEOUT,
         "qlab_query_cues": QUERY_CUES_TIMEOUT,
         "qlab_get_cue_details": CUE_DETAILS_TIMEOUT,
+        "qlab_check_write_readiness": WRITE_READINESS_TIMEOUT,
+        "qlab_create_cue": CREATE_CUE_TIMEOUT,
+        "qlab_update_cues": UPDATE_CUES_TIMEOUT,
     }
 
 

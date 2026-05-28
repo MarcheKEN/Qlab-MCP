@@ -6,6 +6,18 @@ from dataclasses import dataclass
 import os
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    normalized = raw.strip().casefold()
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "n", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean value")
+
+
 @dataclass(frozen=True)
 class QLabConfig:
     host: str = "127.0.0.1"
@@ -14,6 +26,8 @@ class QLabConfig:
     timeout: float = 2.0
     cache_ttl: float = 10.0
     passcode: str | None = None
+    enable_write: bool = False
+    write_dry_run_default: bool = True
 
     @classmethod
     def from_env(cls) -> "QLabConfig":
@@ -24,4 +38,6 @@ class QLabConfig:
             timeout=float(os.getenv("QLAB_TIMEOUT", "2.0")),
             cache_ttl=float(os.getenv("QLAB_CACHE_TTL", "10.0")),
             passcode=os.getenv("QLAB_PASSCODE") or None,
+            enable_write=_env_bool("QLAB_ENABLE_WRITE", False),
+            write_dry_run_default=_env_bool("QLAB_WRITE_DRY_RUN_DEFAULT", True),
         )

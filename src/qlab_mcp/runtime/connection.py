@@ -4,12 +4,242 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..osc.addressing import _clean_workspace_id
+from ..osc.addressing import _clean_workspace_id, _workspace_address
 from ..osc.client import QLabOscClient
 from ..errors import OscTimeoutError, QLabReplyError
 
 
 QLAB_VERSION_KEYS = ("qlabVersion", "QLabVersion", "applicationVersion", "version")
+CONNECT_SCOPE_ORDER = ("view", "edit", "control")
+
+
+def normalize_workspace_mode(data: Any, address: str | None = None) -> dict[str, Any]:
+    """Normalize QLab /showMode data into an operational workspace mode."""
+    if isinstance(data, bool):
+        return _workspace_mode_result(
+            ok=True,
+            status="confirmed",
+            show_mode=data,
+            mode="show" if data else "edit",
+            address=address,
+        )
+    return _workspace_mode_result(
+        ok=False,
+        status="unexpected_data",
+        show_mode=None,
+        mode="unknown",
+        address=address,
+        reason="/showMode did not return a boolean value.",
+    )
+
+
+def read_workspace_mode(client: QLabOscClient, workspace_id: str, *, authenticated: bool = False) -> dict[str, Any]:
+    workspace = _clean_workspace_id(workspace_id)
+    address = _workspace_address(workspace, "showMode")
+    try:
+        reply = client.request(address, workspace_id=workspace if authenticated else None)
+    except QLabReplyError as exc:
+        return _workspace_mode_result(
+            ok=False,
+            status=exc.status,
+            show_mode=None,
+            mode="unknown",
+            address=address,
+            error=str(exc),
+        )
+    except OscTimeoutError as exc:
+        return _workspace_mode_result(
+            ok=False,
+            status="timeout",
+            show_mode=None,
+            mode="unknown",
+            address=address,
+            error=str(exc),
+        )
+    except Exception as exc:
+        return _workspace_mode_result(
+            ok=False,
+            status="error",
+            show_mode=None,
+            mode="unknown",
+            address=address,
+            error=str(exc),
+        )
+
+    if reply.status != "ok":
+        return _workspace_mode_result(
+            ok=False,
+            status=reply.status,
+            show_mode=None,
+            mode="unknown",
+            address=address,
+        )
+    return normalize_workspace_mode(reply.data, address=address)
+
+
+def _workspace_mode_result(
+    *,
+    ok: bool,
+    status: str,
+    show_mode: bool | None,
+    mode: str,
+    address: str | None = None,
+    reason: str | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "ok": ok,
+        "status": status,
+        "show_mode": show_mode,
+        "mode": mode,
+        "source": "/showMode",
+    }
+    if address is not None:
+        result["address"] = address
+    if reason:
+        result["reason"] = reason
+    if error:
+        result["error"] = error
+    return result
+
+
+def parse_connect_scopes(data: Any) -> dict[str, Any]:
+    """Normalize QLab /connect permission data such as ok:view|edit."""
+    if not isinstance(data, str):
+        return _connect_scope_result(
+            ok=False,
+            status="scope_unavailable",
+            scopes=[],
+            unknown_scopes=[],
+            reason="/connect did not return a scope string.",
+        )
+
+    raw = data.strip()
+    if not raw.casefold().startswith("ok:"):
+        return _connect_scope_result(
+            ok=False,
+            status="scope_unavailable",
+            scopes=[],
+            unknown_scopes=[],
+            reason="/connect did not return an ok:<scope> payload.",
+        )
+
+    known: list[str] = []
+    unknown: list[str] = []
+    for token in raw.split(":", 1)[1].replace(",", "|").split("|"):
+        scope = token.strip().casefold()
+        if not scope:
+            continue
+        if scope in CONNECT_SCOPE_ORDER:
+            if scope not in known:
+                known.append(scope)
+        elif scope not in unknown:
+            unknown.append(scope)
+
+    ordered_known = [scope for scope in CONNECT_SCOPE_ORDER if scope in known]
+    if not ordered_known:
+        return _connect_scope_result(
+            ok=False,
+            status="scope_unavailable",
+            scopes=[],
+            unknown_scopes=unknown,
+            reason="/connect returned no recognized permission scopes.",
+        )
+
+    return _connect_scope_result(
+        ok=True,
+        status="confirmed",
+        scopes=ordered_known,
+        unknown_scopes=unknown,
+    )
+
+
+def check_connect_scopes(client: QLabOscClient, workspace_id: str) -> dict[str, Any]:
+    workspace = _clean_workspace_id(workspace_id)
+    address = _workspace_address(workspace, "connect")
+    passcode = getattr(client.config, "passcode", None)
+    if not passcode:
+        return _connect_scope_result(
+            ok=None,
+            status="not_checked",
+            scopes=[],
+            unknown_scopes=[],
+            address=address,
+            reason="QLAB_PASSCODE is not configured; /connect scopes were not checked.",
+        )
+
+    try:
+        reply = client.request(address, passcode)
+    except QLabReplyError as exc:
+        return _connect_scope_result(
+            ok=False,
+            status=exc.status,
+            scopes=[],
+            unknown_scopes=[],
+            address=address,
+            error=str(exc),
+        )
+    except OscTimeoutError as exc:
+        return _connect_scope_result(
+            ok=False,
+            status="timeout",
+            scopes=[],
+            unknown_scopes=[],
+            address=address,
+            error=str(exc),
+        )
+    except Exception as exc:
+        return _connect_scope_result(
+            ok=False,
+            status="error",
+            scopes=[],
+            unknown_scopes=[],
+            address=address,
+            error=str(exc),
+        )
+
+    if reply.status != "ok":
+        return _connect_scope_result(
+            ok=False,
+            status=reply.status,
+            scopes=[],
+            unknown_scopes=[],
+            address=address,
+        )
+
+    parsed = parse_connect_scopes(reply.data)
+    return {
+        **parsed,
+        "address": address,
+        "reply_status": reply.status,
+    }
+
+
+def _connect_scope_result(
+    *,
+    ok: bool | None,
+    status: str,
+    scopes: list[str],
+    unknown_scopes: list[str],
+    address: str | None = None,
+    reason: str | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "ok": ok,
+        "status": status,
+        "scopes": scopes,
+        "unknown_scopes": unknown_scopes,
+        "source": "/connect",
+    }
+    if address is not None:
+        result["address"] = address
+    if reason:
+        result["reason"] = reason
+    if error:
+        result["error"] = error
+    return result
+
 
 def _connection_metadata(client: QLabOscClient) -> dict[str, Any]:
     return {
@@ -36,12 +266,9 @@ def _workspace_candidate(workspace: Any) -> dict[str, Any]:
 
 
 def _base_permissions() -> dict[str, Any]:
-    undetectable_reason = (
-        "QLab does not expose passcode edit/control scopes through a read-only OSC query; "
-        "proving this permission would require sending an edit or control command."
-    )
+    not_checked_reason = "QLAB_PASSCODE is not configured; /connect permission scopes were not checked."
     return {
-        "probe_mode": "read_only",
+        "probe_mode": "connect",
         "view": {
             "ok": None,
             "status": "not_checked",
@@ -51,16 +278,16 @@ def _base_permissions() -> dict[str, Any]:
         "edit": {
             "ok": None,
             "status": "not_checked",
-            "method": None,
-            "safe_to_probe": False,
-            "reason": undetectable_reason,
+            "source": "/connect",
+            "safe_to_probe": True,
+            "reason": not_checked_reason,
         },
         "control": {
             "ok": None,
             "status": "not_checked",
-            "method": None,
-            "safe_to_probe": False,
-            "reason": undetectable_reason,
+            "source": "/connect",
+            "safe_to_probe": True,
+            "reason": not_checked_reason,
         },
     }
 
@@ -80,11 +307,48 @@ def _base_capabilities() -> dict[str, Any]:
     }
 
 
-def _permission_warning() -> str:
-    return (
-        "Edit and control permissions are not checked by read-only diagnostics because QLab does not "
-        "publish passcode scopes over OSC; confirming them would require an edit/control probe."
-    )
+def _connect_warning(connect_scopes: dict[str, Any]) -> str | None:
+    status = connect_scopes.get("status")
+    if status == "not_checked":
+        return "QLAB_PASSCODE is not configured; /connect permission scopes were not checked."
+    if status == "scope_unavailable":
+        return "QLab accepted /connect but did not return parseable permission scopes; edit/control are not granted."
+    return None
+
+
+def _apply_connect_permissions(
+    permissions: dict[str, Any],
+    capabilities: dict[str, Any],
+    connect_scopes: dict[str, Any],
+) -> None:
+    status = connect_scopes.get("status")
+    if status == "confirmed":
+        scopes = set(connect_scopes.get("scopes") or [])
+        for scope in CONNECT_SCOPE_ORDER:
+            granted = scope in scopes
+            permissions[scope] = {
+                "ok": granted,
+                "status": "confirmed" if granted else "not_granted",
+                "source": "/connect",
+                "safe_to_probe": True,
+            }
+        capabilities["edit"] = "edit" in scopes
+        capabilities["control"] = "control" in scopes
+        return
+
+    if status == "not_checked":
+        return
+
+    for scope in CONNECT_SCOPE_ORDER:
+        permissions[scope] = {
+            "ok": False,
+            "status": status,
+            "source": "/connect",
+            "safe_to_probe": True,
+            "reason": connect_scopes.get("reason") or connect_scopes.get("error"),
+        }
+    capabilities["edit"] = False
+    capabilities["control"] = False
 
 
 class WorkspaceConnectionMixin:
@@ -96,10 +360,12 @@ class WorkspaceConnectionMixin:
         passcode_configured = bool(self.client.config.passcode)
         permissions = _base_permissions()
         capabilities = _base_capabilities()
-        warnings: list[str] = [_permission_warning()]
+        warnings: list[str] = []
         checks: dict[str, Any] = {
             "workspaces": None,
             "workspace_resolution": None,
+            "connect": None,
+            "show_mode": None,
             "read_access": None,
         }
         base_result: dict[str, Any] = {
@@ -115,6 +381,8 @@ class WorkspaceConnectionMixin:
             "available_workspaces": [],
             "passcode_configured": passcode_configured,
             "passcode_status": None,
+            "connect_scopes": None,
+            "workspace_mode": None,
             "message": "",
             "connection": _connection_metadata(self.client),
             "permissions": permissions,
@@ -221,14 +489,43 @@ class WorkspaceConnectionMixin:
             }
         )
 
+        connect_scopes = check_connect_scopes(self.client, resolved_workspace_id)
+        checks["connect"] = connect_scopes
+        base_result["connect_scopes"] = connect_scopes
+        _apply_connect_permissions(permissions, capabilities, connect_scopes)
+        warning = _connect_warning(connect_scopes)
+        if warning:
+            warnings.append(warning)
+        if connect_scopes["status"] in {"confirmed", "scope_unavailable"}:
+            base_result["passcode_status"] = "accepted" if passcode_configured else None
+        elif connect_scopes["status"] == "denied":
+            return {
+                **base_result,
+                "passcode_status": "denied",
+                "status": "workspace_denied",
+                "message": "QLab is reachable, but the workspace denied /connect.",
+            }
+        elif connect_scopes["status"] in {"timeout", "error"}:
+            return {
+                **base_result,
+                "passcode_status": connect_scopes["status"],
+                "status": "workspace_connect_failed",
+                "message": "QLab is reachable, but /connect failed for the requested workspace.",
+            }
+
+        workspace_mode = read_workspace_mode(self.client, resolved_workspace_id)
+        checks["show_mode"] = workspace_mode
+        base_result["workspace_mode"] = workspace_mode
+
         if not require_read_access:
             checks["read_access"] = {"ok": None, "skipped": True, "reason": "require_read_access is false"}
-            permissions["view"] = {
-                **permissions["view"],
-                "ok": None,
-                "status": "skipped",
-                "reason": "require_read_access is false",
-            }
+            if permissions["view"]["status"] == "not_checked":
+                permissions["view"] = {
+                    **permissions["view"],
+                    "ok": None,
+                    "status": "skipped",
+                    "reason": "require_read_access is false",
+                }
             return {
                 **base_result,
                 "ok": True,
@@ -236,8 +533,9 @@ class WorkspaceConnectionMixin:
                 "message": "QLab is reachable and a workspace is available; read access was not checked.",
             }
 
+        read_address = _workspace_address(resolved_workspace_id, "cueLists/shallow")
         try:
-            cue_lists = self.get_cue_lists(resolved_workspace_id, include_children=False)["cue_lists"]
+            cue_lists = self.client.request(read_address).data
         except QLabReplyError as exc:
             passcode_status = exc.status
             checks["read_access"] = {
@@ -247,13 +545,14 @@ class WorkspaceConnectionMixin:
                 "data": exc.data,
                 "error": str(exc),
             }
-            permissions["view"] = {
-                **permissions["view"],
-                "ok": False,
-                "status": exc.status,
-                "address": exc.address,
-                "error": str(exc),
-            }
+            if permissions["view"]["status"] != "confirmed":
+                permissions["view"] = {
+                    **permissions["view"],
+                    "ok": False,
+                    "status": exc.status,
+                    "address": exc.address,
+                    "error": str(exc),
+                }
             return {
                 **base_result,
                 "passcode_status": passcode_status,
@@ -263,26 +562,30 @@ class WorkspaceConnectionMixin:
                 else "QLab is reachable, but the workspace read check failed.",
             }
         except OscTimeoutError as exc:
-            checks["read_access"] = {"ok": False, "status": "timeout", "error": str(exc)}
-            permissions["view"] = {
-                **permissions["view"],
-                "ok": False,
-                "status": "timeout",
-                "error": str(exc),
-            }
+            checks["read_access"] = {"ok": False, "status": "timeout", "address": read_address, "error": str(exc)}
+            if permissions["view"]["status"] != "confirmed":
+                permissions["view"] = {
+                    **permissions["view"],
+                    "ok": False,
+                    "status": "timeout",
+                    "address": read_address,
+                    "error": str(exc),
+                }
             return {
                 **base_result,
                 "status": "workspace_read_timeout",
                 "message": "QLab is reachable, but the workspace read check timed out.",
             }
         except Exception as exc:
-            checks["read_access"] = {"ok": False, "status": "error", "error": str(exc)}
-            permissions["view"] = {
-                **permissions["view"],
-                "ok": False,
-                "status": "error",
-                "error": str(exc),
-            }
+            checks["read_access"] = {"ok": False, "status": "error", "address": read_address, "error": str(exc)}
+            if permissions["view"]["status"] != "confirmed":
+                permissions["view"] = {
+                    **permissions["view"],
+                    "ok": False,
+                    "status": "error",
+                    "address": read_address,
+                    "error": str(exc),
+                }
             return {
                 **base_result,
                 "status": "workspace_read_error",
@@ -294,13 +597,22 @@ class WorkspaceConnectionMixin:
             "method": "cueLists/shallow",
             "cue_list_count": len(cue_lists) if isinstance(cue_lists, list) else None,
         }
-        permissions["view"] = {
-            "ok": True,
-            "status": "confirmed",
-            "method": "cueLists/shallow",
-            "safe_to_probe": True,
-            "cue_list_count": len(cue_lists) if isinstance(cue_lists, list) else None,
-        }
+        if permissions["view"]["status"] == "confirmed" and permissions["view"].get("source") == "/connect":
+            permissions["view"] = {
+                **permissions["view"],
+                "read_probe": "confirmed",
+                "read_method": "cueLists/shallow",
+                "cue_list_count": len(cue_lists) if isinstance(cue_lists, list) else None,
+            }
+        else:
+            permissions["view"] = {
+                "ok": True,
+                "status": "confirmed",
+                "method": "cueLists/shallow",
+                "source": "cueLists/shallow",
+                "safe_to_probe": True,
+                "cue_list_count": len(cue_lists) if isinstance(cue_lists, list) else None,
+            }
         capabilities.update(
             {
                 "read_workspace": True,
@@ -316,6 +628,5 @@ class WorkspaceConnectionMixin:
             "ok": True,
             "status": "ready",
             "workspace_readable": True,
-            "passcode_status": "accepted" if passcode_configured else None,
             "message": "QLab is reachable, a workspace is open, and the MCP can read cue lists.",
         }

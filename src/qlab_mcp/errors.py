@@ -32,3 +32,7 @@ class QLabReplyError(QLabMcpError):
 
 class UnsafeCuePropertyError(QLabMcpError):
     """Raised when a property path is not in the read-only allowlist."""
+
+
+class UnsafeWriteOperationError(QLabMcpError):
+    """Raised when write-mode safety gates block a mutating operation."""

@@ -161,6 +161,20 @@ class CueDetailsResult(BaseModel):
     message: str | None = None
 
 
+class CueDetailsBatchResult(BaseModel):
+    """Batch details for up to 50 cues."""
+
+    ok: bool
+    workspace_id: str
+    requested_count: int
+    succeeded_count: int
+    failed_count: int
+    profile: str
+    results: list[CueDetailsResult]
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
 class WriteReadinessResult(BaseModel):
     """Non-mutating readiness check for gated QLab write mode."""
 

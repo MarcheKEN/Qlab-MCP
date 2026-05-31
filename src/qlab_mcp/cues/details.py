@@ -18,6 +18,7 @@ from .profiles import (
 
 
 MAX_VALUES_FOR_KEYS = 100
+MAX_BATCH_CUE_DETAILS = 50
 
 
 def _chunk_keys(keys: list[str] | tuple[str, ...], size: int = MAX_VALUES_FOR_KEYS) -> list[list[str]]:
@@ -129,7 +130,7 @@ class CueDetailsMixin:
             result["sections"] = _empty_auto_sections()
         return result
 
-    def get_cue_details(self, workspace_id: str, cue_ref: str, profile: str = "auto") -> dict[str, Any]:
+    def _get_single_cue_details(self, workspace_id: str, cue_ref: str, profile: str = "auto") -> dict[str, Any]:
         normalized_profile = profile.strip().lower()
         if normalized_profile == "auto":
             return self._get_auto_cue_details(workspace_id, cue_ref)
@@ -170,3 +171,48 @@ class CueDetailsMixin:
         if errors:
             result["errors"] = errors
         return result
+
+    def get_cue_details(self, workspace_id: str, cue_ref: str | list[str], profile: str = "auto") -> dict[str, Any]:
+        if isinstance(cue_ref, str):
+            return self._get_single_cue_details(workspace_id, cue_ref, profile)
+        if not isinstance(cue_ref, list):
+            raise ValueError("cue_ref must be a string or a list of strings")
+        if not cue_ref:
+            raise ValueError("cue_ref list must include at least one cue")
+        if len(cue_ref) > MAX_BATCH_CUE_DETAILS:
+            raise ValueError(f"cue_ref list can include at most {MAX_BATCH_CUE_DETAILS} cues")
+
+        results: list[dict[str, Any]] = []
+        errors: dict[str, str] = {}
+        warnings: list[str] = []
+        failed_count = 0
+        for index, ref in enumerate(cue_ref):
+            if not isinstance(ref, str) or not ref.strip():
+                key = str(ref) if ref is not None else f"index:{index}"
+                errors[key] = "cue_ref entries must be non-empty strings"
+                failed_count += 1
+                continue
+            try:
+                result = self._get_single_cue_details(workspace_id, ref, profile)
+                results.append(result)
+                if result.get("errors"):
+                    errors[ref] = "Cue detail read returned errors; inspect results item errors for details."
+                    failed_count += 1
+            except Exception as exc:
+                errors[ref] = str(exc)
+                failed_count += 1
+
+        succeeded_count = len(cue_ref) - failed_count
+        if failed_count:
+            warnings.append("One or more cue detail reads failed; inspect errors for per-cue failures.")
+        return {
+            "ok": failed_count == 0,
+            "workspace_id": _clean_workspace_id(workspace_id),
+            "requested_count": len(cue_ref),
+            "succeeded_count": succeeded_count,
+            "failed_count": failed_count,
+            "profile": profile,
+            "results": results,
+            "errors": errors or None,
+            "warnings": warnings,
+        }

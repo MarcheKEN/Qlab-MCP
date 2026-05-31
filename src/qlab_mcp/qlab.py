@@ -84,9 +84,9 @@ class QLabReader(
                 return workspace
         return {"uniqueID": requested}
 
-    def get_cue_lists(self, workspace_id: str, include_children: bool = False) -> dict[str, Any]:
+    def get_cue_lists(self, workspace_id: str, include_children: bool = False, cacheable: bool = True) -> dict[str, Any]:
         command = "cueLists" if include_children else "cueLists/shallow"
-        return self._workspace_data(workspace_id, command, "cue_lists")
+        return self._workspace_data(workspace_id, command, "cue_lists", cacheable=cacheable)
 
     def get_workspace_cue_ids(self, workspace_id: str, include_children: bool = True) -> dict[str, Any]:
         command = "cueLists/uniqueIDs" if include_children else "cueLists/uniqueIDs/shallow"

@@ -5,10 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from ..allowlist import properties_for_profile, validate_value_keys
-from ..osc.addressing import _clean_workspace_id, _workspace_address
+from ..osc.addressing import _clean_workspace_id
 from .editorial import _is_ambiguous_label, _is_empty_text
 from .profiles import _coerce_qlab_bool, _derive_profile_fields, _is_positive_number
-from .refs import _flatten_cue_refs
+from .refs import _bounded_cue_refs_from_shallow
 
 
 QUERY_FILTERS = {
@@ -228,13 +228,14 @@ class CueQueryMixin:
         ]
         cacheable = not _query_uses_live_state(filters)
 
-        cue_ref_data = self._request_data(
-            _workspace_address(workspace_id, "cueLists/uniqueIDs"),
-            workspace_id=workspace_id,
+        bounded = _bounded_cue_refs_from_shallow(
+            self,
+            workspace_id,
+            limit=max_cues_scanned,
+            max_depth=None,
             cacheable=cacheable,
-            cache_profile=profile,
         )
-        cue_refs = _flatten_cue_refs(cue_ref_data)
+        cue_refs = bounded["refs"]
         profile_keys = list(properties_for_profile(profile))
         filter_keys: list[str] = []
         for query_filter in filters:
@@ -246,7 +247,7 @@ class CueQueryMixin:
         cues: list[dict[str, Any]] = []
         errors: dict[str, str] = {}
 
-        for cue_ref in cue_refs[:max_cues_scanned]:
+        for cue_ref in cue_refs:
             cue_id = cue_ref.get("uniqueID")
             if not cue_id:
                 continue
@@ -281,11 +282,12 @@ class CueQueryMixin:
                 cue = _derive_profile_fields(profile, cue)
                 cues.append(cue)
 
-        scanned_all_cues = len(cue_refs) <= max_cues_scanned
+        scanned_all_cues = not bounded["truncated"]
         result_limited = matched_count > len(cues)
-        truncation_reasons: list[str] = []
-        if not scanned_all_cues:
-            truncation_reasons.append("max_cues_scanned")
+        truncation_reasons: list[str] = [
+            "max_cues_scanned" if reason == "max_cues" else reason
+            for reason in bounded["truncation_reasons"]
+        ]
         if result_limited:
             truncation_reasons.append("max_results")
         truncated = bool(truncation_reasons)
@@ -306,5 +308,5 @@ class CueQueryMixin:
                 "max_cues_scanned": max_cues_scanned,
             },
             "cues": cues,
-            "errors": errors or None,
+            "errors": {**bounded["errors"], **errors} or None,
         }

@@ -51,7 +51,9 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert overview.title == "Get QLab Workspace Overview"
     assert "first structural read" in overview.description
     assert overview.inputSchema["properties"]["cue_index_profile"]["default"] == "minimal"
+    assert overview.inputSchema["properties"]["max_cues"]["maximum"] == 5000
     assert overview.inputSchema["properties"]["max_index_cues"]["maximum"] == 5000
+    assert overview.inputSchema["properties"]["max_index_cues"]["default"] == 5000
     assert overview.annotations.readOnlyHint is True
     assert overview.annotations.destructiveHint is False
     assert overview.annotations.idempotentHint is True
@@ -87,6 +89,10 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert details.title == "Get QLab Cue Details"
     assert "valuesForKeys" in details.description
     assert "editable" in details.inputSchema["properties"]["profile"]["enum"]
+    cue_ref_schema = details.inputSchema["properties"]["cue_ref"]
+    assert cue_ref_schema["anyOf"][0]["type"] == "string"
+    assert cue_ref_schema["anyOf"][1]["type"] == "array"
+    assert cue_ref_schema["anyOf"][1]["maxItems"] == 50
     assert details.annotations.readOnlyHint is True
 
     readiness = tools["qlab_check_write_readiness"]

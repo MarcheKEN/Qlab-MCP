@@ -20,6 +20,7 @@ from .errors import (
 )
 from .models import (
     CreateCueResult,
+    CueDetailsBatchResult,
     CueDetailsResult,
     CueUpdateInput,
     CueQueryResult,
@@ -116,6 +117,14 @@ CueRef = Annotated[
     Field(
         min_length=1,
         description="Cue number, cue unique ID, selected, playhead, playbackPosition, or active.",
+    ),
+]
+CueRefs = Annotated[
+    list[CueRef],
+    Field(
+        min_length=1,
+        max_length=50,
+        description="List of cue numbers, cue unique IDs, selected, playhead, playbackPosition, or active. Maximum 50.",
     ),
 ]
 READ_ONLY_QLAB_TOOL = ToolAnnotations(
@@ -269,10 +278,10 @@ def qlab_get_workspace_overview(
         int,
         Field(
             ge=1,
-            le=1000,
+            le=5000,
             description=(
                 "Maximum cue/list/group nodes to include in the bounded tree preview before marking it as truncated. "
-                "Defaults to 1000 so large workspaces can be mapped while cue_index stays compact."
+                "Raise up to 5000 for large workspace load checks."
             ),
         ),
     ] = 1000,
@@ -304,7 +313,7 @@ def qlab_get_workspace_overview(
                 "This does not change the bounded tree preview limits."
             ),
         ),
-    ] = 1000,
+    ] = 5000,
     cue_index_profile: Annotated[
         CueIndexProfile,
         Field(
@@ -526,7 +535,7 @@ def qlab_query_cues(
 )
 def qlab_get_cue_details(
     workspace_id: WorkspaceId,
-    cue_ref: CueRef,
+    cue_ref: CueRef | CueRefs,
     profile: Annotated[
         CueProfile,
         Field(
@@ -538,15 +547,17 @@ def qlab_get_cue_details(
             )
         ),
     ] = "auto",
-) -> CueDetailsResult:
-    """Return batched read-only details for one cue using QLab valuesForKeys when possible.
+) -> CueDetailsResult | CueDetailsBatchResult:
+    """Return read-only details for one cue, or a batch of up to 50 cues, using QLab valuesForKeys when possible.
 
     Use auto for safe type-aware inspection, editable for update capability discovery,
     health for warnings, and technical/full_sensitive only when justified.
     """
     return _run_tool(
-        lambda: CueDetailsResult.model_validate(
-            _reader().get_cue_details(workspace_id, cue_ref, profile)
+        lambda: (
+            CueDetailsBatchResult.model_validate(_reader().get_cue_details(workspace_id, cue_ref, profile))
+            if isinstance(cue_ref, list)
+            else CueDetailsResult.model_validate(_reader().get_cue_details(workspace_id, cue_ref, profile))
         )
     )
 

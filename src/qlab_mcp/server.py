@@ -1,4 +1,4 @@
-﻿"""FastMCP server exposing safe QLab inspection and gated cue creation tools."""
+﻿"""FastMCP server exposing safe QLab inspection and gated write tools."""
 
 from __future__ import annotations
 
@@ -153,7 +153,7 @@ The six inspector tools are read-only and intentionally avoid playback, editing,
 Write mode is a separate gated preface: it is disabled unless QLAB_ENABLE_WRITE=true and defaults to dry-run.
 When write mode is ready, all update profiles may exist, but only safe properties can execute as real writes.
 Dangerous or high-risk properties remain dry-run-only and are blocked for real writes.
-Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect, and currently only supports basic cue creation and safe cue updates.
+Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect, and currently only supports basic cue creation and safe batch cue updates.
 
 Start with qlab_check_connection to verify QLab, workspace candidates, passcode, and read access.
 
@@ -637,7 +637,7 @@ def qlab_create_cue(
 
 @mcp.tool(
     title="Update QLab Cues",
-    tags={"qlab", "write-mode", "cue-update", "gated-write"},
+    tags={"qlab", "write-mode", "cue-update", "batch-update", "gated-write"},
     annotations=GATED_CREATE_QLAB_TOOL,
     timeout=UPDATE_CUES_TIMEOUT,
 )

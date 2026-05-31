@@ -224,11 +224,21 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
 def test_write_config_defaults_to_disabled_and_dry_run(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("QLAB_ENABLE_WRITE", raising=False)
     monkeypatch.delenv("QLAB_WRITE_DRY_RUN_DEFAULT", raising=False)
+    monkeypatch.delenv("QLAB_UPDATE_DEBUG", raising=False)
 
     config = QLabConfig.from_env()
 
     assert config.enable_write is False
     assert config.write_dry_run_default is True
+    assert config.update_debug is False
+
+
+def test_write_config_reads_update_debug(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("QLAB_UPDATE_DEBUG", "true")
+
+    config = QLabConfig.from_env()
+
+    assert config.update_debug is True
 
 
 def test_check_write_readiness_reports_disabled_without_osc() -> None:
@@ -240,8 +250,20 @@ def test_check_write_readiness_reports_disabled_without_osc() -> None:
     assert result["ok"] is False
     assert result["status"] == "write_disabled"
     assert result["blockers"] == ["write_disabled"]
+    assert result["error_code"] == "QLAB_WRITE_WRITE_DISABLED"
+    assert result["suggested_action"] == "Set QLAB_ENABLE_WRITE=true only for a deliberate write session."
     assert result["passcode_configured"] is True
     assert result["capabilities"]["create_cue"]["dry_run_default"] is True
+    assert result["capabilities"]["batch_update_cues"]["tool"] == "qlab_update_cues"
+    assert result["capabilities"]["batch_update_cues"]["batch"] == {
+        "min_items": 1,
+        "max_items": 50,
+        "requires_concrete_cue_refs": True,
+        "ambiguous_refs_allowed": False,
+        "preflight_before_any_setter": True,
+        "setter_target": "cue_id",
+    }
+    assert result["capabilities"]["edit_existing_cue"]["legacy_alias_for"] == "batch_update_cues"
     assert client.requests == []
 
 
@@ -254,6 +276,8 @@ def test_check_write_readiness_requires_passcode_without_leaking_secret() -> Non
     assert result["ok"] is False
     assert result["status"] == "passcode_missing"
     assert result["blockers"] == ["passcode_missing"]
+    assert result["error_code"] == "QLAB_WRITE_PASSCODE_MISSING"
+    assert "QLAB_PASSCODE" in result["suggested_action"]
     assert "passcode" in result["checks"]
     assert "secret" not in str(result)
     assert client.requests == []
@@ -267,6 +291,8 @@ def test_check_write_readiness_requires_edit_confirmed_by_connect() -> None:
 
     assert result["ok"] is True
     assert result["status"] == "ready"
+    assert result["error_code"] is None
+    assert result["suggested_action"] is None
     assert result["checks"]["workspace_resolution"]["ok"] is True
     assert result["checks"]["edit_permission"]["status"] == "confirmed"
     assert result["checks"]["connect"]["scopes"] == ["view", "edit"]
@@ -288,6 +314,7 @@ def test_check_write_readiness_blocks_without_edit_scope(connect_data: str) -> N
     assert result["ok"] is False
     assert result["status"] == "edit_not_confirmed"
     assert result["blockers"] == ["edit_not_confirmed"]
+    assert result["error_code"] == "QLAB_WRITE_EDIT_NOT_CONFIRMED"
     assert result["checks"]["edit_permission"]["ok"] is False
 
 
@@ -300,6 +327,7 @@ def test_check_write_readiness_blocks_show_mode() -> None:
     assert result["ok"] is False
     assert result["status"] == "workspace_in_show_mode"
     assert result["blockers"] == ["workspace_in_show_mode"]
+    assert result["suggested_action"] == "Switch the QLab workspace to Edit Mode before real writes."
     assert result["checks"]["show_mode"]["mode"] == "show"
 
 
@@ -620,6 +648,21 @@ def test_update_cues_real_updates_mixed_safe_profiles() -> None:
     assert result["results"][1]["after"]["rate"] == 1.1
 
 
+def test_update_cues_uses_configured_update_debug() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass", update_debug=True),
+        cues={cue_id: {"type": "Memo", "name": "Old"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues("ws-1", [{"cue_ref": cue_id, "properties": {"name": "New"}}], dry_run=False)
+
+    assert result["ok"] is True
+    assert result["results"][0]["debug"]["properties_match"] is True
+    assert result["results"][0]["debug"]["requested_properties"] == {"name": "New"}
+
+
 def test_update_cues_real_blocks_dry_run_only_property_before_osc() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
@@ -792,8 +835,72 @@ def test_update_cues_after_read_mismatch_reports_requested_and_after_values() ->
     assert result["updated_count"] == 0
     assert result["failed_count"] == 1
     assert result["results"][0]["status"] == "verification_failed"
+    assert result["error_code"] == "QLAB_UPDATE_VERIFICATION_FAILED"
+    assert "compare requested versus after" in result["suggested_action"]
     assert "requested" in result["results"][0]["errors"]["verification"]
     assert "after" in result["results"][0]["errors"]["verification"]
+
+
+def test_update_cues_verification_accepts_numeric_normalization() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "duration": 1.0}},
+        ignore_set_property=(cue_id, "duration"),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues("ws-1", [{"cue_ref": cue_id, "properties": {"duration": 1}}], dry_run=False)
+
+    assert result["ok"] is True
+    assert result["status"] == "updated"
+    assert result["results"][0]["errors"] is None
+
+
+def test_update_cues_verification_accepts_continue_mode_labels() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "continueMode": "auto_continue"}},
+        ignore_set_property=(cue_id, "continueMode"),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "properties": {"continueMode": "auto_continue"}}],
+        dry_run=False,
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "updated"
+    assert result["results"][0]["errors"] is None
+
+
+def test_update_cues_verification_accepts_safe_enum_string_normalization() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Text", "colorName": "RED", "text/format/alignment": "Center"}},
+        ignore_set_property=(cue_id, "colorName"),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "text_basic",
+                "properties": {"colorName": "red", "text/format/alignment": "center"},
+            }
+        ],
+        dry_run=False,
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "updated"
+    assert result["results"][0]["errors"] is None
 
 
 def test_update_cues_mixed_clean_confirmed_timeout_and_real_error_counts_only_error() -> None:
@@ -824,6 +931,7 @@ def test_update_cues_mixed_clean_confirmed_timeout_and_real_error_counts_only_er
 
     assert result["ok"] is False
     assert result["status"] == "partial_failed"
+    assert result["error_code"] == "QLAB_UPDATE_PARTIAL_FAILED"
     assert result["updated_count"] == 2
     assert result["failed_count"] == 1
     assert result["timeout_confirmed_count"] == 1

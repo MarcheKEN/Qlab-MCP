@@ -95,6 +95,8 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert readiness.annotations.readOnlyHint is True
     assert readiness.annotations.destructiveHint is False
     assert "workspace_id" in readiness.inputSchema["required"]
+    assert "write_disabled" in readiness.outputSchema["properties"]["status"]["enum"]
+    assert "suggested_action" in readiness.outputSchema["properties"]
 
     create = tools["qlab_create_cue"]
     assert create.title == "Create QLab Cue"
@@ -111,10 +113,12 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "dry_run" in create.inputSchema["properties"]
     assert "workspace_id" in create.inputSchema["required"]
     assert "cue_type" in create.inputSchema["required"]
+    assert create.outputSchema["properties"]["status"]["enum"] == ["dry_run", "created", "verification_failed"]
 
     update = tools["qlab_update_cues"]
     assert update.title == "Update QLab Cues"
     assert "Dry-run planning" in update.description
+    assert "batch-update" in update.meta["fastmcp"]["tags"]
     assert update.annotations.readOnlyHint is False
     assert update.annotations.destructiveHint is False
     assert update.annotations.idempotentHint is False
@@ -123,6 +127,15 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "cue_ref" not in update.inputSchema["properties"]
     assert update.inputSchema["properties"]["updates"]["minItems"] == 1
     assert update.inputSchema["properties"]["updates"]["maxItems"] == 50
+    update_item = update.inputSchema["properties"]["updates"]["items"]["properties"]
+    assert update_item["cue_ref"]["minLength"] == 1
+    assert "Ambiguous refs" in update_item["cue_ref"]["description"]
+    assert "qlab_get_cue_details" in update_item["profile"]["description"]
+    assert "updated_with_confirmed_timeouts" in update.outputSchema["properties"]["status"]["enum"]
+    assert "per cue item" in update.outputSchema["properties"]["timeout_confirmed_count"]["description"]
+    result_item = update.outputSchema["properties"]["results"]["items"]["properties"]
+    assert "dry_run_preflight_failed" in result_item["status"]["enum"]
+    assert "QLAB_UPDATE_DEBUG" in result_item["debug"]["description"]
 
 
 def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:

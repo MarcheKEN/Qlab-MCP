@@ -56,44 +56,6 @@ def _normalize_key_name(value: str) -> str:
     return "".join(ch for ch in value.casefold() if ch.isalnum())
 
 
-def _normalize_workspace_settings_profile(profile: str) -> str:
-    normalized = str(profile or "").strip().lower()
-    if normalized not in WORKSPACE_SETTINGS_PROFILES:
-        allowed = ", ".join(sorted(WORKSPACE_SETTINGS_PROFILES))
-        raise ValueError(f"Unknown workspace settings profile {profile!r}; use one of: {allowed}")
-    return normalized
-
-
-def _normalize_workspace_settings_sections(sections: list[str] | tuple[str, ...] | str | None) -> list[str]:
-    if sections is None:
-        return list(WORKSPACE_SETTINGS_SECTIONS)
-    if isinstance(sections, str):
-        raw_sections = [item.strip() for item in sections.split(",")]
-    else:
-        raw_sections = [str(item).strip() for item in sections]
-
-    normalized_sections: list[str] = []
-    for item in raw_sections:
-        if not item:
-            continue
-        normalized = item.lower()
-        if normalized not in WORKSPACE_SETTINGS_SECTIONS:
-            allowed = ", ".join(WORKSPACE_SETTINGS_SECTIONS)
-            raise ValueError(f"Unknown workspace settings section {item!r}; use one of: {allowed}")
-        if normalized not in normalized_sections:
-            normalized_sections.append(normalized)
-    return normalized_sections or list(WORKSPACE_SETTINGS_SECTIONS)
-
-
-def _normalize_workspace_setting_detail_kind(kind: str | None, section: str) -> str:
-    if kind is None:
-        return "light_patch" if section == "light" else "all"
-    normalized = str(kind or "").strip().lower()
-    if normalized not in WORKSPACE_SETTING_DETAIL_KINDS:
-        allowed = ", ".join(sorted(WORKSPACE_SETTING_DETAIL_KINDS))
-        raise ValueError(f"Unknown workspace setting detail kind {kind!r}; use one of: {allowed}")
-    return normalized
-
 def _contains_any_key(value: Any, normalized_keys: set[str]) -> bool:
     if isinstance(value, dict):
         for key, nested in value.items():

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from .redaction import SAFE_DEVICE_REDACT_KEYS, SAFE_NETWORK_REDACT_KEYS, _contains_any_key

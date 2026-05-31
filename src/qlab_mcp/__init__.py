@@ -1,4 +1,4 @@
-"""Read-only FastMCP server for QLab 5 OSC cue information."""
+"""FastMCP server for QLab 5 OSC inspection and gated cue writes."""
 
 __all__ = ["__version__"]
 

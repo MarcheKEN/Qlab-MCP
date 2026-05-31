@@ -1,7 +1,7 @@
 # QLab MCP
 
 A FastMCP server for inspecting QLab 5 workspaces over OSC, with an optional
-gated write-mode preface for dry-run cue creation.
+gated write-mode preface for dry-run cue creation and batch cue updates.
 
 This project helps an agent understand what is inside an open QLab workspace:
 cues, cue lists, cue health, workspace settings, patches, routes, stages, MIDI,
@@ -9,7 +9,7 @@ network, and light infrastructure. The default inspector mode does not expose
 playback, editing, deletion, raw OSC, or mutating commands.
 
 By default the server remains read-only. Write mode is disabled unless
-`QLAB_ENABLE_WRITE=true`, and cue creation defaults to dry-run unless
+`QLAB_ENABLE_WRITE=true`, and mutating tools default to dry-run unless
 `QLAB_WRITE_DRY_RUN_DEFAULT=false`.
 
 ## Best First Flow
@@ -59,7 +59,7 @@ clear documentation or reference location, not at the package root.
 | `qlab_get_cue_details` | Inspect one cue after finding it in overview or query results. | `auto` profile |
 | `qlab_check_write_readiness` | Check disabled-by-default write-mode readiness without mutation. | Safety/readiness report |
 | `qlab_create_cue` | Dry-run or create one blank allowlisted cue with safe initial properties. | Dry-run by default |
-| `qlab_update_cue` | Dry-run or update one concrete cue through the cue editing registry. | Dry-run by default |
+| `qlab_update_cues` | Dry-run or update 1-50 concrete cues through the cue editing registry. | Dry-run by default |
 
 ## Compact By Default
 
@@ -109,7 +109,7 @@ dictionary does not expose a single complete Workspace Status warnings endpoint.
 
 ## Privacy And Safety
 
-The six inspector tools are read-only. The two write-mode tools are separate,
+The six inspector tools are read-only. The three write-mode tools are separate,
 gated, and disabled by default.
 
 `safe` is the normal profile. It is meant for agent use and redacts sensitive
@@ -139,16 +139,19 @@ Write mode is deliberately gated:
 - `qlab_check_connection` and `qlab_get_workspace_overview` read `/showMode`
   so callers can tell whether the workspace is in Edit Mode or Show Mode.
 - `qlab_check_write_readiness` does not mutate anything.
-- `qlab_create_cue` and `qlab_update_cue` are blocked unless `QLAB_ENABLE_WRITE=true` and
+- `qlab_check_write_readiness` reports `batch_update_cues` capabilities for
+  `qlab_update_cues`; `edit_existing_cue` may appear only as a compatibility
+  alias for older callers.
+- `qlab_create_cue` and `qlab_update_cues` are blocked unless `QLAB_ENABLE_WRITE=true` and
   `QLAB_PASSCODE` is configured, `/connect` confirms `edit`, and `/showMode`
   confirms the workspace is in Edit Mode.
 - `dry_run` defaults to true through `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
-- `qlab_create_cue(..., dry_run=true)` and `qlab_update_cue(..., dry_run=true)`
+- `qlab_create_cue(..., dry_run=true)` and `qlab_update_cues(..., dry_run=true)`
   are planning-only and can run without enabling write mode or configuring a passcode.
 - Real writes bypass and clear the read cache before verifying fresh cue details.
 - Only blank cue creation is allowed in this preface.
 - Allowed cue types are `memo`, `group`, `wait`, and `audio`.
-- `qlab_update_cue` uses a registry of cue-family profiles:
+- `qlab_update_cues` uses a registry of cue-family profiles:
   `common`, `memo_basic`, `wait_basic`, `group_basic`, `audio_basic`, `mic_basic`,
   `video_basic`, `camera_basic`, `text_basic`, `light_basic`, `fade_basic`,
   `network_basic`, `midi_basic`, `midi_file_basic`, `timecode_basic`,
@@ -164,6 +167,10 @@ Write mode is deliberately gated:
 - `properties={...}` remains the simple one-argument setter path.
 - `operations=[...]` supports structured setters such as audio levels, crop,
   text colors, and MIDI fields in dry-run plans.
+- `qlab_update_cues` accepts 1-50 update items in one MCP call. Each item can
+  use a different concrete `cue_ref`, `profile`, `properties`, and `operations`
+  set. Real batch writes complete all preflight checks before sending any setter
+  and use `/cue_id/{uniqueID}/...` addresses for mutation.
 - Every cue-family profile can real-write safe one-argument setters with direct
   fresh readback. This includes common props plus `group_basic` metadata,
   `audio_basic` transport metadata, `text_basic` simple text formatting,
@@ -173,9 +180,19 @@ Write mode is deliberately gated:
   routing, targets, file paths, light commands, network/MIDI output, scripts,
   audio levels, slices, objects, live variants, text ranges/colors, and
   multi-argument geometry.
-- Playback control, raw OSC, GO, stop, panic, batch editing, and ambiguous
-  selected/active edits are not exposed. Target edits, file paths, scripts, and
-  routing changes are dry-run-only catalog entries.
+- If a setter times out but a fresh after-read confirms the requested value,
+  `qlab_update_cues` reports `updated_with_confirmed_timeouts` with a warning
+  instead of treating the item as failed.
+- When write readiness or batch updates fail, results include stable
+  `error_code` and `suggested_action` fields so agents can decide whether to
+  fix configuration, retry a smaller batch, or inspect QLab manually.
+- Fresh verification tolerates QLab's harmless normalization for numeric values,
+  `continueMode` labels, and safe enum-like strings such as `colorName`,
+  `blendMode`, `clockType`, and `text/format/alignment`; free text remains
+  exact-match.
+- Playback control, raw OSC, GO, stop, panic, and ambiguous selected/active
+  edits are not exposed. Target edits, file paths, scripts, and routing changes
+  are dry-run-only catalog entries.
 
 ## Tool Signatures
 
@@ -188,10 +205,21 @@ qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=No
 qlab_get_cue_details(workspace_id, cue_ref, profile="auto")  # profile also supports "editable"
 qlab_check_write_readiness(workspace_id)
 qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
-qlab_update_cue(workspace_id, cue_ref, properties=None, operations=None, profile="common", dry_run=None)
+qlab_update_cues(workspace_id, updates, dry_run=None)
 ```
 
-Structured update operations use this shape:
+`qlab_update_cues` update items use this shape:
+
+```json
+{
+  "cue_ref": "1",
+  "profile": "common",
+  "properties": {"name": "New name"},
+  "operations": []
+}
+```
+
+Structured update operations inside each item use this shape:
 
 ```json
 {
@@ -251,6 +279,7 @@ QLAB_CACHE_TTL=10.0
 QLAB_PASSCODE=
 QLAB_ENABLE_WRITE=false
 QLAB_WRITE_DRY_RUN_DEFAULT=true
+QLAB_UPDATE_DEBUG=false
 ```
 
 Notes:
@@ -266,6 +295,8 @@ Notes:
 - Write mode is disabled by default. When enabled, real writes require
   `QLAB_PASSCODE`, `edit` confirmed by `/connect`, Edit Mode confirmed by
   `/showMode`, and bypass/clear the read cache before fresh verification.
+- `QLAB_UPDATE_DEBUG=true` adds per-cue debug details to `qlab_update_cues`
+  results for troubleshooting batch verification.
 
 ## Run
 
@@ -313,5 +344,6 @@ For write-mode smoke checks on a copy of a workspace:
 3. Set `QLAB_PASSCODE` on the server.
 4. Call `qlab_check_write_readiness(workspace_id=...)` and confirm `edit` is
    granted by `/connect`.
-5. Call `qlab_create_cue(..., dry_run=true)` and inspect `planned_operations`.
-6. Only then call `qlab_create_cue(..., dry_run=false)` on a safe test workspace.
+5. Call `qlab_create_cue(..., dry_run=true)` or `qlab_update_cues(..., dry_run=true)`
+   and inspect `planned_operations`.
+6. Only then call the same tool with `dry_run=false` on a safe test workspace.

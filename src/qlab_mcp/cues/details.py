@@ -17,6 +17,13 @@ from .profiles import (
 )
 
 
+MAX_VALUES_FOR_KEYS = 100
+
+
+def _chunk_keys(keys: list[str] | tuple[str, ...], size: int = MAX_VALUES_FOR_KEYS) -> list[list[str]]:
+    return [list(keys[index : index + size]) for index in range(0, len(keys), size)]
+
+
 class CueDetailsMixin:
     def _read_cue_values_with_fallback(
         self,
@@ -30,27 +37,31 @@ class CueDetailsMixin:
     ) -> dict[str, Any]:
         if not keys:
             return {}
-        normalized_keys = validate_value_keys(keys)
-        try:
-            batched_values = self.read_cue_values(
-                workspace_id,
-                cue_ref,
-                normalized_keys,
-                cache_profile=profile,
-                cacheable=cacheable,
-            )["values"]
-            if not isinstance(batched_values, dict):
-                raise ValueError("QLab valuesForKeys response must be an object")
-            return batched_values
-        except Exception as exc:
-            errors[error_key] = str(exc)
-            values: dict[str, Any] = {}
+        values: dict[str, Any] = {}
+        for chunk_index, raw_chunk in enumerate(_chunk_keys(keys), start=1):
+            normalized_keys = validate_value_keys(raw_chunk)
+            chunk_error_key = error_key if chunk_index == 1 else f"{error_key}:{chunk_index}"
+            try:
+                batched_values = self.read_cue_values(
+                    workspace_id,
+                    cue_ref,
+                    normalized_keys,
+                    cache_profile=profile,
+                    cacheable=cacheable,
+                )["values"]
+                if not isinstance(batched_values, dict):
+                    raise ValueError("QLab valuesForKeys response must be an object")
+                values.update(batched_values)
+                continue
+            except Exception as exc:
+                errors[chunk_error_key] = str(exc)
+
             for property_path in normalized_keys:
                 try:
                     values[property_path] = self.read_cue_property(workspace_id, cue_ref, property_path)["value"]
                 except Exception as property_exc:
                     errors[property_path] = str(property_exc)
-            return values
+        return values
 
     def _get_auto_cue_details(self, workspace_id: str, cue_ref: str) -> dict[str, Any]:
         errors: dict[str, str] = {}

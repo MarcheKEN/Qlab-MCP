@@ -30,6 +30,40 @@ from .safety import check_write_readiness, ensure_write_ready, resolve_dry_run
 
 MAX_BATCH_UPDATES = 50
 AFTER_READ_RETRY_DELAYS = (0.2, 0.5, 1.0)
+UPDATE_STATUS_ACTIONS = {
+    "preflight_failed": "Inspect per-cue errors; no setters were sent, so fix cue refs/profiles before retrying.",
+    "partial_failed": "Inspect per-cue errors and verify the affected cues in QLab before retrying only failed items.",
+    "verification_failed": "Read the cue fresh and compare requested versus after values before retrying.",
+}
+UPDATE_STATUS_CODES = {
+    "preflight_failed": "QLAB_UPDATE_PREFLIGHT_FAILED",
+    "partial_failed": "QLAB_UPDATE_PARTIAL_FAILED",
+    "verification_failed": "QLAB_UPDATE_VERIFICATION_FAILED",
+}
+CONTINUE_MODE_VALUES = {
+    0: 0,
+    1: 1,
+    2: 2,
+    "0": 0,
+    "1": 1,
+    "2": 2,
+    "do_not_continue": 0,
+    "do-not-continue": 0,
+    "manual": 0,
+    "none": 0,
+    "auto_continue": 1,
+    "auto-continue": 1,
+    "autocontinue": 1,
+    "auto_follow": 2,
+    "auto-follow": 2,
+    "autofollow": 2,
+}
+CASEFOLD_COMPARISON_KEYS = {
+    "blendMode",
+    "clockType",
+    "colorName",
+    "text/format/alignment",
+}
 
 
 class QLabWriteMixin:
@@ -376,7 +410,7 @@ class QLabWriteMixin:
                     "warnings": warnings,
                 }
             )
-            if _update_debug_enabled():
+            if _update_debug_enabled(self):
                 result["debug"] = {
                     "cue_ref": item["cue_ref"],
                     "cue_id": result["cue_id"],
@@ -539,6 +573,8 @@ def _batch_update_result(
         "results": fixed_results,
         "errors": errors,
         "warnings": global_warnings,
+        "error_code": None if ok else UPDATE_STATUS_CODES.get(status, f"QLAB_UPDATE_{status.upper()}"),
+        "suggested_action": None if ok else UPDATE_STATUS_ACTIONS.get(status, "Inspect per-cue results before retrying."),
         "message": message,
     }
 
@@ -695,7 +731,7 @@ def _resolve_created_cue_after_timeout(reader: Any, workspace_id: str, before_id
 def _properties_match(values: Any, requested: dict[str, Any]) -> bool:
     if not isinstance(values, dict):
         return False
-    return all(values.get(key) == value for key, value in requested.items())
+    return all(_property_values_match(key, values.get(key), value) for key, value in requested.items())
 
 
 def _verification_mismatch_message(values: Any, requested: dict[str, Any]) -> str:
@@ -704,9 +740,36 @@ def _verification_mismatch_message(values: Any, requested: dict[str, Any]) -> st
     mismatches = [
         {"key": key, "requested": requested_value, "after": values.get(key)}
         for key, requested_value in requested.items()
-        if values.get(key) != requested_value
+        if not _property_values_match(key, values.get(key), requested_value)
     ]
     return f"Fresh after-read did not confirm requested values: {mismatches}"
+
+
+def _property_values_match(key: str, actual: Any, requested: Any) -> bool:
+    actual_value = _comparison_value(key, actual)
+    requested_value = _comparison_value(key, requested)
+    if _is_plain_number(actual_value) and _is_plain_number(requested_value):
+        return float(actual_value) == float(requested_value)
+    return actual_value == requested_value
+
+
+def _comparison_value(key: str, value: Any) -> Any:
+    if key == "continueMode":
+        return _continue_mode_comparison_value(value)
+    if key in CASEFOLD_COMPARISON_KEYS and isinstance(value, str):
+        return value.strip().casefold()
+    return value
+
+
+def _continue_mode_comparison_value(value: Any) -> Any:
+    if isinstance(value, str):
+        normalized = value.strip().casefold().replace(" ", "_")
+        return CONTINUE_MODE_VALUES.get(normalized, value)
+    return CONTINUE_MODE_VALUES.get(value, value)
+
+
+def _is_plain_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _after_values_for_requested(values: Any, requested: dict[str, Any]) -> dict[str, Any] | None:
@@ -715,7 +778,10 @@ def _after_values_for_requested(values: Any, requested: dict[str, Any]) -> dict[
     return {key: values.get(key) for key in requested}
 
 
-def _update_debug_enabled() -> bool:
+def _update_debug_enabled(reader: Any) -> bool:
+    config = getattr(getattr(reader, "client", None), "config", None)
+    if config is not None and hasattr(config, "update_debug"):
+        return bool(getattr(config, "update_debug"))
     return os.getenv("QLAB_UPDATE_DEBUG", "").strip().casefold() in {"1", "true", "yes", "on"}
 
 

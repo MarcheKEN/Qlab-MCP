@@ -28,6 +28,7 @@ class QLabConfig:
     passcode: str | None = None
     enable_write: bool = False
     write_dry_run_default: bool = True
+    update_debug: bool = False
 
     @classmethod
     def from_env(cls) -> "QLabConfig":
@@ -40,4 +41,5 @@ class QLabConfig:
             passcode=os.getenv("QLAB_PASSCODE") or None,
             enable_write=_env_bool("QLAB_ENABLE_WRITE", False),
             write_dry_run_default=_env_bool("QLAB_WRITE_DRY_RUN_DEFAULT", True),
+            update_debug=_env_bool("QLAB_UPDATE_DEBUG", False),
         )

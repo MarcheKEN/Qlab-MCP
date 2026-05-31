@@ -14,6 +14,16 @@ EDIT_PERMISSION_NOTE = (
     "QLab edit permission must be confirmed by /connect before real write commands can run."
 )
 
+READINESS_ACTIONS = {
+    "write_disabled": "Set QLAB_ENABLE_WRITE=true only for a deliberate write session.",
+    "passcode_missing": "Set QLAB_PASSCODE on the MCP server; do not pass the QLab passcode as a tool argument.",
+    "workspace_unavailable": "Call qlab_check_connection and pass a workspace_id from available_workspaces.",
+    "qlab_unreachable": "Start QLab, open the workspace, enable OSC, and verify host/port settings.",
+    "edit_not_confirmed": "Confirm the QLab passcode grants edit scope via /connect.",
+    "workspace_in_show_mode": "Switch the QLab workspace to Edit Mode before real writes.",
+    "show_mode_unknown": "Verify /showMode can be read and confirms Edit Mode before real writes.",
+}
+
 
 def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
     workspace = _clean_workspace_id(workspace_id)
@@ -53,7 +63,7 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
         return _readiness_result(
             ok=False,
             status=blockers[0],
-            message="QLab write mode is not ready; resolve blockers before attempting cue creation.",
+            message="QLab write mode is not ready; resolve blockers before attempting gated writes.",
             workspace_id=workspace,
             write_enabled=write_enabled,
             dry_run_default=dry_run_default,
@@ -251,5 +261,7 @@ def _readiness_result(
         "checks": checks,
         "blockers": blockers,
         "warnings": warnings,
+        "error_code": None if ok else f"QLAB_WRITE_{status.upper()}",
+        "suggested_action": None if ok else READINESS_ACTIONS.get(status, "Inspect checks and blockers before retrying."),
         "message": message,
     }

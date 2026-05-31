@@ -657,6 +657,30 @@ def read_keys_for_operations(operations: list[dict[str, Any]]) -> list[str]:
 
 def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
     catalog = profile_catalog()
+    update_cues_capability = {
+        "planned": True,
+        "tool": "qlab_update_cues",
+        "batch": {
+            "min_items": 1,
+            "max_items": 50,
+            "requires_concrete_cue_refs": True,
+            "ambiguous_refs_allowed": False,
+            "preflight_before_any_setter": True,
+            "setter_target": "cue_id",
+        },
+        "profiles": {
+            name: {
+                "cue_types": profile["cue_types"],
+                "risk_tier": profile["risk_tier"],
+                "real_write_enabled": profile["real_write_enabled"],
+                "properties": list(profile["properties"]),
+            }
+            for name, profile in catalog.items()
+        },
+        "properties": [prop.name for prop in COMMON_PROPERTIES],
+        "supports_operations": True,
+        "dry_run_default": dry_run_default,
+    }
     return {
         "create_cue": {
             "planned": True,
@@ -669,20 +693,10 @@ def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
                 "index": "planned_later",
             },
         },
+        "batch_update_cues": update_cues_capability,
         "edit_existing_cue": {
-            "planned": True,
-            "profiles": {
-                name: {
-                    "cue_types": profile["cue_types"],
-                    "risk_tier": profile["risk_tier"],
-                    "real_write_enabled": profile["real_write_enabled"],
-                    "properties": list(profile["properties"]),
-                }
-                for name, profile in catalog.items()
-            },
-            "properties": [prop.name for prop in COMMON_PROPERTIES],
-            "supports_operations": True,
-            "dry_run_default": dry_run_default,
+            **update_cues_capability,
+            "legacy_alias_for": "batch_update_cues",
         },
         "playback_control": {"enabled": False},
         "raw_osc": {"enabled": False},

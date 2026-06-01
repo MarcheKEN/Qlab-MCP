@@ -537,6 +537,45 @@ class CueOverviewMixin:
             "warnings": warnings,
             "errors": errors or None,
         }
+        id_only_counted_cues = max(int((known_total_cues or 0) - len(summary_refs)), 0) if known_total_cues is not None else None
+        human_cue_count: int | None = None
+        workspace_total_status = "unknown"
+        if known_total_cues is not None:
+            if known_total_cues > len(cue_lists):
+                human_cue_count = max(int(known_total_cues - len(cue_lists)), 0)
+                workspace_total_status = "known" if known_total_cues_status == "known" else "partial"
+            elif limits["truncated"]:
+                workspace_total_status = "inspected_only"
+            else:
+                human_cue_count = max(int(known_total_cues - len(cue_lists)), 0)
+                workspace_total_status = "known" if known_total_cues_status == "known" else "partial"
+        main_partial_branches = [
+            {
+                "cue_ref": item.get("cue_ref"),
+                "number": item.get("number"),
+                "name": item.get("name"),
+                "type": item.get("type"),
+                "child_count": item.get("child_count"),
+                "child_count_source": item.get("child_count_source"),
+                "fallback_used": bool(item.get("fallback_used")),
+            }
+            for item in child_read_errors
+            if item.get("fallback_used")
+        ]
+        result["agent_summary"] = {
+            "workspace_total_for_humans": (
+                f"{human_cue_count} cues in {len(cue_lists)} lists"
+                if human_cue_count is not None
+                else None
+            ),
+            "workspace_total_status": workspace_total_status,
+            "known_total_cue_items": known_total_cues,
+            "cue_lists": len(cue_lists),
+            "metadata_inspected_cues": len(summary_refs),
+            "id_only_counted_cues": id_only_counted_cues,
+            "metadata_partial": bool(child_read_errors or summary["health_counts_status"] != "known"),
+            "main_partial_branches": main_partial_branches,
+        }
         if live_state is not None:
             result["live_state"] = live_state
         if include_cue_index:

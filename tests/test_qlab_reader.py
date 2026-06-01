@@ -1211,6 +1211,15 @@ class QLabReaderTests(unittest.TestCase):
         warning_text = " ".join(result["warnings"])
         self.assertIn("fallback counted ID-only children", warning_text)
         self.assertIn("Metadata, tree, and health counts are partial", warning_text)
+        self.assertEqual(result["agent_summary"]["known_total_cue_items"], 4)
+        self.assertEqual(result["agent_summary"]["cue_lists"], 1)
+        self.assertEqual(result["agent_summary"]["metadata_inspected_cues"], 2)
+        self.assertEqual(result["agent_summary"]["id_only_counted_cues"], 2)
+        self.assertEqual(result["agent_summary"]["workspace_total_for_humans"], "3 cues in 1 lists")
+        self.assertEqual(result["agent_summary"]["workspace_total_status"], "partial")
+        self.assertTrue(result["agent_summary"]["metadata_partial"])
+        self.assertEqual(len(result["agent_summary"]["main_partial_branches"]), 1)
+        self.assertEqual(result["agent_summary"]["main_partial_branches"][0]["number"], "TEKNO")
 
     def test_workspace_overview_root_read_timeout_is_not_empty_healthy_workspace(self) -> None:
         class RootTimeoutClient:
@@ -1269,6 +1278,36 @@ class QLabReaderTests(unittest.TestCase):
         self.assertNotIn("/workspace/ws-1/cueLists/uniqueIDs", client.requests)
         self.assertEqual(result["known_total_cues"], 1)
         self.assertEqual(result["known_total_cues_source"], "bounded_shallow_traversal")
+
+    def test_workspace_overview_depth_zero_without_global_count_keeps_human_total_unknown(self) -> None:
+        class DepthZeroClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/showMode":
+                    return SimpleNamespace(data=False, status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(
+                        data=[{"uniqueID": f"list-{index}", "type": "Cue List"} for index in range(7)],
+                        status="ok",
+                    )
+                raise AssertionError(f"Unexpected request: {address}")
+
+        reader = QLabReader(DepthZeroClient())  # type: ignore[arg-type]
+
+        result = reader.get_workspace_overview(
+            "ws-1",
+            max_depth=0,
+            include_cue_index=False,
+            include_global_count=False,
+        )
+
+        self.assertEqual(result["known_total_cues"], 7)
+        self.assertEqual(result["agent_summary"]["cue_lists"], 7)
+        self.assertIsNone(result["agent_summary"]["workspace_total_for_humans"])
+        self.assertEqual(result["agent_summary"]["workspace_total_status"], "inspected_only")
 
     def test_workspace_overview_global_count_opt_in_uses_unique_ids(self) -> None:
         responses = {
@@ -2411,8 +2450,54 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(scan_limit["total_cue_ids"], 2)
         self.assertTrue(scan_limit["truncated"])
         self.assertEqual(scan_limit["truncation_reasons"], ["max_cues_scanned"])
-        self.assertFalse(scan_limit["scanned_all_cues"])
-        self.assertFalse(scan_limit["result_limited"])
+        self.assertEqual(scan_limit["query_completeness"], "partial")
+        self.assertEqual(scan_limit["query_completeness_reasons"], ["max_cues_scanned"])
+
+    def test_query_cues_reports_id_only_unscanned_branches_as_partial(self) -> None:
+        list_id = "list-1"
+        group_id = "group-tekno"
+        class QueryFallbackClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(data=[{"uniqueID": list_id, "name": "Main", "type": "Cue List"}], status="ok")
+                if address == f"/workspace/ws-1/cue/{list_id}/children/shallow":
+                    return SimpleNamespace(
+                        data=[{"uniqueID": group_id, "number": "TEKNO", "name": "TEKNO", "type": "Group"}],
+                        status="ok",
+                    )
+                if address == f"/workspace/ws-1/cue/{group_id}/children/shallow":
+                    raise OscTimeoutError("Timed out waiting for QLab reply")
+                if address == f"/workspace/ws-1/cue/{group_id}/children/uniqueIDs/shallow":
+                    return SimpleNamespace(data=["child-1", "child-2"], status="ok")
+                if address.endswith("/valuesForKeys"):
+                    cue_id = args[0] if args else None
+                    keys = args[1] if len(args) > 1 else []
+                    payload = {key: None for key in keys}
+                    payload["uniqueID"] = cue_id
+                    payload["type"] = "Group"
+                    return SimpleNamespace(data=payload, status="ok")
+                raise AssertionError(f"Unexpected request: {address}")
+
+        reader = QLabReader(QueryFallbackClient())  # type: ignore[arg-type]
+        result = reader.query_cues("ws-1", "type", "Group", max_cues_scanned=5000)
+
+        self.assertEqual(result["query_completeness"], "partial")
+        self.assertEqual(result["query_completeness_reasons"], ["id_only_unscanned"])
+        self.assertEqual(result["id_only_unscanned_count"], 2)
+        self.assertEqual(result["scanned_count"], 2)
+        self.assertEqual(result["total_cue_ids"], 2)
+        self.assertEqual(len(result["omitted_branches"]), 1)
+        self.assertEqual(result["omitted_branches"][0]["number"], "TEKNO")
+        self.assertEqual(result["omitted_branches"][0]["child_count"], 2)
+        self.assertEqual(result["omitted_branches"][0]["child_count_source"], "children/uniqueIDs/shallow")
+        self.assertTrue(result["omitted_branches"][0]["fallback_used"])
+        self.assertIn("scanned only cues with metadata", " ".join(result["warnings"]))
+        self.assertFalse(result["scanned_all_cues"])
+        self.assertFalse(result["result_limited"])
 
     def test_query_cues_can_scan_more_than_default_when_explicitly_raised(self) -> None:
         cue_ids = [f"{index:032d}-aaaa-bbbb-cccc-{index:012d}" for index in range(501)]

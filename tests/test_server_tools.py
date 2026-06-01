@@ -5,6 +5,7 @@ import asyncio
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
+import qlab_mcp.server as server_module
 from qlab_mcp.errors import QLabReplyError
 from qlab_mcp.server import (
     CHECK_CONNECTION_TIMEOUT,
@@ -18,6 +19,7 @@ from qlab_mcp.server import (
     WRITE_READINESS_TIMEOUT,
     _run_tool,
     mcp,
+    qlab_get_workspace_overview,
     qlab_query_cues,
 )
 
@@ -57,6 +59,10 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert overview.inputSchema["properties"]["include_global_count"]["default"] is False
     assert "cueLists/uniqueIDs" in overview.inputSchema["properties"]["include_global_count"]["description"]
     assert "cue list roots" in overview.inputSchema["properties"]["include_global_count"]["description"]
+    assert "agent_summary" in overview.outputSchema["properties"]
+    agent_summary_schema = overview.outputSchema["properties"]["agent_summary"]
+    agent_summary_variants = agent_summary_schema.get("anyOf", [agent_summary_schema])
+    assert any(variant.get("type") == "object" for variant in agent_summary_variants)
     assert overview.annotations.readOnlyHint is True
     assert overview.annotations.destructiveHint is False
     assert overview.annotations.idempotentHint is True
@@ -85,6 +91,12 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert query.inputSchema["properties"]["max_cues_scanned"]["maximum"] == 5000
     query_filters = set(query.inputSchema["properties"]["primary_filter"]["enum"])
     assert {"name_empty", "displayName_empty", "number_empty", "ambiguous_label", "flagged_or_broken"} <= query_filters
+    assert "query_completeness" in query.outputSchema["properties"]
+    assert "query_completeness_reasons" in query.outputSchema["properties"]
+    assert "id_only_unscanned_count" in query.outputSchema["properties"]
+    assert "omitted_branches" in query.outputSchema["properties"]
+    assert "partial_branches" in query.outputSchema["properties"]
+    assert "warnings" in query.outputSchema["properties"]
     assert query.annotations.readOnlyHint is True
     assert query.annotations.destructiveHint is False
 
@@ -206,3 +218,95 @@ def test_tool_wrapper_converts_validation_errors_to_tool_error() -> None:
         assert "max_results must be 1 or greater" in str(exc)
     else:
         raise AssertionError("Expected ToolError")
+
+
+def test_overview_public_tool_preserves_agent_summary(monkeypatch) -> None:
+    class FakeReader:
+        def get_workspace_overview(self, **kwargs):
+            return {
+                "workspace_id": "ws-1",
+                "workspace": {"displayName": "demo.qlab5"},
+                "cue_count": 879,
+                "cue_count_meaning": "inspected_cues",
+                "known_total_cues": 1424,
+                "known_total_cues_status": "partial",
+                "known_total_cues_source": "bounded_shallow_traversal+children/uniqueIDs/shallow",
+                "known_total_cues_meaning": "cue_items_including_cue_lists",
+                "summary": {"cue_lists": 7, "inspected_cues": 879},
+                "agent_summary": {
+                    "workspace_total_for_humans": "1417 cues in 7 lists",
+                    "workspace_total_status": "partial",
+                    "known_total_cue_items": 1424,
+                    "cue_lists": 7,
+                    "metadata_inspected_cues": 879,
+                    "id_only_counted_cues": 545,
+                    "metadata_partial": True,
+                    "main_partial_branches": [{"number": "TEKNO", "child_count": 545}],
+                },
+                "cue_lists": [],
+                "limits": {"truncated": True, "truncation_reasons": ["child_metadata_unavailable"]},
+                "warnings": ["metadata partial"],
+                "errors": None,
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    result = qlab_get_workspace_overview()
+    payload = result.model_dump()
+
+    assert payload["agent_summary"]["workspace_total_for_humans"] == "1417 cues in 7 lists"
+    assert payload["agent_summary"]["id_only_counted_cues"] == 545
+    assert payload["known_total_cues_meaning"] == "cue_items_including_cue_lists"
+
+
+def test_query_public_tool_preserves_completeness_fields(monkeypatch) -> None:
+    class FakeReader:
+        def query_cues(self, **kwargs):
+            return {
+                "workspace_id": "ws-1",
+                "filters": [{"filter": "type", "value": "Light"}],
+                "profile": "basic_safe",
+                "scanned_count": 879,
+                "matched_count": 391,
+                "returned_count": 20,
+                "total_cue_ids": 879,
+                "query_completeness": "partial",
+                "query_completeness_reasons": ["id_only_unscanned"],
+                "id_only_unscanned_count": 545,
+                "omitted_branches": [
+                    {
+                        "cue_ref": "C7105E58-F911-4A2E-9BD9-40CEDDC79AE1",
+                        "number": "TEKNO",
+                        "child_count": 545,
+                        "fallback_used": True,
+                    }
+                ],
+                "partial_branches": [
+                    {
+                        "cue_ref": "C7105E58-F911-4A2E-9BD9-40CEDDC79AE1",
+                        "number": "TEKNO",
+                        "child_count": 545,
+                        "fallback_used": True,
+                    }
+                ],
+                "truncated": True,
+                "truncation_reasons": ["child_metadata_unavailable"],
+                "scanned_all_cues": False,
+                "result_limited": False,
+                "limits": {"max_results": 20, "max_cues_scanned": 5000},
+                "cues": [],
+                "warnings": ["Query scanned only cues with metadata available."],
+                "errors": None,
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    result = qlab_query_cues("ws-1", "type", "Light", max_cues_scanned=5000, max_results=20)
+    payload = result.model_dump()
+
+    assert payload["query_completeness"] == "partial"
+    assert payload["query_completeness_reasons"] == ["id_only_unscanned"]
+    assert payload["id_only_unscanned_count"] == 545
+    assert payload["omitted_branches"][0]["number"] == "TEKNO"
+    assert payload["partial_branches"][0]["child_count"] == 545
+    assert "metadata available" in payload["warnings"][0]

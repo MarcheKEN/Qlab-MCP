@@ -234,6 +234,7 @@ class CueQueryMixin:
             limit=max_cues_scanned,
             max_depth=None,
             cacheable=cacheable,
+            fallback_child_ids=True,
         )
         cue_refs = bounded["refs"]
         profile_keys = list(properties_for_profile(profile))
@@ -283,6 +284,23 @@ class CueQueryMixin:
                 cues.append(cue)
 
         scanned_all_cues = not bounded["truncated"]
+        omitted_branches = [
+            {
+                "cue_ref": item.get("cue_ref"),
+                "number": item.get("number"),
+                "name": item.get("name"),
+                "type": item.get("type"),
+                "child_count": item.get("child_count"),
+                "child_count_source": item.get("child_count_source"),
+                "fallback_used": bool(item.get("fallback_used")),
+            }
+            for item in bounded.get("child_read_errors", [])
+        ]
+        id_only_unscanned_count = sum(
+            int(item.get("child_count") or 0)
+            for item in omitted_branches
+            if item.get("fallback_used") and item.get("child_count") is not None
+        )
         result_limited = matched_count > len(cues)
         truncation_reasons: list[str] = [
             "max_cues_scanned" if reason == "max_cues" else reason
@@ -290,6 +308,22 @@ class CueQueryMixin:
         ]
         if result_limited:
             truncation_reasons.append("max_results")
+        query_completeness_reasons: list[str] = []
+        if "max_cues_scanned" in truncation_reasons:
+            query_completeness_reasons.append("max_cues_scanned")
+        if id_only_unscanned_count > 0:
+            query_completeness_reasons.append("id_only_unscanned")
+        query_completeness = "partial" if query_completeness_reasons else "complete"
+        warnings: list[str] = []
+        if id_only_unscanned_count > 0:
+            warnings.append(
+                "Query scanned only cues with metadata available from shallow traversal; "
+                "some ID-only branch children were counted but not searched."
+            )
+        if "max_cues_scanned" in query_completeness_reasons:
+            warnings.append(
+                "Query stopped at max_cues_scanned before all discoverable cue metadata was scanned."
+            )
         truncated = bool(truncation_reasons)
         return {
             "workspace_id": _clean_workspace_id(workspace_id),
@@ -299,6 +333,11 @@ class CueQueryMixin:
             "matched_count": matched_count,
             "returned_count": len(cues),
             "total_cue_ids": len(cue_refs),
+            "query_completeness": query_completeness,
+            "query_completeness_reasons": query_completeness_reasons,
+            "id_only_unscanned_count": id_only_unscanned_count,
+            "omitted_branches": omitted_branches,
+            "partial_branches": omitted_branches,
             "truncated": truncated,
             "truncation_reasons": truncation_reasons,
             "scanned_all_cues": scanned_all_cues,
@@ -308,5 +347,6 @@ class CueQueryMixin:
                 "max_cues_scanned": max_cues_scanned,
             },
             "cues": cues,
+            "warnings": warnings,
             "errors": {**bounded["errors"], **errors} or None,
         }

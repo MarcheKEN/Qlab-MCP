@@ -97,6 +97,7 @@ class WorkspaceOverviewResult(BaseModel):
     known_total_cues_source: str | None = None
     known_total_cues_meaning: str | None = None
     summary: dict[str, Any]
+    agent_summary: dict[str, Any] | None = None
     cue_lists: list[dict[str, Any]]
     cue_index: dict[str, Any] | None = None
     editorial_health: dict[str, Any] | None = None
@@ -142,12 +143,18 @@ class CueQueryResult(BaseModel):
     matched_count: int
     returned_count: int
     total_cue_ids: int
+    query_completeness: str | None = None
+    query_completeness_reasons: list[str] = Field(default_factory=list)
+    id_only_unscanned_count: int = 0
+    omitted_branches: list[dict[str, Any]] = Field(default_factory=list)
+    partial_branches: list[dict[str, Any]] = Field(default_factory=list)
     truncated: bool
     truncation_reasons: list[str] = Field(default_factory=list)
     scanned_all_cues: bool
     result_limited: bool
     limits: dict[str, Any]
     cues: list[dict[str, Any]]
+    warnings: list[str] = Field(default_factory=list)
     errors: dict[str, str] | None = None
 
 

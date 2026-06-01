@@ -323,6 +323,16 @@ def qlab_get_workspace_overview(
             ),
         ),
     ] = "minimal",
+    include_global_count: Annotated[
+        bool,
+        Field(
+            description=(
+                "When true, read cueLists/uniqueIDs to calculate the real total cue-item count, "
+                "including cue list roots and Group children. "
+                "This is potentially expensive and is off by default."
+            ),
+        ),
+    ] = False,
 ) -> WorkspaceOverviewResult:
     """Map what the QLab show contains and how cue lists, groups, and cues are organized.
 
@@ -338,6 +348,7 @@ def qlab_get_workspace_overview(
                 include_cue_index=include_cue_index,
                 max_index_cues=max_index_cues,
                 cue_index_profile=cue_index_profile,
+                include_global_count=include_global_count,
             )
         )
     )

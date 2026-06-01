@@ -54,6 +54,9 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert overview.inputSchema["properties"]["max_cues"]["maximum"] == 5000
     assert overview.inputSchema["properties"]["max_index_cues"]["maximum"] == 5000
     assert overview.inputSchema["properties"]["max_index_cues"]["default"] == 5000
+    assert overview.inputSchema["properties"]["include_global_count"]["default"] is False
+    assert "cueLists/uniqueIDs" in overview.inputSchema["properties"]["include_global_count"]["description"]
+    assert "cue list roots" in overview.inputSchema["properties"]["include_global_count"]["description"]
     assert overview.annotations.readOnlyHint is True
     assert overview.annotations.destructiveHint is False
     assert overview.annotations.idempotentHint is True

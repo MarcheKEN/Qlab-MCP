@@ -78,6 +78,55 @@ def _is_container_cue(cue: dict[str, Any]) -> bool:
     return cue.get("type") in CONTAINER_CUE_TYPES
 
 
+def _child_read_error_context(
+    cue: dict[str, Any],
+    *,
+    cue_id: str,
+    parent_id: str | None,
+    cue_list_id: str | None,
+    depth: int,
+    message: str,
+    fallback_used: bool = False,
+    child_count: int | None = None,
+    child_count_source: str | None = None,
+    child_metadata_status: str | None = None,
+    fallback_error: str | None = None,
+) -> dict[str, Any]:
+    context = {
+        "cue_ref": cue_id,
+        "number": cue.get("number"),
+        "name": cue.get("name"),
+        "displayName": cue.get("displayName"),
+        "type": cue.get("type"),
+        "parent_id": parent_id,
+        "cue_list_id": cue_list_id,
+        "depth": depth,
+        "colorName": cue.get("colorName"),
+        "duration": cue.get("duration"),
+        "isBroken": cue.get("isBroken"),
+        "isWarning": cue.get("isWarning"),
+        "message": message,
+        "fallback_used": fallback_used,
+        "child_count": child_count,
+        "child_count_source": child_count_source,
+        "child_metadata_status": child_metadata_status,
+        "fallback_error": fallback_error,
+    }
+    required_keys = {
+        "cue_ref",
+        "number",
+        "name",
+        "displayName",
+        "type",
+        "parent_id",
+        "cue_list_id",
+        "depth",
+        "message",
+        "fallback_used",
+    }
+    return {key: value for key, value in context.items() if key in required_keys or value is not None}
+
+
 def _bounded_cue_refs_from_shallow(
     reader: Any,
     workspace_id: str,
@@ -85,6 +134,7 @@ def _bounded_cue_refs_from_shallow(
     limit: int,
     max_depth: int | None = None,
     cacheable: bool = True,
+    fallback_child_ids: bool = False,
 ) -> dict[str, Any]:
     """Walk cueLists/shallow + children/shallow without global uniqueIDs."""
     if limit < 1:
@@ -95,6 +145,7 @@ def _bounded_cue_refs_from_shallow(
     child_read_errors: list[dict[str, Any]] = []
     truncation_reasons: list[str] = []
     seen: set[str] = set()
+    known_ids: set[str] = set()
 
     def mark_truncated(reason: str) -> None:
         if reason not in truncation_reasons:
@@ -119,14 +170,15 @@ def _bounded_cue_refs_from_shallow(
             return
         if cue_id:
             seen.add(cue_id)
-        refs.append(
-            _cue_ref_from_shallow(
-                cue,
-                parent_id=parent_id,
-                cue_list_id=current_cue_list_id,
-                depth=depth,
-            )
+        ref = _cue_ref_from_shallow(
+            cue,
+            parent_id=parent_id,
+            cue_list_id=current_cue_list_id,
+            depth=depth,
         )
+        refs.append(ref)
+        if cue_id:
+            known_ids.add(cue_id)
 
         if not cue_id or not _is_container_cue(cue):
             return
@@ -137,32 +189,92 @@ def _bounded_cue_refs_from_shallow(
             mark_truncated("max_cues")
             return
 
+        def record_child_read_error(
+            message: str,
+            *,
+            fallback_used: bool = False,
+            child_count: int | None = None,
+            child_count_source: str | None = None,
+            child_metadata_status: str | None = None,
+            fallback_error: str | None = None,
+        ) -> None:
+            child_read_errors.append(
+                _child_read_error_context(
+                    cue,
+                    cue_id=cue_id,
+                    parent_id=parent_id,
+                    cue_list_id=current_cue_list_id,
+                    depth=depth,
+                    message=message,
+                    fallback_used=fallback_used,
+                    child_count=child_count,
+                    child_count_source=child_count_source,
+                    child_metadata_status=child_metadata_status,
+                    fallback_error=fallback_error,
+                )
+            )
+
+        def fallback_to_child_ids(message: str) -> None:
+            errors[cue_id] = message
+            ref["child_metadata_status"] = "timeout" if "Timed out" in message or "timed out" in message else "unavailable"
+            try:
+                id_children = reader.get_cue_children(workspace_id, cue_id, shallow=True, ids_only=True)["children"]
+                id_refs = _flatten_cue_refs(
+                    id_children,
+                    parent_id=cue_id,
+                    cue_list_id=current_cue_list_id,
+                    depth=depth + 1,
+                )
+                child_ids = [str(item["uniqueID"]) for item in id_refs if item.get("uniqueID")]
+                for child_id in child_ids:
+                    known_ids.add(child_id)
+                ref["child_count"] = len(child_ids)
+                ref["child_count_source"] = "children/uniqueIDs/shallow"
+                ref["child_metadata_status"] = "timeout" if "Timed out" in message or "timed out" in message else "unavailable"
+                ref["fallback_used"] = True
+                mark_truncated("child_metadata_unavailable")
+                record_child_read_error(
+                    message,
+                    fallback_used=True,
+                    child_count=len(child_ids),
+                    child_count_source="children/uniqueIDs/shallow",
+                    child_metadata_status=ref["child_metadata_status"],
+                )
+            except Exception as fallback_exc:
+                ref["child_count"] = None
+                ref["child_count_source"] = None
+                ref["fallback_used"] = True
+                mark_truncated("child_read_error")
+                record_child_read_error(
+                    message,
+                    fallback_used=True,
+                    child_metadata_status=ref["child_metadata_status"],
+                    fallback_error=str(fallback_exc),
+                )
+
         try:
             children = reader.get_cue_children(workspace_id, cue_id, shallow=True, ids_only=False)["children"]
         except Exception as exc:
-            errors[cue_id] = str(exc)
-            child_read_errors.append(
-                {
-                    "cue_ref": cue_id,
-                    "parent_id": parent_id,
-                    "cue_list_id": current_cue_list_id,
-                    "depth": depth,
-                    "message": str(exc),
-                }
-            )
+            if not fallback_child_ids:
+                errors[cue_id] = str(exc)
+                mark_truncated("child_read_error")
+                record_child_read_error(str(exc))
+                return
+            fallback_to_child_ids(str(exc))
             return
         if not isinstance(children, list):
-            errors[cue_id] = "QLab children/shallow response must be a list"
-            child_read_errors.append(
-                {
-                    "cue_ref": cue_id,
-                    "parent_id": parent_id,
-                    "cue_list_id": current_cue_list_id,
-                    "depth": depth,
-                    "message": "QLab children/shallow response must be a list",
-                }
-            )
+            if not fallback_child_ids:
+                message = "QLab children/shallow response must be a list"
+                errors[cue_id] = message
+                mark_truncated("child_read_error")
+                record_child_read_error(message)
+                return
+            fallback_to_child_ids("QLab children/shallow response must be a list")
             return
+        ref["child_count"] = len(children)
+        ref["child_count_source"] = "children/shallow"
+        ref["child_metadata_status"] = "available"
+        ref["fallback_used"] = False
         for child in children:
             if len(refs) >= limit:
                 mark_truncated("max_cues")
@@ -174,18 +286,24 @@ def _bounded_cue_refs_from_shallow(
     except Exception as exc:
         return {
             "refs": [],
-            "truncated": False,
-            "truncation_reasons": [],
+            "truncated": True,
+            "truncation_reasons": ["root_read_error"],
             "errors": {"cueLists/shallow": str(exc)},
             "child_read_errors": [],
+            "known_total_cues": None,
+            "known_total_cues_status": "unknown",
+            "known_total_cues_source": "bounded_shallow_traversal",
         }
     if not isinstance(cue_lists, list):
         return {
             "refs": [],
-            "truncated": False,
-            "truncation_reasons": [],
+            "truncated": True,
+            "truncation_reasons": ["root_read_error"],
             "errors": {"cueLists/shallow": "QLab cueLists/shallow response must be a list"},
             "child_read_errors": [],
+            "known_total_cues": None,
+            "known_total_cues_status": "unknown",
+            "known_total_cues_source": "bounded_shallow_traversal",
         }
 
     for cue_list in cue_lists:
@@ -200,4 +318,11 @@ def _bounded_cue_refs_from_shallow(
         "truncation_reasons": truncation_reasons,
         "errors": errors,
         "child_read_errors": child_read_errors,
+        "known_total_cues": len(known_ids),
+        "known_total_cues_status": "partial" if truncation_reasons or errors else "known",
+        "known_total_cues_source": (
+            "bounded_shallow_traversal+children/uniqueIDs/shallow"
+            if any(item.get("fallback_used") for item in child_read_errors)
+            else "bounded_shallow_traversal"
+        ),
     }

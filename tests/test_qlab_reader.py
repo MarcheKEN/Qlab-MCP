@@ -1028,6 +1028,7 @@ class QLabReaderTests(unittest.TestCase):
                 {"uniqueID": "list-id", "name": "Main", "type": "Cue List", "armed": True, "flagged": False}
             ],
             "/workspace/ws-1/cueLists/uniqueIDs": ["list-id", "child-id"],
+            "/workspace/ws-1/cue/list-id/children/shallow": [],
         }
         with FakeQlabOscServer(responses) as server:
             reader = QLabReader(client_for(server))
@@ -1085,10 +1086,14 @@ class QLabReaderTests(unittest.TestCase):
                         data=[
                             {
                                 "uniqueID": list_id,
+                                "number": "TEKNO",
                                 "name": "Main",
+                                "displayName": "TEKNO Main",
                                 "type": "Cue List",
                                 "armed": True,
                                 "flagged": False,
+                                "colorName": "red",
+                                "duration": 12.5,
                                 "isBroken": False,
                                 "isWarning": False,
                             }
@@ -1106,11 +1111,259 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["limits"]["truncated"])
         self.assertIn("child_read_error", result["limits"]["truncation_reasons"])
         self.assertEqual(result["limits"]["child_read_errors"][0]["cue_ref"], list_id)
+        self.assertEqual(result["limits"]["child_read_errors"][0]["number"], "TEKNO")
+        self.assertEqual(result["limits"]["child_read_errors"][0]["name"], "Main")
+        self.assertEqual(result["limits"]["child_read_errors"][0]["displayName"], "TEKNO Main")
+        self.assertEqual(result["limits"]["child_read_errors"][0]["type"], "Cue List")
+        self.assertEqual(result["limits"]["child_read_errors"][0]["parent_id"], None)
+        self.assertEqual(result["limits"]["child_read_errors"][0]["depth"], 0)
+        self.assertEqual(result["limits"]["child_read_errors"][0]["colorName"], "red")
+        self.assertEqual(result["limits"]["child_read_errors"][0]["duration"], 12.5)
+        self.assertFalse(result["limits"]["child_read_errors"][0]["isBroken"])
+        self.assertFalse(result["limits"]["child_read_errors"][0]["isWarning"])
         self.assertEqual(result["summary"]["total_cue_ids_status"], "partial")
         self.assertEqual(result["summary"]["health_counts_status"], "partial")
         self.assertIsNone(result["summary"]["broken"])
         self.assertIn("Some container children could not be read", " ".join(result["warnings"]))
         self.assertIn(list_id, result["errors"])
+
+    def test_workspace_overview_falls_back_to_child_unique_ids_when_shallow_times_out(self) -> None:
+        list_id = "list-1"
+        group_id = "TEKNO"
+
+        class FallbackChildrenClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def __init__(self) -> None:
+                self.requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.requests.append(address)
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/showMode":
+                    return SimpleNamespace(data=False, status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(
+                        data=[{"uniqueID": list_id, "name": "Main", "type": "Cue List"}],
+                        status="ok",
+                    )
+                if address == f"/workspace/ws-1/cue/{list_id}/children/shallow":
+                    return SimpleNamespace(
+                        data=[
+                            {
+                                "uniqueID": group_id,
+                                "number": "TEKNO",
+                                "name": "TENEMOS UN PROBLEMA",
+                                "displayName": "TEKNO display",
+                                "type": "Group",
+                                "colorName": "red",
+                                "duration": 12.5,
+                                "isBroken": False,
+                                "isWarning": True,
+                            }
+                        ],
+                        status="ok",
+                    )
+                if address == f"/workspace/ws-1/cue/{group_id}/children/shallow":
+                    raise OscTimeoutError("Timed out waiting for QLab reply to children/shallow")
+                if address == f"/workspace/ws-1/cue/{group_id}/children/uniqueIDs/shallow":
+                    return SimpleNamespace(data=["child-1", "child-2"], status="ok")
+                raise AssertionError(f"Unexpected request: {address}")
+
+        client = FallbackChildrenClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        result = reader.get_workspace_overview("ws-1", max_depth=2, include_cue_index=False)
+
+        self.assertIn(f"/workspace/ws-1/cue/{group_id}/children/uniqueIDs/shallow", client.requests)
+        self.assertEqual(result["summary"]["inspected_cues"], 2)
+        self.assertEqual(result["summary"]["returned_cues"], 2)
+        self.assertEqual(result["known_total_cues"], 4)
+        self.assertEqual(result["known_total_cues_status"], "partial")
+        self.assertEqual(result["known_total_cues_meaning"], "cue_items_including_cue_lists")
+        self.assertEqual(result["summary"]["known_total_cues"], 4)
+        self.assertEqual(result["summary"]["known_total_cues_meaning"], "cue_items_including_cue_lists")
+        self.assertEqual(
+            result["limits"]["count_status"]["known_total_cues_meaning"],
+            "cue_items_including_cue_lists",
+        )
+        group = result["cue_lists"][0]["children"][0]
+        self.assertEqual(group["child_count"], 2)
+        self.assertEqual(group["child_count_source"], "children/uniqueIDs/shallow")
+        self.assertEqual(group["child_metadata_status"], "timeout")
+        self.assertTrue(group["fallback_used"])
+        error = result["limits"]["child_read_errors"][0]
+        self.assertEqual(error["cue_ref"], group_id)
+        self.assertEqual(error["number"], "TEKNO")
+        self.assertEqual(error["displayName"], "TEKNO display")
+        self.assertEqual(error["parent_id"], list_id)
+        self.assertEqual(error["cue_list_id"], list_id)
+        self.assertEqual(error["colorName"], "red")
+        self.assertEqual(error["duration"], 12.5)
+        self.assertFalse(error["isBroken"])
+        self.assertTrue(error["isWarning"])
+        self.assertTrue(error["fallback_used"])
+        self.assertEqual(error["child_count"], 2)
+        self.assertEqual(error["child_count_source"], "children/uniqueIDs/shallow")
+        self.assertEqual(error["child_metadata_status"], "timeout")
+        self.assertIn(group_id, result["errors"])
+        warning_text = " ".join(result["warnings"])
+        self.assertIn("fallback counted ID-only children", warning_text)
+        self.assertIn("Metadata, tree, and health counts are partial", warning_text)
+
+    def test_workspace_overview_root_read_timeout_is_not_empty_healthy_workspace(self) -> None:
+        class RootTimeoutClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/showMode":
+                    return SimpleNamespace(data=False, status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    raise OscTimeoutError("Timed out waiting for QLab reply to cueLists/shallow")
+                raise AssertionError(f"Unexpected request: {address}")
+
+        reader = QLabReader(RootTimeoutClient())  # type: ignore[arg-type]
+
+        result = reader.get_workspace_overview("ws-1", max_depth=0, include_cue_index=False)
+
+        self.assertEqual(result["cue_count"], 0)
+        self.assertEqual(result["cue_count_meaning"], "inspected_cues")
+        self.assertIsNone(result["known_total_cues"])
+        self.assertEqual(result["known_total_cues_status"], "unknown")
+        self.assertEqual(result["summary"]["total_cue_ids_status"], "unknown")
+        self.assertEqual(result["summary"]["known_total_cues_status"], "unknown")
+        self.assertTrue(result["limits"]["truncated"])
+        self.assertIn("root_read_error", result["limits"]["truncation_reasons"])
+        self.assertIn("cueLists/shallow", result["errors"])
+        self.assertIn("Root cue list read failed", " ".join(result["warnings"]))
+
+    def test_workspace_overview_global_count_is_opt_in(self) -> None:
+        class CountingClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def __init__(self) -> None:
+                self.requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.requests.append(address)
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/showMode":
+                    return SimpleNamespace(data=False, status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(data=[{"uniqueID": "list-1", "type": "Cue List"}], status="ok")
+                if address == "/workspace/ws-1/cue/list-1/children/shallow":
+                    return SimpleNamespace(data=[], status="ok")
+                if address == "/workspace/ws-1/cueLists/uniqueIDs":
+                    return SimpleNamespace(data=["list-1", "child-1"], status="ok")
+                raise AssertionError(f"Unexpected request: {address}")
+
+        client = CountingClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        result = reader.get_workspace_overview("ws-1", include_cue_index=False, include_global_count=False)
+
+        self.assertNotIn("/workspace/ws-1/cueLists/uniqueIDs", client.requests)
+        self.assertEqual(result["known_total_cues"], 1)
+        self.assertEqual(result["known_total_cues_source"], "bounded_shallow_traversal")
+
+    def test_workspace_overview_global_count_opt_in_uses_unique_ids(self) -> None:
+        responses = {
+            "/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}],
+            "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-1", "type": "Cue List"}],
+            "/workspace/ws-1/cue/list-1/children/shallow": [],
+            "/workspace/ws-1/cueLists/uniqueIDs": ["list-1", "child-1", "child-2"],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_overview("ws-1", include_cue_index=False, include_global_count=True)
+
+        self.assertIn("/workspace/ws-1/cueLists/uniqueIDs", server.received)
+        self.assertEqual(result["known_total_cues"], 3)
+        self.assertEqual(result["known_total_cues_status"], "known")
+        self.assertEqual(result["known_total_cues_source"], "cueLists/uniqueIDs")
+        self.assertEqual(result["known_total_cues_meaning"], "cue_items_including_cue_lists")
+        self.assertTrue(result["summary"]["global_unique_ids_used"])
+
+    def test_workspace_overview_global_count_timeout_does_not_break_overview(self) -> None:
+        class GlobalTimeoutClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/showMode":
+                    return SimpleNamespace(data=False, status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(data=[{"uniqueID": "list-1", "type": "Cue List"}], status="ok")
+                if address == "/workspace/ws-1/cue/list-1/children/shallow":
+                    return SimpleNamespace(data=[], status="ok")
+                if address == "/workspace/ws-1/cueLists/uniqueIDs":
+                    raise OscTimeoutError("Timed out waiting for QLab reply to cueLists/uniqueIDs")
+                if address == "/workspace/ws-1/cueLists/uniqueIDs/shallow":
+                    raise OscTimeoutError("Timed out waiting for QLab reply to cueLists/uniqueIDs/shallow")
+                raise AssertionError(f"Unexpected request: {address}")
+
+        reader = QLabReader(GlobalTimeoutClient())  # type: ignore[arg-type]
+
+        result = reader.get_workspace_overview("ws-1", include_cue_index=False, include_global_count=True)
+
+        self.assertEqual(result["summary"]["inspected_cues"], 1)
+        self.assertIsNone(result["known_total_cues"])
+        self.assertEqual(result["known_total_cues_status"], "timeout")
+        self.assertIn("cueLists/uniqueIDs", result["errors"])
+        self.assertIn("Global cue count was requested", " ".join(result["warnings"]))
+
+    def test_workspace_overview_global_count_falls_back_by_roots_after_global_timeout(self) -> None:
+        class GlobalFallbackClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def __init__(self) -> None:
+                self.requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.requests.append(address)
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/showMode":
+                    return SimpleNamespace(data=False, status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(data=[{"uniqueID": "list-1", "type": "Cue List"}], status="ok")
+                if address == "/workspace/ws-1/cue/list-1/children/shallow":
+                    return SimpleNamespace(data=[], status="ok")
+                if address == "/workspace/ws-1/cueLists/uniqueIDs":
+                    raise OscTimeoutError("Timed out waiting for QLab reply to cueLists/uniqueIDs")
+                if address == "/workspace/ws-1/cueLists/uniqueIDs/shallow":
+                    return SimpleNamespace(data=["list-1"], status="ok")
+                if address == "/workspace/ws-1/cue/list-1/children/uniqueIDs":
+                    return SimpleNamespace(
+                        data=[
+                            {"uniqueID": "group-1", "cues": [{"uniqueID": "child-1", "cues": []}]},
+                            {"uniqueID": "child-2", "cues": []},
+                        ],
+                        status="ok",
+                    )
+                raise AssertionError(f"Unexpected request: {address}")
+
+        client = GlobalFallbackClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        result = reader.get_workspace_overview("ws-1", include_cue_index=False, include_global_count=True)
+
+        self.assertIn("/workspace/ws-1/cueLists/uniqueIDs/shallow", client.requests)
+        self.assertIn("/workspace/ws-1/cue/list-1/children/uniqueIDs", client.requests)
+        self.assertEqual(result["known_total_cues"], 4)
+        self.assertEqual(result["known_total_cues_status"], "known")
+        self.assertEqual(
+            result["known_total_cues_source"],
+            "cueLists/uniqueIDs_fallback:cueLists/uniqueIDs/shallow+children/uniqueIDs",
+        )
+        self.assertIn("cueLists/uniqueIDs", result["errors"])
+        self.assertIn("per-root uniqueID fallback", " ".join(result["warnings"]))
 
     def test_workspace_overview_can_include_live_state_when_requested(self) -> None:
         responses = {

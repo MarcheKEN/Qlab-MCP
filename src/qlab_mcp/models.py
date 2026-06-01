@@ -91,6 +91,11 @@ class WorkspaceOverviewResult(BaseModel):
     workspace_id: str
     workspace: Any
     cue_count: int
+    cue_count_meaning: str | None = None
+    known_total_cues: int | None = None
+    known_total_cues_status: str | None = None
+    known_total_cues_source: str | None = None
+    known_total_cues_meaning: str | None = None
     summary: dict[str, Any]
     cue_lists: list[dict[str, Any]]
     cue_index: dict[str, Any] | None = None

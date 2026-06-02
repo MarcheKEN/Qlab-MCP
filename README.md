@@ -33,6 +33,7 @@ The public entry points stay at the package root:
 - `src/qlab_mcp/server.py` exposes the six inspector tools plus three gated write-mode tools.
 - `src/qlab_mcp/qlab.py` keeps the compatibility facade for `QLabReader`.
 - `src/qlab_mcp/models.py`, `config.py`, `errors.py`, and `allowlist.py` hold shared API types and policy.
+- `fastmcp.json` points FastMCP at `src/qlab_mcp/server.py:mcp` with STDIO transport and the project environment.
 
 Internal readers are grouped by responsibility:
 
@@ -198,7 +199,7 @@ Write mode is deliberately gated:
 
 ```text
 qlab_check_connection(workspace_id=None, require_read_access=True)
-qlab_get_workspace_overview(workspace_id=None, max_depth=2, max_cues=1000, include_live_state=False, include_cue_index=True, max_index_cues=1000, cue_index_profile="minimal")
+qlab_get_workspace_overview(workspace_id=None, max_depth=2, max_cues=1000, include_live_state=False, include_cue_index=True, max_index_cues=5000, cue_index_profile="minimal", include_global_count=False)
 qlab_get_workspace_settings(workspace_id, sections=None)
 qlab_get_workspace_setting_details(workspace_id, section, kind=None, ref=None, profile="safe")
 qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=None, profile="basic_safe", max_results=500, max_cues_scanned=500)
@@ -308,8 +309,18 @@ uv run qlab-mcp
 or:
 
 ```bash
+uv run fastmcp run
+```
+
+or:
+
+```bash
 uv run fastmcp run src/qlab_mcp/server.py:mcp
 ```
+
+`fastmcp.json` does not set QLab credentials or enable write mode. Keep
+`QLAB_PASSCODE`, `QLAB_ENABLE_WRITE`, and `QLAB_WRITE_DRY_RUN_DEFAULT` in the
+server environment for each deliberate run.
 
 ## Manual QLab Check
 

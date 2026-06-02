@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from pathlib import Path
 
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
+from fastmcp.utilities.mcp_server_config.v1.mcp_server_config import MCPServerConfig
 
 import qlab_mcp.server as server_module
 from qlab_mcp.errors import QLabReplyError
@@ -23,6 +26,24 @@ from qlab_mcp.server import (
     qlab_get_cue_details,
     qlab_query_cues,
 )
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_fastmcp_json_points_to_stdio_server_without_write_env() -> None:
+    raw_config = json.loads((PROJECT_ROOT / "fastmcp.json").read_text())
+    parsed = MCPServerConfig.model_validate(raw_config)
+
+    assert parsed.source.path == "src/qlab_mcp/server.py"
+    assert parsed.source.entrypoint == "mcp"
+    assert parsed.environment.project == Path(".")
+    assert parsed.deployment.transport == "stdio"
+
+    deployment_env = raw_config.get("deployment", {}).get("env", {})
+    assert "QLAB_PASSCODE" not in deployment_env
+    assert "QLAB_ENABLE_WRITE" not in deployment_env
+    assert "QLAB_WRITE_DRY_RUN_DEFAULT" not in deployment_env
 
 
 def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -> None:

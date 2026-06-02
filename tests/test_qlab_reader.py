@@ -1213,13 +1213,90 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIn("Metadata, tree, and health counts are partial", warning_text)
         self.assertEqual(result["agent_summary"]["known_total_cue_items"], 4)
         self.assertEqual(result["agent_summary"]["cue_lists"], 1)
-        self.assertEqual(result["agent_summary"]["metadata_inspected_cues"], 2)
-        self.assertEqual(result["agent_summary"]["id_only_counted_cues"], 2)
+
+    def test_workspace_overview_expands_cart_children(self) -> None:
+        cart_id = "cart-1"
+        midi_id = "midi-1"
+        timecode_id = "timecode-1"
+
+        responses = {
+            "/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}],
+            "/workspace/ws-1/showMode": False,
+            "/workspace/ws-1/cueLists/shallow": [
+                {"uniqueID": "list-1", "name": "Main", "type": "Cue List"},
+                {"uniqueID": cart_id, "name": "Cue Cart", "type": "Cart"},
+            ],
+            "/workspace/ws-1/cue/list-1/children/shallow": [],
+            f"/workspace/ws-1/cue/{cart_id}/children/shallow": [
+                {
+                    "uniqueID": midi_id,
+                    "name": "midi note",
+                    "type": "MIDI",
+                    "cartPosition": [0, 0],
+                    "cartPosition/row": 0,
+                    "cartPosition/column": 0,
+                },
+                {
+                    "uniqueID": timecode_id,
+                    "name": "timecode out",
+                    "type": "MTC",
+                    "cartPosition": [0, 1],
+                    "cartPosition/row": 0,
+                    "cartPosition/column": 1,
+                },
+            ],
+        }
+
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+            result = reader.get_workspace_overview("ws-1", max_depth=1, include_cue_index=False)
+
+        cart = result["cue_lists"][1]
+        self.assertEqual(cart["type"], "Cart")
+        self.assertEqual(cart["child_count"], 2)
+        self.assertEqual([child["type"] for child in cart["children"]], ["MIDI", "MTC"])
+        self.assertEqual(cart["children"][0]["cartPosition"], [0, 0])
+        self.assertEqual(result["summary"]["types"]["Cart"], 1)
+        self.assertEqual(result["summary"]["types"]["MIDI"], 1)
+        self.assertEqual(result["summary"]["types"]["MTC"], 1)
+        self.assertIn(f"/workspace/ws-1/cue/{cart_id}/children/shallow", server.received)
+
+    def test_workspace_overview_cart_fallback_counts_id_only_children(self) -> None:
+        cart_id = "cart-1"
+
+        class CartFallbackClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/showMode":
+                    return SimpleNamespace(data=False, status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(data=[{"uniqueID": cart_id, "name": "Cue Cart", "type": "Cart"}], status="ok")
+                if address == f"/workspace/ws-1/cue/{cart_id}/children/shallow":
+                    raise OscTimeoutError("Timed out waiting for QLab reply to children/shallow")
+                if address == f"/workspace/ws-1/cue/{cart_id}/children/uniqueIDs/shallow":
+                    return SimpleNamespace(data=["midi-1", "timecode-1", "midi-file-1"], status="ok")
+                raise AssertionError(f"Unexpected request: {address}")
+
+        reader = QLabReader(CartFallbackClient())  # type: ignore[arg-type]
+        result = reader.get_workspace_overview("ws-1", max_depth=1, include_cue_index=False)
+
+        cart = result["cue_lists"][0]
+        self.assertEqual(cart["type"], "Cart")
+        self.assertEqual(cart["child_count"], 3)
+        self.assertEqual(cart["child_count_source"], "children/uniqueIDs/shallow")
+        self.assertTrue(cart["fallback_used"])
+        self.assertEqual(result["known_total_cues"], 4)
+        self.assertEqual(result["agent_summary"]["id_only_counted_cues"], 3)
+        self.assertEqual(result["limits"]["child_read_errors"][0]["type"], "Cart")
+        self.assertEqual(result["agent_summary"]["metadata_inspected_cues"], 1)
         self.assertEqual(result["agent_summary"]["workspace_total_for_humans"], "3 cues in 1 lists")
         self.assertEqual(result["agent_summary"]["workspace_total_status"], "partial")
         self.assertTrue(result["agent_summary"]["metadata_partial"])
         self.assertEqual(len(result["agent_summary"]["main_partial_branches"]), 1)
-        self.assertEqual(result["agent_summary"]["main_partial_branches"][0]["number"], "TEKNO")
+        self.assertEqual(result["agent_summary"]["main_partial_branches"][0]["type"], "Cart")
 
     def test_workspace_overview_root_read_timeout_is_not_empty_healthy_workspace(self) -> None:
         class RootTimeoutClient:
@@ -2499,6 +2576,118 @@ class QLabReaderTests(unittest.TestCase):
         self.assertFalse(result["scanned_all_cues"])
         self.assertFalse(result["result_limited"])
 
+    def test_query_cues_finds_cart_children_by_real_type(self) -> None:
+        cart_id = "cart-1"
+        midi_id = "midi-1"
+        timecode_id = "timecode-1"
+
+        class CartChildrenClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(data=[{"uniqueID": cart_id, "name": "Cue Cart", "type": "Cart"}], status="ok")
+                if address == f"/workspace/ws-1/cue/{cart_id}/children/shallow":
+                    return SimpleNamespace(
+                        data=[
+                            {
+                                "uniqueID": midi_id,
+                                "name": "MIDI note",
+                                "type": "MIDI",
+                                "cartPosition": [0, 0],
+                                "cartPosition/row": 0,
+                                "cartPosition/column": 0,
+                            },
+                            {
+                                "uniqueID": timecode_id,
+                                "name": "Timecode out",
+                                "type": "MTC",
+                                "cartPosition": [0, 1],
+                                "cartPosition/row": 0,
+                                "cartPosition/column": 1,
+                            },
+                        ],
+                        status="ok",
+                    )
+                if address.endswith("/valuesForKeys"):
+                    if "/cue_id/" in address:
+                        cue_id = address.split("/cue_id/", 1)[1].split("/valuesForKeys", 1)[0]
+                    else:
+                        cue_id = address.split("/cue/", 1)[1].split("/valuesForKeys", 1)[0]
+                    keys = json.loads(args[0]) if args else []
+                    values = {key: None for key in keys}
+                    if cue_id == cart_id:
+                        values.update({"uniqueID": cue_id, "name": "Cue Cart", "type": "Cart"})
+                    else:
+                        values.update(
+                            {
+                                "uniqueID": cue_id,
+                                "number": "",
+                                "name": "MIDI note" if cue_id == midi_id else "Timecode out",
+                                "displayName": "MIDI note" if cue_id == midi_id else "Timecode out",
+                                "listName": "MIDI note" if cue_id == midi_id else "Timecode out",
+                                "type": "MIDI" if cue_id == midi_id else "MTC",
+                                "armed": True,
+                                "flagged": False,
+                                "cartPosition": [0, 0] if cue_id == midi_id else [0, 1],
+                                "cartPosition/row": 0,
+                                "cartPosition/column": 0 if cue_id == midi_id else 1,
+                            }
+                        )
+                    return SimpleNamespace(data=values, status="ok")
+                raise AssertionError(f"Unexpected request: {address}")
+
+        reader = QLabReader(CartChildrenClient())  # type: ignore[arg-type]
+        midi = reader.query_cues("ws-1", "type", "MIDI", max_cues_scanned=5000)
+        timecode = reader.query_cues("ws-1", "name_contains", "timecode", max_cues_scanned=5000)
+
+        self.assertEqual(midi["matched_count"], 1)
+        self.assertEqual(midi["cues"][0]["uniqueID"], midi_id)
+        self.assertEqual(midi["cues"][0]["parent_id"], cart_id)
+        self.assertEqual(midi["cues"][0]["cue_list_id"], cart_id)
+        self.assertEqual(midi["cues"][0]["cartPosition"], [0, 0])
+        self.assertEqual(timecode["matched_count"], 1)
+        self.assertEqual(timecode["cues"][0]["uniqueID"], timecode_id)
+        self.assertEqual(timecode["query_completeness"], "complete")
+
+    def test_query_cues_reports_cart_id_only_children_as_partial(self) -> None:
+        cart_id = "cart-1"
+
+        class CartFallbackClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(data=[{"uniqueID": cart_id, "name": "Cue Cart", "type": "Cart"}], status="ok")
+                if address == f"/workspace/ws-1/cue/{cart_id}/children/shallow":
+                    raise OscTimeoutError("Timed out waiting for QLab reply")
+                if address == f"/workspace/ws-1/cue/{cart_id}/children/uniqueIDs/shallow":
+                    return SimpleNamespace(data=["midi-1", "timecode-1", "midi-file-1"], status="ok")
+                if address.endswith("/valuesForKeys"):
+                    if "/cue_id/" in address:
+                        cue_id = address.split("/cue_id/", 1)[1].split("/valuesForKeys", 1)[0]
+                    else:
+                        cue_id = address.split("/cue/", 1)[1].split("/valuesForKeys", 1)[0]
+                    keys = json.loads(args[0]) if args else []
+                    values = {key: None for key in keys}
+                    values.update({"uniqueID": cue_id, "type": "Cart", "name": "Cue Cart"})
+                    return SimpleNamespace(data=values, status="ok")
+                raise AssertionError(f"Unexpected request: {address}")
+
+        reader = QLabReader(CartFallbackClient())  # type: ignore[arg-type]
+        result = reader.query_cues("ws-1", "type", "MIDI", max_cues_scanned=5000)
+
+        self.assertEqual(result["query_completeness"], "partial")
+        self.assertEqual(result["query_completeness_reasons"], ["id_only_unscanned"])
+        self.assertEqual(result["id_only_unscanned_count"], 3)
+        self.assertEqual(result["matched_count"], 0)
+        self.assertEqual(result["omitted_branches"][0]["type"], "Cart")
+        self.assertEqual(result["omitted_branches"][0]["child_count"], 3)
+
     def test_query_cues_can_scan_more_than_default_when_explicitly_raised(self) -> None:
         cue_ids = [f"{index:032d}-aaaa-bbbb-cccc-{index:012d}" for index in range(501)]
 
@@ -3343,6 +3532,27 @@ class QLabReaderTests(unittest.TestCase):
 
         self.assertEqual(result["properties"]["mode"], 3)
         self.assertEqual(result["properties"]["playbackPositionID"], "child-id")
+        self.assertTrue(all("/children" not in address for address in server.received))
+
+    def test_cart_details_do_not_expand_children(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cart-id",
+                "type": "Cart",
+                "name": "Cue Cart",
+                "mode": 5,
+                "cartRows": 4,
+                "cartColumns": 4,
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "inspector_safe")
+
+        self.assertEqual(result["cue_type"], "Cart")
+        self.assertEqual(result["properties"]["mode"], 5)
+        self.assertEqual(result["properties"]["cartRows"], 4)
         self.assertTrue(all("/children" not in address for address in server.received))
 
     def test_batch_exhaustive_emits_size_and_sensitivity_warning(self) -> None:

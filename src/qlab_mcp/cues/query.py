@@ -98,6 +98,9 @@ QUERY_BASE_PROPERTIES = (
     "hasFileTargets",
     "hasCueTargets",
     "isLoaded",
+    "cartPosition",
+    "cartPosition/row",
+    "cartPosition/column",
 )
 QUERY_DEFAULT_OUTPUT_KEYS = QUERY_BASE_PROPERTIES
 

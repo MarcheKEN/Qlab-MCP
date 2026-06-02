@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 
-CONTAINER_CUE_TYPES = {"Cue List", "Cue Cart", "Group"}
+CONTAINER_CUE_TYPES = {"Cue List", "Cue Cart", "Cart", "Group"}
 
 
 def _flatten_cue_refs(
@@ -163,7 +163,7 @@ def _bounded_cue_refs_from_shallow(
         cue_id = str(cue_id_value) if cue_id_value else None
         current_cue_list_id = (
             cue_id
-            if parent_id is None and cue_id and cue.get("type") in {"Cue List", "Cue Cart"}
+            if parent_id is None and cue_id and cue.get("type") in {"Cue List", "Cue Cart", "Cart"}
             else cue_list_id
         )
         if cue_id and cue_id in seen:

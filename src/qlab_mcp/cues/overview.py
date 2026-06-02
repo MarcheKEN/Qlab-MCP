@@ -18,7 +18,7 @@ from .refs import _bounded_cue_refs_from_shallow, _flatten_cue_refs
 from ..runtime.connection import QLAB_VERSION_KEYS, read_workspace_mode
 
 
-CONTAINER_CUE_TYPES = {"Cue List", "Cue Cart", "Group"}
+CONTAINER_CUE_TYPES = {"Cue List", "Cue Cart", "Cart", "Group"}
 KNOWN_TOTAL_CUES_MEANING = "cue_items_including_cue_lists"
 OVERVIEW_CUE_KEYS = (
     "uniqueID",
@@ -34,6 +34,9 @@ OVERVIEW_CUE_KEYS = (
     "isBroken",
     "isWarning",
     "continueMode",
+    "cartPosition",
+    "cartPosition/row",
+    "cartPosition/column",
 )
 
 def _workspace_overview_metadata(workspace: Any) -> dict[str, Any]:

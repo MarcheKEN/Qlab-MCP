@@ -19,10 +19,46 @@ from .profiles import (
 
 MAX_VALUES_FOR_KEYS = 100
 MAX_BATCH_CUE_DETAILS = 50
+UNRESOLVED_CUE_ERROR_CODE = "cue_ref_unresolved"
+EXHAUSTIVE_WARNING = (
+    "profile='exhaustive' may return large, sensitive, or heavy read-only payloads "
+    "including notes, file targets, scripts, stage data, maps, routing, and geometry."
+)
+EXHAUSTIVE_BATCH_WARNING = (
+    "Batch exhaustive cue details can be very large; prefer one cue or a small batch "
+    "unless load testing."
+)
 
 
 def _chunk_keys(keys: list[str] | tuple[str, ...], size: int = MAX_VALUES_FOR_KEYS) -> list[list[str]]:
     return [list(keys[index : index + size]) for index in range(0, len(keys), size)]
+
+
+def _looks_unresolved(values: dict[str, Any], errors: dict[str, str]) -> bool:
+    return not values and bool(errors) and any(key.startswith("valuesForKeys") for key in errors)
+
+
+def _compact_unresolved_errors() -> dict[str, str]:
+    return {
+        "error_code": UNRESOLVED_CUE_ERROR_CODE,
+        "message": "Cue ref could not be resolved or read.",
+    }
+
+
+def _batch_error_summary(result: dict[str, Any]) -> str:
+    result_errors = result.get("errors")
+    if isinstance(result_errors, dict) and result_errors.get("error_code"):
+        return str(result_errors["error_code"])
+    return "Cue detail read returned errors; inspect results item errors for details."
+
+
+def _profile_warnings(profile: str, requested_count: int = 1) -> list[str]:
+    if profile.strip().lower() != "exhaustive":
+        return []
+    warnings = [EXHAUSTIVE_WARNING]
+    if requested_count > 1:
+        warnings.append(EXHAUSTIVE_BATCH_WARNING)
+    return warnings
 
 
 class CueDetailsMixin:
@@ -85,6 +121,8 @@ class CueDetailsMixin:
                 raise
         else:
             values = self._read_cue_values_with_fallback(workspace_id, cue_ref, common_keys, errors, profile="auto")
+        if _looks_unresolved(values, errors):
+            errors = _compact_unresolved_errors()
         values = _derive_profile_fields("auto", values)
 
         type_specific_keys = [
@@ -158,7 +196,16 @@ class CueDetailsMixin:
                     return self._empty_active_details(workspace_id, cue_ref, profile)
                 raise
         else:
-            values = self._read_cue_values_with_fallback(workspace_id, cue_ref, keys, errors, profile=profile)
+            values = self._read_cue_values_with_fallback(
+                workspace_id,
+                cue_ref,
+                keys,
+                errors,
+                profile=profile,
+                cacheable=normalized_profile != "exhaustive",
+            )
+        if _looks_unresolved(values, errors):
+            errors = _compact_unresolved_errors()
         values = _derive_profile_fields(profile, values)
 
         result: dict[str, Any] = {
@@ -168,6 +215,11 @@ class CueDetailsMixin:
             "cue_type": values.get("type"),
             "properties": values,
         }
+        warnings = _profile_warnings(normalized_profile)
+        if warnings:
+            result["warnings"] = warnings
+        if normalized_profile == "inspector_safe":
+            result["sections"] = _build_auto_sections(values)
         if errors:
             result["errors"] = errors
         return result
@@ -184,7 +236,7 @@ class CueDetailsMixin:
 
         results: list[dict[str, Any]] = []
         errors: dict[str, str] = {}
-        warnings: list[str] = []
+        warnings: list[str] = _profile_warnings(profile, len(cue_ref))
         failed_count = 0
         for index, ref in enumerate(cue_ref):
             if not isinstance(ref, str) or not ref.strip():
@@ -196,7 +248,7 @@ class CueDetailsMixin:
                 result = self._get_single_cue_details(workspace_id, ref, profile)
                 results.append(result)
                 if result.get("errors"):
-                    errors[ref] = "Cue detail read returned errors; inspect results item errors for details."
+                    errors[ref] = _batch_error_summary(result)
                     failed_count += 1
             except Exception as exc:
                 errors[ref] = str(exc)

@@ -169,6 +169,7 @@ class CueDetailsResult(BaseModel):
     sections: dict[str, dict[str, Any]] | None = None
     update_capabilities: dict[str, Any] | None = None
     errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
     active_count: int | None = None
     message: str | None = None
 

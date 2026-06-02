@@ -20,6 +20,7 @@ from qlab_mcp.server import (
     _run_tool,
     mcp,
     qlab_get_workspace_overview,
+    qlab_get_cue_details,
     qlab_query_cues,
 )
 
@@ -104,6 +105,11 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert details.title == "Get QLab Cue Details"
     assert "valuesForKeys" in details.description
     assert "editable" in details.inputSchema["properties"]["profile"]["enum"]
+    assert "inspector_safe" in details.inputSchema["properties"]["profile"]["enum"]
+    assert "exhaustive" in details.inputSchema["properties"]["profile"]["enum"]
+    assert "Inspector-style" in details.inputSchema["properties"]["profile"]["description"]
+    assert "heavy/sensitive" in details.inputSchema["properties"]["profile"]["description"]
+    assert "exhaustive" not in query.inputSchema["properties"]["profile"]["enum"]
     cue_ref_schema = details.inputSchema["properties"]["cue_ref"]
     assert cue_ref_schema["anyOf"][0]["type"] == "string"
     assert cue_ref_schema["anyOf"][1]["type"] == "array"
@@ -216,6 +222,21 @@ def test_tool_wrapper_converts_validation_errors_to_tool_error() -> None:
         qlab_query_cues("ws-1", "type", "Audio", max_results=0)
     except ToolError as exc:
         assert "max_results must be 1 or greater" in str(exc)
+    else:
+        raise AssertionError("Expected ToolError")
+
+
+def test_public_cue_details_reports_clear_batch_limit(monkeypatch) -> None:
+    class FakeReader:
+        def get_cue_details(self, workspace_id, cue_ref, profile):
+            raise ValueError("cue_ref list can include at most 50 cues")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    try:
+        qlab_get_cue_details("ws-1", ["10"] * 51)
+    except ToolError as exc:
+        assert "cue_ref list can include at most 50 cues" in str(exc)
     else:
         raise AssertionError("Expected ToolError")
 

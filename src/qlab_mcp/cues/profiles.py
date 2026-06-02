@@ -213,7 +213,7 @@ def _derive_profile_fields(profile: str, values: dict[str, Any]) -> dict[str, An
             derived.pop(heavy_key, None)
     if normalized in {"health", "targets"}:
         derived.pop("fileTarget", None)
-    if normalized == "type_specific":
+    if normalized in {"type_specific", "inspector_safe"}:
         for sensitive_or_heavy_key in ("notes", "fileTarget", "scriptSource", "stage", "stage/regions"):
             derived.pop(sensitive_or_heavy_key, None)
     if normalized == "full":

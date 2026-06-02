@@ -2700,6 +2700,9 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["failed_count"], 1)
         self.assertIn("missing", result["errors"])
         self.assertIsNotNone(result["results"][1]["errors"])
+        self.assertEqual(result["errors"]["missing"], "cue_ref_unresolved")
+        self.assertEqual(result["results"][1]["errors"]["error_code"], "cue_ref_unresolved")
+        self.assertLessEqual(len(result["results"][1]["errors"]), 2)
         self.assertIn("One or more cue detail reads failed", result["warnings"][0])
 
     def test_batch_cue_details_rejects_more_than_50_cues(self) -> None:
@@ -2743,6 +2746,103 @@ class QLabReaderTests(unittest.TestCase):
 
         self.assertEqual(result["properties"]["message"], "/device/standby 10")
         self.assertEqual(result["properties"]["networkPatchName"], "LX Console")
+
+    def test_inspector_safe_profile_reads_broader_non_sensitive_fields(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "number": "10",
+                "name": "Projection",
+                "type": "Video",
+                "notes": "private note",
+                "fileTarget": "/Users/stage/private.mov",
+                "scriptSource": "display dialog \"private\"",
+                "stage": {"regions": [{"id": "large"}]},
+                "stage/regions": [{"id": "large"}],
+                "stageName": "Main",
+                "stage/size": [1920, 1080],
+                "anchor/x": 0.5,
+                "anchor/y": 0.5,
+                "translation/x": 10,
+                "translation/y": 20,
+                "scale/x": 1.1,
+                "scale/y": 0.9,
+                "cropTop": 10,
+                "cropBottom": 20,
+                "opacity": 0.75,
+                "rate": 1.0,
+                "playCount": 2,
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "inspector_safe")
+
+        self.assertEqual(result["profile"], "inspector_safe")
+        self.assertEqual(result["cue_type"], "Video")
+        self.assertEqual(result["properties"]["anchor/x"], 0.5)
+        self.assertEqual(result["properties"]["cropTop"], 10)
+        self.assertEqual(result["properties"]["translation/x"], 10)
+        self.assertEqual(result["properties"]["scale/y"], 0.9)
+        self.assertEqual(result["sections"]["identity"]["type"], "Video")
+        self.assertNotIn("notes", result["properties"])
+        self.assertNotIn("fileTarget", result["properties"])
+        self.assertNotIn("scriptSource", result["properties"])
+        self.assertNotIn("stage", result["properties"])
+        self.assertNotIn("stage/regions", result["properties"])
+        self.assertTrue(all("/children" not in address for address in server.received))
+
+    def test_inspector_safe_profile_covers_audio_light_and_group_without_children(self) -> None:
+        cases = [
+            (
+                "Audio",
+                {
+                    "audioOutputPatchName": "Main",
+                    "audioMap/size": [2, 2],
+                    "rate": 0.95,
+                    "startTime": 1.5,
+                    "endTime": 12.0,
+                    "playCount": 3,
+                    "infiniteLoop": False,
+                    "preservePitch": True,
+                },
+                ("rate", 0.95),
+            ),
+            (
+                "Light",
+                {
+                    "lightCommandText": "1 thru 5 @ 80",
+                    "parameterValues": {"intensity": 80},
+                    "parameterFadesEnabled": {"intensity": True},
+                    "alwaysCollate": True,
+                    "subcontroller": "default",
+                },
+                ("lightCommandText", "1 thru 5 @ 80"),
+            ),
+            (
+                "Group",
+                {"mode": 3, "playlist/doLoop": True, "playbackPositionID": "child-id"},
+                ("mode", 3),
+            ),
+        ]
+        for cue_type, extra_values, expected in cases:
+            with self.subTest(cue_type=cue_type):
+                values = {
+                    "uniqueID": "cue-id",
+                    "number": "10",
+                    "name": f"{cue_type} cue",
+                    "type": cue_type,
+                    **extra_values,
+                }
+                with FakeQlabOscServer({"/workspace/ws-1/cue/10/valuesForKeys": values}) as server:
+                    reader = QLabReader(client_for(server))
+
+                    result = reader.get_cue_details("ws-1", "10", "inspector_safe")
+
+                key, expected_value = expected
+                self.assertEqual(result["properties"][key], expected_value)
+                self.assertTrue(all("/children" not in address for address in server.received))
 
     def test_auto_cue_details_sections_representative_types(self) -> None:
         cases = [
@@ -3035,6 +3135,232 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIn("fileTarget", properties_for_profile("full_sensitive"))
         self.assertIn("scriptSource", properties_for_profile("full_sensitive"))
         self.assertIn("stage", properties_for_profile("full_sensitive"))
+
+    def test_exhaustive_profile_includes_sensitive_heavy_and_deep_allowlisted_keys(self) -> None:
+        exhaustive = properties_for_profile("exhaustive")
+
+        for key in (
+            "notes",
+            "fileTarget",
+            "scriptSource",
+            "stage",
+            "stage/regions",
+            "audioMap/objects",
+            "audioOutputPatch/routing",
+            "levels",
+            "anchor",
+            "cueSize",
+            "text/format/shadowOffset/width",
+            "fadeEntries",
+            "devampType",
+        ):
+            self.assertIn(key, exhaustive)
+        self.assertNotIn("stage", properties_for_profile("auto"))
+        self.assertNotIn("fileTarget", properties_for_profile("auto"))
+        self.assertNotIn("stage", properties_for_profile("inspector_safe"))
+        self.assertNotIn("fileTarget", properties_for_profile("inspector_safe"))
+        self.assertNotIn("audioOutputPatch/routing", properties_for_profile("inspector_safe"))
+        self.assertNotIn("text/format/shadowOffset/width", properties_for_profile("inspector_safe"))
+
+    def test_exhaustive_video_details_include_heavy_geometry_stage_fields(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "type": "Video",
+                "fileTarget": "/Users/example/private/video.mov",
+                "notes": "private note",
+                "stage": {"name": "Main", "regions": [{"id": "r1"}]},
+                "stage/regions": [{"id": "r1"}],
+                "stage/name": "Main",
+                "stage/size": [1920, 1080],
+                "anchor": [0.5, 0.5],
+                "anchor/x": 0.5,
+                "anchor/y": 0.5,
+                "cueSize": [640, 360],
+                "cueSize/width": 640,
+                "cueSize/height": 360,
+                "fillStage": True,
+                "fillStyle": "scale_to_fit",
+                "holdLastFrame": True,
+                "layer": 5,
+                "preserveAspectRatio": True,
+                "quaternion": [0, 0, 0, 1],
+                "smooth": True,
+                "videoEffects": [{"name": "blur"}],
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "exhaustive")
+
+        self.assertEqual(result["profile"], "exhaustive")
+        self.assertEqual(result["properties"]["fileTarget"], "/Users/example/private/video.mov")
+        self.assertEqual(result["properties"]["stage/regions"], [{"id": "r1"}])
+        self.assertEqual(result["properties"]["anchor"], [0.5, 0.5])
+        self.assertEqual(result["properties"]["cueSize/width"], 640)
+        self.assertEqual(result["properties"]["layer"], 5)
+        self.assertIn("large, sensitive", result["warnings"][0])
+        self.assertTrue(all("/children" not in address for address in server.received))
+
+    def test_exhaustive_text_details_include_format_and_geometry_fields(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "type": "Text",
+                "text": "Act I",
+                "text/format": {"fontFamily": "Helvetica"},
+                "text/format/fontFamily": "Helvetica",
+                "text/format/fontStyle": "Bold",
+                "text/format/fontFamilyAndStyle": "Helvetica Bold",
+                "text/format/lineSpacing": 1.2,
+                "text/format/shadowBlurRadius": 3,
+                "text/format/shadowOffset": [2, 4],
+                "text/format/shadowOffset/width": 2,
+                "text/format/shadowOffset/height": 4,
+                "text/format/color": "#ffffff",
+                "text/format/backgroundColor": "#000000",
+                "text/format/shadowColor": "#111111",
+                "text/format/strikethroughColor": "#222222",
+                "text/format/underlineColor": "#333333",
+                "text/outputSize": [320, 120],
+                "text/outputSize/width": 320,
+                "text/outputSize/height": 120,
+                "cueSize": [320, 120],
+                "anchor": [0.5, 0.5],
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "exhaustive")
+
+        self.assertEqual(result["properties"]["text/format/fontFamily"], "Helvetica")
+        self.assertEqual(result["properties"]["text/format/shadowOffset/width"], 2)
+        self.assertEqual(result["properties"]["text/outputSize/height"], 120)
+        self.assertEqual(result["properties"]["cueSize"], [320, 120])
+
+    def test_exhaustive_audio_details_include_playback_maps_and_patch_fields(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "type": "Audio",
+                "audioMap": {"name": "Main Map"},
+                "audioMap/filters": [{"name": "EQ"}],
+                "audioMap/marks": [{"time": 1.2}],
+                "audioMap/objects": [{"name": "Object 1"}],
+                "audioMap/uniqueID": "map-id",
+                "audioMap/size/width": 2,
+                "audioMap/size/height": 2,
+                "audioOutputPatch": {"name": "Main"},
+                "audioOutputPatch/cueOutputChannels": [1, 2],
+                "audioOutputPatch/muteChannels": [],
+                "audioOutputPatch/routing": [{"in": 1, "out": 1}],
+                "levels": [[0, 0]],
+                "muteChannels": [2],
+                "muteObjects": ["Object 1"],
+                "numChannelsIn": 2,
+                "objectLevels": {"Object 1": 0},
+                "objects": [{"name": "Object 1"}],
+                "sliderLevels": [0, 0],
+                "sliceMarkers": [{"time": 0}],
+                "soloChannels": [1],
+                "soloObjects": ["Object 1"],
+                "rate": 1.25,
+                "startTime": 0.5,
+                "endTime": 12,
+                "playCount": 3,
+                "infiniteLoop": False,
+                "preservePitch": True,
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "exhaustive")
+
+        self.assertEqual(result["properties"]["audioMap/objects"], [{"name": "Object 1"}])
+        self.assertEqual(result["properties"]["audioOutputPatch/routing"], [{"in": 1, "out": 1}])
+        self.assertEqual(result["properties"]["levels"], [[0, 0]])
+        self.assertEqual(result["properties"]["sliceMarkers"], [{"time": 0}])
+        self.assertEqual(result["properties"]["rate"], 1.25)
+
+    def test_exhaustive_light_details_include_command_parameter_fields(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "type": "Light",
+                "lightCommandText": "1 thru 5 @ 80",
+                "parameterValues": {"intensity": 80},
+                "parameterFadesEnabled": {"intensity": True},
+                "alwaysCollate": True,
+                "subcontroller": "eos",
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "exhaustive")
+
+        self.assertEqual(result["properties"]["lightCommandText"], "1 thru 5 @ 80")
+        self.assertEqual(result["properties"]["parameterValues"], {"intensity": 80})
+        self.assertTrue(result["properties"]["alwaysCollate"])
+
+    def test_exhaustive_script_details_can_return_script_fields(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "type": "Script",
+                "scriptSource": "display dialog \"secret\"",
+                "scriptText": "display dialog \"secret\"",
+                "notes": "operator note",
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "exhaustive")
+
+        self.assertEqual(result["properties"]["scriptSource"], "display dialog \"secret\"")
+        self.assertEqual(result["properties"]["scriptText"], "display dialog \"secret\"")
+        self.assertEqual(result["properties"]["notes"], "operator note")
+        self.assertIn("scripts", result["warnings"][0])
+
+    def test_exhaustive_group_details_do_not_expand_children(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "type": "Group",
+                "mode": 3,
+                "playbackPositionID": "child-id",
+                "playlist/doLoop": True,
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "exhaustive")
+
+        self.assertEqual(result["properties"]["mode"], 3)
+        self.assertEqual(result["properties"]["playbackPositionID"], "child-id")
+        self.assertTrue(all("/children" not in address for address in server.received))
+
+    def test_batch_exhaustive_emits_size_and_sensitivity_warning(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {"uniqueID": "cue-10", "type": "Audio"},
+            "/workspace/ws-1/cue/11/valuesForKeys": {"uniqueID": "cue-11", "type": "Video"},
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", ["10", "11"], "exhaustive")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["succeeded_count"], 2)
+        self.assertEqual(len(result["results"]), 2)
+        self.assertTrue(any("large, sensitive" in warning for warning in result["warnings"]))
+        self.assertTrue(any("Batch exhaustive" in warning for warning in result["warnings"]))
+        self.assertTrue(all(item["warnings"] for item in result["results"]))
 
     def test_editable_profile_returns_update_capabilities_for_audio(self) -> None:
         responses = {

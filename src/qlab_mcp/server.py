@@ -34,7 +34,7 @@ from .models import (
 from .qlab import QLabReader
 
 
-CueProfile = Literal[
+CueQueryProfile = Literal[
     "auto",
     "basic_safe",
     "basic",
@@ -45,9 +45,27 @@ CueProfile = Literal[
     "targets",
     "group",
     "type_specific",
+    "inspector_safe",
     "editable",
     "full",
     "full_sensitive",
+]
+CueDetailsProfile = Literal[
+    "auto",
+    "basic_safe",
+    "basic",
+    "technical",
+    "health",
+    "timing",
+    "status",
+    "targets",
+    "group",
+    "type_specific",
+    "inspector_safe",
+    "editable",
+    "full",
+    "full_sensitive",
+    "exhaustive",
 ]
 CueIndexProfile = Literal["minimal", "health"]
 CueQueryFilter = Literal[
@@ -123,8 +141,8 @@ CueRefs = Annotated[
     list[CueRef],
     Field(
         min_length=1,
-        max_length=50,
         description="List of cue numbers, cue unique IDs, selected, playhead, playbackPosition, or active. Maximum 50.",
+        json_schema_extra={"maxItems": 50},
     ),
 ]
 READ_ONLY_QLAB_TOOL = ToolAnnotations(
@@ -490,7 +508,7 @@ def qlab_query_cues(
         ),
     ] = None,
     profile: Annotated[
-        CueProfile,
+        CueQueryProfile,
         Field(
             description=(
                 "Read-only data profile to return for matching cues. Default basic_safe gives compact identity/status; "
@@ -548,21 +566,25 @@ def qlab_get_cue_details(
     workspace_id: WorkspaceId,
     cue_ref: CueRef | CueRefs,
     profile: Annotated[
-        CueProfile,
+        CueDetailsProfile,
         Field(
             description=(
                 "Read-only detail profile. Use auto for safe type-aware sections, health for warnings/broken cues, "
+                "inspector_safe for broader QLab Inspector-style details without file paths or scripts, "
                 "targets for target IDs without file paths, technical for notes/targets/routing/paths, "
                 "editable for safe details plus qlab_update_cues profile/property capabilities, "
-                "and full_sensitive only for deep audits."
+                "full_sensitive for deep audits, and exhaustive for the deepest allowlisted read-only read "
+                "including heavy/sensitive payloads; exhaustive may be large."
             )
         ),
     ] = "auto",
 ) -> CueDetailsResult | CueDetailsBatchResult:
     """Return read-only details for one cue, or a batch of up to 50 cues, using QLab valuesForKeys when possible.
 
-    Use auto for safe type-aware inspection, editable for update capability discovery,
-    health for warnings, and technical/full_sensitive only when justified.
+    Use auto for safe type-aware inspection, inspector_safe for broader non-sensitive Inspector context,
+    editable for update capability discovery,
+    health for warnings, technical/full_sensitive only when justified, and exhaustive only for deep audits
+    or load testing because it can expose large/sensitive payloads.
     """
     return _run_tool(
         lambda: (

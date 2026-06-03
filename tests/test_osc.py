@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 import sys
 import unittest
+from unittest.mock import Mock, patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from qlab_mcp.config import QLabConfig
 from qlab_mcp.osc.client import QLabOscClient, _slip_decode, _slip_encode
 from qlab_mcp.errors import OscProtocolError
 from qlab_mcp.osc import decode_message, encode_message
@@ -68,6 +71,56 @@ class OscMessageTests(unittest.TestCase):
         self.assertEqual(framed[0], 0xC0)
         self.assertEqual(framed[-1], 0xC0)
         self.assertEqual(_slip_decode(framed[1:-1]), packet)
+
+    def test_udp_connect_cache_does_not_suppress_tcp_connect(self) -> None:
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, reply_port=0, timeout=0.05, passcode="secret")
+        )
+        client._remember_connected_workspace("ws-1", "udp")
+        sent: list[tuple[str, tuple[object, ...]]] = []
+
+        def fake_send(sock: object, address: str, *args: object) -> object:
+            sent.append((address, args))
+            return SimpleNamespace(status="ok", data="ok")
+
+        fake_sock = Mock()
+        fake_sock.__enter__ = Mock(return_value=fake_sock)
+        fake_sock.__exit__ = Mock(return_value=False)
+
+        with patch("socket.create_connection", return_value=fake_sock):
+            with patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=fake_send):
+                reply = client.request_tcp("/workspace/ws-1/settings/light/patch", workspace_id="ws-1")
+
+        self.assertEqual(reply.data, "ok")
+        self.assertEqual(
+            sent,
+            [
+                ("/workspace/ws-1/connect", ("secret",)),
+                ("/workspace/ws-1/settings/light/patch", ()),
+            ],
+        )
+
+    def test_tcp_request_connects_each_new_socket(self) -> None:
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, reply_port=0, timeout=0.05, passcode="secret")
+        )
+        sent: list[str] = []
+
+        def fake_send(sock: object, address: str, *args: object) -> object:
+            sent.append(address)
+            return SimpleNamespace(status="ok", data="ok")
+
+        fake_sock = Mock()
+        fake_sock.__enter__ = Mock(return_value=fake_sock)
+        fake_sock.__exit__ = Mock(return_value=False)
+
+        with patch("socket.create_connection", return_value=fake_sock):
+            with patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=fake_send):
+                client.request_tcp("/workspace/ws-1/settings/light/patch", workspace_id="ws-1")
+                client.request_tcp("/workspace/ws-1/settings/light/patch", workspace_id="ws-1")
+
+        self.assertEqual(sent.count("/workspace/ws-1/connect"), 2)
+        self.assertEqual(sent.count("/workspace/ws-1/settings/light/patch"), 2)
 
 
 if __name__ == "__main__":

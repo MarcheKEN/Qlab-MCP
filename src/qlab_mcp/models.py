@@ -108,14 +108,23 @@ class WorkspaceOverviewResult(BaseModel):
 
 
 class WorkspaceSettingsResult(BaseModel):
-    """Read-only infrastructure/settings inventory for a QLab workspace."""
+    """Read-only workspace settings summary or batched detail result."""
 
     workspace_id: str
+    mode: str = "summary"
     profile: str
-    sections: dict[str, Any]
-    summary: dict[str, Any]
+    requested_profile: str | None = None
+    sections: dict[str, Any] = Field(default_factory=dict)
+    summary: dict[str, Any] = Field(default_factory=dict)
+    available_detail_requests: list[dict[str, Any]] = Field(default_factory=list)
+    ok: bool | None = None
+    requested_count: int | None = None
+    succeeded_count: int | None = None
+    failed_count: int | None = None
+    results: list[dict[str, Any]] = Field(default_factory=list)
     redactions: list[dict[str, str]] = Field(default_factory=list)
     errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class WorkspaceSettingDetailsResult(BaseModel):
@@ -130,7 +139,27 @@ class WorkspaceSettingDetailsResult(BaseModel):
     choices: list[dict[str, Any]] = Field(default_factory=list)
     redactions: list[dict[str, str]] = Field(default_factory=list)
     errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
     message: str | None = None
+
+
+class WorkspaceSettingRequestInput(BaseModel):
+    """One workspace settings detail request for qlab_get_workspace_settings(mode='details')."""
+
+    section: str = Field(
+        description="Workspace settings section: audio, video, network, midi, light, or general."
+    )
+    kind: str | None = Field(
+        default=None,
+        description=(
+            "Detail kind. Use all, output_patch, input_patch, audio_map, route, stage, "
+            "video_input_patch, network_patch, midi_patch, or light_patch."
+        ),
+    )
+    ref: str | None = Field(
+        default=None,
+        description="Optional item name or uniqueID. Omit only when one item exists or choices are desired.",
+    )
 
 
 class CueQueryResult(BaseModel):

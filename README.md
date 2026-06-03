@@ -18,10 +18,10 @@ Use the tools in this order:
 
 1. `qlab_check_connection`
 2. `qlab_get_workspace_overview`
-3. `qlab_get_workspace_settings`
+3. `qlab_get_workspace_settings(mode="summary")`
 4. `qlab_query_cues`
 5. `qlab_get_cue_details`
-6. `qlab_get_workspace_setting_details`
+6. `qlab_get_workspace_settings(mode="details")`
 
 The core idea is simple: start broad and compact, then ask for details only
 when you know exactly what needs inspection.
@@ -54,8 +54,8 @@ clear documentation or reference location, not at the package root.
 | --- | --- | --- |
 | `qlab_check_connection` | Confirm QLab is reachable, pick a workspace, verify safe read access, and report Edit/Show mode. | Small diagnostic result |
 | `qlab_get_workspace_overview` | Get the show map, Edit/Show mode, cue lists, groups, cue counts, and optional cue index. | Bounded tree plus compact index |
-| `qlab_get_workspace_settings` | Inventory patches, routes, stages, MIDI, network, light availability, and general settings. | Safe infrastructure summary |
-| `qlab_get_workspace_setting_details` | Inspect one patch, route, stage, map, MIDI/network item, or light patch. | `safe` profile |
+| `qlab_get_workspace_settings` | Summary inventory, available detail requests, or batched setting details. | `summary` mode |
+| `qlab_get_workspace_setting_details` | Backwards-compatible wrapper for one setting detail request. | `safe` profile |
 | `qlab_query_cues` | Search cues by type, state, color, name, number prefix, targets, timing, or health. | Up to 500 scanned/returned cues |
 | `qlab_get_cue_details` | Inspect one cue after finding it in overview or query results. | `auto` profile |
 | `qlab_check_write_readiness` | Check disabled-by-default write-mode readiness without mutation. | Safety/readiness report |
@@ -70,8 +70,8 @@ at once.
 - Overview gives a bounded tree and a compact cue index.
 - When cue_index is enabled, overview also derives editorial health from that
   index: empty labels, duplicate names/numbers, and ambiguous placeholders.
-- Settings gives infrastructure summaries without heavy raw payloads.
-- Details tools go deeper only when the caller asks for a specific cue or setting.
+- Settings summary gives infrastructure summaries plus `available_detail_requests` without heavy raw payloads.
+- Settings details goes deeper only when the caller asks for specific setting requests.
 - `technical` and `full_sensitive` are explicit audit modes, not normal defaults.
 
 For large shows, `qlab_query_cues` keeps `max_results=500` and
@@ -120,6 +120,10 @@ credentials, and similar details.
 `technical` is for deliberate technical audits. It can reveal IP addresses,
 ports, interfaces, screens, devices, routes, raw regions, mesh/warp data,
 audio-map levels, light patch payloads, and routing payloads.
+
+For workspace settings, `exhaustive` is the deepest allowlisted read-only
+settings profile. It may return large payloads and always includes warnings.
+Passcodes and credentials remain redacted.
 
 `full_sensitive` is deeper still. It can expose cue notes, local media paths,
 scripts, and heavy stage payloads. Use it only when that exposure is intentional.
@@ -200,13 +204,35 @@ Write mode is deliberately gated:
 ```text
 qlab_check_connection(workspace_id=None, require_read_access=True)
 qlab_get_workspace_overview(workspace_id=None, max_depth=2, max_cues=1000, include_live_state=False, include_cue_index=True, max_index_cues=5000, cue_index_profile="minimal", include_global_count=False)
-qlab_get_workspace_settings(workspace_id, sections=None)
-qlab_get_workspace_setting_details(workspace_id, section, kind=None, ref=None, profile="safe")
+qlab_get_workspace_settings(workspace_id, mode="summary", sections=None, requests=None, profile="safe")
+qlab_get_workspace_setting_details(workspace_id, section, kind=None, ref=None, profile="safe")  # compatibility wrapper
 qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=None, profile="basic_safe", max_results=500, max_cues_scanned=500)
 qlab_get_cue_details(workspace_id, cue_ref, profile="auto")  # profile also supports "editable"
 qlab_check_write_readiness(workspace_id)
 qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
 qlab_update_cues(workspace_id, updates, dry_run=None)
+```
+
+`qlab_get_workspace_settings(mode="summary")` returns `available_detail_requests`
+such as:
+
+```json
+[
+  {"section": "audio", "kind": "output_patch", "ref": "Main"},
+  {"section": "video", "kind": "stage", "ref": "TELON"},
+  {"section": "light", "kind": "light_patch", "ref": null}
+]
+```
+
+`qlab_get_workspace_settings(mode="details")` accepts one or more requests and
+returns a batch result. A failed request returns its own error or choices and
+does not block other valid requests.
+
+```json
+[
+  {"section": "network", "kind": "network_patch", "ref": "EOS"},
+  {"section": "video", "kind": "route", "ref": "Projector"}
+]
 ```
 
 `qlab_update_cues` update items use this shape:
@@ -331,14 +357,14 @@ server environment for each deliberate run.
 5. Call `qlab_check_connection`.
 6. If several workspaces are open, pass a `workspace_id` from `available_workspaces`.
 7. Call `qlab_get_workspace_overview`.
-8. Call `qlab_get_workspace_settings`.
+8. Call `qlab_get_workspace_settings(mode="summary")`.
 9. Use `qlab_query_cues` to find candidate cues.
-10. Use `qlab_get_cue_details` or `qlab_get_workspace_setting_details` for focused inspection.
+10. Use `qlab_get_cue_details` or `qlab_get_workspace_settings(mode="details")` for focused inspection.
 
 For large lighting workspaces, also check:
 
 ```text
-qlab_get_workspace_setting_details(section="light", kind="light_patch")
+qlab_get_workspace_settings(mode="details", requests=[{"section":"light", "kind":"light_patch"}])
 ```
 
 The expected safe result should summarize the light patch. If the UDP reply is

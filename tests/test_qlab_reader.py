@@ -1601,6 +1601,20 @@ class QLabReaderTests(unittest.TestCase):
         self.assertNotIn("SECRET-HANDLE", serialized)
         self.assertNotIn("1234", serialized)
         self.assertTrue(all("impact" in redaction for redaction in result["redactions"]))
+        self.assertIn(
+            {"section": "network", "kind": "network_patch", "ref": "EOS", "name": "EOS", "uniqueID": "network-1"},
+            result["available_detail_requests"],
+        )
+        self.assertIn(
+            {
+                "section": "video",
+                "kind": "stage",
+                "ref": "Main Stage",
+                "name": "Main Stage",
+                "uniqueID": "stage-1",
+            },
+            result["available_detail_requests"],
+        )
         self.assertEqual(
             server.received,
             [
@@ -1660,6 +1674,8 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["sections"]["light"]["summary"]["patch_read"], "skipped")
         self.assertIsNone(result["errors"])
         self.assertEqual(result["summary"]["error_count"], 0)
+        self.assertIn({"section": "light", "kind": "light_patch", "ref": None}, result["available_detail_requests"])
+        self.assertIn({"section": "general", "kind": "all", "ref": None}, result["available_detail_requests"])
         self.assertEqual(
             server.received,
             [
@@ -1962,6 +1978,217 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIn("Multiple settings items", result["message"])
         self.assertEqual(server.received, ["/workspace/ws-1/settings/network/patchList"])
 
+    def test_workspace_settings_summary_lists_all_detail_request_kinds(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/audio/patchList": [{"name": "Main", "uniqueID": "audio-out-1"}],
+            "/workspace/ws-1/settings/mic/patchList": [{"name": "Mic", "uniqueID": "audio-in-1"}],
+            "/workspace/ws-1/settings/audio/cueOutputChannelCounts": {},
+            "/workspace/ws-1/settings/audio/outputChannelNames": {},
+            "/workspace/ws-1/settings/audio/maps": [{"name": "Map", "uniqueID": "map-1"}],
+            "/workspace/ws-1/settings/video/inputPatchList": [{"name": "Camera", "uniqueID": "video-in-1"}],
+            "/workspace/ws-1/settings/video/routes": [{"name": "Projector", "uniqueID": "route-1"}],
+            "/workspace/ws-1/settings/video/stages": [{"name": "TELON", "uniqueID": "stage-1"}],
+            "/workspace/ws-1/settings/video/stageID/stage-1/regions": [],
+            "/workspace/ws-1/settings/network/patchList": [{"name": "OSC", "uniqueID": "network-1"}],
+            "/workspace/ws-1/settings/midi/patchList": [{"name": "MIDI", "uniqueID": "midi-1"}],
+            "/workspace/ws-1/settings/general/minGoTime": 0.4,
+            "/workspace/ws-1/settings/general/selectionIsPlayhead": True,
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_settings("ws-1")
+
+        request_keys = {
+            (request["section"], request["kind"], request["ref"])
+            for request in result["available_detail_requests"]
+        }
+        self.assertEqual(result["mode"], "summary")
+        self.assertIn(("audio", "output_patch", "Main"), request_keys)
+        self.assertIn(("audio", "input_patch", "Mic"), request_keys)
+        self.assertIn(("audio", "audio_map", "Map"), request_keys)
+        self.assertIn(("video", "video_input_patch", "Camera"), request_keys)
+        self.assertIn(("video", "route", "Projector"), request_keys)
+        self.assertIn(("video", "stage", "TELON"), request_keys)
+        self.assertIn(("network", "network_patch", "OSC"), request_keys)
+        self.assertIn(("midi", "midi_patch", "MIDI"), request_keys)
+        self.assertIn(("light", "light_patch", None), request_keys)
+        self.assertIn(("general", "all", None), request_keys)
+
+    def test_workspace_settings_details_mode_single_request(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/network/patchList": [
+                {"name": "QLab Loopback", "uniqueID": "network-1", "destinations": [{"ipAddress": "127.0.0.1"}]}
+            ],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_settings(
+                "ws-1",
+                mode="details",
+                requests=[{"section": "network", "kind": "network_patch", "ref": "QLab Loopback"}],
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["requested_count"], 1)
+        self.assertEqual(result["succeeded_count"], 1)
+        self.assertEqual(result["failed_count"], 0)
+        self.assertEqual(result["results"][0]["section"], "network")
+        self.assertEqual(result["results"][0]["kind"], "network_patch")
+        self.assertTrue(result["results"][0]["details"]["destination_present"])
+        self.assertEqual(server.received, ["/workspace/ws-1/settings/network/patchList"])
+
+    def test_workspace_settings_details_mode_batch_mixed_requests(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/audio/patchList": [{"name": "Main", "uniqueID": "audio-1"}],
+            "/workspace/ws-1/settings/video/stages": [{"name": "TELON", "uniqueID": "stage-1"}],
+            "/workspace/ws-1/settings/video/stageID/stage-1/regions": [{"name": "A", "uniqueID": "region-1"}],
+            "/workspace/ws-1/settings/light/patch": {"instruments": [{"name": "1"}], "groups": []},
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_settings(
+                "ws-1",
+                mode="details",
+                requests=[
+                    {"section": "audio", "kind": "output_patch", "ref": "Main"},
+                    {"section": "video", "kind": "stage", "ref": "TELON"},
+                    {"section": "light", "kind": "light_patch"},
+                ],
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["requested_count"], 3)
+        self.assertEqual(result["succeeded_count"], 3)
+        self.assertEqual([item["kind"] for item in result["results"]], ["output_patch", "stage", "light_patch"])
+        self.assertEqual(result["results"][1]["details"]["regions"][0]["uniqueID"], "region-1")
+        self.assertEqual(result["results"][2]["details"]["summary"]["instrument_count"], 1)
+        self.assertEqual(
+            server.received,
+            [
+                "/workspace/ws-1/settings/audio/patchList",
+                "/workspace/ws-1/settings/video/stages",
+                "/workspace/ws-1/settings/video/stageID/stage-1/regions",
+                "/workspace/ws-1/settings/light/patch",
+            ],
+        )
+
+    def test_workspace_settings_details_mode_preserves_choices_for_omitted_ref(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/network/patchList": [
+                {"name": "OSC A", "uniqueID": "network-1"},
+                {"name": "OSC B", "uniqueID": "network-2"},
+            ],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_settings(
+                "ws-1",
+                mode="details",
+                requests=[{"section": "network", "kind": "network_patch"}],
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["requested_count"], 1)
+        self.assertEqual(result["failed_count"], 1)
+        self.assertIsNone(result["results"][0]["details"])
+        self.assertEqual(len(result["results"][0]["choices"]), 2)
+        self.assertIn("Multiple settings items", result["results"][0]["message"])
+        self.assertEqual(server.received, ["/workspace/ws-1/settings/network/patchList"])
+
+    def test_workspace_settings_details_mode_valid_and_invalid_requests_partial_success(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/network/patchList": [
+                {"name": "OSC", "uniqueID": "network-1", "destinations": [{"ipAddress": "127.0.0.1"}]}
+            ],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_settings(
+                "ws-1",
+                mode="details",
+                requests=[
+                    {"section": "network", "kind": "network_patch", "ref": "OSC"},
+                    {"section": "audio", "kind": "network_patch", "ref": "bad"},
+                ],
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["requested_count"], 2)
+        self.assertEqual(result["succeeded_count"], 1)
+        self.assertEqual(result["failed_count"], 1)
+        self.assertTrue(result["results"][0]["ok"])
+        self.assertFalse(result["results"][1]["ok"])
+        self.assertIn("Audio details support", result["errors"]["request_1"])
+        self.assertEqual(server.received, ["/workspace/ws-1/settings/network/patchList"])
+
+    def test_workspace_settings_details_mode_exhaustive_warns_and_redacts_credentials(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/network/patchList": [
+                {
+                    "name": "OSC",
+                    "uniqueID": "network-1",
+                    "destinations": [{"ipAddress": "127.0.0.1", "port": 53000, "passcode": "secret"}],
+                }
+            ],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_settings(
+                "ws-1",
+                mode="details",
+                profile="exhaustive",
+                requests=[{"section": "network", "kind": "network_patch", "ref": "OSC"}],
+            )
+
+        serialized = json.dumps(result)
+        self.assertTrue(result["ok"])
+        self.assertIn("deepest allowlisted", result["warnings"][0])
+        self.assertIn("127.0.0.1", serialized)
+        self.assertIn("53000", serialized)
+        self.assertNotIn("secret", serialized)
+        self.assertEqual(result["results"][0]["details"]["destinations"][0]["passcode"], "[redacted]")
+        self.assertEqual(result["results"][0]["redactions"][0]["reason"], "credential")
+        self.assertEqual(server.received, ["/workspace/ws-1/settings/network/patchList"])
+
+    def test_workspace_setting_details_technical_audio_map_uses_focused_map_id_read(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/audio/maps": [
+                {"name": "Stereo", "uniqueID": "map-1", "width": 1000, "height": 1000}
+            ],
+            "/workspace/ws-1/settings/audio/mapID/map-1": {
+                "name": "Stereo",
+                "uniqueID": "map-1",
+                "width": 1000,
+                "height": 1000,
+                "marks": [{"name": "Left", "levels": [0, -60]}],
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_setting_details(
+                "ws-1",
+                section="audio",
+                kind="audio_map",
+                ref="Stereo",
+                profile="technical",
+            )
+
+        self.assertEqual(result["details"]["marks"][0]["levels"], [0, -60])
+        self.assertEqual(
+            server.received,
+            [
+                "/workspace/ws-1/settings/audio/maps",
+                "/workspace/ws-1/settings/audio/mapID/map-1",
+            ],
+        )
+
     def test_workspace_setting_details_light_patch_records_error(self) -> None:
         responses = {
             "/workspace/ws-1/settings/light/patch": {"status": "error", "data": "light patch unavailable"},
@@ -2005,6 +2232,62 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["details"]["summary"]["instrument_count"], 1)
         self.assertEqual(result["details"]["summary"]["read_transport"], "tcp_fallback")
         self.assertIn("does not imply output failure", result["details"]["summary"]["read_transport_meaning"])
+
+    def test_workspace_setting_details_light_patch_tcp_denied_returns_clear_error_without_secret(self) -> None:
+        secret = "server-passcode"
+
+        class DeniedFallbackClient:
+            config = QLabConfig(passcode=secret)
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                raise OscTimeoutError("udp too small")
+
+            def request_tcp(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                raise QLabReplyError("denied", "not connected", address.lstrip("/"))
+
+        reader = QLabReader(DeniedFallbackClient())  # type: ignore[arg-type]
+
+        result = reader.get_workspace_setting_details("ws-1", section="light", kind="light_patch")
+
+        serialized = json.dumps(result)
+        self.assertIn("light.patch", result["errors"])
+        self.assertIn("TCP fallback also failed", result["errors"]["light.patch"])
+        self.assertEqual(result["details"]["summary"]["patch_present"], False)
+        self.assertNotIn(secret, serialized)
+
+    def test_workspace_settings_details_batch_keeps_successes_when_light_tcp_fallback_denied(self) -> None:
+        class MixedFallbackClient:
+            config = QLabConfig(passcode="server-passcode")
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                if address == "/workspace/ws-1/settings/network/patchList":
+                    return SimpleNamespace(data=[{"name": "OSC", "uniqueID": "network-1"}])
+                if address == "/workspace/ws-1/settings/light/patch":
+                    raise OscTimeoutError("udp too small")
+                raise AssertionError(address)
+
+            def request_tcp(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                raise QLabReplyError("denied", "not connected", address.lstrip("/"))
+
+        reader = QLabReader(MixedFallbackClient())  # type: ignore[arg-type]
+
+        result = reader.get_workspace_settings(
+            "ws-1",
+            mode="details",
+            requests=[
+                {"section": "network", "kind": "network_patch", "ref": "OSC"},
+                {"section": "light", "kind": "light_patch"},
+            ],
+        )
+
+        serialized = json.dumps(result)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["succeeded_count"], 1)
+        self.assertEqual(result["failed_count"], 1)
+        self.assertTrue(result["results"][0]["ok"])
+        self.assertFalse(result["results"][1]["ok"])
+        self.assertIn("Workspace setting detail request failed", result["errors"]["request_1"])
+        self.assertNotIn("server-passcode", serialized)
 
     def test_workspace_setting_details_light_patch_tcp_fallback_handles_large_payload(self) -> None:
         class FallbackClient:

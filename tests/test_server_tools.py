@@ -95,12 +95,22 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "Workspace Settings" in settings.description
     assert settings.annotations.readOnlyHint is True
     assert settings.annotations.destructiveHint is False
-    assert "profile" not in settings.inputSchema["properties"]
+    assert settings.inputSchema["properties"]["mode"]["default"] == "summary"
+    assert settings.inputSchema["properties"]["mode"]["enum"] == ["summary", "details"]
+    assert settings.inputSchema["properties"]["profile"]["default"] == "safe"
+    assert settings.inputSchema["properties"]["profile"]["enum"] == ["safe", "technical", "exhaustive"]
+    assert "requests" in settings.inputSchema["properties"]
+    assert "available_detail_requests" in settings.outputSchema["properties"]
+    assert "succeeded_count" in settings.outputSchema["properties"]
+    assert "failed_count" in settings.outputSchema["properties"]
+    assert "summary" in settings.description
+    assert "one failed request does not block" in settings.description
 
     setting_details = tools["qlab_get_workspace_setting_details"]
     assert setting_details.title == "Get QLab Workspace Setting Details"
-    assert "default safe profile" in setting_details.description
+    assert "Backwards-compatible wrapper" in setting_details.description
     assert setting_details.inputSchema["properties"]["profile"]["default"] == "safe"
+    assert "exhaustive" in setting_details.inputSchema["properties"]["profile"]["enum"]
     assert setting_details.annotations.readOnlyHint is True
     assert setting_details.annotations.destructiveHint is False
 

@@ -25,6 +25,7 @@ from .models import (
     CueUpdateInput,
     CueQueryResult,
     QlabConnectionCheckResult,
+    WorkspaceSettingRequestInput,
     UpdateCuesResult,
     WriteReadinessResult,
     WorkspaceSettingDetailsResult,
@@ -100,7 +101,8 @@ CueQueryFilter = Literal[
     "flagged_or_broken",
 ]
 WorkspaceSettingsSection = Literal["audio", "video", "network", "midi", "light", "general"]
-WorkspaceSettingsProfile = Literal["safe", "technical"]
+WorkspaceSettingsMode = Literal["summary", "details"]
+WorkspaceSettingsProfile = Literal["safe", "technical", "exhaustive"]
 WorkspaceSettingDetailKind = Literal[
     "all",
     "output_patch",
@@ -159,7 +161,7 @@ GATED_CREATE_QLAB_TOOL = ToolAnnotations(
 )
 CHECK_CONNECTION_TIMEOUT = 6.0
 WORKSPACE_OVERVIEW_TIMEOUT = 45.0
-WORKSPACE_SETTINGS_TIMEOUT = 30.0
+WORKSPACE_SETTINGS_TIMEOUT = 60.0
 WORKSPACE_SETTING_DETAILS_TIMEOUT = 60.0
 QUERY_CUES_TIMEOUT = 60.0
 CUE_DETAILS_TIMEOUT = 20.0
@@ -186,9 +188,9 @@ Start with qlab_check_connection to verify QLab, workspace candidates, passcode,
 
 Then use qlab_get_workspace_overview for a bounded show map.
 
-Use qlab_get_workspace_settings when you need compact infrastructure/settings inventory such as patches, stages, routes, MIDI, network, or light availability. It is the default settings map and avoids heavy light-patch dumps.
+Use qlab_get_workspace_settings(mode="summary") when you need compact infrastructure/settings inventory such as patches, stages, routes, MIDI, network, or light availability. It returns available_detail_requests and avoids heavy light-patch dumps.
 
-Use qlab_get_workspace_setting_details after settings when you need one specific patch, stage, route, map, or light patch. Use profile="safe" first for compact normalized details; use profile="technical" only when raw routing/device diagnostics are justified.
+Use qlab_get_workspace_settings(mode="details", requests=[...]) after settings when you need one or more specific patches, stages, routes, maps, MIDI/network items, or the light patch. Use profile="safe" first for compact normalized details; use profile="technical" or profile="exhaustive" only when raw routing/device diagnostics are justified. qlab_get_workspace_setting_details remains as a single-request compatibility wrapper.
 
 Use qlab_query_cues for filtered cue searches across up to 500 cues by default, or up to 5000 cues when a caller explicitly raises the scan limit, then qlab_get_cue_details for one cue that needs deeper inspection.
 
@@ -380,28 +382,62 @@ def qlab_get_workspace_overview(
 )
 def qlab_get_workspace_settings(
     workspace_id: WorkspaceId,
+    mode: Annotated[
+        WorkspaceSettingsMode,
+        Field(
+            description=(
+                "summary returns compact inventory plus available_detail_requests. "
+                "details runs one or more focused detail requests and returns a batch result."
+            ),
+        ),
+    ] = "summary",
     sections: Annotated[
         list[WorkspaceSettingsSection] | None,
         Field(
             description=(
-                "Workspace settings sections to inspect. Use audio, video, network, midi, light, and/or general. "
-                "When omitted, all sections are read."
+                "Summary mode sections to inspect. Use audio, video, network, midi, light, and/or general. "
+                "When omitted in summary mode, all sections are read. Ignored in details mode."
             ),
         ),
     ] = None,
+    requests: Annotated[
+        list[WorkspaceSettingRequestInput] | None,
+        Field(
+            description=(
+                "Details mode requests. Each item has section, kind, and optional ref. "
+                "Examples: {'section':'audio','kind':'output_patch','ref':'Main'}, "
+                "{'section':'video','kind':'stage','ref':'TELON'}, or "
+                "{'section':'light','kind':'light_patch'}."
+            ),
+        ),
+    ] = None,
+    profile: Annotated[
+        WorkspaceSettingsProfile,
+        Field(
+            description=(
+                "Read-only profile for details mode. safe returns compact redacted summaries; technical can include "
+                "routing, regions, interfaces, IPs/ports, device data, and raw payloads when needed; exhaustive returns "
+                "the deepest allowlisted read-only data and may be large. Summary mode stays compact."
+            ),
+        ),
+    ] = "safe",
 ) -> WorkspaceSettingsResult:
-    """Return compact read-only QLab Workspace Settings infrastructure inventory.
+    """Return read-only QLab Workspace Settings summary or batched details.
 
-    Use this after the overview when an agent needs audio patches/maps, video stages/routes, network patches,
-    MIDI patches, light availability, or general workspace settings. This is the default settings map:
-    it returns names, IDs, counts, relationships, connection state, and redaction metadata, but it does not
-    read the full light patch or raw hardware payloads.
+    Summary mode is the first settings read after the overview: it returns compact sections, counts, redactions,
+    errors, and available_detail_requests. Details mode accepts one or more requests and returns independent
+    per-request results; one failed request does not block other valid requests.
     """
     return _run_tool(
         lambda: WorkspaceSettingsResult.model_validate(
             _reader().get_workspace_settings(
                 workspace_id=workspace_id,
+                mode=mode,
                 sections=sections,
+                requests=[request.model_dump() if hasattr(request, "model_dump") else request for request in requests]
+                if requests is not None
+                else None,
+                profile=profile,
             )
         )
     )
@@ -451,10 +487,9 @@ def qlab_get_workspace_setting_details(
 ) -> WorkspaceSettingDetailsResult:
     """Return read-only details for one workspace setting item.
 
-    Use this after qlab_get_workspace_settings when a specific patch, stage, route, map, or light patch needs
-    deeper inspection. The default safe profile summarizes large structures: light patches become instrument
-    indexes, video stages become stage/region/route summaries, and audio maps omit long level arrays. Use
-    technical only for explicit low-level audits.
+    Backwards-compatible wrapper around qlab_get_workspace_settings(mode="details"). The default safe profile
+    summarizes large structures: light patches become instrument indexes, video stages become stage/region/route
+    summaries, and audio maps omit long level arrays. Use technical or exhaustive only for explicit low-level audits.
     """
     return _run_tool(
         lambda: WorkspaceSettingDetailsResult.model_validate(

@@ -89,7 +89,7 @@ class QLabOscClient:
     def __init__(self, config: QLabConfig | None = None):
         self.config = config or QLabConfig.from_env()
         self._lock = self._get_lock(self.config)
-        self._connected_workspaces: set[str] = set()
+        self._connected_workspaces: set[tuple[str, str]] = set()
 
     @classmethod
     def _get_lock(cls, config: QLabConfig) -> threading.Lock:
@@ -103,15 +103,15 @@ class QLabOscClient:
         with self._lock:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                 sock.bind(("", self.config.reply_port))
-                if workspace_id and self.config.passcode and not self._workspace_is_connected(workspace_id):
+                if workspace_id and self.config.passcode and not self._workspace_is_connected(workspace_id, "udp"):
                     self._send_with_reply_on_socket(
                         sock,
                         f"/workspace/{workspace_id}/connect",
                         self.config.passcode,
                     )
-                    self._remember_connected_workspace(workspace_id)
+                    self._remember_connected_workspace(workspace_id, "udp")
                 reply = self._send_with_reply_on_socket(sock, address, *args)
-                self._remember_connect_reply(address, reply)
+                self._remember_connect_reply(address, reply, "udp")
                 return reply
 
     def request_tcp(self, address: str, *args: Any, workspace_id: str | None = None) -> QLabReply:
@@ -120,15 +120,15 @@ class QLabOscClient:
             timeout=self.config.timeout,
         ) as sock:
             sock.settimeout(self.config.timeout)
-            if workspace_id and self.config.passcode and not self._workspace_is_connected(workspace_id):
+            if workspace_id and self.config.passcode:
                 self._send_with_reply_on_tcp_socket(
                     sock,
                     f"/workspace/{workspace_id}/connect",
                     self.config.passcode,
                 )
-                self._remember_connected_workspace(workspace_id)
+                self._remember_connected_workspace(workspace_id, "tcp")
             reply = self._send_with_reply_on_tcp_socket(sock, address, *args)
-            self._remember_connect_reply(address, reply)
+            self._remember_connect_reply(address, reply, "tcp")
             return reply
 
     def _send_with_reply(self, address: str, *args: Any) -> QLabReply:
@@ -136,20 +136,20 @@ class QLabOscClient:
             sock.bind(("", self.config.reply_port))
             return self._send_with_reply_on_socket(sock, address, *args)
 
-    def _workspace_is_connected(self, workspace_id: str) -> bool:
-        return workspace_id.strip("/") in self._connected_workspaces
+    def _workspace_is_connected(self, workspace_id: str, transport: str) -> bool:
+        return (workspace_id.strip("/"), transport) in self._connected_workspaces
 
-    def _remember_connected_workspace(self, workspace_id: str) -> None:
+    def _remember_connected_workspace(self, workspace_id: str, transport: str) -> None:
         workspace = workspace_id.strip("/")
         if workspace:
-            self._connected_workspaces.add(workspace)
+            self._connected_workspaces.add((workspace, transport))
 
-    def _remember_connect_reply(self, address: str, reply: QLabReply) -> None:
+    def _remember_connect_reply(self, address: str, reply: QLabReply, transport: str) -> None:
         if reply.status != "ok":
             return
         workspace = _workspace_from_connect_address(address)
         if workspace:
-            self._remember_connected_workspace(workspace)
+            self._remember_connected_workspace(workspace, transport)
 
     def _send_with_reply_on_socket(self, sock: socket.socket, address: str, *args: Any) -> QLabReply:
         packet = encode_message(address, *args)

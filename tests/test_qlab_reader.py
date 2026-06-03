@@ -1214,6 +1214,58 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["agent_summary"]["known_total_cue_items"], 4)
         self.assertEqual(result["agent_summary"]["cue_lists"], 1)
 
+    def test_workspace_overview_uses_tcp_for_large_child_metadata_before_id_only_fallback(self) -> None:
+        list_id = "list-1"
+        group_id = "group-1"
+        child_id = "child-1"
+
+        class TcpChildClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def __init__(self) -> None:
+                self.udp_requests: list[str] = []
+                self.tcp_requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.udp_requests.append(address)
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/showMode":
+                    return SimpleNamespace(data=False, status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(data=[{"uniqueID": list_id, "name": "Main", "type": "Cue List"}], status="ok")
+                if address == f"/workspace/ws-1/cue/{list_id}/children/shallow":
+                    return SimpleNamespace(data=[{"uniqueID": group_id, "name": "Big Group", "type": "Group"}], status="ok")
+                if address == f"/workspace/ws-1/cue/{group_id}/children/shallow":
+                    raise OscTimeoutError("Timed out waiting for QLab reply to children/shallow")
+                if address == f"/workspace/ws-1/cue/{group_id}/children/uniqueIDs/shallow":
+                    raise AssertionError("ID-only fallback should not run after TCP metadata success")
+                raise AssertionError(f"Unexpected UDP request: {address}")
+
+            def request_tcp(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.tcp_requests.append(address)
+                if address == f"/workspace/ws-1/cue/{group_id}/children/shallow":
+                    return SimpleNamespace(
+                        data=[{"uniqueID": child_id, "name": "Audio Child", "type": "Audio"}],
+                        status="ok",
+                    )
+                raise AssertionError(f"Unexpected TCP request: {address}")
+
+        client = TcpChildClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        result = reader.get_workspace_overview("ws-1", max_depth=3, include_cue_index=False)
+
+        self.assertEqual(client.tcp_requests, [f"/workspace/ws-1/cue/{group_id}/children/shallow"])
+        self.assertEqual(result["known_total_cues"], 3)
+        self.assertEqual(result["known_total_cues_status"], "known")
+        self.assertFalse(result["limits"]["truncated"])
+        self.assertEqual(result["limits"]["child_read_errors"], [])
+        group = result["cue_lists"][0]["children"][0]
+        self.assertEqual(group["child_count"], 1)
+        self.assertEqual(group["child_read_transport"], "tcp_fallback")
+        self.assertNotIn(f"/workspace/ws-1/cue/{group_id}/children/uniqueIDs/shallow", client.udp_requests)
+
     def test_workspace_overview_expands_cart_children(self) -> None:
         cart_id = "cart-1"
         midi_id = "midi-1"
@@ -1404,6 +1456,49 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["known_total_cues_source"], "cueLists/uniqueIDs")
         self.assertEqual(result["known_total_cues_meaning"], "cue_items_including_cue_lists")
         self.assertTrue(result["summary"]["global_unique_ids_used"])
+
+    def test_workspace_overview_global_count_uses_tcp_after_udp_timeout(self) -> None:
+        class GlobalTcpClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def __init__(self) -> None:
+                self.udp_requests: list[str] = []
+                self.tcp_requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.udp_requests.append(address)
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/showMode":
+                    return SimpleNamespace(data=False, status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(data=[{"uniqueID": "list-1", "type": "Cue List"}], status="ok")
+                if address == "/workspace/ws-1/cue/list-1/children/shallow":
+                    return SimpleNamespace(data=[], status="ok")
+                if address == "/workspace/ws-1/cueLists/uniqueIDs":
+                    raise OscTimeoutError("Timed out waiting for QLab reply to cueLists/uniqueIDs")
+                if address == "/workspace/ws-1/cueLists/uniqueIDs/shallow":
+                    raise AssertionError("Root ID fallback should not run after TCP global count success")
+                raise AssertionError(f"Unexpected UDP request: {address}")
+
+            def request_tcp(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.tcp_requests.append(address)
+                if address == "/workspace/ws-1/cueLists/uniqueIDs":
+                    return SimpleNamespace(data=["list-1", "child-1", "child-2"], status="ok")
+                raise AssertionError(f"Unexpected TCP request: {address}")
+
+        client = GlobalTcpClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        result = reader.get_workspace_overview("ws-1", include_cue_index=False, include_global_count=True)
+
+        self.assertEqual(client.tcp_requests, ["/workspace/ws-1/cueLists/uniqueIDs"])
+        self.assertEqual(result["known_total_cues"], 3)
+        self.assertEqual(result["known_total_cues_status"], "known")
+        self.assertEqual(result["known_total_cues_source"], "cueLists/uniqueIDs")
+        self.assertEqual(result["limits"]["count_status"]["global_count_read_transport"], "tcp_fallback")
+        self.assertNotIn("/workspace/ws-1/cueLists/uniqueIDs", result["errors"] or {})
+        self.assertNotIn("/workspace/ws-1/cueLists/uniqueIDs/shallow", client.udp_requests)
 
     def test_workspace_overview_global_count_timeout_does_not_break_overview(self) -> None:
         class GlobalTimeoutClient:
@@ -2858,6 +2953,67 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIn("scanned only cues with metadata", " ".join(result["warnings"]))
         self.assertFalse(result["scanned_all_cues"])
         self.assertFalse(result["result_limited"])
+
+    def test_query_cues_uses_tcp_child_metadata_before_id_only_partial_branch(self) -> None:
+        list_id = "list-1"
+        group_id = "group-tekno"
+        child_id = "audio-1"
+
+        class QueryTcpClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def __init__(self) -> None:
+                self.udp_requests: list[str] = []
+                self.tcp_requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.udp_requests.append(address)
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    return SimpleNamespace(data=[{"uniqueID": list_id, "name": "Main", "type": "Cue List"}], status="ok")
+                if address == f"/workspace/ws-1/cue/{list_id}/children/shallow":
+                    return SimpleNamespace(
+                        data=[{"uniqueID": group_id, "number": "TEKNO", "name": "TEKNO", "type": "Group"}],
+                        status="ok",
+                    )
+                if address == f"/workspace/ws-1/cue/{group_id}/children/shallow":
+                    raise OscTimeoutError("Timed out waiting for QLab reply")
+                if address == f"/workspace/ws-1/cue/{group_id}/children/uniqueIDs/shallow":
+                    raise AssertionError("ID-only fallback should not run after TCP metadata success")
+                if address.endswith("/valuesForKeys"):
+                    cue_id = address.split("/cue/", 1)[1].split("/valuesForKeys", 1)[0]
+                    keys = json.loads(args[0]) if args else []
+                    payload = {key: None for key in keys}
+                    payload["uniqueID"] = cue_id
+                    payload["type"] = "Audio" if cue_id == child_id else "Group"
+                    payload["name"] = "Audio Child" if cue_id == child_id else "TEKNO"
+                    return SimpleNamespace(data=payload, status="ok")
+                raise AssertionError(f"Unexpected UDP request: {address}")
+
+            def request_tcp(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.tcp_requests.append(address)
+                if address == f"/workspace/ws-1/cue/{group_id}/children/shallow":
+                    return SimpleNamespace(
+                        data=[{"uniqueID": child_id, "name": "Audio Child", "type": "Audio"}],
+                        status="ok",
+                    )
+                raise AssertionError(f"Unexpected TCP request: {address}")
+
+        client = QueryTcpClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        result = reader.query_cues("ws-1", "type", "Audio", max_cues_scanned=5000)
+
+        self.assertEqual(client.tcp_requests, [f"/workspace/ws-1/cue/{group_id}/children/shallow"])
+        self.assertEqual(result["query_completeness"], "complete")
+        self.assertEqual(result["id_only_unscanned_count"], 0)
+        self.assertEqual(result["omitted_branches"], [])
+        self.assertEqual(result["scanned_count"], 3)
+        self.assertEqual(result["matched_count"], 1)
+        self.assertEqual(result["cues"][0]["uniqueID"], child_id)
+        self.assertTrue(result["scanned_all_cues"])
+        self.assertNotIn(f"/workspace/ws-1/cue/{group_id}/children/uniqueIDs/shallow", client.udp_requests)
 
     def test_query_cues_finds_cart_children_by_real_type(self) -> None:
         cart_id = "cart-1"

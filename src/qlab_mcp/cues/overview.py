@@ -114,7 +114,13 @@ def _tree_from_bounded_refs(refs: list[dict[str, Any]], max_depth: int, truncate
             continue
         node = _cue_overview_node(cue)
         node["depth"] = ref.get("depth", 0)
-        for key in ("child_metadata_status", "child_count_source", "fallback_used"):
+        for key in (
+            "child_metadata_status",
+            "child_count_source",
+            "child_read_transport",
+            "child_count_read_transport",
+            "fallback_used",
+        ):
             if key in ref:
                 node[key] = ref[key]
         if ref.get("child_count") is not None:
@@ -195,11 +201,16 @@ def _global_cue_count_with_fallback(reader: Any, workspace_id: str) -> dict[str,
     partial = False
 
     try:
-        global_ids = reader.get_workspace_cue_ids(workspace_id, include_children=True)
+        global_ids = reader.get_workspace_cue_ids(
+            workspace_id,
+            include_children=True,
+            tcp_fallback_on_timeout=True,
+        )
         return {
             "known_total_cues": global_ids["cue_count"],
             "known_total_cues_status": "known",
             "known_total_cues_source": "cueLists/uniqueIDs",
+            "read_transport": global_ids.get("read_transport", "udp"),
             "errors": {},
         }
     except Exception as exc:
@@ -207,7 +218,12 @@ def _global_cue_count_with_fallback(reader: Any, workspace_id: str) -> dict[str,
         fallback_used = True
 
     try:
-        root_ids = reader.get_workspace_cue_ids(workspace_id, include_children=False)["cue_ids"]
+        root_result = reader.get_workspace_cue_ids(
+            workspace_id,
+            include_children=False,
+            tcp_fallback_on_timeout=True,
+        )
+        root_ids = root_result["cue_ids"]
     except Exception as exc:
         errors["cueLists/uniqueIDs/shallow"] = str(exc)
         message = str(exc)
@@ -215,18 +231,31 @@ def _global_cue_count_with_fallback(reader: Any, workspace_id: str) -> dict[str,
             "known_total_cues": None,
             "known_total_cues_status": "timeout" if "Timed out" in message or "timed out" in message else "unknown",
             "known_total_cues_source": "cueLists/uniqueIDs",
+            "read_transport": None,
             "errors": errors,
         }
 
     for root_id in root_ids:
         known_ids.add(str(root_id))
         try:
-            child_data = reader.get_cue_children(workspace_id, str(root_id), shallow=False, ids_only=True)["children"]
+            child_data = reader.get_cue_children(
+                workspace_id,
+                str(root_id),
+                shallow=False,
+                ids_only=True,
+                tcp_fallback_on_timeout=True,
+            )["children"]
             child_refs = _flatten_cue_refs(child_data, parent_id=str(root_id), cue_list_id=str(root_id), depth=1)
         except Exception as exc:
             errors[f"{root_id}/children/uniqueIDs"] = str(exc)
             try:
-                child_data = reader.get_cue_children(workspace_id, str(root_id), shallow=True, ids_only=True)["children"]
+                child_data = reader.get_cue_children(
+                    workspace_id,
+                    str(root_id),
+                    shallow=True,
+                    ids_only=True,
+                    tcp_fallback_on_timeout=True,
+                )["children"]
                 child_refs = _flatten_cue_refs(child_data, parent_id=str(root_id), cue_list_id=str(root_id), depth=1)
                 partial = True
             except Exception as shallow_exc:
@@ -247,6 +276,7 @@ def _global_cue_count_with_fallback(reader: Any, workspace_id: str) -> dict[str,
             if fallback_used
             else "cueLists/uniqueIDs"
         ),
+        "read_transport": None,
         "errors": errors,
     }
 
@@ -358,7 +388,10 @@ class CueOverviewMixin:
             known_total_cues = global_count["known_total_cues"]
             known_total_cues_status = global_count["known_total_cues_status"]
             known_total_cues_source = global_count["known_total_cues_source"]
+            global_count_read_transport = global_count.get("read_transport")
             global_count_errors = global_count["errors"]
+        else:
+            global_count_read_transport = None
         if global_count_errors:
             global_count_error = next(iter(global_count_errors.values()))
 
@@ -407,6 +440,7 @@ class CueOverviewMixin:
                 "known_total_cues_meaning": KNOWN_TOTAL_CUES_MEANING,
                 "source": count_source,
                 "global_unique_ids_used": global_unique_ids_used,
+                "global_count_read_transport": global_count_read_transport,
                 "inspected_cues": len(summary_refs),
                 "returned_cues": len(overview_refs),
             },

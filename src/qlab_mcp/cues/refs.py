@@ -90,6 +90,8 @@ def _child_read_error_context(
     child_count: int | None = None,
     child_count_source: str | None = None,
     child_metadata_status: str | None = None,
+    child_read_transport: str | None = None,
+    child_count_read_transport: str | None = None,
     fallback_error: str | None = None,
 ) -> dict[str, Any]:
     context = {
@@ -110,6 +112,8 @@ def _child_read_error_context(
         "child_count": child_count,
         "child_count_source": child_count_source,
         "child_metadata_status": child_metadata_status,
+        "child_read_transport": child_read_transport,
+        "child_count_read_transport": child_count_read_transport,
         "fallback_error": fallback_error,
     }
     required_keys = {
@@ -196,6 +200,8 @@ def _bounded_cue_refs_from_shallow(
             child_count: int | None = None,
             child_count_source: str | None = None,
             child_metadata_status: str | None = None,
+            child_read_transport: str | None = None,
+            child_count_read_transport: str | None = None,
             fallback_error: str | None = None,
         ) -> None:
             child_read_errors.append(
@@ -210,6 +216,8 @@ def _bounded_cue_refs_from_shallow(
                     child_count=child_count,
                     child_count_source=child_count_source,
                     child_metadata_status=child_metadata_status,
+                    child_read_transport=child_read_transport,
+                    child_count_read_transport=child_count_read_transport,
                     fallback_error=fallback_error,
                 )
             )
@@ -218,7 +226,14 @@ def _bounded_cue_refs_from_shallow(
             errors[cue_id] = message
             ref["child_metadata_status"] = "timeout" if "Timed out" in message or "timed out" in message else "unavailable"
             try:
-                id_children = reader.get_cue_children(workspace_id, cue_id, shallow=True, ids_only=True)["children"]
+                id_child_result = reader.get_cue_children(
+                    workspace_id,
+                    cue_id,
+                    shallow=True,
+                    ids_only=True,
+                    tcp_fallback_on_timeout=True,
+                )
+                id_children = id_child_result["children"]
                 id_refs = _flatten_cue_refs(
                     id_children,
                     parent_id=cue_id,
@@ -232,6 +247,7 @@ def _bounded_cue_refs_from_shallow(
                 ref["child_count_source"] = "children/uniqueIDs/shallow"
                 ref["child_metadata_status"] = "timeout" if "Timed out" in message or "timed out" in message else "unavailable"
                 ref["fallback_used"] = True
+                ref["child_count_read_transport"] = id_child_result.get("read_transport")
                 mark_truncated("child_metadata_unavailable")
                 record_child_read_error(
                     message,
@@ -239,6 +255,7 @@ def _bounded_cue_refs_from_shallow(
                     child_count=len(child_ids),
                     child_count_source="children/uniqueIDs/shallow",
                     child_metadata_status=ref["child_metadata_status"],
+                    child_count_read_transport=id_child_result.get("read_transport"),
                 )
             except Exception as fallback_exc:
                 ref["child_count"] = None
@@ -253,7 +270,14 @@ def _bounded_cue_refs_from_shallow(
                 )
 
         try:
-            children = reader.get_cue_children(workspace_id, cue_id, shallow=True, ids_only=False)["children"]
+            child_result = reader.get_cue_children(
+                workspace_id,
+                cue_id,
+                shallow=True,
+                ids_only=False,
+                tcp_fallback_on_timeout=True,
+            )
+            children = child_result["children"]
         except Exception as exc:
             if not fallback_child_ids:
                 errors[cue_id] = str(exc)
@@ -275,6 +299,7 @@ def _bounded_cue_refs_from_shallow(
         ref["child_count_source"] = "children/shallow"
         ref["child_metadata_status"] = "available"
         ref["fallback_used"] = False
+        ref["child_read_transport"] = child_result.get("read_transport")
         for child in children:
             if len(refs) >= limit:
                 mark_truncated("max_cues")
@@ -282,7 +307,12 @@ def _bounded_cue_refs_from_shallow(
             append_cue(child, parent_id=cue_id, cue_list_id=current_cue_list_id, depth=depth + 1)
 
     try:
-        cue_lists = reader.get_cue_lists(workspace_id, include_children=False, cacheable=cacheable)["cue_lists"] or []
+        cue_lists = reader.get_cue_lists(
+            workspace_id,
+            include_children=False,
+            cacheable=cacheable,
+            tcp_fallback_on_timeout=True,
+        )["cue_lists"] or []
     except Exception as exc:
         return {
             "refs": [],

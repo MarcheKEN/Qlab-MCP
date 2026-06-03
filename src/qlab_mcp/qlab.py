@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from .errors import OscTimeoutError
 from .osc.addressing import (
     _clean_cue_ref,
     _clean_workspace_id,
@@ -61,6 +62,34 @@ class QLabReader(
             lambda: self.client.request(address, *args, workspace_id=workspace_id).data,
         )
 
+    def _request_data_with_tcp_fallback(
+        self,
+        address: str,
+        *args: Any,
+        workspace_id: str | None = None,
+        cacheable: bool = True,
+        cache_profile: str | None = None,
+    ) -> tuple[Any, str]:
+        def read() -> tuple[Any, str]:
+            try:
+                return self.client.request(address, *args, workspace_id=workspace_id).data, "udp"
+            except OscTimeoutError as udp_exc:
+                request_tcp = getattr(self.client, "request_tcp", None)
+                if request_tcp is None:
+                    raise
+                try:
+                    return request_tcp(address, *args, workspace_id=workspace_id).data, "tcp_fallback"
+                except Exception as tcp_exc:
+                    raise OscTimeoutError(
+                        f"{udp_exc}; TCP fallback also failed for large read-only reply: {tcp_exc}"
+                    ) from tcp_exc
+
+        if not cacheable or not cache_profile_is_safe(cache_profile):
+            return read()
+
+        key = (client_cache_namespace(self.client), workspace_id, address, args, "udp_tcp_timeout_fallback")
+        return self._read_cache.get_or_set(key, self._cache_ttl(), read)
+
     def get_workspaces(self) -> dict[str, Any]:
         reply = self.client.request("/workspaces")
         return {"workspaces": reply.data, "status": reply.status}
@@ -84,19 +113,42 @@ class QLabReader(
                 return workspace
         return {"uniqueID": requested}
 
-    def get_cue_lists(self, workspace_id: str, include_children: bool = False, cacheable: bool = True) -> dict[str, Any]:
+    def get_cue_lists(
+        self,
+        workspace_id: str,
+        include_children: bool = False,
+        cacheable: bool = True,
+        tcp_fallback_on_timeout: bool = False,
+    ) -> dict[str, Any]:
         command = "cueLists" if include_children else "cueLists/shallow"
-        return self._workspace_data(workspace_id, command, "cue_lists", cacheable=cacheable)
+        return self._workspace_data(
+            workspace_id,
+            command,
+            "cue_lists",
+            cacheable=cacheable,
+            tcp_fallback_on_timeout=tcp_fallback_on_timeout,
+        )
 
-    def get_workspace_cue_ids(self, workspace_id: str, include_children: bool = True) -> dict[str, Any]:
+    def get_workspace_cue_ids(
+        self,
+        workspace_id: str,
+        include_children: bool = True,
+        tcp_fallback_on_timeout: bool = False,
+    ) -> dict[str, Any]:
         command = "cueLists/uniqueIDs" if include_children else "cueLists/uniqueIDs/shallow"
-        data = self._request_data(_workspace_address(workspace_id, command), workspace_id=workspace_id)
+        address = _workspace_address(workspace_id, command)
+        if tcp_fallback_on_timeout:
+            data, read_transport = self._request_data_with_tcp_fallback(address, workspace_id=workspace_id)
+        else:
+            data = self._request_data(address, workspace_id=workspace_id)
+            read_transport = "udp"
         cue_ids = _normalize_id_list(data)
         return {
             "workspace_id": _clean_workspace_id(workspace_id),
             "include_children": include_children,
             "cue_count": len(cue_ids),
             "cue_ids": cue_ids,
+            "read_transport": read_transport,
         }
 
     def get_workspace_cue_inventory(
@@ -147,19 +199,26 @@ class QLabReader(
         cue_ref: str,
         shallow: bool = False,
         ids_only: bool = False,
+        tcp_fallback_on_timeout: bool = False,
     ) -> dict[str, Any]:
         suffix = "children"
         if ids_only:
             suffix += "/uniqueIDs"
         if shallow:
             suffix += "/shallow"
-        data = self._request_data(_cue_address(workspace_id, cue_ref, suffix), workspace_id=workspace_id)
+        address = _cue_address(workspace_id, cue_ref, suffix)
+        if tcp_fallback_on_timeout:
+            data, read_transport = self._request_data_with_tcp_fallback(address, workspace_id=workspace_id)
+        else:
+            data = self._request_data(address, workspace_id=workspace_id)
+            read_transport = "udp"
         return {
             "workspace_id": _clean_workspace_id(workspace_id),
             "cue_ref": _clean_cue_ref(cue_ref),
             "children": data,
             "ids_only": ids_only,
             "shallow": shallow,
+            "read_transport": read_transport,
         }
 
     def read_cue_property(self, workspace_id: str, cue_ref: str, property_path: str) -> dict[str, Any]:
@@ -206,11 +265,22 @@ class QLabReader(
         key: str,
         cacheable: bool = True,
         cache_profile: str | None = None,
+        tcp_fallback_on_timeout: bool = False,
     ) -> dict[str, Any]:
-        data = self._request_data(
-            _workspace_address(workspace_id, command),
-            workspace_id=workspace_id,
-            cacheable=cacheable,
-            cache_profile=cache_profile,
-        )
-        return {"workspace_id": _clean_workspace_id(workspace_id), key: data}
+        address = _workspace_address(workspace_id, command)
+        if tcp_fallback_on_timeout:
+            data, read_transport = self._request_data_with_tcp_fallback(
+                address,
+                workspace_id=workspace_id,
+                cacheable=cacheable,
+                cache_profile=cache_profile,
+            )
+        else:
+            data = self._request_data(
+                address,
+                workspace_id=workspace_id,
+                cacheable=cacheable,
+                cache_profile=cache_profile,
+            )
+            read_transport = "udp"
+        return {"workspace_id": _clean_workspace_id(workspace_id), key: data, "read_transport": read_transport}

@@ -21,6 +21,7 @@ from .osc.addressing import (
 from .allowlist import validate_property_path, validate_value_keys
 from .osc.client import QLabOscClient
 from .runtime.connection import WorkspaceConnectionMixin
+from .status import WorkspaceStatusMixin
 from .cues.details import CueDetailsMixin
 from .cues.overview import CueOverviewMixin
 from .cues.query import CueQueryMixin
@@ -33,6 +34,7 @@ class QLabReader(
     WorkspaceConnectionMixin,
     CueOverviewMixin,
     WorkspaceSettingsMixin,
+    WorkspaceStatusMixin,
     CueQueryMixin,
     CueDetailsMixin,
     QLabWriteMixin,

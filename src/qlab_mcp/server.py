@@ -25,6 +25,7 @@ from .models import (
     CueUpdateInput,
     CueQueryResult,
     QlabConnectionCheckResult,
+    WorkspaceStatusResult,
     WorkspaceSettingRequestInput,
     UpdateCuesResult,
     WriteReadinessResult,
@@ -103,6 +104,7 @@ CueQueryFilter = Literal[
 WorkspaceSettingsSection = Literal["audio", "video", "network", "midi", "light", "general"]
 WorkspaceSettingsMode = Literal["summary", "details"]
 WorkspaceSettingsProfile = Literal["safe", "technical", "exhaustive"]
+WorkspaceStatusProfile = Literal["summary", "technical"]
 WorkspaceSettingDetailKind = Literal[
     "all",
     "output_patch",
@@ -161,6 +163,7 @@ GATED_CREATE_QLAB_TOOL = ToolAnnotations(
 )
 CHECK_CONNECTION_TIMEOUT = 6.0
 WORKSPACE_OVERVIEW_TIMEOUT = 45.0
+WORKSPACE_STATUS_TIMEOUT = 60.0
 WORKSPACE_SETTINGS_TIMEOUT = 60.0
 WORKSPACE_SETTING_DETAILS_TIMEOUT = 60.0
 QUERY_CUES_TIMEOUT = 60.0
@@ -178,7 +181,7 @@ mcp = FastMCP(
     instructions="""
 Use these tools to read QLab 5 workspace and cue information over OSC.
 
-The six inspector tools are read-only and intentionally avoid playback, editing, deletion, and raw OSC.
+The seven inspector tools are read-only and intentionally avoid playback, editing, deletion, and raw OSC.
 Write mode is a separate gated preface: it is disabled unless QLAB_ENABLE_WRITE=true and defaults to dry-run.
 When write mode is ready, all update profiles may exist, but only safe properties can execute as real writes.
 Dangerous or high-risk properties remain dry-run-only and are blocked for real writes.
@@ -187,6 +190,8 @@ Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /con
 Start with qlab_check_connection to verify QLab, workspace candidates, passcode, and read access.
 
 Then use qlab_get_workspace_overview for a bounded show map.
+
+Use qlab_get_workspace_status for compact operational status derived from documented read-only OSC reads: cue warnings, trigger/timecode summaries, settings summary, and explicit not_exposed sections for Workspace Status data QLab does not expose over OSC.
 
 Use qlab_get_workspace_settings(mode="summary") when you need compact infrastructure/settings inventory such as patches, stages, routes, MIDI, network, or light availability. It returns available_detail_requests and avoids heavy light-patch dumps.
 
@@ -369,6 +374,62 @@ def qlab_get_workspace_overview(
                 max_index_cues=max_index_cues,
                 cue_index_profile=cue_index_profile,
                 include_global_count=include_global_count,
+            )
+        )
+    )
+
+
+@mcp.tool(
+    title="Get QLab Workspace Status",
+    tags={"qlab", "status", "diagnostics", "timecode", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_STATUS_TIMEOUT,
+)
+def qlab_get_workspace_status(
+    workspace_id: WorkspaceId,
+    profile: Annotated[
+        WorkspaceStatusProfile,
+        Field(
+            description=(
+                "summary returns compact derived operational status. technical adds safe settings section payloads. "
+                "This is not a full clone of QLab's Workspace Status window; unavailable OSC sections are explicit."
+            ),
+        ),
+    ] = "summary",
+    include_timecode: Annotated[
+        bool,
+        Field(description="When true, include timecode config and per-list/cart currentTimecode/text samples when exposed."),
+    ] = True,
+    max_cues_scanned: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=5000,
+            description="Maximum cues to scan for cue-derived status summaries before marking them partial.",
+        ),
+    ] = 1000,
+    sample_limit: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=50,
+            description="Maximum sample cue/status rows returned inside compact sections.",
+        ),
+    ] = 10,
+) -> WorkspaceStatusResult:
+    """Return compact read-only Workspace Status context for a QLab workspace.
+
+    Uses documented OSC reads and derived summaries. Sections that QLab does not expose as safe read-only OSC
+    endpoints are returned with source='not_exposed' instead of invented values.
+    """
+    return _run_tool(
+        lambda: WorkspaceStatusResult.model_validate(
+            _reader().get_workspace_status(
+                workspace_id=workspace_id,
+                profile=profile,
+                include_timecode=include_timecode,
+                max_cues_scanned=max_cues_scanned,
+                sample_limit=sample_limit,
             )
         )
     )

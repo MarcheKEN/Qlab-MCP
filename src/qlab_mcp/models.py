@@ -82,6 +82,9 @@ class QlabConnectionCheckResult(BaseModel):
     permissions: dict[str, Any]
     capabilities: dict[str, Any]
     checks: dict[str, Any]
+    overrides_scope: str | None = None
+    overrides: dict[str, Any] = Field(default_factory=dict)
+    override_warnings: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -125,6 +128,18 @@ class WorkspaceSettingsResult(BaseModel):
     redactions: list[dict[str, str]] = Field(default_factory=list)
     errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
+
+
+class WorkspaceStatusResult(BaseModel):
+    """Read-only operational status derived from documented QLab OSC reads."""
+
+    workspace_id: str
+    profile: str = "summary"
+    sections: dict[str, Any] = Field(default_factory=dict)
+    summary: dict[str, Any] = Field(default_factory=dict)
+    limits: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    errors: dict[str, str] | None = None
 
 
 class WorkspaceSettingDetailsResult(BaseModel):

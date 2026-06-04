@@ -18,7 +18,7 @@ from qlab_mcp.config import QLabConfig
 from qlab_mcp.errors import OscTimeoutError, QLabReplyError, UnsafeCuePropertyError
 from qlab_mcp.osc import decode_message, encode_message
 from qlab_mcp.qlab import QLabReader
-from qlab_mcp.runtime.connection import normalize_workspace_mode, parse_connect_scopes
+from qlab_mcp.runtime.connection import OVERRIDE_ENDPOINTS, normalize_workspace_mode, parse_connect_scopes
 from qlab_mcp.runtime.read_cache import shared_read_cache
 
 
@@ -147,6 +147,31 @@ def client_for(server: FakeQlabOscServer, timeout: float = 0.25) -> QLabOscClien
     return QLabOscClient(QLabConfig(host="127.0.0.1", osc_port=server.port, reply_port=0, timeout=timeout))
 
 
+def override_responses(enabled: bool = True) -> dict[str, Any]:
+    return {f"/overrides/{endpoint}": enabled for endpoint in OVERRIDE_ENDPOINTS.values()}
+
+
+def override_addresses() -> list[str]:
+    return [f"/overrides/{endpoint}" for endpoint in OVERRIDE_ENDPOINTS.values()]
+
+
+def empty_settings_summary_responses() -> dict[str, Any]:
+    return {
+        "/workspace/ws-1/settings/audio/patchList": [],
+        "/workspace/ws-1/settings/mic/patchList": [],
+        "/workspace/ws-1/settings/audio/cueOutputChannelCounts": [],
+        "/workspace/ws-1/settings/audio/outputChannelNames": [],
+        "/workspace/ws-1/settings/audio/maps": [],
+        "/workspace/ws-1/settings/video/inputPatchList": [],
+        "/workspace/ws-1/settings/video/routes": [],
+        "/workspace/ws-1/settings/video/stages": [],
+        "/workspace/ws-1/settings/network/patchList": [],
+        "/workspace/ws-1/settings/midi/patchList": [],
+        "/workspace/ws-1/settings/general/minGoTime": 0,
+        "/workspace/ws-1/settings/general/selectionIsPlayhead": False,
+    }
+
+
 class ConnectScopeTests(unittest.TestCase):
     def test_parse_connect_scope_combinations(self) -> None:
         cases = {
@@ -211,6 +236,7 @@ class QLabReaderTests(unittest.TestCase):
             "/workspaces": workspaces,
             "/workspace/ws-1/showMode": False,
             "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-1", "name": "Main"}],
+            **override_responses(),
         }
         with FakeQlabOscServer(responses) as server:
             reader = QLabReader(client_for(server))
@@ -233,6 +259,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["capabilities"]["list_workspaces"])
         self.assertTrue(result["capabilities"]["resolve_workspace"])
         self.assertTrue(result["capabilities"]["workspace_overview"])
+        self.assertTrue(result["capabilities"]["workspace_status"])
         self.assertTrue(result["capabilities"]["query_cues"])
         self.assertTrue(result["capabilities"]["cue_details"])
         self.assertIsNone(result["capabilities"]["edit"])
@@ -241,6 +268,9 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["workspace_mode"]["mode"], "edit")
         self.assertFalse(result["workspace_mode"]["show_mode"])
         self.assertEqual(result["checks"]["show_mode"]["status"], "confirmed")
+        self.assertEqual(result["overrides_scope"], "global_to_qlab_app")
+        self.assertEqual(result["overrides"]["dmx_output_enabled"]["enabled"], True)
+        self.assertEqual(result["override_warnings"], [])
         self.assertTrue(result["permissions"]["view"]["ok"])
         self.assertEqual(result["permissions"]["view"]["status"], "confirmed")
         self.assertTrue(result["permissions"]["view"]["safe_to_probe"])
@@ -249,7 +279,10 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["permissions"]["edit"]["safe_to_probe"])
         self.assertTrue(result["permissions"]["control"]["safe_to_probe"])
         self.assertIn("QLAB_PASSCODE is not configured", result["warnings"][0])
-        self.assertEqual(server.received, ["/workspaces", "/workspace/ws-1/showMode", "/workspace/ws-1/cueLists/shallow"])
+        self.assertEqual(
+            server.received,
+            ["/workspaces", "/workspace/ws-1/showMode", *override_addresses(), "/workspace/ws-1/cueLists/shallow"],
+        )
 
     def test_check_connection_parses_connect_scopes(self) -> None:
         workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5", "version": "5.5.10"}]
@@ -258,6 +291,7 @@ class QLabReaderTests(unittest.TestCase):
             "/workspace/ws-1/connect": "ok:view|edit",
             "/workspace/ws-1/showMode": False,
             "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-1", "name": "Main"}],
+            **override_responses(),
         }
         with FakeQlabOscServer(responses) as server:
             assert server.port is not None
@@ -289,9 +323,96 @@ class QLabReaderTests(unittest.TestCase):
                 "/workspaces",
                 "/workspace/ws-1/connect",
                 "/workspace/ws-1/showMode",
+                *override_addresses(),
                 "/workspace/ws-1/cueLists/shallow",
             ],
         )
+
+    def test_check_connection_reports_disabled_override_as_warning_not_failure(self) -> None:
+        workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]
+        overrides = override_responses()
+        overrides["/overrides/dmxOutputEnabled"] = 0
+        responses = {
+            "/workspaces": workspaces,
+            "/workspace/ws-1/showMode": False,
+            "/workspace/ws-1/cueLists/shallow": [],
+            **overrides,
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.check_connection()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["status"], "ready")
+        self.assertFalse(result["overrides"]["dmx_output_enabled"]["enabled"])
+        self.assertEqual(result["override_warnings"], ["Override disabled: dmx_output_enabled"])
+        self.assertIn("Override disabled: dmx_output_enabled", result["warnings"])
+        self.assertIn("/overrides/dmxOutputEnabled", server.received)
+
+    def test_check_connection_normalizes_integer_override_values(self) -> None:
+        workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]
+        overrides = override_responses()
+        overrides["/overrides/dmxOutputEnabled"] = 1
+        overrides["/overrides/timecodeOutputEnabled"] = 0
+        responses = {
+            "/workspaces": workspaces,
+            "/workspace/ws-1/showMode": False,
+            "/workspace/ws-1/cueLists/shallow": [],
+            **overrides,
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.check_connection()
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["overrides"]["dmx_output_enabled"]["enabled"])
+        self.assertEqual(result["overrides"]["dmx_output_enabled"]["status"], "ok")
+        self.assertNotIn("raw_value", result["overrides"]["dmx_output_enabled"])
+        self.assertFalse(result["overrides"]["timecode_output_enabled"]["enabled"])
+        self.assertEqual(result["overrides"]["timecode_output_enabled"]["status"], "ok")
+        self.assertEqual(result["override_warnings"], ["Override disabled: timecode_output_enabled"])
+
+    def test_check_connection_reports_weird_override_value_as_unexpected_data(self) -> None:
+        workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]
+        overrides = override_responses()
+        overrides["/overrides/dmxOutputEnabled"] = "enabled"
+        responses = {
+            "/workspaces": workspaces,
+            "/workspace/ws-1/showMode": False,
+            "/workspace/ws-1/cueLists/shallow": [],
+            **overrides,
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.check_connection()
+
+        self.assertTrue(result["ok"])
+        self.assertIsNone(result["overrides"]["dmx_output_enabled"]["enabled"])
+        self.assertEqual(result["overrides"]["dmx_output_enabled"]["status"], "unexpected_data")
+        self.assertEqual(result["overrides"]["dmx_output_enabled"]["raw_value"], "enabled")
+        self.assertEqual(result["override_warnings"], [])
+
+    def test_check_connection_override_read_failure_does_not_break_connection(self) -> None:
+        workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]
+        responses = {
+            "/workspaces": workspaces,
+            "/workspace/ws-1/showMode": False,
+            "/workspace/ws-1/cueLists/shallow": [],
+            **override_responses(),
+            "/overrides/midiOutputEnabled": {"status": "error", "data": "unsupported"},
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.check_connection()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["status"], "ready")
+        self.assertFalse(result["overrides"]["midi_output_enabled"]["ok"])
+        self.assertEqual(result["overrides"]["midi_output_enabled"]["status"], "error")
 
     def test_check_connection_preserves_connect_view_when_read_probe_times_out(self) -> None:
         workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]
@@ -299,6 +420,7 @@ class QLabReaderTests(unittest.TestCase):
             "/workspaces": workspaces,
             "/workspace/ws-1/connect": "ok:view|edit",
             "/workspace/ws-1/showMode": False,
+            **override_responses(),
             "/workspace/ws-1/cueLists/shallow": lambda _message: time.sleep(0.2),
         }
         with FakeQlabOscServer(responses) as server:
@@ -330,6 +452,7 @@ class QLabReaderTests(unittest.TestCase):
                 "/workspaces",
                 "/workspace/ws-1/connect",
                 "/workspace/ws-1/showMode",
+                *override_addresses(),
                 "/workspace/ws-1/cueLists/shallow",
             ],
         )
@@ -388,7 +511,9 @@ class QLabReaderTests(unittest.TestCase):
 
     def test_check_connection_can_skip_read_access(self) -> None:
         workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]
-        with FakeQlabOscServer({"/workspaces": workspaces, "/workspace/ws-1/showMode": True}) as server:
+        with FakeQlabOscServer(
+            {"/workspaces": workspaces, "/workspace/ws-1/showMode": True, **override_responses()}
+        ) as server:
             reader = QLabReader(client_for(server))
 
             result = reader.check_connection(require_read_access=False)
@@ -402,7 +527,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["workspace_mode"]["show_mode"])
         self.assertTrue(result["capabilities"]["resolve_workspace"])
         self.assertFalse(result["capabilities"]["read_workspace"])
-        self.assertEqual(server.received, ["/workspaces", "/workspace/ws-1/showMode"])
+        self.assertEqual(server.received, ["/workspaces", "/workspace/ws-1/showMode", *override_addresses()])
 
     def test_check_connection_reports_denied_workspace_read(self) -> None:
         responses = {
@@ -457,6 +582,146 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["cue_count"], 2)
         self.assertEqual(result["cue_ids"], ["list-id", "cue-id"])
         self.assertEqual(server.received, ["/workspace/ws-1/cueLists/uniqueIDs"])
+
+    def test_workspace_status_returns_derived_sections_and_not_exposed_markers(self) -> None:
+        responses = {
+            "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-id", "type": "Cue List", "name": "Main"}],
+            "/workspace/ws-1/cue/list-id/children/shallow": [
+                {"uniqueID": "cue-1", "type": "Audio", "number": "1"},
+                {"uniqueID": "tc-1", "type": "Timecode", "number": "TC"},
+            ],
+            "/workspace/ws-1/cue/list-id/valuesForKeys": {
+                "uniqueID": "list-id",
+                "type": "Cue List",
+                "name": "Main",
+                "timecodeSyncMode": 1,
+                "timecodeSMPTEFormat": 30,
+                "isWarning": False,
+                "isBroken": False,
+                "flagged": False,
+            },
+            "/workspace/ws-1/cue/cue-1/valuesForKeys": {
+                "uniqueID": "cue-1",
+                "type": "Audio",
+                "number": "1",
+                "isWarning": True,
+                "isBroken": False,
+                "flagged": True,
+                "continueMode": 2,
+            },
+            "/workspace/ws-1/cue/tc-1/valuesForKeys": {
+                "uniqueID": "tc-1",
+                "type": "Timecode",
+                "number": "TC",
+                "timecodeString": "01:00:00:00",
+                "isWarning": False,
+                "isBroken": False,
+                "flagged": False,
+            },
+            "/workspace/ws-1/cue/list-id/currentTimecode/text": "01:00:12:10",
+            "/workspace/ws-1/cue/tc-1/currentTimecode/text": {"status": "error", "data": "not a receiver"},
+            **empty_settings_summary_responses(),
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_status("ws-1", max_cues_scanned=10)
+
+        self.assertEqual(result["summary"]["cue_scan_completeness"], "complete")
+        self.assertEqual(result["sections"]["warnings_summary"]["warning_count"], 1)
+        self.assertEqual(result["sections"]["warnings_summary"]["flagged_count"], 1)
+        self.assertEqual(result["sections"]["trigger_summary"]["auto_follow_count"], 1)
+        self.assertEqual(result["sections"]["trigger_summary"]["timecode_trigger_count"], 0)
+        self.assertEqual(result["sections"]["timecode_config"]["configured_count"], 2)
+        self.assertFalse(result["sections"]["timecode_config"]["default_timecode_values_seen"])
+        self.assertFalse(result["sections"]["timecode_config"]["default_timecode_values_not_counted"])
+        self.assertTrue(result["sections"]["timecode_live_status"]["available"])
+        self.assertEqual(
+            result["sections"]["timecode_live_status"]["sample"][0]["currentTimecode/text"],
+            "01:00:12:10",
+        )
+        self.assertEqual(result["sections"]["logs"]["source"], "not_exposed")
+        self.assertEqual(result["sections"]["artnet"]["source"], "not_exposed")
+        self.assertEqual(result["sections"]["video_metrics"]["source"], "not_exposed")
+        self.assertIn("/workspace/ws-1/cue/list-id/currentTimecode/text", server.received)
+
+    def test_workspace_status_does_not_count_default_timecode_values_as_configured(self) -> None:
+        responses = {
+            "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-id", "type": "Cue List", "name": "Main"}],
+            "/workspace/ws-1/cue/list-id/children/shallow": [{"uniqueID": "cue-1", "type": "Audio"}],
+            "/workspace/ws-1/cue/list-id/valuesForKeys": {
+                "uniqueID": "list-id",
+                "type": "Cue List",
+                "timecodeTrigger": {"hours": 1, "minutes": 0, "seconds": 0, "frames": 0, "bits": 0},
+                "timecodeTrigger/text": "1:00:00:00",
+                "timecodeSyncMode": 0,
+                "timecodeSMPTEFormat": 3,
+                "timecodeStartBehavior": 4,
+                "timecodeStopBehavior": 1,
+                "timecodeFreewheelTime": 0.25,
+                "timecodeLookbackTime": 0,
+            },
+            "/workspace/ws-1/cue/cue-1/valuesForKeys": {
+                "uniqueID": "cue-1",
+                "type": "Audio",
+                "timecodeTrigger": {"hours": 1, "minutes": 0, "seconds": 0, "frames": 0, "bits": 0},
+                "timecodeTrigger/text": "1:00:00:00",
+            },
+            **empty_settings_summary_responses(),
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_status("ws-1", max_cues_scanned=10)
+
+        timecode = result["sections"]["timecode_config"]
+        self.assertFalse(timecode["available"])
+        self.assertEqual(timecode["configured_count"], 0)
+        self.assertTrue(timecode["default_timecode_values_seen"])
+        self.assertTrue(timecode["default_timecode_values_not_counted"])
+        self.assertEqual(result["sections"]["trigger_summary"]["timecode_trigger_count"], 0)
+        self.assertFalse(result["sections"]["timecode_live_status"]["available"])
+        self.assertIsNone(result["errors"])
+        self.assertNotIn("/workspace/ws-1/cue/list-id/currentTimecode/text", server.received)
+
+    def test_workspace_status_live_timecode_unavailable_is_not_hard_error(self) -> None:
+        responses = {
+            "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-id", "type": "Cue List", "name": "Main"}],
+            "/workspace/ws-1/cue/list-id/children/shallow": [],
+            "/workspace/ws-1/cue/list-id/valuesForKeys": {
+                "uniqueID": "list-id",
+                "type": "Cue List",
+                "timecodeSyncMode": 1,
+                "isWarning": False,
+                "isBroken": False,
+                "flagged": False,
+            },
+            "/workspace/ws-1/cue/list-id/currentTimecode/text": {"status": "error", "data": "not running"},
+            **empty_settings_summary_responses(),
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_status("ws-1", max_cues_scanned=10)
+
+        live = result["sections"]["timecode_live_status"]
+        self.assertFalse(live["available"])
+        self.assertEqual(live["source"], "not_running_or_not_exposed")
+        self.assertEqual(live["status"], "unavailable")
+        self.assertIn("unavailable for 1 candidate", " ".join(live["notes"]))
+        self.assertIsNone(result["errors"])
+
+    def test_workspace_status_failed_cue_scan_keeps_sections_explicit(self) -> None:
+        with FakeQlabOscServer({"/workspace/ws-1/cueLists/shallow": {"status": "error", "data": "denied"}}) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_status("ws-1")
+
+        self.assertEqual(result["summary"]["cue_scan_completeness"], "failed")
+        self.assertFalse(result["sections"]["warnings_summary"]["available"])
+        self.assertFalse(result["sections"]["timecode_live_status"]["available"])
+        self.assertEqual(result["sections"]["video_metrics"]["source"], "not_exposed")
+        self.assertTrue(any(key.startswith("cue_scan.") for key in result["errors"]))
 
     def test_workspace_cue_ids_flattens_nested_qlab_response(self) -> None:
         qlab_response = [

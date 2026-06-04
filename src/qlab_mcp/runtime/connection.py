@@ -11,6 +11,21 @@ from ..errors import OscTimeoutError, QLabReplyError
 
 QLAB_VERSION_KEYS = ("qlabVersion", "QLabVersion", "applicationVersion", "version")
 CONNECT_SCOPE_ORDER = ("view", "edit", "control")
+OVERRIDE_ENDPOINTS = {
+    "dmx_output_enabled": "dmxOutputEnabled",
+    "midi_input_enabled": "midiInputEnabled",
+    "midi_output_enabled": "midiOutputEnabled",
+    "msc_input_enabled": "mscInputEnabled",
+    "msc_output_enabled": "mscOutputEnabled",
+    "sysex_input_enabled": "sysexInputEnabled",
+    "sysex_output_enabled": "sysexOutputEnabled",
+    "network_external_input_enabled": "networkExternalInputEnabled",
+    "network_external_output_enabled": "networkExternalOutputEnabled",
+    "network_local_input_enabled": "networkLocalInputEnabled",
+    "network_local_output_enabled": "networkLocalOutputEnabled",
+    "timecode_input_enabled": "timecodeInputEnabled",
+    "timecode_output_enabled": "timecodeOutputEnabled",
+}
 
 
 def normalize_workspace_mode(data: Any, address: str | None = None) -> dict[str, Any]:
@@ -298,6 +313,7 @@ def _base_capabilities() -> dict[str, Any]:
         "resolve_workspace": False,
         "read_workspace": False,
         "workspace_overview": False,
+        "workspace_status": False,
         "workspace_settings": False,
         "workspace_setting_details": False,
         "query_cues": False,
@@ -314,6 +330,62 @@ def _connect_warning(connect_scopes: dict[str, Any]) -> str | None:
     if status == "scope_unavailable":
         return "QLab accepted /connect but did not return parseable permission scopes; edit/control are not granted."
     return None
+
+
+def _normalize_override_enabled(value: Any) -> tuple[bool | None, bool]:
+    if isinstance(value, bool):
+        return value, True
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value), True
+    return None, False
+
+
+def _read_override_controls(client: QLabOscClient) -> tuple[dict[str, Any], list[str]]:
+    overrides: dict[str, Any] = {}
+    warnings: list[str] = []
+    for key, endpoint in OVERRIDE_ENDPOINTS.items():
+        address = f"/overrides/{endpoint}"
+        try:
+            reply = client.request(address)
+            value = reply.data
+            enabled, normalized = _normalize_override_enabled(value)
+            item = {
+                "ok": True,
+                "status": reply.status,
+                "enabled": enabled,
+                "address": address,
+            }
+            if not normalized:
+                item["raw_value"] = value
+                item["status"] = "unexpected_data"
+            elif enabled is False:
+                warnings.append(f"Override disabled: {key}")
+            overrides[key] = item
+        except QLabReplyError as exc:
+            overrides[key] = {
+                "ok": False,
+                "status": exc.status,
+                "enabled": None,
+                "address": address,
+                "error": str(exc),
+            }
+        except OscTimeoutError as exc:
+            overrides[key] = {
+                "ok": False,
+                "status": "timeout",
+                "enabled": None,
+                "address": address,
+                "error": str(exc),
+            }
+        except Exception as exc:
+            overrides[key] = {
+                "ok": False,
+                "status": "error",
+                "enabled": None,
+                "address": address,
+                "error": str(exc),
+            }
+    return overrides, warnings
 
 
 def _apply_connect_permissions(
@@ -383,6 +455,9 @@ class WorkspaceConnectionMixin:
             "passcode_status": None,
             "connect_scopes": None,
             "workspace_mode": None,
+            "overrides_scope": "global_to_qlab_app",
+            "overrides": {},
+            "override_warnings": [],
             "message": "",
             "connection": _connection_metadata(self.client),
             "permissions": permissions,
@@ -517,6 +592,11 @@ class WorkspaceConnectionMixin:
         checks["show_mode"] = workspace_mode
         base_result["workspace_mode"] = workspace_mode
 
+        overrides, override_warnings = _read_override_controls(self.client)
+        base_result["overrides"] = overrides
+        base_result["override_warnings"] = override_warnings
+        warnings.extend(override_warnings)
+
         if not require_read_access:
             checks["read_access"] = {"ok": None, "skipped": True, "reason": "require_read_access is false"}
             if permissions["view"]["status"] == "not_checked":
@@ -617,6 +697,7 @@ class WorkspaceConnectionMixin:
             {
                 "read_workspace": True,
                 "workspace_overview": True,
+                "workspace_status": True,
                 "workspace_settings": True,
                 "workspace_setting_details": True,
                 "query_cues": True,

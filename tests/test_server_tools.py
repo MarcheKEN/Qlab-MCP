@@ -17,12 +17,14 @@ from qlab_mcp.server import (
     QUERY_CUES_TIMEOUT,
     UPDATE_CUES_TIMEOUT,
     WORKSPACE_OVERVIEW_TIMEOUT,
+    WORKSPACE_STATUS_TIMEOUT,
     WORKSPACE_SETTING_DETAILS_TIMEOUT,
     WORKSPACE_SETTINGS_TIMEOUT,
     WRITE_READINESS_TIMEOUT,
     _run_tool,
     mcp,
     qlab_get_workspace_overview,
+    qlab_get_workspace_status,
     qlab_get_cue_details,
     qlab_query_cues,
 )
@@ -55,6 +57,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert set(tools) == {
         "qlab_check_connection",
         "qlab_get_workspace_overview",
+        "qlab_get_workspace_status",
         "qlab_get_workspace_settings",
         "qlab_get_workspace_setting_details",
         "qlab_query_cues",
@@ -89,6 +92,17 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert overview.annotations.destructiveHint is False
     assert overview.annotations.idempotentHint is True
     assert overview.annotations.openWorldHint is True
+
+    status = tools["qlab_get_workspace_status"]
+    assert status.title == "Get QLab Workspace Status"
+    assert "Workspace Status" in status.description
+    assert status.inputSchema["properties"]["profile"]["default"] == "summary"
+    assert status.inputSchema["properties"]["profile"]["enum"] == ["summary", "technical"]
+    assert status.inputSchema["properties"]["max_cues_scanned"]["default"] == 1000
+    assert status.inputSchema["properties"]["sample_limit"]["maximum"] == 50
+    assert "sections" in status.outputSchema["properties"]
+    assert status.annotations.readOnlyHint is True
+    assert status.annotations.destructiveHint is False
 
     settings = tools["qlab_get_workspace_settings"]
     assert settings.title == "Get QLab Workspace Settings"
@@ -203,6 +217,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
             for name in (
                 "qlab_check_connection",
                 "qlab_get_workspace_overview",
+                "qlab_get_workspace_status",
                 "qlab_get_workspace_settings",
                 "qlab_get_workspace_setting_details",
                 "qlab_query_cues",
@@ -217,6 +232,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
     assert asyncio.run(tool_timeouts()) == {
         "qlab_check_connection": CHECK_CONNECTION_TIMEOUT,
         "qlab_get_workspace_overview": WORKSPACE_OVERVIEW_TIMEOUT,
+        "qlab_get_workspace_status": WORKSPACE_STATUS_TIMEOUT,
         "qlab_get_workspace_settings": WORKSPACE_SETTINGS_TIMEOUT,
         "qlab_get_workspace_setting_details": WORKSPACE_SETTING_DETAILS_TIMEOUT,
         "qlab_query_cues": QUERY_CUES_TIMEOUT,
@@ -309,6 +325,31 @@ def test_overview_public_tool_preserves_agent_summary(monkeypatch) -> None:
     assert payload["agent_summary"]["workspace_total_for_humans"] == "1417 cues in 7 lists"
     assert payload["agent_summary"]["id_only_counted_cues"] == 545
     assert payload["known_total_cues_meaning"] == "cue_items_including_cue_lists"
+
+
+def test_workspace_status_public_tool_preserves_sections(monkeypatch) -> None:
+    class FakeReader:
+        def get_workspace_status(self, **kwargs):
+            return {
+                "workspace_id": "ws-1",
+                "profile": "summary",
+                "sections": {
+                    "warnings_summary": {"source": "derived_from_cues", "available": True, "broken_count": 1},
+                    "logs": {"source": "not_exposed", "available": False},
+                },
+                "summary": {"cue_scan_completeness": "complete", "scanned_count": 12},
+                "limits": {"max_cues_scanned": 1000, "sample_limit": 10},
+                "warnings": [],
+                "errors": None,
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    result = qlab_get_workspace_status("ws-1")
+    payload = result.model_dump()
+
+    assert payload["sections"]["warnings_summary"]["broken_count"] == 1
+    assert payload["sections"]["logs"]["source"] == "not_exposed"
 
 
 def test_query_public_tool_preserves_completeness_fields(monkeypatch) -> None:

@@ -213,7 +213,11 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
     assert catalog["midi_basic"]["properties"]["note"]["path"] == "byte1"
     assert catalog["midi_basic"]["real_write_enabled"] is True
     assert catalog["timecode_basic"]["real_write_enabled"] is True
+    assert catalog["timecode_basic"]["properties"]["outputType"]["real_write_enabled"] is True
     assert catalog["timecode_basic"]["properties"]["timecodeFrameRate"]["path"] == "framerate"
+    assert catalog["timecode_basic"]["properties"]["timecodeFrameRate"]["args"][0]["validator"] == "timecode_framerate"
+    assert catalog["timecode_basic"]["properties"]["timecodeString"]["planned_only_reason"]
+    assert catalog["timecode_basic"]["properties"]["timecodeFormat"]["planned_only_reason"]
     assert catalog["target_basic"]["properties"]["cueTargetID"]["planned_only_reason"]
     assert catalog["light_basic"]["properties"]["lightCommandText"]["planned_only_reason"]
     assert catalog["fade_basic"]["properties"]["stopTargetWhenDone"]["planned_only_reason"]
@@ -570,6 +574,9 @@ def test_update_cues_rejects_empty_and_over_limit() -> None:
     client = BatchFakeWriteClient(QLabConfig(enable_write=False), cues={})
     reader = QLabReader(client)  # type: ignore[arg-type]
 
+    with pytest.raises(UnsafeWriteOperationError, match="updates must be a list"):
+        reader.update_cues("ws-1", "not-a-list", dry_run=True)  # type: ignore[arg-type]
+
     with pytest.raises(UnsafeWriteOperationError, match="at least one"):
         reader.update_cues("ws-1", [], dry_run=True)
 
@@ -580,6 +587,171 @@ def test_update_cues_rejects_empty_and_over_limit() -> None:
             dry_run=True,
         )
 
+    assert client.requests == []
+
+
+def test_update_cues_dry_run_reports_invalid_property_value_per_item() -> None:
+    memo_id = "11111111-1111-4111-8111-111111111111"
+    group_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={
+            memo_id: {"type": "Memo", "name": "Memo old"},
+            group_id: {"type": "Group", "preWait": 0},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": memo_id, "properties": {"name": "Memo old"}},
+            {"cue_ref": group_id, "properties": {"preWait": -1}},
+        ],
+        dry_run=True,
+    )
+
+    addresses = [request[0] for request in client.requests]
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["dry_run"] is True
+    assert result["requested_count"] == 2
+    assert result["failed_count"] == 1
+    assert result["results"][0]["status"] == "dry_run"
+    assert result["results"][1]["status"] == "dry_run_preflight_failed"
+    assert result["results"][1]["errors"]["validation"] == "preWait must be a non-negative number"
+    assert f"/workspace/ws-1/cue_id/{memo_id}/valuesForKeys" in addresses
+    assert f"/workspace/ws-1/cue_id/{group_id}/valuesForKeys" not in addresses
+    assert f"/workspace/ws-1/cue_id/{memo_id}/name" not in addresses
+    assert f"/workspace/ws-1/cue_id/{group_id}/preWait" not in addresses
+
+
+def test_update_cues_dry_run_reports_video_opacity_validation_per_item() -> None:
+    video_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={video_id: {"type": "Video", "opacity": 1}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": video_id, "profile": "video_basic", "properties": {"opacity": 0.8}},
+            {"cue_ref": video_id, "profile": "video_basic", "properties": {"opacity": 80}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["requested_count"] == 2
+    assert result["results"][0]["status"] == "dry_run"
+    assert result["results"][0]["properties"]["opacity"] == 0.8
+    assert result["results"][1]["status"] == "dry_run_preflight_failed"
+    assert result["results"][1]["errors"]["validation"] == "opacity must be a number from 0 to 1"
+
+
+def test_update_cues_dry_run_reports_text_rgba_validation_per_item() -> None:
+    valid_text_id = "11111111-1111-4111-8111-111111111111"
+    invalid_text_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={
+            valid_text_id: {"type": "Text"},
+            invalid_text_id: {"type": "Text"},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": valid_text_id,
+                "profile": "text_basic",
+                "operations": [
+                    {"property": "text/format/color", "args": {"red": 1, "green": 0.5, "blue": 0, "alpha": 1}}
+                ],
+            },
+            {
+                "cue_ref": invalid_text_id,
+                "profile": "text_basic",
+                "operations": [
+                    {"property": "text/format/color", "args": {"red": 255, "green": 0, "blue": 0, "alpha": 1}}
+                ],
+            }
+        ],
+        dry_run=True,
+    )
+
+    addresses = [request[0] for request in client.requests]
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["status"] == "dry_run"
+    assert result["results"][1]["status"] == "dry_run_preflight_failed"
+    assert result["results"][1]["errors"]["validation"] == "text/format/color.red must be a number from 0 to 1"
+    assert "read_before" not in result["results"][1]["errors"]
+    assert f"/workspace/ws-1/cue_id/{valid_text_id}/valuesForKeys" in addresses
+    assert f"/workspace/ws-1/cue_id/{invalid_text_id}/valuesForKeys" not in addresses
+
+
+def test_update_cues_dry_run_reports_invalid_continue_mode_per_item() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Memo", "continueMode": 0}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "properties": {"continueMode": "bad_mode"}}],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"]["validation"] == (
+        "continueMode must be 0, 1, 2, do_not_continue, auto_continue, or auto_follow"
+    )
+
+
+def test_update_cues_dry_run_reports_invalid_cue_ref_per_item_without_reading() -> None:
+    client = BatchFakeWriteClient(QLabConfig(enable_write=False), cues={})
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": "selected", "properties": {"name": "Nope"}}],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert "concrete cue" in result["results"][0]["errors"]["cue_ref"]
+    assert client.requests == []
+
+
+def test_update_cues_dry_run_reports_invalid_profile_per_item() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Memo"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "bad_profile", "properties": {"name": "Nope"}}],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert "update profile is not allowed" in result["results"][0]["errors"]["profile"]
     assert client.requests == []
 
 
@@ -611,6 +783,45 @@ def test_update_cues_real_preflight_failure_blocks_all_setters() -> None:
     assert "Audio cue" in result["results"][1]["errors"]["profile"]
     assert f"/workspace/ws-1/cue_id/{memo_id}/name" not in addresses
     assert f"/workspace/ws-1/cue_id/{audio_id}/rate" not in addresses
+
+
+def test_update_cues_real_preflight_invalid_value_blocks_all_setters_without_secret_leak() -> None:
+    memo_id = "11111111-1111-4111-8111-111111111111"
+    group_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            memo_id: {"type": "Memo", "name": "Memo old"},
+            group_id: {"type": "Group", "preWait": 0},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": memo_id, "properties": {"name": "Memo new"}},
+            {"cue_ref": group_id, "properties": {"preWait": -1}},
+        ],
+        dry_run=False,
+    )
+
+    addresses = [request[0] for request in client.requests]
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["dry_run"] is False
+    assert result["requested_count"] == 2
+    assert result["failed_count"] == 1
+    assert result["results"][0]["status"] == "planned"
+    assert result["results"][1]["status"] == "preflight_failed"
+    assert result["results"][1]["errors"]["validation"] == "preWait must be a non-negative number"
+    assert "read_before" not in result["results"][1]["errors"]
+    assert result["message"] == "Batch cue update was blocked during preflight; no mutating OSC commands were sent."
+    assert f"/workspace/ws-1/cue_id/{memo_id}/valuesForKeys" in addresses
+    assert f"/workspace/ws-1/cue_id/{group_id}/valuesForKeys" not in addresses
+    assert f"/workspace/ws-1/cue_id/{memo_id}/name" not in addresses
+    assert f"/workspace/ws-1/cue_id/{group_id}/preWait" not in addresses
+    assert "server-pass" not in repr(result)
 
 
 def test_update_cues_real_updates_mixed_safe_profiles() -> None:
@@ -1191,6 +1402,32 @@ def test_update_cue_text_basic_rejects_invalid_values_before_osc() -> None:
     assert client.requests == []
 
 
+def test_update_cue_video_opacity_uses_qlab_unit_interval() -> None:
+    client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None))
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    with pytest.raises(UnsafeWriteOperationError, match="opacity must be a number from 0 to 1"):
+        reader.update_cue("ws-1", "1", {"opacity": 80}, dry_run=True, profile="video_basic")
+
+    assert client.requests == []
+
+
+def test_update_cue_text_color_components_use_qlab_unit_interval() -> None:
+    client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None))
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    with pytest.raises(UnsafeWriteOperationError, match="text/format/color.red must be a number from 0 to 1"):
+        reader.update_cue(
+            "ws-1",
+            "1",
+            operations=[{"property": "text/format/color", "args": {"red": 255, "green": 0, "blue": 0, "alpha": 1}}],
+            dry_run=True,
+            profile="text_basic",
+        )
+
+    assert client.requests == []
+
+
 def test_update_cue_text_basic_rejects_non_text_before_setters() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = FakeWriteClient(
@@ -1278,7 +1515,7 @@ def test_update_cue_operations_support_video_text_and_midi_dry_run_shapes() -> N
         operations=[
             {
                 "property": "text/format/color",
-                "args": {"red": 255, "green": 128, "blue": 0, "alpha": 1},
+                "args": {"red": 1, "green": 0.5, "blue": 0, "alpha": 1},
             }
         ],
         dry_run=True,
@@ -1305,7 +1542,7 @@ def test_update_cue_operations_support_video_text_and_midi_dry_run_shapes() -> N
     assert video_setter["address"] == f"/workspace/ws-1/cue_id/{cue_id}/crop"
     assert video_setter["args"] == [1, 2, 3, 4]
     assert text_setter["address"] == f"/workspace/ws-1/cue_id/{cue_id}/text/format/color"
-    assert text_setter["args"] == [255, 128, 0, 1]
+    assert text_setter["args"] == [1, 0.5, 0, 1]
     assert midi_setters == [f"/workspace/ws-1/cue_id/{cue_id}/channel", f"/workspace/ws-1/cue_id/{cue_id}/byte1"]
 
 
@@ -1348,6 +1585,7 @@ def test_update_cue_real_blocks_dry_run_only_profiles_and_properties_before_osc(
         ("light_basic", "Light", {"lightCommandText": "1 thru 5 @ 80"}),
         ("network_basic", "Network", {"message": "/eos/cue/1/fire"}),
         ("midi_basic", "MIDI", {"note": 64}),
+        ("timecode_basic", "Timecode", {"timecodeString": "01:00:00:00"}),
         ("script_basic", "Script", {"scriptSource": "display dialog \"blocked\""}),
     ):
         client = FakeWriteClient(
@@ -1361,14 +1599,62 @@ def test_update_cue_real_blocks_dry_run_only_profiles_and_properties_before_osc(
         assert client.requests == []
 
 
+def test_update_cue_timecode_frame_rate_uses_documented_framerate_path() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=False, passcode=None),
+        existing_cue_id=cue_id,
+        cue_values={"uniqueID": cue_id, "type": "Timecode", "framerate": 3},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cue(
+        "ws-1",
+        cue_id,
+        {"timecodeFrameRate": 0},
+        dry_run=True,
+        profile="timecode_basic",
+    )
+
+    planned_setters = [
+        operation for operation in result["planned_operations"] if operation["operation"] == "set_property"
+    ]
+    assert result["ok"] is True
+    assert result["properties"] == {"framerate": 0}
+    assert planned_setters == [
+        {
+            "operation": "set_property",
+            "property": "timecodeFrameRate",
+            "address": f"/workspace/ws-1/cue_id/{cue_id}/framerate",
+            "args": [0],
+            "mode": "saved",
+            "risk_tier": "medium",
+            "real_write_enabled": True,
+        }
+    ]
+
+
+def test_update_cue_timecode_rejects_invalid_output_type_and_frame_rate() -> None:
+    client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None))
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    with pytest.raises(UnsafeWriteOperationError, match="outputType must be 0 for MTC or 1 for LTC"):
+        reader.update_cue("ws-1", "1", {"outputType": 2}, dry_run=True, profile="timecode_basic")
+
+    with pytest.raises(UnsafeWriteOperationError, match="timecodeFrameRate must be a timecode frame rate index"):
+        reader.update_cue("ws-1", "1", {"timecodeFrameRate": 8}, dry_run=True, profile="timecode_basic")
+
+    assert client.requests == []
+
+
 @pytest.mark.parametrize(
     ("profile", "cue_type", "properties"),
     [
         ("mic_basic", "Mic", {"channels": 2, "channelOffset": 1}),
-        ("video_basic", "Video", {"translation/x": 100, "opacity": 80, "cropTop": 5}),
+        ("video_basic", "Video", {"translation/x": 100, "opacity": 0.8, "cropTop": 5}),
         ("camera_basic", "Camera", {"scale/x": 1.2, "rotation": 15, "channels": 2}),
         ("midi_file_basic", "MIDI File", {"rate": 1.1, "startTime": 0, "endTime": 8, "playCount": 2}),
-        ("timecode_basic", "Timecode", {"timecodeString": "01:00:00:00", "timecodeFormat": 1}),
+        ("timecode_basic", "Timecode", {"outputType": 1, "startTime": "01:00:00:00"}),
         ("target_basic", "Start", {"name": "Start cue renamed"}),
         ("reset_basic", "Reset", {"name": "Reset cue renamed"}),
         ("devamp_basic", "Devamp", {"name": "Devamp cue renamed"}),
@@ -1388,7 +1674,7 @@ def test_update_cue_real_updates_new_safe_profiles(profile: str, cue_type: str, 
         "channels": 1,
         "channelOffset": 0,
         "translation/x": 0,
-        "opacity": 100,
+        "opacity": 1,
         "cropTop": 0,
         "scale/x": 1,
         "rotation": 0,
@@ -1396,8 +1682,7 @@ def test_update_cue_real_updates_new_safe_profiles(profile: str, cue_type: str, 
         "startTime": 0,
         "endTime": 10,
         "playCount": 1,
-        "timecodeString": "00:00:00:00",
-        "timecodeFormat": 0,
+        "outputType": 0,
     }
     client = FakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass", cache_ttl=10),

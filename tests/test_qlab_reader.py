@@ -4334,6 +4334,7 @@ class QLabReaderTests(unittest.TestCase):
             ("Text", "text_basic", ("text/format/color",)),
             ("Network", "network_basic", ("message", "oscMessage")),
             ("Light", "light_basic", ("lightCommandText", "setLight")),
+            ("Timecode", "timecode_basic", ("timecodeString", "timecodeFormat")),
             ("Script", "script_basic", ("scriptSource", "scriptText")),
         )
         for cue_type, expected_profile, dry_run_props in cases:
@@ -4361,6 +4362,30 @@ class QLabReaderTests(unittest.TestCase):
                 for prop in dry_run_props:
                     self.assertIn(prop, capabilities["dry_run_only_properties"])
                     self.assertNotIn(prop, capabilities["real_write_properties"])
+
+    def test_editable_profile_exposes_documented_timecode_update_capabilities(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "number": "10",
+                "name": "TC",
+                "displayName": "TC",
+                "type": "Timecode",
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "editable")
+
+        capabilities = result["update_capabilities"]
+        self.assertEqual(capabilities["recommended_profile"], "timecode_basic")
+        for prop in ("outputType", "timecodeFrameRate", "startTime", "endTime"):
+            self.assertIn(prop, capabilities["real_write_properties"])
+        self.assertEqual(capabilities["operations"]["timecodeFrameRate"]["path"], "framerate")
+        self.assertEqual(capabilities["validators"]["timecodeFrameRate"]["value"], "timecode_framerate")
+        self.assertIn("timecodeString", capabilities["dry_run_only_properties"])
+        self.assertIn("timecodeFormat", capabilities["dry_run_only_properties"])
 
     def test_health_profile_redacts_file_target_but_reports_presence(self) -> None:
         responses = {

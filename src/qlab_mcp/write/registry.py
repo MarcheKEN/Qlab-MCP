@@ -119,7 +119,7 @@ def _planned_patch_refs(prefix: str, *, validator: str) -> tuple[CuePropertySpec
 
 
 def _rgba_args() -> tuple[tuple[str, str], ...]:
-    return (("red", "color_component"), ("green", "color_component"), ("blue", "color_component"), ("alpha", "alpha"))
+    return (("red", "unit_interval"), ("green", "unit_interval"), ("blue", "unit_interval"), ("alpha", "unit_interval"))
 
 
 def _group_properties() -> tuple[CuePropertySpec, ...]:
@@ -382,10 +382,27 @@ MIDI_FILE_CATALOG_PROPERTIES = (
 )
 
 TIMECODE_CATALOG_PROPERTIES = (
-    _prop("timecodeMode", "int", risk_tier="medium", real_write_enabled=True),
-    _prop("timecodeString", "string", risk_tier="medium", real_write_enabled=True),
-    _prop("timecodeFormat", "int", risk_tier="medium", real_write_enabled=True),
-    _prop("timecodeFrameRate", "positive_int", path="framerate", read_key="framerate", risk_tier="medium", real_write_enabled=True),
+    _prop("outputType", "timecode_output_type", risk_tier="medium", real_write_enabled=True),
+    _planned_prop(
+        "timecodeMode",
+        "timecode_output_type",
+        path="outputType",
+        read_key="outputType",
+        reason="use_documented_outputType_for_timecode_output_mode",
+    ),
+    _planned_prop(
+        "timecodeString",
+        "string",
+        reason="timecodeString_is_documented_for_midi_msc_not_timecode_cues",
+    ),
+    _planned_prop(
+        "timecodeFormat",
+        "timecode_framerate",
+        path="framerate",
+        read_key="framerate",
+        reason="use_documented_timecodeFrameRate_for_timecode_framerate",
+    ),
+    _prop("timecodeFrameRate", "timecode_framerate", path="framerate", read_key="framerate", risk_tier="medium", real_write_enabled=True),
     _prop("startTime", "string", risk_tier="medium", real_write_enabled=True),
     _prop("endTime", "string", risk_tier="medium", real_write_enabled=True),
     *_planned_patch_refs("audioOutputPatch", validator="patch_ref"),
@@ -852,12 +869,16 @@ def _validate_value(validator: str, value: Any) -> Any:
             raise UnsafeWriteOperationError("rate must be a number from 0.03 to 33.0")
         return number
     if validator == "opacity":
-        number = _number(value, "opacity must be a number from 0 to 100")
-        if number < 0 or number > 100:
-            raise UnsafeWriteOperationError("opacity must be a number from 0 to 100")
+        number = _number(value, "opacity must be a number from 0 to 1")
+        if number < 0 or number > 1:
+            raise UnsafeWriteOperationError("opacity must be a number from 0 to 1")
         return number
     if validator == "continue_mode":
         return _continue_mode(value)
+    if validator == "timecode_output_type":
+        return _int_range(value, 0, 1, "value must be 0 for MTC or 1 for LTC")
+    if validator == "timecode_framerate":
+        return _int_range(value, 0, 7, "value must be a timecode frame rate index from 0 to 7")
     if validator == "text_alignment":
         return _enum_string(value, {"left", "center", "right", "justify"}, "value must be left, center, right, or justify")
     if validator == "text_line_style":
@@ -868,12 +889,10 @@ def _validate_value(validator: str, value: Any) -> Any:
         return _int_range(value, 0, 16383, "value must be an integer from 0 to 16383")
     if validator == "midi_channel":
         return _int_range(value, 1, 16, "value must be an integer from 1 to 16")
-    if validator == "color_component":
-        return _int_range(value, 0, 255, "color component must be an integer from 0 to 255")
-    if validator == "alpha":
-        number = _number(value, "alpha must be a number from 0 to 1")
+    if validator == "unit_interval":
+        number = _number(value, "value must be a number from 0 to 1")
         if number < 0 or number > 1:
-            raise UnsafeWriteOperationError("alpha must be a number from 0 to 1")
+            raise UnsafeWriteOperationError("value must be a number from 0 to 1")
         return number
     if validator == "dict_or_json_string":
         if isinstance(value, (dict, list)) or isinstance(value, str):
@@ -903,10 +922,6 @@ def _validate_named_value(name: str, validator: str, value: Any) -> Any:
             message = message.replace("rate must", f"{name} must", 1)
         elif message.startswith("opacity must"):
             message = message.replace("opacity must", f"{name} must", 1)
-        elif message.startswith("color component must"):
-            message = message.replace("color component must", f"{name} must", 1)
-        elif message.startswith("alpha must"):
-            message = message.replace("alpha must", f"{name} must", 1)
         raise UnsafeWriteOperationError(message) from exc
 
 

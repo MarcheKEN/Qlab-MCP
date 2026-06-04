@@ -204,16 +204,16 @@ class QLabWriteMixin:
         operations: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Compatibility wrapper for local Python callers; MCP exposes qlab_update_cues."""
+        raw_update = {
+            "cue_ref": cue_ref,
+            "profile": profile or COMMON_UPDATE_PROFILE,
+            "properties": properties,
+            "operations": operations,
+        }
+        _normalize_batch_update_item(raw_update)
         batch = self.update_cues(
             workspace_id,
-            [
-                {
-                    "cue_ref": cue_ref,
-                    "profile": profile or COMMON_UPDATE_PROFILE,
-                    "properties": properties,
-                    "operations": operations,
-                }
-            ],
+            [raw_update],
             dry_run=dry_run,
         )
         item = dict(batch["results"][0])
@@ -258,14 +258,17 @@ class QLabWriteMixin:
         if len(updates) > MAX_BATCH_UPDATES:
             raise UnsafeWriteOperationError(f"updates can include at most {MAX_BATCH_UPDATES} cue updates")
         effective_dry_run = resolve_dry_run(self, dry_run)
-        items = [_normalize_batch_update_item(raw_update) for raw_update in updates]
+        items = [_normalize_batch_update_item_for_batch(raw_update) for raw_update in updates]
 
         if effective_dry_run:
             results = []
             for item in items:
-                before, errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
-                profile_errors = _validate_profile_for_before(item["profile"], before)
-                errors.update(profile_errors)
+                errors = dict(item.get("errors") or {})
+                before = None
+                if not errors and item["cue_ref"]:
+                    before, read_errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
+                    errors.update(read_errors)
+                    errors.update(_validate_profile_for_before(item["profile"], before))
                 cue_id = _resolved_cue_id(before)
                 results.append(
                     _batch_item_result(
@@ -285,12 +288,13 @@ class QLabWriteMixin:
                 dry_run=True,
                 results=results,
                 status="dry_run" if failed_count == 0 else "preflight_failed",
-                requested_count=len(items),
+                requested_count=len(updates),
                 warnings=["Dry run only: no mutating OSC commands were sent to QLab."],
             )
 
         for item in items:
-            ensure_real_write_allowed(item["profile"], item["operations"])
+            if not item.get("errors"):
+                ensure_real_write_allowed(item["profile"], item["operations"])
         workspace = ensure_write_ready(self, workspace)
 
         read_cache = getattr(self, "_read_cache", shared_read_cache())
@@ -298,12 +302,17 @@ class QLabWriteMixin:
         preflight_results: list[dict[str, Any]] = []
         preflight_ok = True
         for item in items:
-            before, before_errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
+            before = None
+            before_errors: dict[str, str] = {}
+            errors = dict(item.get("errors") or {})
+            if not errors and item["cue_ref"]:
+                before, before_errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
             resolved_cue_id = _resolved_cue_id(before)
-            errors = dict(before_errors)
-            if before is None or not resolved_cue_id:
+            errors.update(before_errors)
+            if not item.get("errors") and (before is None or not resolved_cue_id):
                 errors.setdefault("cue", "Cue could not be read before update.")
-            errors.update(_validate_profile_for_before(item["profile"], before))
+            if not item.get("errors"):
+                errors.update(_validate_profile_for_before(item["profile"], before))
             if errors:
                 preflight_ok = False
             preflight_results.append(
@@ -326,7 +335,7 @@ class QLabWriteMixin:
                 dry_run=False,
                 results=preflight_results,
                 status="preflight_failed",
-                requested_count=len(items),
+                requested_count=len(updates),
                 errors={"preflight": "One or more cue updates failed preflight; no setters were sent."},
             )
 
@@ -438,7 +447,7 @@ class QLabWriteMixin:
             dry_run=False,
             results=final_results,
             status=status,
-            requested_count=len(items),
+            requested_count=len(updates),
             timeout_confirmed_count=timeout_confirmed_count,
         )
 
@@ -462,23 +471,63 @@ def _clean_update_cue_ref(cue_ref: str) -> str:
 
 
 def _normalize_batch_update_item(raw_update: Any) -> dict[str, Any]:
+    item = _normalize_batch_update_item_for_batch(raw_update)
+    if item.get("errors"):
+        raise UnsafeWriteOperationError("; ".join(str(message) for message in item["errors"].values()))
+    return item
+
+
+def _normalize_batch_update_item_for_batch(raw_update: Any) -> dict[str, Any]:
     if hasattr(raw_update, "model_dump"):
         raw_update = raw_update.model_dump()
     if not isinstance(raw_update, dict):
-        raise UnsafeWriteOperationError("each update must be an object")
-    cue = _clean_update_cue_ref(raw_update.get("cue_ref", ""))
-    profile = validate_update_profile(raw_update.get("profile") or COMMON_UPDATE_PROFILE)
-    properties, operations = normalize_update_request(
-        profile,
-        raw_update.get("properties"),
-        raw_update.get("operations"),
-    )
+        return _invalid_batch_update_item("", COMMON_UPDATE_PROFILE, {"update": "each update must be an object"})
+
+    errors: dict[str, str] = {}
+    raw_cue_ref = raw_update.get("cue_ref", "")
+    try:
+        cue = _clean_update_cue_ref(raw_cue_ref)
+    except Exception as exc:
+        cue = str(raw_cue_ref or "")
+        errors["cue_ref"] = str(exc)
+
+    raw_profile = raw_update.get("profile") or COMMON_UPDATE_PROFILE
+    try:
+        profile = validate_update_profile(raw_profile)
+    except Exception as exc:
+        profile = str(raw_profile or COMMON_UPDATE_PROFILE)
+        errors["profile"] = str(exc)
+
+    properties: dict[str, Any] = {}
+    operations: list[dict[str, Any]] = []
+    if "profile" not in errors:
+        try:
+            properties, operations = normalize_update_request(
+                profile,
+                raw_update.get("properties"),
+                raw_update.get("operations"),
+            )
+        except Exception as exc:
+            errors["validation"] = str(exc)
+
     return {
         "cue_ref": cue,
         "profile": profile,
         "properties": properties,
         "operations": operations,
         "read_keys": read_keys_for_operations(operations),
+        "errors": errors or None,
+    }
+
+
+def _invalid_batch_update_item(cue_ref: str, profile: str, errors: dict[str, str]) -> dict[str, Any]:
+    return {
+        "cue_ref": cue_ref,
+        "profile": profile,
+        "properties": {},
+        "operations": [],
+        "read_keys": read_keys_for_operations([]),
+        "errors": errors,
     }
 
 

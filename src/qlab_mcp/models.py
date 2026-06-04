@@ -321,7 +321,7 @@ class CueUpdateInput(BaseModel):
             "Ambiguous refs such as selected, active, playhead, and playbackPosition are rejected."
         ),
     )
-    profile: UpdateCueProfile = Field(
+    profile: str = Field(
         default="common",
         description=(
             "Update registry profile for this cue. Each batch item may use a different profile; "

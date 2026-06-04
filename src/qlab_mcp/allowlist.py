@@ -210,6 +210,7 @@ TYPE_SPECIFIC_PROPERTIES = {
     "timecodeString",
     "timecodeFormat",
     "timecodeMode",
+    "outputType",
     "timecodeFrameRate",
     "framerate",
     "stopTargetWhenDone",

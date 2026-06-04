@@ -203,6 +203,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert update_item["cue_ref"]["minLength"] == 1
     assert "Ambiguous refs" in update_item["cue_ref"]["description"]
     assert "qlab_get_cue_details" in update_item["profile"]["description"]
+    assert "enum" not in update_item["profile"]
     assert "updated_with_confirmed_timeouts" in update.outputSchema["properties"]["status"]["enum"]
     assert "per cue item" in update.outputSchema["properties"]["timeout_confirmed_count"]["description"]
     result_item = update.outputSchema["properties"]["results"]["items"]["properties"]

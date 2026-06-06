@@ -205,6 +205,46 @@ def _cue_matches_filter(cue: dict[str, Any], cue_ref: dict[str, Any], query_filt
     raise ValueError(f"Unknown cue query filter {filter_name!r}")
 
 
+def _query_workspace_resolution_error(
+    workspace_id: str,
+    filters: list[dict[str, Any]],
+    profile: str,
+    max_results: int,
+    max_cues_scanned: int,
+    status: str,
+    message: str,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": status,
+        "error_code": status,
+        "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+        "workspace_id": workspace_id,
+        "filters": filters,
+        "profile": profile,
+        "scanned_count": 0,
+        "matched_count": 0,
+        "returned_count": 0,
+        "total_cue_ids": 0,
+        "query_completeness": "failed",
+        "query_completeness_reasons": ["workspace_resolution"],
+        "id_only_unscanned_count": 0,
+        "omitted_branches": [],
+        "partial_branches": [],
+        "truncated": False,
+        "truncation_reasons": [],
+        "scanned_all_cues": False,
+        "result_limited": False,
+        "limits": {
+            "max_results": max_results,
+            "max_cues_scanned": max_cues_scanned,
+        },
+        "cues": [],
+        "warnings": ["Requested workspace could not be resolved."],
+        "errors": {"workspace_resolution": message},
+    }
+
+
 class CueQueryMixin:
     def query_cues(
         self,
@@ -230,10 +270,22 @@ class CueQueryMixin:
             *_normalize_optional_filters(optional_filters),
         ]
         cacheable = not _query_uses_live_state(filters)
+        try:
+            resolved_workspace_id = self._resolve_workspace_id_strict(workspace_id)
+        except Exception as exc:
+            return _query_workspace_resolution_error(
+                _clean_workspace_id(workspace_id),
+                filters,
+                profile,
+                max_results,
+                max_cues_scanned,
+                getattr(exc, "status", "workspace_not_found"),
+                str(exc),
+            )
 
         bounded = _bounded_cue_refs_from_shallow(
             self,
-            workspace_id,
+            resolved_workspace_id,
             limit=max_cues_scanned,
             max_depth=None,
             cacheable=cacheable,
@@ -258,7 +310,7 @@ class CueQueryMixin:
             scanned_count += 1
             try:
                 values = self.read_cue_values(
-                    workspace_id,
+                    resolved_workspace_id,
                     str(cue_id),
                     keys,
                     cache_profile=profile,
@@ -329,7 +381,7 @@ class CueQueryMixin:
             )
         truncated = bool(truncation_reasons)
         return {
-            "workspace_id": _clean_workspace_id(workspace_id),
+            "workspace_id": resolved_workspace_id,
             "filters": filters,
             "profile": profile,
             "scanned_count": scanned_count,

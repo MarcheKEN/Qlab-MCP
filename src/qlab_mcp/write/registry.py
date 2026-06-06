@@ -12,6 +12,23 @@ from ..errors import UnsafeWriteOperationError
 COMMON_UPDATE_PROFILE = "common"
 AUDIO_BASIC_UPDATE_PROFILE = "audio_basic"
 TEXT_BASIC_UPDATE_PROFILE = "text_basic"
+QLAB_COLOR_NAMES = {
+    "none",
+    "red",
+    "orange",
+    "yellow",
+    "green",
+    "blue",
+    "purple",
+    "cyan",
+    "magenta",
+    "pink",
+    "hot pink",
+    "white",
+    "black",
+    "gray",
+    "grey",
+}
 
 
 @dataclass(frozen=True)
@@ -153,7 +170,7 @@ COMMON_PROPERTIES = (
     _prop("notes", "string", real_write_enabled=True),
     _prop("armed", "boolean", real_write_enabled=True),
     _prop("flagged", "boolean", real_write_enabled=True),
-    _prop("colorName", "string", real_write_enabled=True),
+    _prop("colorName", "color_name", real_write_enabled=True),
     _prop("preWait", "non_negative_number", real_write_enabled=True),
     _prop("postWait", "non_negative_number", real_write_enabled=True),
     _prop("duration", "non_negative_number", real_write_enabled=True),
@@ -875,6 +892,8 @@ def _validate_value(validator: str, value: Any) -> Any:
         return number
     if validator == "continue_mode":
         return _continue_mode(value)
+    if validator == "color_name":
+        return _color_name(value)
     if validator == "timecode_output_type":
         return _int_range(value, 0, 1, "value must be 0 for MTC or 1 for LTC")
     if validator == "timecode_framerate":
@@ -922,6 +941,8 @@ def _validate_named_value(name: str, validator: str, value: Any) -> Any:
             message = message.replace("rate must", f"{name} must", 1)
         elif message.startswith("opacity must"):
             message = message.replace("opacity must", f"{name} must", 1)
+        elif message.startswith("colorName must"):
+            message = message.replace("colorName must", f"{name} must", 1)
         raise UnsafeWriteOperationError(message) from exc
 
 
@@ -950,6 +971,16 @@ def _enum_string(value: Any, allowed: set[str], message: str) -> str:
     normalized = value.strip().casefold()
     if normalized not in allowed:
         raise UnsafeWriteOperationError(message)
+    return normalized
+
+
+def _color_name(value: Any) -> str:
+    if not isinstance(value, str):
+        raise UnsafeWriteOperationError("colorName must be a string")
+    normalized = value.strip()
+    if normalized.casefold() not in QLAB_COLOR_NAMES:
+        allowed = ", ".join(sorted(QLAB_COLOR_NAMES))
+        raise UnsafeWriteOperationError(f"colorName must be one of: {allowed}")
     return normalized
 
 

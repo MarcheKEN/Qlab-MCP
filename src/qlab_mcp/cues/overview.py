@@ -281,6 +281,102 @@ def _global_cue_count_with_fallback(reader: Any, workspace_id: str) -> dict[str,
     }
 
 
+def _overview_workspace_resolution_error(workspace_id: str, status: str, message: str) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": status,
+        "error_code": status,
+        "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+        "workspace_id": workspace_id,
+        "workspace": None,
+        "cue_count": 0,
+        "cue_count_meaning": "failed",
+        "known_total_cues": None,
+        "known_total_cues_status": "failed",
+        "known_total_cues_source": "workspace_resolution",
+        "known_total_cues_meaning": KNOWN_TOTAL_CUES_MEANING,
+        "summary": {
+            "total_cue_ids": 0,
+            "total_cue_ids_status": "failed",
+            "total_cue_ids_source": "workspace_resolution",
+            "total_cue_ids_meaning": "inspected_cues",
+            "known_total_cues": None,
+            "known_total_cues_status": "failed",
+            "known_total_cues_source": "workspace_resolution",
+            "known_total_cues_meaning": KNOWN_TOTAL_CUES_MEANING,
+            "global_unique_ids_used": False,
+            "inspected_cues": 0,
+            "returned_cues": 0,
+            "cue_lists": 0,
+            "types": {},
+            "colors": {},
+            "armed": 0,
+            "disarmed": 0,
+            "flagged": 0,
+            "broken": None,
+            "warning": None,
+            "health_counts_status": "failed",
+            "health_counts_source": "workspace_resolution",
+            "health_counts": {"broken": 0, "warning": 0, "broken_known": 0, "warning_known": 0, "unknown_cues": 0},
+            "max_depth_returned": 0,
+        },
+        "agent_summary": {
+            "workspace_total_for_humans": None,
+            "workspace_total_status": "failed",
+            "known_total_cue_items": None,
+            "cue_lists": 0,
+            "metadata_inspected_cues": 0,
+            "id_only_counted_cues": None,
+            "metadata_partial": True,
+            "main_partial_branches": [],
+        },
+        "cue_lists": [],
+        "cue_index": {
+            "profile": "minimal",
+            "columns": [],
+            "rows": [],
+            "total_cue_ids": 0,
+            "indexed_count": 0,
+            "truncated": False,
+            "max_index_cues": 0,
+            "errors": None,
+        },
+        "editorial_health": {
+            "source": "workspace_resolution",
+            "inspected_cues": 0,
+            "name_empty": {"count": 0, "examples": [], "truncated": False, "example_limit": 25},
+            "displayName_empty": {"count": 0, "examples": [], "truncated": False, "example_limit": 25},
+            "number_empty": {"count": 0, "examples": [], "truncated": False, "example_limit": 25},
+            "ambiguous_label": {"count": 0, "examples": [], "truncated": False, "example_limit": 25},
+            "duplicate_names": {"group_count": 0, "cue_count": 0, "examples": [], "truncated": False, "example_limit": 25},
+            "duplicate_numbers": {"group_count": 0, "cue_count": 0, "examples": [], "truncated": False, "example_limit": 25},
+        },
+        "limits": {
+            "max_depth": 0,
+            "max_cues": 0,
+            "truncated": False,
+            "truncation_reasons": [],
+            "count_status": {
+                "total_cue_ids": "failed",
+                "total_cue_ids_meaning": "inspected_cues",
+                "known_total_cues": None,
+                "known_total_cues_status": "failed",
+                "known_total_cues_source": "workspace_resolution",
+                "known_total_cues_meaning": KNOWN_TOTAL_CUES_MEANING,
+                "source": "workspace_resolution",
+                "global_unique_ids_used": False,
+                "global_count_read_transport": None,
+                "inspected_cues": 0,
+                "returned_cues": 0,
+            },
+            "child_read_errors": [],
+        },
+        "warnings": ["Requested workspace could not be resolved."],
+        "errors": {"workspace_resolution": message},
+        "live_state": None,
+    }
+
+
 class CueOverviewMixin:
     def get_workspace_overview(
         self,
@@ -310,7 +406,17 @@ class CueOverviewMixin:
 
         workspaces_result = self.get_workspaces()
         workspaces = workspaces_result.get("workspaces") or []
-        workspace = self._resolve_workspace(workspaces, workspace_id)
+        if workspace_id is not None:
+            try:
+                workspace = self._resolve_workspace_strict(workspaces, workspace_id)
+            except Exception as exc:
+                return _overview_workspace_resolution_error(
+                    _clean_workspace_id(workspace_id),
+                    getattr(exc, "status", "workspace_not_found"),
+                    str(exc),
+                )
+        else:
+            workspace = self._resolve_workspace(workspaces, workspace_id)
         resolved_workspace_id = _clean_workspace_id(workspace.get("uniqueID") or workspace_id or "")
         workspace_mode = read_workspace_mode(self.client, resolved_workspace_id, authenticated=True)
 

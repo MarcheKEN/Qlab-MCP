@@ -70,6 +70,50 @@ def _numbers_equal(left: Any, right: Any) -> bool:
         return left == right
 
 
+def _workspace_status_limits(max_cues_scanned: int, sample_limit: int) -> dict[str, int]:
+    return {
+        "max_cues_scanned": max_cues_scanned,
+        "sample_limit": sample_limit,
+    }
+
+
+def _workspace_status_failed_summary() -> dict[str, Any]:
+    return {
+        "available_sections": [],
+        "unavailable_sections": [],
+        "cue_scan_completeness": "failed",
+        "scanned_count": 0,
+        "matched_timecode_config_count": 0,
+        "settings_error_count": 0,
+    }
+
+
+def _workspace_status_workspace_error(
+    *,
+    workspace_id: str,
+    profile: str,
+    max_cues_scanned: int,
+    sample_limit: int,
+    status: str,
+    message: str,
+    error: str,
+    suggested_action: str,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": status,
+        "error_code": status,
+        "suggested_action": suggested_action,
+        "workspace_id": workspace_id,
+        "profile": profile,
+        "sections": {},
+        "summary": _workspace_status_failed_summary(),
+        "limits": _workspace_status_limits(max_cues_scanned, sample_limit),
+        "warnings": [message],
+        "errors": {"workspace_resolution": error},
+    }
+
+
 class WorkspaceStatusMixin:
     def get_workspace_status(
         self,
@@ -90,6 +134,73 @@ class WorkspaceStatusMixin:
 
         resolved_workspace_id = _clean_workspace_id(workspace_id)
         normalized_profile = _normalize_workspace_status_profile(profile)
+
+        try:
+            workspaces_result = self.get_workspaces()
+            workspaces = workspaces_result.get("workspaces")
+        except Exception as exc:
+            return _workspace_status_workspace_error(
+                workspace_id=resolved_workspace_id,
+                profile=normalized_profile,
+                max_cues_scanned=max_cues_scanned,
+                sample_limit=sample_limit,
+                status="workspace_unavailable",
+                message="Workspace list could not be read.",
+                error=_compact_error(exc),
+                suggested_action="Verify QLab is running, OSC access is enabled, and then call qlab_check_connection.",
+            )
+
+        if not isinstance(workspaces, list):
+            return _workspace_status_workspace_error(
+                workspace_id=resolved_workspace_id,
+                profile=normalized_profile,
+                max_cues_scanned=max_cues_scanned,
+                sample_limit=sample_limit,
+                status="invalid_workspaces_response",
+                message="QLab /workspaces did not return the expected list shape.",
+                error="QLab workspaces response must be a list",
+                suggested_action="Call qlab_check_connection to inspect the current QLab workspace response.",
+            )
+
+        workspace = next(
+            (
+                item
+                for item in workspaces
+                if isinstance(item, dict) and item.get("uniqueID") == resolved_workspace_id
+            ),
+            None,
+        )
+        if workspace is None:
+            display_matches = [
+                item
+                for item in workspaces
+                if isinstance(item, dict) and item.get("displayName") == resolved_workspace_id
+            ]
+            if len(display_matches) > 1:
+                return _workspace_status_workspace_error(
+                    workspace_id=resolved_workspace_id,
+                    profile=normalized_profile,
+                    max_cues_scanned=max_cues_scanned,
+                    sample_limit=sample_limit,
+                    status="workspace_ambiguous",
+                    message="Requested workspace displayName matched multiple open workspaces.",
+                    error=f"Workspace displayName is ambiguous: {resolved_workspace_id}",
+                    suggested_action="Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+                )
+            workspace = display_matches[0] if display_matches else None
+        if workspace is None:
+            return _workspace_status_workspace_error(
+                workspace_id=resolved_workspace_id,
+                profile=normalized_profile,
+                max_cues_scanned=max_cues_scanned,
+                sample_limit=sample_limit,
+                status="workspace_not_found",
+                message="Requested workspace could not be resolved.",
+                error=f"Workspace not found: {resolved_workspace_id}",
+                suggested_action="Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+            )
+
+        resolved_workspace_id = _clean_workspace_id(workspace.get("uniqueID") or resolved_workspace_id)
         sections: dict[str, Any] = {}
         errors: dict[str, str] = {}
         warnings: list[str] = []
@@ -157,10 +268,7 @@ class WorkspaceStatusMixin:
                 "matched_timecode_config_count": sections["timecode_config"].get("configured_count", 0),
                 "settings_error_count": len(sections["settings_summary"].get("errors") or {}),
             },
-            "limits": {
-                "max_cues_scanned": max_cues_scanned,
-                "sample_limit": sample_limit,
-            },
+            "limits": _workspace_status_limits(max_cues_scanned, sample_limit),
             "warnings": warnings,
             "errors": errors or None,
         }

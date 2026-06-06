@@ -32,13 +32,22 @@ WriteReadinessStatus = Literal[
     "ready",
     "write_disabled",
     "passcode_missing",
+    "workspace_not_found",
+    "workspace_ambiguous",
     "workspace_unavailable",
     "qlab_unreachable",
     "edit_not_confirmed",
     "workspace_in_show_mode",
     "show_mode_unknown",
 ]
-CreateCueStatus = Literal["dry_run", "created", "verification_failed"]
+CreateCueStatus = Literal[
+    "dry_run",
+    "created",
+    "verification_failed",
+    "workspace_not_found",
+    "workspace_ambiguous",
+    "workspace_unavailable",
+]
 UpdateCueStatus = Literal[
     "dry_run",
     "dry_run_preflight_failed",
@@ -57,6 +66,9 @@ UpdateCuesStatus = Literal[
     "updated_with_confirmed_timeouts",
     "partial_failed",
     "verification_failed",
+    "workspace_not_found",
+    "workspace_ambiguous",
+    "workspace_unavailable",
 ]
 
 
@@ -135,6 +147,10 @@ class WorkspaceStatusResult(BaseModel):
 
     workspace_id: str
     profile: str = "summary"
+    ok: bool | None = None
+    status: str | None = None
+    error_code: str | None = None
+    suggested_action: str | None = None
     sections: dict[str, Any] = Field(default_factory=dict)
     summary: dict[str, Any] = Field(default_factory=dict)
     limits: dict[str, Any] = Field(default_factory=dict)

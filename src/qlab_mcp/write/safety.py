@@ -18,6 +18,8 @@ READINESS_ACTIONS = {
     "write_disabled": "Set QLAB_ENABLE_WRITE=true only for a deliberate write session.",
     "passcode_missing": "Set QLAB_PASSCODE on the MCP server; do not pass the QLab passcode as a tool argument.",
     "workspace_unavailable": "Call qlab_check_connection and pass a workspace_id from available_workspaces.",
+    "workspace_not_found": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+    "workspace_ambiguous": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
     "qlab_unreachable": "Start QLab, open the workspace, enable OSC, and verify host/port settings.",
     "edit_not_confirmed": "Confirm the QLab passcode grants edit scope via /connect.",
     "workspace_in_show_mode": "Switch the QLab workspace to Edit Mode before real writes.",
@@ -108,12 +110,13 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
             blockers=blockers,
             warnings=warnings,
         )
-    except Exception:
-        checks["workspace_resolution"] = {"ok": False, "status": "error"}
-        blockers.append("workspace_unavailable")
+    except Exception as exc:
+        status = getattr(exc, "status", "workspace_unavailable")
+        checks["workspace_resolution"] = {"ok": False, "status": status, "error": str(exc)}
+        blockers.append(status)
         return _readiness_result(
             ok=False,
-            status="workspace_unavailable",
+            status=status,
             message="The requested workspace could not be resolved for write mode.",
             workspace_id=workspace,
             write_enabled=write_enabled,
@@ -125,13 +128,14 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
             warnings=warnings,
         )
 
+    resolved_workspace_id = _clean_workspace_id(workspace_info.get("uniqueID") or workspace)
     checks["workspace_resolution"] = {
         "ok": True,
         "status": "resolved",
-        "workspace_id": workspace_info.get("uniqueID") or workspace,
+        "workspace_id": resolved_workspace_id,
         "workspace_name": workspace_info.get("displayName") or workspace_info.get("name"),
     }
-    connect_scopes = check_connect_scopes(reader.client, workspace)
+    connect_scopes = check_connect_scopes(reader.client, resolved_workspace_id)
     checks["connect"] = connect_scopes
     edit_confirmed = connect_scopes.get("status") == "confirmed" and "edit" in (connect_scopes.get("scopes") or [])
     edit_status = "confirmed" if edit_confirmed else "not_granted"
@@ -151,7 +155,7 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
             ok=False,
             status="edit_not_confirmed",
             message="QLab write mode is not ready; /connect did not confirm edit permission.",
-            workspace_id=workspace,
+            workspace_id=resolved_workspace_id,
             write_enabled=write_enabled,
             dry_run_default=dry_run_default,
             passcode_configured=passcode_configured,
@@ -161,7 +165,7 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
             warnings=warnings,
         )
 
-    workspace_mode = read_workspace_mode(reader.client, workspace, authenticated=True)
+    workspace_mode = read_workspace_mode(reader.client, resolved_workspace_id, authenticated=True)
     checks["show_mode"] = workspace_mode
     if workspace_mode.get("show_mode") is True:
         blockers.append("workspace_in_show_mode")
@@ -169,7 +173,7 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
             ok=False,
             status="workspace_in_show_mode",
             message="QLab write mode is not ready; the workspace is currently in Show Mode.",
-            workspace_id=workspace,
+            workspace_id=resolved_workspace_id,
             write_enabled=write_enabled,
             dry_run_default=dry_run_default,
             passcode_configured=passcode_configured,
@@ -184,7 +188,7 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
             ok=False,
             status="show_mode_unknown",
             message="QLab write mode is not ready; /showMode could not confirm the workspace is in Edit Mode.",
-            workspace_id=workspace,
+            workspace_id=resolved_workspace_id,
             write_enabled=write_enabled,
             dry_run_default=dry_run_default,
             passcode_configured=passcode_configured,
@@ -198,7 +202,7 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
         ok=True,
         status="ready",
         message="QLab write mode is enabled, /connect confirmed edit permission, and the workspace is in Edit Mode.",
-        workspace_id=workspace,
+        workspace_id=resolved_workspace_id,
         write_enabled=write_enabled,
         dry_run_default=dry_run_default,
         passcode_configured=passcode_configured,
@@ -230,7 +234,7 @@ def resolve_dry_run(reader: Any, dry_run: bool | None) -> bool:
 
 def _resolve_workspace_for_write(reader: Any, workspace_id: str) -> dict[str, Any]:
     workspaces = reader.get_workspaces().get("workspaces")
-    workspace = reader._resolve_workspace(workspaces, workspace_id)
+    workspace = reader._resolve_workspace_strict(workspaces, workspace_id)
     if not isinstance(workspace, dict):
         raise ValueError("QLab workspace entry must be an object")
     return workspace

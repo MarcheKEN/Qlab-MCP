@@ -45,6 +45,13 @@ def _compact_unresolved_errors() -> dict[str, str]:
     }
 
 
+def _workspace_resolution_errors(status: str, message: str) -> dict[str, str]:
+    return {
+        "error_code": status,
+        "message": message,
+    }
+
+
 def _batch_error_summary(result: dict[str, Any]) -> str:
     result_errors = result.get("errors")
     if isinstance(result_errors, dict) and result_errors.get("error_code"):
@@ -225,8 +232,38 @@ class CueDetailsMixin:
         return result
 
     def get_cue_details(self, workspace_id: str, cue_ref: str | list[str], profile: str = "auto") -> dict[str, Any]:
+        requested_workspace_id = _clean_workspace_id(workspace_id)
+        try:
+            resolved_workspace_id = self._resolve_workspace_id_strict(workspace_id)
+        except Exception as exc:
+            errors = _workspace_resolution_errors(getattr(exc, "status", "workspace_not_found"), str(exc))
+            if isinstance(cue_ref, str):
+                return {
+                    "workspace_id": requested_workspace_id,
+                    "cue_ref": cue_ref,
+                    "profile": profile,
+                    "cue_type": None,
+                    "properties": {},
+                    "sections": None,
+                    "update_capabilities": None,
+                    "errors": errors,
+                    "warnings": ["Requested workspace could not be resolved."],
+                    "active_count": None,
+                    "message": "Requested workspace could not be resolved.",
+                }
+            return {
+                "ok": False,
+                "workspace_id": requested_workspace_id,
+                "requested_count": len(cue_ref) if isinstance(cue_ref, list) else 0,
+                "succeeded_count": 0,
+                "failed_count": len(cue_ref) if isinstance(cue_ref, list) else 0,
+                "profile": profile,
+                "results": [],
+                "errors": {"workspace_resolution": str(exc), "error_code": errors["error_code"]},
+                "warnings": ["Requested workspace could not be resolved."],
+            }
         if isinstance(cue_ref, str):
-            return self._get_single_cue_details(workspace_id, cue_ref, profile)
+            return self._get_single_cue_details(resolved_workspace_id, cue_ref, profile)
         if not isinstance(cue_ref, list):
             raise ValueError("cue_ref must be a string or a list of strings")
         if not cue_ref:
@@ -245,7 +282,7 @@ class CueDetailsMixin:
                 failed_count += 1
                 continue
             try:
-                result = self._get_single_cue_details(workspace_id, ref, profile)
+                result = self._get_single_cue_details(resolved_workspace_id, ref, profile)
                 results.append(result)
                 if result.get("errors"):
                     errors[ref] = _batch_error_summary(result)
@@ -259,7 +296,7 @@ class CueDetailsMixin:
             warnings.append("One or more cue detail reads failed; inspect errors for per-cue failures.")
         return {
             "ok": failed_count == 0,
-            "workspace_id": _clean_workspace_id(workspace_id),
+            "workspace_id": resolved_workspace_id,
             "requested_count": len(cue_ref),
             "succeeded_count": succeeded_count,
             "failed_count": failed_count,

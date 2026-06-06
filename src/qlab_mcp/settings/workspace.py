@@ -72,6 +72,41 @@ def _normalize_workspace_settings_profile(profile: str) -> str:
         raise ValueError(f"Unknown workspace settings profile {profile!r}; use one of: {allowed}")
     return normalized
 
+
+def _settings_workspace_resolution_error(
+    workspace_id: str,
+    mode: str,
+    profile: str,
+    status: str,
+    message: str,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": status,
+        "error_code": status,
+        "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+        "workspace_id": workspace_id,
+        "mode": mode,
+        "profile": profile,
+        "requested_profile": profile,
+        "sections": {},
+        "summary": {
+            "requested_sections": [],
+            "returned_sections": [],
+            "section_count": 0,
+            "error_count": 1,
+            "redaction_count": 0,
+        },
+        "available_detail_requests": [],
+        "requested_count": 0 if mode == "details" else None,
+        "succeeded_count": 0 if mode == "details" else None,
+        "failed_count": 0 if mode == "details" else None,
+        "results": [],
+        "redactions": [],
+        "errors": {"workspace_resolution": message},
+        "warnings": ["Requested workspace could not be resolved."],
+    }
+
 def _normalize_workspace_settings_sections(sections: list[str] | tuple[str, ...] | str | None) -> list[str]:
     if sections is None:
         return list(WORKSPACE_SETTINGS_SECTIONS)
@@ -1009,9 +1044,20 @@ class WorkspaceSettingsMixin:
         profile: str = "safe",
     ) -> dict[str, Any]:
         normalized_mode = _normalize_workspace_settings_mode(mode)
+        normalized_profile = _normalize_workspace_settings_profile(profile)
+        try:
+            resolved_workspace_id = self._resolve_workspace_id_strict(workspace_id)
+        except Exception as exc:
+            return _settings_workspace_resolution_error(
+                _clean_workspace_id(workspace_id),
+                normalized_mode,
+                normalized_profile,
+                getattr(exc, "status", "workspace_not_found"),
+                str(exc),
+            )
         if normalized_mode == "summary":
-            return self._get_workspace_settings_summary(workspace_id, sections=sections, profile=profile)
-        return self._get_workspace_settings_details_batch(workspace_id, requests=requests, profile=profile)
+            return self._get_workspace_settings_summary(resolved_workspace_id, sections=sections, profile=profile)
+        return self._get_workspace_settings_details_batch(resolved_workspace_id, requests=requests, profile=profile)
 
     def get_workspace_setting_details(
         self,

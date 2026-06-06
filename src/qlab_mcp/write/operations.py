@@ -66,6 +66,35 @@ CASEFOLD_COMPARISON_KEYS = {
 }
 
 
+def _write_workspace_resolution_error(
+    workspace_id: str,
+    *,
+    dry_run: bool,
+    status: str,
+    message: str,
+    requested_count: int = 0,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": status,
+        "workspace_id": workspace_id,
+        "dry_run": dry_run,
+        "requested_count": requested_count,
+        "planned_count": 0,
+        "updated_count": 0,
+        "failed_count": requested_count,
+        "timeout_confirmed_count": 0,
+        "results": [],
+        "planned_operations": [],
+        "executed_operations": [],
+        "errors": {"workspace_resolution": message},
+        "warnings": ["Requested workspace could not be resolved."],
+        "error_code": status,
+        "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+        "message": "Requested workspace could not be resolved; no mutating OSC commands were planned or sent.",
+    }
+
+
 class QLabWriteMixin:
     def check_write_readiness(self, workspace_id: str) -> dict[str, Any]:
         return check_write_readiness(self, workspace_id)
@@ -79,11 +108,10 @@ class QLabWriteMixin:
         after_cue_id: str | None = None,
     ) -> dict[str, Any]:
         workspace = _clean_workspace_id(workspace_id)
+        effective_dry_run = resolve_dry_run(self, dry_run)
         qlab_cue_type = validate_writable_cue_type(cue_type)
         normalized_properties = validate_write_properties(properties)
-        effective_dry_run = resolve_dry_run(self, dry_run)
         placement = _normalize_placement(after_cue_id)
-        planned_operations = _planned_create_operations(workspace, qlab_cue_type, normalized_properties, placement)
 
         if placement is not None and not effective_dry_run:
             raise UnsafeWriteOperationError(
@@ -91,6 +119,28 @@ class QLabWriteMixin:
             )
 
         if effective_dry_run:
+            try:
+                workspace = self._resolve_workspace_id_strict(workspace)
+            except Exception as exc:
+                return {
+                    "ok": False,
+                    "status": getattr(exc, "status", "workspace_not_found"),
+                    "workspace_id": _clean_workspace_id(workspace_id),
+                    "cue_type": qlab_cue_type,
+                    "dry_run": True,
+                    "created_cue_id": None,
+                    "placement": placement,
+                    "properties": normalized_properties,
+                    "planned_operations": [],
+                    "executed_operations": [],
+                    "verification": None,
+                    "errors": {"workspace_resolution": str(exc)},
+                    "warnings": ["Requested workspace could not be resolved."],
+                    "error_code": getattr(exc, "status", "workspace_not_found"),
+                    "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+                    "message": "Requested workspace could not be resolved; no cue create operation was planned or sent.",
+                }
+            planned_operations = _planned_create_operations(workspace, qlab_cue_type, normalized_properties, placement)
             return {
                 "ok": True,
                 "status": "dry_run",
@@ -110,6 +160,7 @@ class QLabWriteMixin:
             }
 
         workspace = ensure_write_ready(self, workspace)
+        planned_operations = _planned_create_operations(workspace, qlab_cue_type, normalized_properties, placement)
 
         read_cache = getattr(self, "_read_cache", shared_read_cache())
         read_cache.clear()
@@ -259,6 +310,21 @@ class QLabWriteMixin:
             raise UnsafeWriteOperationError(f"updates can include at most {MAX_BATCH_UPDATES} cue updates")
         effective_dry_run = resolve_dry_run(self, dry_run)
         items = [_normalize_batch_update_item_for_batch(raw_update) for raw_update in updates]
+        if not effective_dry_run:
+            for item in items:
+                if not item.get("errors"):
+                    ensure_real_write_allowed(item["profile"], item["operations"])
+        if effective_dry_run:
+            try:
+                workspace = self._resolve_workspace_id_strict(workspace)
+            except Exception as exc:
+                return _write_workspace_resolution_error(
+                    _clean_workspace_id(workspace_id),
+                    dry_run=True,
+                    status=getattr(exc, "status", "workspace_not_found"),
+                    message=str(exc),
+                    requested_count=len(updates),
+                )
 
         if effective_dry_run:
             results = []
@@ -292,9 +358,6 @@ class QLabWriteMixin:
                 warnings=["Dry run only: no mutating OSC commands were sent to QLab."],
             )
 
-        for item in items:
-            if not item.get("errors"):
-                ensure_real_write_allowed(item["profile"], item["operations"])
         workspace = ensure_write_ready(self, workspace)
 
         read_cache = getattr(self, "_read_cache", shared_read_cache())
@@ -552,6 +615,14 @@ def _batch_item_result(
     errors: dict[str, str] | None,
     warnings: list[str],
 ) -> dict[str, Any]:
+    planned_operations = []
+    if not errors:
+        planned_operations = _planned_update_operations(
+            workspace_id,
+            item["cue_ref"],
+            item["operations"],
+            resolved_cue_id=cue_id,
+        )
     return {
         "cue_ref": item["cue_ref"],
         "cue_id": cue_id,
@@ -562,12 +633,7 @@ def _batch_item_result(
         "before": before,
         "after": after,
         "diff": _diff_properties(before, item["properties"], after),
-        "planned_operations": _planned_update_operations(
-            workspace_id,
-            item["cue_ref"],
-            item["operations"],
-            resolved_cue_id=cue_id,
-        ),
+        "planned_operations": planned_operations,
         "executed_operations": [],
         "errors": errors,
         "warnings": warnings,
@@ -592,7 +658,7 @@ def _batch_update_result(
         for result in fixed_results
         if result.get("status") in {"updated", "updated_with_confirmed_timeouts"}
     )
-    planned_count = sum(1 for result in fixed_results if result.get("status") != "preflight_failed")
+    planned_count = sum(1 for result in fixed_results if result.get("planned_operations"))
     ok = failed_count == 0 and status not in {"preflight_failed", "partial_failed", "verification_failed"}
     if status == "dry_run":
         message = "Dry run succeeded; review planned_operations before disabling dry_run."

@@ -7,6 +7,7 @@ import pytest
 
 from qlab_mcp.config import QLabConfig
 from qlab_mcp.errors import OscTimeoutError, QLabReplyError, UnsafeWriteOperationError
+from qlab_mcp.models import CreateCueResult, UpdateCuesResult, WriteReadinessResult
 from qlab_mcp.qlab import QLabReader
 from qlab_mcp.runtime.read_cache import shared_read_cache
 from qlab_mcp.write.registry import UPDATE_PROFILE_NAMES, profile_catalog
@@ -50,6 +51,8 @@ class FakeWriteClient:
         self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
 
     def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+        if address == "/workspaces" and not self.config.enable_write:
+            return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
         self.requests.append((address, args, workspace_id))
         if address == "/workspaces":
             return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
@@ -121,6 +124,8 @@ class BatchFakeWriteClient:
         self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
 
     def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+        if address == "/workspaces" and not self.config.enable_write:
+            return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
         self.requests.append((address, args, workspace_id))
         if address == "/workspaces":
             return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
@@ -347,6 +352,44 @@ def test_check_write_readiness_blocks_unknown_show_mode() -> None:
     assert result["checks"]["show_mode"]["status"] == "unexpected_data"
 
 
+def test_check_write_readiness_invalid_workspace_fails_before_edit_checks() -> None:
+    client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"))
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.check_write_readiness("missing-ws")
+
+    assert result["ok"] is False
+    assert result["status"] == "workspace_not_found"
+    assert result["checks"]["workspace_resolution"]["ok"] is False
+    assert result["checks"]["connect"] is None
+    assert result["checks"]["show_mode"] is None
+    assert [request[0] for request in client.requests] == ["/workspaces"]
+
+
+def test_workspace_resolution_statuses_validate_for_write_readiness_model() -> None:
+    for status in ("workspace_not_found", "workspace_ambiguous", "workspace_unavailable"):
+        result = WriteReadinessResult.model_validate(
+            {
+                "ok": False,
+                "status": status,
+                "workspace_id": "INVALID",
+                "write_enabled": True,
+                "dry_run_default": True,
+                "passcode_configured": True,
+                "capabilities": {},
+                "checks": {},
+                "blockers": [status],
+                "warnings": [],
+                "error_code": status,
+                "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+                "message": "Workspace could not be resolved.",
+            }
+        )
+
+        assert result.status == status
+        assert "passcode" not in str(result.model_dump().get("errors", ""))
+
+
 def test_create_cue_disabled_blocks_before_osc() -> None:
     client = FakeWriteClient(QLabConfig(enable_write=False, passcode="server-pass"))
     reader = QLabReader(client)  # type: ignore[arg-type]
@@ -383,6 +426,50 @@ def test_create_cue_dry_run_sends_no_mutating_osc() -> None:
         "verify",
     ]
     assert client.requests == []
+
+
+def test_create_cue_dry_run_invalid_workspace_has_no_plan() -> None:
+    client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"))
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.create_cue(
+        "missing-ws",
+        "memo",
+        properties={"name": "Nope"},
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "workspace_not_found"
+    assert result["planned_operations"] == []
+    assert result["executed_operations"] == []
+    assert "workspace_resolution" in result["errors"]
+    assert [request[0] for request in client.requests] == ["/workspaces"]
+
+
+def test_workspace_resolution_statuses_validate_for_create_cue_model() -> None:
+    for status in ("workspace_not_found", "workspace_ambiguous", "workspace_unavailable"):
+        result = CreateCueResult.model_validate(
+            {
+                "ok": False,
+                "status": status,
+                "workspace_id": "INVALID",
+                "cue_type": "Memo",
+                "dry_run": True,
+                "properties": {},
+                "planned_operations": [],
+                "executed_operations": [],
+                "errors": {"workspace_resolution": "Workspace not found: INVALID"},
+                "warnings": [],
+                "error_code": status,
+                "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+                "message": "Workspace could not be resolved.",
+            }
+        )
+
+        assert result.status == status
+        assert result.planned_operations == []
+        assert result.executed_operations == []
 
 
 def test_create_cue_rejects_unallowlisted_cue_type_before_osc() -> None:
@@ -620,10 +707,103 @@ def test_update_cues_dry_run_reports_invalid_property_value_per_item() -> None:
     assert result["results"][0]["status"] == "dry_run"
     assert result["results"][1]["status"] == "dry_run_preflight_failed"
     assert result["results"][1]["errors"]["validation"] == "preWait must be a non-negative number"
+    assert result["results"][1]["planned_operations"] == []
     assert f"/workspace/ws-1/cue_id/{memo_id}/valuesForKeys" in addresses
     assert f"/workspace/ws-1/cue_id/{group_id}/valuesForKeys" not in addresses
     assert f"/workspace/ws-1/cue_id/{memo_id}/name" not in addresses
     assert f"/workspace/ws-1/cue_id/{group_id}/preWait" not in addresses
+
+
+def test_update_cues_dry_run_rejects_unknown_color_name_without_plan() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Memo", "colorName": "none"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "properties": {"colorName": "banana"}}],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["planned_count"] == 0
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert "colorName must be one of" in result["results"][0]["errors"]["validation"]
+    assert result["results"][0]["planned_operations"] == []
+
+
+def test_update_cues_dry_run_accepts_known_color_name() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Memo", "colorName": "none"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "properties": {"colorName": "blue"}}],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    assert result["planned_count"] == 1
+    assert result["results"][0]["properties"]["colorName"] == "blue"
+    assert result["results"][0]["planned_operations"]
+
+
+def test_update_cues_dry_run_invalid_workspace_has_no_plans() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "notes": ""}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "missing-ws",
+        [{"cue_ref": cue_id, "properties": {"notes": "Nope"}}],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "workspace_not_found"
+    assert result["planned_count"] == 0
+    assert result["planned_operations"] == []
+    assert result["executed_operations"] == []
+    assert "workspace_resolution" in result["errors"]
+    assert [request[0] for request in client.requests] == ["/workspaces"]
+
+
+def test_workspace_resolution_statuses_validate_for_update_cues_model() -> None:
+    for status in ("workspace_not_found", "workspace_ambiguous", "workspace_unavailable"):
+        result = UpdateCuesResult.model_validate(
+            {
+                "ok": False,
+                "status": status,
+                "workspace_id": "INVALID",
+                "dry_run": True,
+                "requested_count": 1,
+                "planned_count": 0,
+                "updated_count": 0,
+                "failed_count": 1,
+                "timeout_confirmed_count": 0,
+                "results": [],
+                "errors": {"workspace_resolution": "Workspace not found: INVALID"},
+                "warnings": [],
+                "error_code": status,
+                "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+                "message": "Workspace could not be resolved.",
+            }
+        )
+
+        assert result.status == status
+        assert result.planned_count == 0
+        assert result.results == []
 
 
 def test_update_cues_dry_run_reports_video_opacity_validation_per_item() -> None:
@@ -692,8 +872,65 @@ def test_update_cues_dry_run_reports_text_rgba_validation_per_item() -> None:
     assert result["results"][1]["status"] == "dry_run_preflight_failed"
     assert result["results"][1]["errors"]["validation"] == "text/format/color.red must be a number from 0 to 1"
     assert "read_before" not in result["results"][1]["errors"]
+    assert result["results"][1]["planned_operations"] == []
     assert f"/workspace/ws-1/cue_id/{valid_text_id}/valuesForKeys" in addresses
     assert f"/workspace/ws-1/cue_id/{invalid_text_id}/valuesForKeys" not in addresses
+
+
+def test_update_cues_dry_run_unresolved_ref_has_no_planned_operations() -> None:
+    missing_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={},
+        missing_refs={missing_id},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": missing_id, "properties": {"notes": "Nope"}}],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["planned_count"] == 0
+    assert result["updated_count"] == 0
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert "read_before" in result["results"][0]["errors"]
+    assert result["results"][0]["planned_operations"] == []
+    assert result["results"][0]["executed_operations"] == []
+
+
+def test_update_cues_dry_run_mixed_unresolved_ref_keeps_valid_plan_only() -> None:
+    valid_id = "11111111-1111-4111-8111-111111111111"
+    missing_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={valid_id: {"type": "Memo", "notes": "Old"}},
+        missing_refs={missing_id},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": valid_id, "properties": {"notes": "Ok"}},
+            {"cue_ref": missing_id, "properties": {"notes": "Nope"}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["planned_count"] == 1
+    assert result["updated_count"] == 0
+    assert result["results"][0]["status"] == "dry_run"
+    assert result["results"][0]["planned_operations"]
+    assert result["results"][1]["status"] == "dry_run_preflight_failed"
+    assert "read_before" in result["results"][1]["errors"]
+    assert result["results"][1]["planned_operations"] == []
+    assert result["results"][1]["executed_operations"] == []
 
 
 def test_update_cues_dry_run_reports_invalid_continue_mode_per_item() -> None:

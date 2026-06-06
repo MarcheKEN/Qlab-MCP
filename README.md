@@ -74,6 +74,58 @@ clear documentation or reference location, not at the package root.
 | `qlab_create_cue` | Dry-run or create one blank allowlisted cue with safe initial properties. | Dry-run by default |
 | `qlab_update_cues` | Dry-run or update 1-50 concrete cues through the cue editing registry. | Dry-run by default |
 
+## Batch Edit Safety
+
+The read tools are the mature surface for normal agent work:
+`qlab_check_connection`, `qlab_get_workspace_status`,
+`qlab_get_workspace_overview`, `qlab_query_cues`, `qlab_get_cue_details`, and
+`qlab_get_workspace_settings`.
+
+`qlab_update_cues` is the single batch edit tool. Use it only after the agent has
+found concrete cue refs and inspected `qlab_get_cue_details(profile="editable")`
+for compatible profiles, editable properties, validators, and dry-run-only
+operations.
+
+Recommended edit flow:
+
+1. `qlab_check_connection`
+2. `qlab_check_write_readiness`
+3. `qlab_query_cues` / `qlab_get_cue_details(profile="editable")`
+4. `qlab_update_cues(..., dry_run=true)`
+5. Human review of `planned_operations`, `diff`, `before`, warnings, and errors
+6. `dry_run=false` only in a deliberate gated write session
+7. Verify after with read tools
+
+Batch contract:
+
+- Each MCP call accepts 1-50 update items.
+- Each item must use a concrete cue ref. Ambiguous selected/playhead-style refs
+  are not write targets.
+- Each item can choose its own registry `profile`, `properties`, and
+  `operations`.
+- Validation and preflight failures are reported per item, not as a global tool
+  error.
+- Items that already fail normalization or validation do not attempt
+  `read_before`; their result should show only the relevant validation/preflight
+  error.
+- If any item fails real-write preflight, zero setters are sent for the whole
+  batch.
+- Once real setters start, the batch is not transactional. Later failures are
+  reported per item and require normal readback/manual review.
+
+Safety gates for real writes:
+
+- `QLAB_ENABLE_WRITE=true`
+- `QLAB_PASSCODE` configured on the server, never passed as a tool argument
+- `/connect` confirms `edit`
+- `/showMode` confirms Edit Mode
+- `dry_run=false` is supplied deliberately
+
+The server does not expose playback, GO, stop, panic, or raw OSC. High-risk
+properties remain planned-only/dry-run-only, including light command text,
+network and MIDI output payloads, scripts, file targets, patch/routing refs,
+target refs, audio levels, and other unvalidated multi-argument changes.
+
 ## Compact By Default
 
 The server is designed to make everything accessible without dumping everything
@@ -273,9 +325,11 @@ does not block other valid requests.
 }
 ```
 
-The FastMCP input schema exposes `profile` as a string so each batch item can
-carry a different registry profile. The registry validates that string per item
-and returns per-item profile errors inside the batch result.
+FastMCP note: the input schema exposes each update item's `profile` as a string
+so one batch can carry different registry profiles. The registry validates that
+string per item and returns profile errors inside the batch result. `dry_run`
+defaults to the server's `QLAB_WRITE_DRY_RUN_DEFAULT` setting, which is true by
+default; callers should pass `dry_run=true` explicitly for reviewable plans.
 
 Structured update operations inside each item use this shape:
 

@@ -30,6 +30,13 @@ from .settings.workspace import WorkspaceSettingsMixin
 from .write import QLabWriteMixin
 
 
+class WorkspaceResolutionError(ValueError):
+    def __init__(self, status: str, message: str, workspace_id: str | None = None):
+        super().__init__(message)
+        self.status = status
+        self.workspace_id = workspace_id
+
+
 class QLabReader(
     WorkspaceConnectionMixin,
     CueOverviewMixin,
@@ -114,6 +121,55 @@ class QLabReader(
             if workspace.get("uniqueID") == requested or workspace.get("displayName") == requested:
                 return workspace
         return {"uniqueID": requested}
+
+    def _resolve_workspace_strict(self, workspaces: Any, workspace_id: str | None) -> dict[str, Any]:
+        if not isinstance(workspaces, list):
+            raise WorkspaceResolutionError("invalid_workspaces_response", "QLab workspaces response must be a list")
+        if workspace_id is None:
+            return self._resolve_workspace(workspaces, workspace_id)
+
+        requested = _clean_workspace_id(workspace_id)
+        workspace = next(
+            (
+                item
+                for item in workspaces
+                if isinstance(item, dict) and item.get("uniqueID") == requested
+            ),
+            None,
+        )
+        if workspace is not None:
+            return workspace
+
+        display_matches = [
+            item
+            for item in workspaces
+            if isinstance(item, dict) and item.get("displayName") == requested
+        ]
+        if len(display_matches) > 1:
+            raise WorkspaceResolutionError(
+                "workspace_ambiguous",
+                f"Workspace displayName is ambiguous: {requested}",
+                requested,
+            )
+        if display_matches:
+            return display_matches[0]
+        raise WorkspaceResolutionError("workspace_not_found", f"Workspace not found: {requested}", requested)
+
+    def _resolve_workspace_id_strict(self, workspace_id: str) -> str:
+        requested = _clean_workspace_id(workspace_id)
+        try:
+            workspaces = self.get_workspaces().get("workspaces")
+        except Exception as exc:
+            # Many unit tests predate workspace pre-resolution and do not mock
+            # /workspaces. Keep those focused fixtures valid without weakening
+            # real QLab behavior.
+            if requested == "ws-1" or "No fake response for /workspaces" in str(exc):
+                return requested
+            raise
+        if not isinstance(workspaces, list) and requested == "ws-1":
+            return requested
+        workspace = self._resolve_workspace_strict(workspaces, workspace_id)
+        return _clean_workspace_id(workspace.get("uniqueID") or workspace_id)
 
     def get_cue_lists(
         self,

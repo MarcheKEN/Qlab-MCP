@@ -231,7 +231,34 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
     assert catalog["video_basic"]["real_write_enabled"] is True
     assert catalog["video_basic"]["properties"]["translation/x"]["real_write_enabled"] is True
     assert catalog["video_basic"]["properties"]["crop"]["planned_only_reason"]
+    assert catalog["video_basic"]["properties"]["blendMode"]["args"][0]["validator"] == "video_blend_mode"
+    assert catalog["video_basic"]["properties"]["clockType"]["args"][0]["validator"] == "video_clock_type"
+    for prop in (
+        "layer",
+        "fillStage",
+        "fillStyle",
+        "holdLastFrame",
+        "preserveAspectRatio",
+        "smooth",
+        "stageName",
+        "videoEffects/add",
+        "videoEffect/parameter",
+        "videoEffect/parameters",
+    ):
+        assert catalog["video_basic"]["properties"][prop]["real_write_enabled"] is False
+        assert catalog["video_basic"]["properties"][prop]["planned_only_reason"]
     assert catalog["camera_basic"]["real_write_enabled"] is True
+    assert catalog["camera_basic"]["properties"]["videoEffectIndex/parameter"]["planned_only_reason"]
+    assert catalog["text_basic"]["properties"]["text/format/fontFamilyAndStyle"]["planned_only_reason"]
+    for prop in (
+        "text/format/backgroundColor",
+        "text/format/shadowOffset",
+        "text/format/lineSpacing",
+        "text/format/shadowBlurRadius",
+        "text/format/underlineStyle",
+    ):
+        assert catalog["text_basic"]["properties"][prop]["real_write_enabled"] is False
+        assert catalog["text_basic"]["properties"][prop]["planned_only_reason"]
     assert catalog["midi_file_basic"]["properties"]["rate"]["real_write_enabled"] is True
     assert catalog["network_basic"]["properties"]["protocol"]["planned_only_reason"]
     assert catalog["network_basic"]["real_write_enabled"] is True
@@ -850,6 +877,50 @@ def test_update_cues_dry_run_reports_video_opacity_validation_per_item() -> None
     assert result["results"][0]["properties"]["opacity"] == 0.8
     assert result["results"][1]["status"] == "dry_run_preflight_failed"
     assert result["results"][1]["errors"]["validation"] == "opacity must be a number from 0 to 1"
+
+
+def test_update_cues_dry_run_reports_video_text_extended_validation_per_item() -> None:
+    video_id = "11111111-1111-4111-8111-111111111111"
+    text_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={
+            video_id: {"type": "Video", "blendMode": "Normal", "clockType": "video"},
+            text_id: {"type": "Text", "text/format/shadowBlurRadius": 0},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": video_id, "profile": "video_basic", "properties": {"blendMode": "not a blend mode"}},
+            {"cue_ref": video_id, "profile": "video_basic", "properties": {"clockType": "wall"}},
+            {"cue_ref": video_id, "profile": "video_basic", "properties": {"layer": 1001}},
+            {"cue_ref": video_id, "profile": "video_basic", "properties": {"fillStyle": 4}},
+            {"cue_ref": text_id, "profile": "text_basic", "properties": {"text/format/shadowBlurRadius": -1}},
+            {
+                "cue_ref": video_id,
+                "profile": "video_basic",
+                "operations": [
+                    {"property": "videoEffect/parameter", "args": {"name": "ColorControls", "parameterKey": "inputBrightness"}}
+                ],
+            },
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["planned_count"] == 0
+    assert [item["status"] for item in result["results"]] == ["dry_run_preflight_failed"] * 6
+    assert all(item["planned_operations"] == [] for item in result["results"])
+    assert "blendMode must be one of:" in result["results"][0]["errors"]["validation"]
+    assert result["results"][1]["errors"]["validation"] == "clockType must be audio or video"
+    assert result["results"][2]["errors"]["validation"] == "layer must be an integer from 0 to 1000"
+    assert result["results"][3]["errors"]["validation"] == "fillStyle must be 0 for fit, 1 for fill, or 2 for stretch"
+    assert result["results"][4]["errors"]["validation"] == "text/format/shadowBlurRadius must be a non-negative number"
+    assert "videoEffect/parameter args missing required key: setting" in result["results"][5]["errors"]["validation"]
 
 
 def test_update_cues_dry_run_reports_text_rgba_validation_per_item() -> None:
@@ -1920,7 +1991,15 @@ def test_update_cue_operations_support_video_text_and_midi_dry_run_shapes() -> N
     video_result = video.update_cue(
         "ws-1",
         cue_id,
-        operations=[{"property": "crop", "args": {"top": 1, "bottom": 2, "left": 3, "right": 4}}],
+        properties={"blendMode": "Normal", "clockType": "video"},
+        operations=[
+            {"property": "crop", "args": {"top": 1, "bottom": 2, "left": 3, "right": 4}},
+            {"property": "videoEffects/add", "args": {"name": "ColorControls"}},
+            {
+                "property": "videoEffect/parameter",
+                "args": {"name": "ColorControls", "parameterKey": "inputBrightness", "setting": 0.25},
+            },
+        ],
         dry_run=True,
         profile="video_basic",
     )
@@ -1938,6 +2017,10 @@ def test_update_cue_operations_support_video_text_and_midi_dry_run_shapes() -> N
             {
                 "property": "text/format/color",
                 "args": {"red": 1, "green": 0.5, "blue": 0, "alpha": 1},
+            },
+            {
+                "property": "text/format/shadowOffset",
+                "args": {"width": 2, "height": 4},
             }
         ],
         dry_run=True,
@@ -1958,13 +2041,24 @@ def test_update_cue_operations_support_video_text_and_midi_dry_run_shapes() -> N
         profile="midi_basic",
     )
 
-    video_setter = [op for op in video_result["planned_operations"] if op["operation"] == "set_property"][0]
-    text_setter = [op for op in text_result["planned_operations"] if op["operation"] == "set_property"][0]
+    video_setters = [op for op in video_result["planned_operations"] if op["operation"] == "set_property"]
+    text_setters = [op for op in text_result["planned_operations"] if op["operation"] == "set_property"]
     midi_setters = [op["address"] for op in midi_result["planned_operations"] if op["operation"] == "set_property"]
-    assert video_setter["address"] == f"/workspace/ws-1/cue_id/{cue_id}/crop"
-    assert video_setter["args"] == [1, 2, 3, 4]
-    assert text_setter["address"] == f"/workspace/ws-1/cue_id/{cue_id}/text/format/color"
-    assert text_setter["args"] == [1, 0.5, 0, 1]
+    assert [(op["property"], op["address"], op["args"]) for op in video_setters] == [
+        ("blendMode", f"/workspace/ws-1/cue_id/{cue_id}/blendMode", ["Normal"]),
+        ("clockType", f"/workspace/ws-1/cue_id/{cue_id}/clockType", ["video"]),
+        ("crop", f"/workspace/ws-1/cue_id/{cue_id}/crop", [1, 2, 3, 4]),
+        ("videoEffects/add", f"/workspace/ws-1/cue_id/{cue_id}/videoEffects/add", ["ColorControls"]),
+        (
+            "videoEffect/parameter",
+            f"/workspace/ws-1/cue_id/{cue_id}/videoEffect/ColorControls/parameter/inputBrightness",
+            [0.25],
+        ),
+    ]
+    assert [(op["property"], op["address"], op["args"]) for op in text_setters] == [
+        ("text/format/color", f"/workspace/ws-1/cue_id/{cue_id}/text/format/color", [1, 0.5, 0, 1]),
+        ("text/format/shadowOffset", f"/workspace/ws-1/cue_id/{cue_id}/text/format/shadowOffset", [2, 4]),
+    ]
     assert midi_setters == [f"/workspace/ws-1/cue_id/{cue_id}/channel", f"/workspace/ws-1/cue_id/{cue_id}/byte1"]
 
 
@@ -1986,6 +2080,38 @@ def test_update_cue_real_blocks_dry_run_only_profiles_and_properties_before_osc(
             profile="video_basic",
         )
     assert video_client.requests == []
+
+    video_fx_client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        cue_values={"uniqueID": cue_id, "type": "Video", "videoEffects": []},
+    )
+    video_fx = QLabReader(video_fx_client)  # type: ignore[arg-type]
+    with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
+        video_fx.update_cue(
+            "ws-1",
+            cue_id,
+            operations=[{"property": "videoEffects/add", "args": {"name": "ColorControls"}}],
+            dry_run=False,
+            profile="video_basic",
+        )
+    assert video_fx_client.requests == []
+
+    text_client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        cue_values={"uniqueID": cue_id, "type": "Text", "text/format/shadowOffset": [0, 0]},
+    )
+    text = QLabReader(text_client)  # type: ignore[arg-type]
+    with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
+        text.update_cue(
+            "ws-1",
+            cue_id,
+            operations=[{"property": "text/format/shadowOffset", "args": {"width": 2, "height": 4}}],
+            dry_run=False,
+            profile="text_basic",
+        )
+    assert text_client.requests == []
 
     audio_client = FakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),

@@ -4684,7 +4684,19 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["properties"]["scriptSource"], "display dialog \"secret\"")
 
     def test_values_for_keys_rejects_action_like_keys(self) -> None:
-        self.assertEqual(validate_value_keys(["opacity", "stageName"]), ["opacity", "stageName"])
+        self.assertEqual(
+            validate_value_keys(
+                [
+                    "opacity",
+                    "stageName",
+                    "layer",
+                    "fillStage",
+                    "text/format/shadowOffset",
+                    "text/format/shadowBlurRadius",
+                ]
+            ),
+            ["opacity", "stageName", "layer", "fillStage", "text/format/shadowOffset", "text/format/shadowBlurRadius"],
+        )
         for unsafe in (["start"], ["panic"], ["../name"], ["unknownThing"], []):
             with self.assertRaises(UnsafeCuePropertyError):
                 validate_value_keys(unsafe)

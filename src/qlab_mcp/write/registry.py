@@ -14,12 +14,22 @@ AUDIO_BASIC_UPDATE_PROFILE = "audio_basic"
 TEXT_BASIC_UPDATE_PROFILE = "text_basic"
 QLAB_COLOR_NAMES = {
     "none",
+    "berry",
     "red",
+    "crimson",
     "orange",
+    "peach",
     "yellow",
     "green",
+    "forest",
     "blue",
+    "sky blue",
     "purple",
+    "plum",
+    "lavender",
+    "indigo",
+    "midnight",
+    "olive",
     "cyan",
     "magenta",
     "pink",
@@ -29,17 +39,33 @@ QLAB_COLOR_NAMES = {
     "gray",
     "grey",
 }
-AUDIO_OBJECT_COLOR_NAMES = QLAB_COLOR_NAMES | {
-    "berry",
-    "crimson",
-    "forest",
-    "indigo",
-    "lavender",
-    "midnight",
-    "olive",
-    "peach",
-    "plum",
-    "sky blue",
+AUDIO_OBJECT_COLOR_NAMES = QLAB_COLOR_NAMES
+
+QLAB_BLEND_MODES = {
+    "normal": "Normal",
+    "darken": "Darken",
+    "multiply": "Multiply",
+    "color burn": "Color Burn",
+    "linear burn": "Linear Burn",
+    "lighten": "Lighten",
+    "screen": "Screen",
+    "color dodge": "Color Dodge",
+    "linear dodge": "Linear Dodge",
+    "overlay": "Overlay",
+    "soft light": "Soft Light",
+    "hard light": "Hard Light",
+    "pin light": "Pin Light",
+    "difference": "Difference",
+    "exclusion": "Exclusion",
+    "subtract": "Subtract",
+    "divide": "Divide",
+    "hue": "Hue",
+    "saturation": "Saturation",
+    "color": "Color",
+    "luminosity": "Luminosity",
+    "addition compositing": "Addition Compositing",
+    "maximum compositing": "Maximum Compositing",
+    "source atop compositing": "Source Atop Compositing",
 }
 
 
@@ -598,6 +624,12 @@ MIC_CATALOG_PROPERTIES = (
 
 VIDEO_CATALOG_PROPERTIES = (
     _planned_prop("fileTarget", "string", reason="file_paths_need_dedicated_safety_policy"),
+    _planned_prop("layer", "video_layer", reason="video_layer_changes_need_visual_validation"),
+    _planned_prop("fillStage", "boolean", reason="video_framing_changes_need_visual_validation"),
+    _planned_prop("fillStyle", "video_fill_style", reason="video_framing_changes_need_visual_validation"),
+    _planned_prop("holdLastFrame", "boolean", reason="video_playback_visual_state_needs_validation"),
+    _planned_prop("preserveAspectRatio", "boolean", reason="video_framing_changes_need_visual_validation"),
+    _planned_prop("smooth", "boolean", reason="video_rendering_changes_need_visual_validation"),
     _op("anchor", (("x", "number"), ("y", "number")), modes=("saved", "live"), planned_only_reason="geometry_changes_need_visual_validation"),
     _prop("anchor/x", "number", risk_tier="medium", real_write_enabled=True),
     _prop("anchor/y", "number", risk_tier="medium", real_write_enabled=True),
@@ -614,11 +646,57 @@ VIDEO_CATALOG_PROPERTIES = (
     _prop("cropBottom", "number", risk_tier="medium", real_write_enabled=True),
     _prop("cropLeft", "number", risk_tier="medium", real_write_enabled=True),
     _prop("cropRight", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("blendMode", "string", risk_tier="medium", real_write_enabled=True),
-    _prop("clockType", "string", risk_tier="medium", real_write_enabled=True),
+    _prop("blendMode", "video_blend_mode", risk_tier="medium", real_write_enabled=True),
+    _prop("clockType", "video_clock_type", risk_tier="medium", real_write_enabled=True),
     *_planned_patch_refs("stage", validator="patch_ref"),
     *_planned_patch_refs("videoOutputPatch", validator="patch_ref"),
-    _planned_prop("videoEffect", "any", reason="video_effect_parameters_need_profile_specific_validation"),
+    _op("videoEffects/add", (("name", "non_empty_string"),), path="videoEffects/add", read_key="videoEffects", risk_tier="high", planned_only_reason="video_effect_changes_need_visual_validation"),
+    _op(
+        "videoEffects/insert",
+        (("name", "non_empty_string"), ("index", "non_negative_int")),
+        path="videoEffects/insert",
+        read_key="videoEffects",
+        risk_tier="high",
+        planned_only_reason="video_effect_changes_need_visual_validation",
+    ),
+    _op("videoEffect/delete", (("name", "non_empty_string"),), path="videoEffect/{name}/delete", osc_args=(), read_key="videoEffects", risk_tier="high", planned_only_reason="video_effect_changes_need_visual_validation"),
+    _op("videoEffectIndex/delete", (("index", "non_negative_int"),), path="videoEffectIndex/{index}/delete", osc_args=(), read_key="videoEffects", risk_tier="high", planned_only_reason="video_effect_changes_need_visual_validation"),
+    _op("videoEffect/enabled", (("name", "non_empty_string"), ("value", "boolean")), path="videoEffect/{name}/enabled", read_key="videoEffects", risk_tier="high", planned_only_reason="video_effect_changes_need_visual_validation"),
+    _op("videoEffectIndex/enabled", (("index", "non_negative_int"), ("value", "boolean")), path="videoEffectIndex/{index}/enabled", read_key="videoEffects", risk_tier="high", planned_only_reason="video_effect_changes_need_visual_validation"),
+    _op("videoEffect/move", (("name", "non_empty_string"), ("newIndex", "non_negative_int")), path="videoEffect/{name}/move", read_key="videoEffects", risk_tier="high", planned_only_reason="video_effect_changes_need_visual_validation"),
+    _op("videoEffectIndex/move", (("index", "non_negative_int"), ("newIndex", "non_negative_int")), path="videoEffectIndex/{index}/move", read_key="videoEffects", risk_tier="high", planned_only_reason="video_effect_changes_need_visual_validation"),
+    _op(
+        "videoEffect/parameter",
+        (("name", "non_empty_string"), ("parameterKey", "non_empty_string"), ("setting", "json_value")),
+        path="videoEffect/{name}/parameter/{parameterKey}",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="video_effect_parameters_need_profile_specific_validation",
+    ),
+    _op(
+        "videoEffectIndex/parameter",
+        (("index", "non_negative_int"), ("parameterKey", "non_empty_string"), ("setting", "json_value")),
+        path="videoEffectIndex/{index}/parameter/{parameterKey}",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="video_effect_parameters_need_profile_specific_validation",
+    ),
+    _op(
+        "videoEffect/parameters",
+        (("name", "non_empty_string"), ("parameters", "dict_or_json_string")),
+        path="videoEffect/{name}/parameters",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="video_effect_parameters_need_profile_specific_validation",
+    ),
+    _op(
+        "videoEffectIndex/parameters",
+        (("index", "non_negative_int"), ("parameters", "dict_or_json_string")),
+        path="videoEffectIndex/{index}/parameters",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="video_effect_parameters_need_profile_specific_validation",
+    ),
 )
 
 TEXT_SAFE_PROPERTIES = (
@@ -637,6 +715,11 @@ TEXT_CATALOG_PROPERTIES = (
     _op("text/format/shadowColor", _rgba_args(), planned_only_reason="text_color_changes_need_visual_validation"),
     _op("text/format/underlineColor", _rgba_args(), planned_only_reason="text_color_changes_need_visual_validation"),
     _op("text/format/strikethroughColor", _rgba_args(), planned_only_reason="text_color_changes_need_visual_validation"),
+    _planned_prop("text/format/lineSpacing", "number", reason="text_layout_changes_need_visual_validation"),
+    _planned_prop("text/format/shadowBlurRadius", "non_negative_number", reason="text_shadow_changes_need_visual_validation"),
+    _op("text/format/shadowOffset", (("width", "number"), ("height", "number")), planned_only_reason="text_shadow_changes_need_visual_validation"),
+    _planned_prop("text/format/shadowOffset/width", "number", reason="text_shadow_changes_need_visual_validation"),
+    _planned_prop("text/format/shadowOffset/height", "number", reason="text_shadow_changes_need_visual_validation"),
     _planned_prop("text/format/underlineStyle", "text_line_style", reason="text_decoration_needs_visual_validation"),
     _planned_prop("text/format/strikethroughStyle", "text_line_style", reason="text_decoration_needs_visual_validation"),
     *VIDEO_CATALOG_PROPERTIES,
@@ -1210,6 +1293,14 @@ def _validate_value(validator: str, value: Any) -> Any:
         if number < 0 or number > 1:
             raise UnsafeWriteOperationError("opacity must be a number from 0 to 1")
         return number
+    if validator == "video_layer":
+        return _int_range(value, 0, 1000, "value must be an integer from 0 to 1000")
+    if validator == "video_fill_style":
+        return _int_range(value, 0, 2, "value must be 0 for fit, 1 for fill, or 2 for stretch")
+    if validator == "video_blend_mode":
+        return _blend_mode(value)
+    if validator == "video_clock_type":
+        return _enum_string(value, {"audio", "video"}, "value must be audio or video")
     if validator == "continue_mode":
         return _continue_mode(value)
     if validator == "color_name":
@@ -1249,6 +1340,8 @@ def _validate_value(validator: str, value: Any) -> Any:
         if isinstance(value, (dict, list)) or isinstance(value, str):
             return value
         raise UnsafeWriteOperationError("value must be a dict, list, or JSON string")
+    if validator == "json_value":
+        return _json_value(value)
     if validator == "list":
         if not isinstance(value, list):
             raise UnsafeWriteOperationError("value must be a list")
@@ -1314,6 +1407,28 @@ def _enum_string(value: Any, allowed: set[str], message: str) -> str:
     if normalized not in allowed:
         raise UnsafeWriteOperationError(message)
     return normalized
+
+
+def _blend_mode(value: Any) -> str:
+    if not isinstance(value, str):
+        raise UnsafeWriteOperationError("value must be a QLab video blend mode")
+    normalized = value.strip().casefold()
+    if normalized not in QLAB_BLEND_MODES:
+        allowed = ", ".join(QLAB_BLEND_MODES.values())
+        raise UnsafeWriteOperationError(f"value must be one of: {allowed}")
+    return QLAB_BLEND_MODES[normalized]
+
+
+def _json_value(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, list):
+        return [_json_value(item) for item in value]
+    if isinstance(value, dict):
+        if not all(isinstance(key, str) for key in value):
+            raise UnsafeWriteOperationError("value must be JSON-compatible")
+        return {key: _json_value(item) for key, item in value.items()}
+    raise UnsafeWriteOperationError("value must be JSON-compatible")
 
 
 def _non_empty_string(value: Any, message: str) -> str:

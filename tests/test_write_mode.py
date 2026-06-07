@@ -270,9 +270,85 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
     assert catalog["timecode_basic"]["properties"]["timecodeFrameRate"]["args"][0]["validator"] == "timecode_framerate"
     assert catalog["timecode_basic"]["properties"]["timecodeString"]["planned_only_reason"]
     assert catalog["timecode_basic"]["properties"]["timecodeFormat"]["planned_only_reason"]
-    assert catalog["target_basic"]["properties"]["cueTargetID"]["planned_only_reason"]
+    for prop in ("cueTargetID", "cueTargetNumber", "cueTargetName", "tempCueTargetID", "tempCueTargetNumber", "targetMode"):
+        assert catalog["target_basic"]["properties"][prop]["real_write_enabled"] is False
+        assert catalog["target_basic"]["properties"][prop]["planned_only_reason"]
+    assert catalog["target_basic"]["properties"]["cueTargetID"]["args"][0]["validator"] == "cue_target_id"
+    assert catalog["target_basic"]["properties"]["cueTargetNumber"]["args"][0]["validator"] == "cue_target_number"
+    assert catalog["target_basic"]["properties"]["targetMode"]["args"][0]["validator"] == "target_mode"
+    for prop in ("cueTargetID", "cueTargetNumber", "patchTargetID", "audioMapTargetID", "targetMode"):
+        assert catalog["reset_basic"]["properties"][prop]["real_write_enabled"] is False
+        assert catalog["reset_basic"]["properties"][prop]["planned_only_reason"]
+    assert catalog["reset_basic"]["properties"]["patchTargetID"]["args"][0]["validator"] == "target_id"
+    for prop in (
+        "cueTargetID",
+        "cueTargetNumber",
+        "cueTargetName",
+        "tempCueTargetID",
+        "tempCueTargetNumber",
+        "targetMode",
+        "devampType",
+        "startNextCueWhenSliceEnds",
+        "stopTargetWhenSliceEnds",
+    ):
+        assert catalog["devamp_basic"]["properties"][prop]["real_write_enabled"] is False
+        assert catalog["devamp_basic"]["properties"][prop]["planned_only_reason"]
+    assert catalog["devamp_basic"]["properties"]["devampType"]["args"][0]["validator"] == "devamp_type"
     assert catalog["light_basic"]["properties"]["lightCommandText"]["planned_only_reason"]
-    assert catalog["fade_basic"]["properties"]["stopTargetWhenDone"]["planned_only_reason"]
+    for prop in (
+        "stopTargetWhenDone",
+        "audioMapTargetID",
+        "patchTargetID",
+        "targetMode",
+        "levelsMode",
+        "geoMode",
+        "mode",
+        "fadeType",
+        "pathHeight",
+        "pathWidth",
+        "rotation",
+        "rotationType",
+        "doOpacity",
+        "doRate",
+        "doRotation",
+        "doScale",
+        "doTranslation",
+        "doLevel",
+        "doObjectLevel",
+        "doObjectIDLevel",
+        "setGeometryFromTarget",
+        "setLevelsFromTarget",
+        "willFade",
+    ):
+        assert catalog["fade_basic"]["properties"][prop]["real_write_enabled"] is False
+        assert catalog["fade_basic"]["properties"][prop]["planned_only_reason"]
+    assert catalog["fade_basic"]["properties"]["targetMode"]["args"][0]["validator"] == "target_mode"
+    assert catalog["fade_basic"]["properties"]["levelsMode"]["args"][0]["validator"] == "fade_mode"
+    assert catalog["fade_basic"]["properties"]["geoMode"]["args"][0]["validator"] == "fade_mode"
+    assert catalog["fade_basic"]["properties"]["mode"]["path"] == "geoMode"
+    assert catalog["fade_basic"]["properties"]["mode"]["args"][0]["validator"] == "fade_mode"
+    assert catalog["fade_basic"]["properties"]["fadeType"]["args"][0]["validator"] == "fade_type"
+    assert catalog["fade_basic"]["properties"]["rotationType"]["args"][0]["validator"] == "rotation_type"
+    assert catalog["fade_basic"]["properties"]["pathHeight"]["args"][0]["validator"] == "positive_number"
+    assert catalog["fade_basic"]["properties"]["pathWidth"]["args"][0]["validator"] == "positive_number"
+    assert catalog["fade_basic"]["properties"]["doLevel"]["args"] == [
+        {"name": "row", "validator": "audio_level_row"},
+        {"name": "column", "validator": "audio_output_ref"},
+        {"name": "value", "validator": "boolean"},
+    ]
+    assert catalog["fade_basic"]["properties"]["doObjectLevel"]["args"] == [
+        {"name": "row", "validator": "audio_level_row"},
+        {"name": "object", "validator": "audio_object_ref"},
+        {"name": "value", "validator": "boolean"},
+    ]
+    assert catalog["fade_basic"]["properties"]["doObjectIDLevel"]["args"] == [
+        {"name": "row", "validator": "audio_level_row"},
+        {"name": "objectID", "validator": "audio_object_ref"},
+        {"name": "value", "validator": "boolean"},
+    ]
+    assert catalog["fade_basic"]["properties"]["willFade"]["planned_only_reason"] == "deprecated_use_doLevel"
+    for network_only_prop in ("fadeEntries", "fadeFrom", "fadeTo", "fps"):
+        assert network_only_prop not in catalog["fade_basic"]["properties"]
     assert catalog["script_basic"]["real_write_enabled"] is True
     assert catalog["script_basic"]["properties"]["scriptSource"]["planned_only_reason"] == "script_execution_risk"
 
@@ -1045,6 +1121,328 @@ def test_update_cues_dry_run_reports_invalid_continue_mode_per_item() -> None:
     )
 
 
+def test_update_cues_transport_target_profiles_dry_run_plan_documented_targets() -> None:
+    start_id = "11111111-1111-4111-8111-111111111111"
+    reset_id = "22222222-2222-4222-8222-222222222222"
+    devamp_id = "33333333-3333-4333-8333-333333333333"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={
+            start_id: {"type": "Start", "cueTargetID": "", "cueTargetNumber": "", "targetMode": 0},
+            reset_id: {"type": "Reset", "patchTargetID": "old-patch", "audioMapTargetID": "old-map", "targetMode": 0},
+            devamp_id: {
+                "type": "Devamp",
+                "cueTargetID": "",
+                "cueTargetNumber": "",
+                "targetMode": 0,
+                "devampType": 1,
+                "startNextCueWhenSliceEnds": False,
+                "stopTargetWhenSliceEnds": True,
+            },
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": start_id,
+                "profile": "target_basic",
+                "properties": {
+                    "cueTargetID": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "cueTargetNumber": "LX1",
+                    "tempCueTargetID": "none",
+                    "tempCueTargetNumber": "LX2",
+                    "targetMode": 0,
+                },
+            },
+            {
+                "cue_ref": reset_id,
+                "profile": "reset_basic",
+                "properties": {
+                    "cueTargetID": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                    "cueTargetNumber": "RST1",
+                    "patchTargetID": "patch-1",
+                    "audioMapTargetID": "map-1",
+                    "targetMode": 1,
+                },
+            },
+            {
+                "cue_ref": devamp_id,
+                "profile": "devamp_basic",
+                "properties": {
+                    "cueTargetID": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                    "cueTargetNumber": "DV1",
+                    "tempCueTargetID": "",
+                    "tempCueTargetNumber": "DV2",
+                    "targetMode": 0,
+                    "devampType": 2,
+                    "startNextCueWhenSliceEnds": True,
+                    "stopTargetWhenSliceEnds": False,
+                },
+            },
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "dry_run"
+    assert result["planned_count"] == 3
+    assert [item["profile"] for item in result["results"]] == ["target_basic", "reset_basic", "devamp_basic"]
+    assert all(item["executed_operations"] == [] for item in result["results"])
+
+    planned_by_item = [
+        {
+            operation["property"]: operation
+            for operation in item["planned_operations"]
+            if operation["operation"] == "set_property"
+        }
+        for item in result["results"]
+    ]
+    assert set(planned_by_item[0]) == {
+        "cueTargetID",
+        "cueTargetNumber",
+        "tempCueTargetID",
+        "tempCueTargetNumber",
+        "targetMode",
+    }
+    assert set(planned_by_item[1]) == {"cueTargetID", "cueTargetNumber", "patchTargetID", "audioMapTargetID", "targetMode"}
+    assert set(planned_by_item[2]) == {
+        "cueTargetID",
+        "cueTargetNumber",
+        "tempCueTargetID",
+        "tempCueTargetNumber",
+        "targetMode",
+        "devampType",
+        "startNextCueWhenSliceEnds",
+        "stopTargetWhenSliceEnds",
+    }
+    assert all(operation["real_write_enabled"] is False for item in planned_by_item for operation in item.values())
+    assert planned_by_item[0]["tempCueTargetID"]["args"] == ["none"]
+    assert planned_by_item[2]["tempCueTargetID"]["args"] == [""]
+
+
+def test_update_cues_transport_target_validators_fail_without_plan() -> None:
+    start_id = "11111111-1111-4111-8111-111111111111"
+    devamp_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={
+            start_id: {"type": "Start", "targetMode": 0},
+            devamp_id: {"type": "Devamp", "devampType": 1, "startNextCueWhenSliceEnds": False},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": start_id, "profile": "target_basic", "properties": {"targetMode": 2}},
+            {"cue_ref": start_id, "profile": "target_basic", "properties": {"cueTargetNumber": ""}},
+            {"cue_ref": devamp_id, "profile": "devamp_basic", "properties": {"devampType": 3}},
+            {"cue_ref": devamp_id, "profile": "devamp_basic", "properties": {"startNextCueWhenSliceEnds": "banana"}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["planned_count"] == 0
+    assert [item["status"] for item in result["results"]] == ["dry_run_preflight_failed"] * 4
+    assert all(item["planned_operations"] == [] for item in result["results"])
+    assert result["results"][0]["errors"]["validation"] == "targetMode must be 0 for cue target or 1 for patch target"
+    assert result["results"][1]["errors"]["validation"] == "cueTargetNumber must be a non-empty cue target number"
+    assert result["results"][2]["errors"]["validation"] == "devampType must be 1 for current slice or 2 for looping cue"
+    assert result["results"][3]["errors"]["validation"] == "startNextCueWhenSliceEnds must be a boolean"
+    assert client.requests == []
+
+
+def test_update_cues_target_profile_type_mismatch_fails_cleanly_without_plan() -> None:
+    memo_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={memo_id: {"type": "Memo", "cueTargetID": ""}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": memo_id, "profile": "target_basic", "properties": {"cueTargetID": "target-id"}}],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["planned_count"] == 0
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert "target_basic update profile requires cue type" in result["results"][0]["errors"]["profile"]
+    assert result["results"][0]["planned_operations"] == []
+
+
+def test_update_cues_fade_basic_dry_run_plans_documented_fade_fields() -> None:
+    fade_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={
+            fade_id: {
+                "type": "Fade",
+                "targetMode": 0,
+                "levelsMode": 0,
+                "geoMode": 0,
+                "fadeType": 1,
+                "pathHeight": 1,
+                "pathWidth": 1,
+                "rotationType": 0,
+                "stopTargetWhenDone": False,
+            }
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": fade_id,
+                "profile": "fade_basic",
+                "properties": {
+                    "targetMode": 1,
+                    "levelsMode": 1,
+                    "mode": 0,
+                    "fadeType": 2,
+                    "stopTargetWhenDone": True,
+                    "pathHeight": 1.5,
+                    "pathWidth": 2.5,
+                    "rotation": 15,
+                    "rotationType": 3,
+                    "doOpacity": True,
+                    "doRate": True,
+                    "doRotation": True,
+                    "doScale": True,
+                    "doTranslation": True,
+                    "audioMapTargetID": "map-1",
+                    "patchTargetID": "patch-1",
+                },
+                "operations": [
+                    {"property": "doLevel", "args": {"row": 1, "column": 1, "value": True}},
+                    {"property": "doObjectLevel", "args": {"row": 1, "object": "object-a", "value": True}},
+                    {"property": "doObjectIDLevel", "args": {"row": 1, "objectID": "object-id", "value": True}},
+                    {"property": "setGeometryFromTarget", "args": {}},
+                    {"property": "setLevelsFromTarget", "args": {}},
+                    {"property": "willFade", "args": {"row": 1, "column": 1, "value": False}},
+                ],
+            },
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "dry_run"
+    assert result["planned_count"] == 1
+    assert result["results"][0]["executed_operations"] == []
+    setters = [op for op in result["results"][0]["planned_operations"] if op["operation"] == "set_property"]
+    setter_by_property = {setter["property"]: setter for setter in setters}
+    assert setter_by_property["mode"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/geoMode"
+    assert setter_by_property["doLevel"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/doLevel/1/1"
+    assert setter_by_property["doObjectLevel"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/doObjectLevel/1/object-a"
+    assert setter_by_property["doObjectIDLevel"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/doObjectIDLevel/1/object-id"
+    assert setter_by_property["setGeometryFromTarget"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/setGeometryFromTarget"
+    assert setter_by_property["setLevelsFromTarget"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/setLevelsFromTarget"
+    assert setter_by_property["willFade"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/willFade/1/1"
+    assert setter_by_property["doLevel"]["args"] == [True]
+    assert setter_by_property["setGeometryFromTarget"]["args"] == []
+    assert all(setter["real_write_enabled"] is False for setter in setters)
+    assert all(setter["planned_only_reason"] for setter in setters)
+    assert len(client.requests) == 1
+    address, args, workspace_id = client.requests[0]
+    assert address == f"/workspace/ws-1/cue_id/{fade_id}/valuesForKeys"
+    assert workspace_id == "ws-1"
+    for key in ("geoMode", "pathHeight", "pathWidth", "fadeType", "patchTargetID"):
+        assert f'"{key}"' in args[0]
+
+
+def test_update_cues_fade_basic_validators_fail_without_plan() -> None:
+    fade_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={fade_id: {"type": "Fade", "targetMode": 0}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": fade_id, "profile": "fade_basic", "properties": {"targetMode": 99}},
+            {"cue_ref": fade_id, "profile": "fade_basic", "properties": {"levelsMode": 2}},
+            {"cue_ref": fade_id, "profile": "fade_basic", "properties": {"geoMode": -1}},
+            {"cue_ref": fade_id, "profile": "fade_basic", "properties": {"fadeType": 3}},
+            {"cue_ref": fade_id, "profile": "fade_basic", "properties": {"rotationType": 4}},
+            {"cue_ref": fade_id, "profile": "fade_basic", "properties": {"pathHeight": 0}},
+            {"cue_ref": fade_id, "profile": "fade_basic", "properties": {"pathWidth": -1}},
+            {"cue_ref": fade_id, "profile": "fade_basic", "properties": {"doOpacity": "banana"}},
+            {
+                "cue_ref": fade_id,
+                "profile": "fade_basic",
+                "operations": [{"property": "doLevel", "args": {"row": 25, "column": 1, "value": True}}],
+            },
+            {
+                "cue_ref": fade_id,
+                "profile": "fade_basic",
+                "operations": [{"property": "doLevel", "args": {"row": 1, "column": 129, "value": True}}],
+            },
+            {
+                "cue_ref": fade_id,
+                "profile": "fade_basic",
+                "operations": [{"property": "doObjectLevel", "args": {"row": 1, "object": "", "value": True}}],
+            },
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["planned_count"] == 0
+    assert [item["status"] for item in result["results"]] == ["dry_run_preflight_failed"] * 11
+    assert all(item["planned_operations"] == [] for item in result["results"])
+    assert result["results"][0]["errors"]["validation"] == "targetMode must be 0 for cue target or 1 for patch target"
+    assert result["results"][1]["errors"]["validation"] == "levelsMode must be 0 or 1"
+    assert result["results"][2]["errors"]["validation"] == "geoMode must be 0 or 1"
+    assert result["results"][3]["errors"]["validation"] == "fadeType must be 1 for absolute or 2 for relative"
+    assert result["results"][4]["errors"]["validation"] == "rotationType must be an integer from 0 to 3"
+    assert result["results"][5]["errors"]["validation"] == "pathHeight must be a positive number"
+    assert result["results"][6]["errors"]["validation"] == "pathWidth must be a positive number"
+    assert result["results"][7]["errors"]["validation"] == "doOpacity must be a boolean"
+    assert result["results"][8]["errors"]["validation"] == "doLevel.row must be an integer from 0 to 24"
+    assert result["results"][9]["errors"]["validation"] == (
+        "doLevel.column must be an integer from 0 to 128 or a cue output name"
+    )
+    assert result["results"][10]["errors"]["validation"] == "doObjectLevel.object must be a non-empty object name or ID"
+    assert client.requests == []
+
+
+def test_update_cues_fade_profile_type_mismatch_fails_cleanly_without_plan() -> None:
+    memo_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={memo_id: {"type": "Memo", "targetMode": 0}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": memo_id, "profile": "fade_basic", "properties": {"targetMode": 0}}],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["planned_count"] == 0
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert result["results"][0]["planned_operations"] == []
+    assert result["results"][0]["errors"]["profile"] == "fade_basic update profile requires a Fade cue"
+
+
 def test_update_cues_dry_run_reports_invalid_cue_ref_per_item_without_reading() -> None:
     client = BatchFakeWriteClient(QLabConfig(enable_write=False), cues={})
     reader = QLabReader(client)  # type: ignore[arg-type]
@@ -1222,6 +1620,24 @@ def test_update_cues_real_blocks_dry_run_only_property_before_osc() -> None:
                     ],
                 }
             ],
+            dry_run=False,
+        )
+
+    assert client.requests == []
+
+
+def test_update_cues_real_blocks_target_refs_before_osc() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Start", "cueTargetID": ""}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
+        reader.update_cues(
+            "ws-1",
+            [{"cue_ref": cue_id, "profile": "target_basic", "properties": {"cueTargetID": "target-id"}}],
             dry_run=False,
         )
 
@@ -2134,6 +2550,7 @@ def test_update_cue_real_blocks_dry_run_only_profiles_and_properties_before_osc(
         ("network_basic", "Network", {"message": "/eos/cue/1/fire"}),
         ("midi_basic", "MIDI", {"note": 64}),
         ("timecode_basic", "Timecode", {"timecodeString": "01:00:00:00"}),
+        ("fade_basic", "Fade", {"targetMode": 0}),
         ("script_basic", "Script", {"scriptSource": "display dialog \"blocked\""}),
     ):
         client = FakeWriteClient(

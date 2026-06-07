@@ -737,19 +737,28 @@ LIGHT_CATALOG_PROPERTIES = (
 
 FADE_CATALOG_PROPERTIES = (
     _planned_prop("stopTargetWhenDone", "boolean", reason="fade_target_behavior_needs_validation"),
-    _planned_prop("audioMapTargetID", "string", reason="target_refs_need_dedicated_resolution"),
-    _planned_prop("targetMode", "int", reason="target_behavior_needs_validation"),
-    _planned_prop("levelsMode", "int", reason="fade_level_mode_needs_validation"),
-    _planned_prop("mode", "int", reason="fade_mode_needs_validation"),
+    _planned_prop("audioMapTargetID", "target_id", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("patchTargetID", "target_id", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("targetMode", "target_mode", reason="target_behavior_needs_validation"),
+    _planned_prop("levelsMode", "fade_mode", reason="fade_level_mode_needs_validation"),
+    _planned_prop("geoMode", "fade_mode", reason="fade_geometry_mode_needs_validation"),
+    _planned_prop("mode", "fade_mode", path="geoMode", read_key="geoMode", reason="deprecated_use_geoMode"),
+    _planned_prop("fadeType", "fade_type", reason="fade_type_needs_validation"),
+    _planned_prop("pathHeight", "positive_number", reason="fade_geometry_path_needs_validation"),
+    _planned_prop("pathWidth", "positive_number", reason="fade_geometry_path_needs_validation"),
     _planned_prop("rotation", "number", reason="fade_geometry_needs_target_validation"),
-    _planned_prop("rotationType", "int", reason="fade_geometry_needs_target_validation"),
+    _planned_prop("rotationType", "rotation_type", reason="fade_geometry_needs_target_validation"),
     _planned_prop("doOpacity", "boolean", reason="fade_target_behavior_needs_validation"),
     _planned_prop("doRate", "boolean", reason="fade_target_behavior_needs_validation"),
     _planned_prop("doRotation", "boolean", reason="fade_target_behavior_needs_validation"),
     _planned_prop("doScale", "boolean", reason="fade_target_behavior_needs_validation"),
     _planned_prop("doTranslation", "boolean", reason="fade_target_behavior_needs_validation"),
-    _op("doLevel", (("row", "non_negative_int"), ("column", "non_negative_int"), ("value", "boolean")), path="doLevel/{row}/{column}", risk_tier="high", planned_only_reason="fade_level_targets_need_validation"),
-    _op("doObjectLevel", (("row", "non_negative_int"), ("object", "non_empty_string"), ("value", "boolean")), path="doObjectLevel/{row}/{object}", risk_tier="high", planned_only_reason="fade_object_targets_need_validation"),
+    _op("doLevel", (("row", "audio_level_row"), ("column", "audio_output_ref"), ("value", "boolean")), path="doLevel/{row}/{column}", risk_tier="high", planned_only_reason="fade_level_targets_need_validation"),
+    _op("doObjectLevel", (("row", "audio_level_row"), ("object", "audio_object_ref"), ("value", "boolean")), path="doObjectLevel/{row}/{object}", risk_tier="high", planned_only_reason="fade_object_targets_need_validation"),
+    _op("doObjectIDLevel", (("row", "audio_level_row"), ("objectID", "audio_object_ref"), ("value", "boolean")), path="doObjectIDLevel/{row}/{objectID}", risk_tier="high", planned_only_reason="fade_object_targets_need_validation"),
+    _op("setGeometryFromTarget", (), path="setGeometryFromTarget", risk_tier="high", planned_only_reason="target_copy_actions_need_dedicated_validation"),
+    _op("setLevelsFromTarget", (), path="setLevelsFromTarget", risk_tier="high", planned_only_reason="target_copy_actions_need_dedicated_validation"),
+    _op("willFade", (("row", "audio_level_row"), ("column", "audio_output_ref"), ("value", "boolean")), path="willFade/{row}/{column}", risk_tier="high", planned_only_reason="deprecated_use_doLevel"),
 )
 
 NETWORK_CATALOG_PROPERTIES = (
@@ -828,22 +837,31 @@ TIMECODE_CATALOG_PROPERTIES = (
 )
 
 TARGET_CATALOG_PROPERTIES = (
-    _planned_prop("cueTargetNumber", "string", reason="target_refs_need_dedicated_resolution"),
-    _planned_prop("cueTargetID", "string", reason="target_refs_need_dedicated_resolution"),
-    _planned_prop("cueTargetName", "string", reason="target_refs_need_dedicated_resolution"),
-    _planned_prop("targetMode", "int", reason="target_behavior_needs_validation"),
+    _planned_prop("cueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("cueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("cueTargetName", "non_empty_string", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("tempCueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("targetMode", "target_mode", reason="target_behavior_needs_validation"),
 )
 
 RESET_CATALOG_PROPERTIES = (
-    _planned_prop("audioMapTargetID", "string", reason="reset_targets_need_validation"),
-    _planned_prop("targetMode", "int", reason="reset_targets_need_validation"),
+    _planned_prop("cueTargetNumber", "cue_target_number", reason="reset_targets_need_validation"),
+    _planned_prop("cueTargetID", "cue_target_id", reason="reset_targets_need_validation"),
+    _planned_prop("patchTargetID", "target_id", reason="reset_targets_need_validation"),
+    _planned_prop("audioMapTargetID", "target_id", reason="reset_targets_need_validation"),
+    _planned_prop("targetMode", "target_mode", reason="reset_targets_need_validation"),
 )
 
 DEVAMP_CATALOG_PROPERTIES = (
-    _planned_prop("cueTargetNumber", "string", reason="devamp_targets_need_validation"),
-    _planned_prop("cueTargetID", "string", reason="devamp_targets_need_validation"),
-    _planned_prop("cueTargetName", "string", reason="devamp_targets_need_validation"),
-    _planned_prop("targetMode", "int", reason="devamp_targets_need_validation"),
+    _planned_prop("cueTargetNumber", "cue_target_number", reason="devamp_targets_need_validation"),
+    _planned_prop("cueTargetID", "cue_target_id", reason="devamp_targets_need_validation"),
+    _planned_prop("cueTargetName", "non_empty_string", reason="devamp_targets_need_validation"),
+    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="devamp_targets_need_validation"),
+    _planned_prop("tempCueTargetID", "cue_target_id", reason="devamp_targets_need_validation"),
+    _planned_prop("targetMode", "target_mode", reason="devamp_targets_need_validation"),
+    _planned_prop("devampType", "devamp_type", reason="devamp_targets_need_validation"),
+    _planned_prop("startNextCueWhenSliceEnds", "boolean", reason="devamp_targets_need_validation"),
     _planned_prop("stopTargetWhenSliceEnds", "boolean", reason="devamp_targets_need_validation"),
 )
 
@@ -1321,6 +1339,22 @@ def _validate_value(validator: str, value: Any) -> Any:
         return _int_range(value, 0, 1, "value must be 0 for MTC or 1 for LTC")
     if validator == "timecode_framerate":
         return _int_range(value, 0, 7, "value must be a timecode frame rate index from 0 to 7")
+    if validator == "target_mode":
+        return _int_range(value, 0, 1, "value must be 0 for cue target or 1 for patch target")
+    if validator == "fade_mode":
+        return _int_range(value, 0, 1, "value must be 0 or 1")
+    if validator == "fade_type":
+        return _int_range(value, 1, 2, "value must be 1 for absolute or 2 for relative")
+    if validator == "rotation_type":
+        return _int_range(value, 0, 3, "value must be an integer from 0 to 3")
+    if validator == "devamp_type":
+        return _int_range(value, 1, 2, "value must be 1 for current slice or 2 for looping cue")
+    if validator == "cue_target_id":
+        return _cue_target_id(value)
+    if validator == "cue_target_number":
+        return _non_empty_string(value, "value must be a non-empty cue target number")
+    if validator == "target_id":
+        return _non_empty_string(value, "value must be a non-empty target ID")
     if validator == "text_alignment":
         return _enum_string(value, {"left", "center", "right", "justify"}, "value must be left, center, right, or justify")
     if validator == "text_line_style":
@@ -1435,6 +1469,15 @@ def _non_empty_string(value: Any, message: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise UnsafeWriteOperationError(message)
     return value.strip()
+
+
+def _cue_target_id(value: Any) -> str:
+    if not isinstance(value, str):
+        raise UnsafeWriteOperationError("value must be a cue target ID string")
+    normalized = value.strip()
+    if normalized == "" or normalized.casefold() == "none":
+        return normalized
+    return normalized
 
 
 def _channel_ref(value: Any, *, minimum: int, maximum: int, name: str) -> int | str:

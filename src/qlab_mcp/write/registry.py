@@ -29,6 +29,18 @@ QLAB_COLOR_NAMES = {
     "gray",
     "grey",
 }
+AUDIO_OBJECT_COLOR_NAMES = QLAB_COLOR_NAMES | {
+    "berry",
+    "crimson",
+    "forest",
+    "indigo",
+    "lavender",
+    "midnight",
+    "olive",
+    "peach",
+    "plum",
+    "sky blue",
+}
 
 
 @dataclass(frozen=True)
@@ -195,9 +207,11 @@ AUDIO_CATALOG_PROPERTIES = (
     *_planned_patch_refs("audioMap", validator="patch_ref"),
     _planned_prop("doFade", "boolean", reason="integrated_fade_changes_playback_behavior"),
     _planned_prop("lockFadeToCue", "boolean", reason="integrated_fade_changes_playback_behavior"),
+    _planned_prop("lastSlicePlayCount", "int_or_minus_one", reason="slice_editing_needs_dedicated_validation"),
+    _planned_prop("lastSliceInfiniteLoop", "boolean", reason="slice_editing_needs_dedicated_validation"),
     _op(
         "level",
-        (("inChannel", "positive_int"), ("outChannel", "positive_int"), ("decibel", "number")),
+        (("inChannel", "audio_level_row"), ("outChannel", "audio_output_ref"), ("decibel", "decibel")),
         path="level/{inChannel}/{outChannel}",
         modes=("saved", "live"),
         risk_tier="high",
@@ -205,30 +219,66 @@ AUDIO_CATALOG_PROPERTIES = (
     ),
     _op(
         "sliderLevel",
-        (("channel", "positive_int"), ("decibel", "number")),
+        (("channel", "audio_output_ref"), ("decibel", "decibel")),
         path="sliderLevel/{channel}",
         modes=("saved", "live"),
         risk_tier="high",
         planned_only_reason="audio_levels_can_affect_live_output",
     ),
     _op(
+        "gang",
+        (("inChannel", "audio_level_row"), ("outChannel", "audio_output_ref"), ("gang", "string")),
+        path="gang/{inChannel}/{outChannel}",
+        risk_tier="high",
+        planned_only_reason="audio_levels_can_affect_live_output",
+    ),
+    _op(
+        "doLevel",
+        (("row", "audio_level_row"), ("column", "audio_output_ref"), ("value", "boolean")),
+        path="doLevel/{row}/{column}",
+        risk_tier="high",
+        planned_only_reason="audio_levels_can_affect_live_output",
+    ),
+    _op(
         "mute",
-        (("output", "positive_int"), ("value", "boolean")),
+        (("output", "audio_output_ref"), ("value", "boolean")),
         path="mute/channel/{output}",
         risk_tier="high",
         planned_only_reason="mute_changes_audio_output",
     ),
     _op(
         "solo",
-        (("output", "positive_int"), ("value", "boolean")),
+        (("output", "audio_output_ref"), ("value", "boolean")),
         path="solo/{output}",
         risk_tier="high",
         planned_only_reason="solo_changes_audio_output",
     ),
+    _op("mute/clear", (), path="mute/clear", risk_tier="high", planned_only_reason="mute_changes_audio_output"),
+    _op("mute/channel/clear", (), path="mute/channel/clear", risk_tier="high", planned_only_reason="mute_changes_audio_output"),
+    _op("mute/object/clear", (), path="mute/object/clear", risk_tier="high", planned_only_reason="mute_changes_audio_output"),
+    _op("solo/clear", (), path="solo/clear", risk_tier="high", planned_only_reason="solo_changes_audio_output"),
+    _op("solo/channel/clear", (), path="solo/channel/clear", risk_tier="high", planned_only_reason="solo_changes_audio_output"),
+    _op("solo/object/clear", (), path="solo/object/clear", risk_tier="high", planned_only_reason="solo_changes_audio_output"),
+    _op("setDefaultLevels", (), path="setDefaultLevels", risk_tier="high", planned_only_reason="audio_levels_can_affect_live_output"),
+    _op("setSilentLevels", (), path="setSilentLevels", risk_tier="high", planned_only_reason="audio_levels_can_affect_live_output"),
     _op(
         "sliceMarker",
         (("index", "non_negative_int"), ("time", "non_negative_number"), ("playCount", "int_or_minus_one")),
         path="sliceMarker/{index}",
+        risk_tier="medium",
+        planned_only_reason="slice_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "sliceMarker/time",
+        (("index", "non_negative_int"), ("time", "non_negative_number")),
+        path="sliceMarker/{index}/time",
+        risk_tier="medium",
+        planned_only_reason="slice_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "sliceMarker/playCount",
+        (("index", "non_negative_int"), ("playCount", "int_or_minus_one")),
+        path="sliceMarker/{index}/playCount",
         risk_tier="medium",
         planned_only_reason="slice_editing_needs_dedicated_validation",
     ),
@@ -240,21 +290,197 @@ AUDIO_CATALOG_PROPERTIES = (
         planned_only_reason="slice_editing_needs_dedicated_validation",
     ),
     _op(
+        "deleteSliceMarker",
+        (("index", "non_negative_int"),),
+        path="deleteSliceMarker/{index}",
+        risk_tier="high",
+        planned_only_reason="destructive_slice_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "deleteSliceMarkers",
+        (),
+        path="deleteSliceMarkers",
+        risk_tier="high",
+        planned_only_reason="destructive_slice_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "object/name",
+        (("object", "audio_object_ref"), ("name", "non_empty_string")),
+        path="object/{object}/name",
+        risk_tier="high",
+        planned_only_reason="spatial_audio_changes_output",
+    ),
+    _op(
+        "objectID/name",
+        (("objectID", "audio_object_ref"), ("name", "non_empty_string")),
+        path="objectID/{objectID}/name",
+        risk_tier="high",
+        planned_only_reason="spatial_audio_changes_output",
+    ),
+    _op(
+        "object/colorName",
+        (("object", "audio_object_ref"), ("colorName", "audio_object_color_name")),
+        path="object/{object}/colorName",
+        risk_tier="high",
+        planned_only_reason="spatial_audio_changes_output",
+    ),
+    _op(
+        "objectID/colorName",
+        (("objectID", "audio_object_ref"), ("colorName", "audio_object_color_name")),
+        path="objectID/{objectID}/colorName",
+        risk_tier="high",
+        planned_only_reason="spatial_audio_changes_output",
+    ),
+    _op(
         "object/position",
-        (("object", "non_empty_string"), ("x", "number"), ("y", "number")),
+        (("object", "audio_object_ref"), ("x", "number"), ("y", "number")),
         path="object/{object}/position",
         modes=("saved", "live"),
         risk_tier="high",
         planned_only_reason="spatial_audio_changes_output",
     ),
     _op(
+        "objectID/position",
+        (("objectID", "audio_object_ref"), ("x", "number"), ("y", "number")),
+        path="objectID/{objectID}/position",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="spatial_audio_changes_output",
+    ),
+    _op(
+        "object/position/x",
+        (("object", "audio_object_ref"), ("x", "number")),
+        path="object/{object}/position/x",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="spatial_audio_changes_output",
+    ),
+    _op(
+        "object/position/y",
+        (("object", "audio_object_ref"), ("y", "number")),
+        path="object/{object}/position/y",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="spatial_audio_changes_output",
+    ),
+    _op(
+        "objectID/position/x",
+        (("objectID", "audio_object_ref"), ("x", "number")),
+        path="objectID/{objectID}/position/x",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="spatial_audio_changes_output",
+    ),
+    _op(
+        "objectID/position/y",
+        (("objectID", "audio_object_ref"), ("y", "number")),
+        path="objectID/{objectID}/position/y",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="spatial_audio_changes_output",
+    ),
+    _op(
         "object/spread",
-        (("object", "non_empty_string"), ("spread", "number")),
+        (("object", "audio_object_ref"), ("spread", "number")),
         path="object/{object}/spread",
         modes=("saved", "live"),
         risk_tier="high",
         planned_only_reason="spatial_audio_changes_output",
     ),
+    _op(
+        "objectID/spread",
+        (("objectID", "audio_object_ref"), ("spread", "number")),
+        path="objectID/{objectID}/spread",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="spatial_audio_changes_output",
+    ),
+    _op(
+        "objectLevel",
+        (("row", "audio_level_row"), ("object", "audio_object_ref"), ("decibel", "decibel")),
+        path="objectLevel/{row}/{object}",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="audio_levels_can_affect_live_output",
+    ),
+    _op(
+        "objectIDLevel",
+        (("row", "audio_level_row"), ("objectID", "audio_object_ref"), ("decibel", "decibel")),
+        path="objectIDLevel/{row}/{objectID}",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="audio_levels_can_affect_live_output",
+    ),
+    _op(
+        "doObjectLevel",
+        (("row", "audio_level_row"), ("object", "audio_object_ref"), ("value", "boolean")),
+        path="doObjectLevel/{row}/{object}",
+        risk_tier="high",
+        planned_only_reason="audio_levels_can_affect_live_output",
+    ),
+    _op(
+        "doObjectIDLevel",
+        (("row", "audio_level_row"), ("objectID", "audio_object_ref"), ("value", "boolean")),
+        path="doObjectIDLevel/{row}/{objectID}",
+        risk_tier="high",
+        planned_only_reason="audio_levels_can_affect_live_output",
+    ),
+    _op(
+        "mute/object",
+        (("object", "audio_object_ref"), ("value", "boolean")),
+        path="mute/object/{object}",
+        risk_tier="high",
+        planned_only_reason="mute_changes_audio_output",
+    ),
+    _op(
+        "mute/objectID",
+        (("objectID", "audio_object_ref"), ("value", "boolean")),
+        path="mute/objectID/{objectID}",
+        risk_tier="high",
+        planned_only_reason="mute_changes_audio_output",
+    ),
+    _op(
+        "solo/object",
+        (("object", "audio_object_ref"), ("value", "boolean")),
+        path="solo/object/{object}",
+        risk_tier="high",
+        planned_only_reason="solo_changes_audio_output",
+    ),
+    _op(
+        "solo/objectID",
+        (("objectID", "audio_object_ref"), ("value", "boolean")),
+        path="solo/objectID/{objectID}",
+        risk_tier="high",
+        planned_only_reason="solo_changes_audio_output",
+    ),
+    _planned_prop("audioOutputPatch/cueOutputChannels", "audio_patch_channel_count", reason="audio_patch_routing_needs_dedicated_validation"),
+    _op(
+        "audioOutputPatch/level",
+        (("inChannel", "audio_level_row"), ("outChannel", "device_output_ref"), ("decibel", "decibel")),
+        path="audioOutputPatch/level/{inChannel}/{outChannel}",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="audio_patch_routing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioOutputPatch/mute",
+        (("output", "device_output_ref"), ("value", "boolean")),
+        path="audioOutputPatch/mute/{output}",
+        risk_tier="high",
+        planned_only_reason="audio_patch_routing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioOutputPatch/solo",
+        (("output", "device_output_ref"), ("value", "boolean")),
+        path="audioOutputPatch/solo/{output}",
+        risk_tier="high",
+        planned_only_reason="audio_patch_routing_needs_dedicated_validation",
+    ),
+    _op("audioOutputPatch/mute/clear", (), path="audioOutputPatch/mute/clear", risk_tier="high", planned_only_reason="audio_patch_routing_needs_dedicated_validation"),
+    _op("audioOutputPatch/solo/clear", (), path="audioOutputPatch/solo/clear", risk_tier="high", planned_only_reason="audio_patch_routing_needs_dedicated_validation"),
+    _op("audioOutputPatch/reset", (), path="audioOutputPatch/reset", risk_tier="high", planned_only_reason="audio_patch_routing_needs_dedicated_validation"),
+    _op("audioOutputPatch/routing/reset", (), path="audioOutputPatch/routing/reset", risk_tier="high", planned_only_reason="audio_patch_routing_needs_dedicated_validation"),
+    _planned_prop("audioOutputPatch/name", "non_empty_string", reason="audio_patch_routing_needs_dedicated_validation"),
     _op(
         "audioMap/filter/position",
         (("filter", "non_empty_string"), ("x", "number"), ("y", "number")),
@@ -266,6 +492,98 @@ AUDIO_CATALOG_PROPERTIES = (
         "audioMap/filter/passthrough",
         (("filter", "non_empty_string"), ("output", "positive_int"), ("value", "boolean")),
         path="audioMap/filter/{filter}/passthrough/{output}",
+        risk_tier="high",
+        planned_only_reason="audio_map_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioMap/object/name",
+        (("object", "audio_object_ref"), ("name", "non_empty_string")),
+        path="audioMap/object/{object}/name",
+        risk_tier="high",
+        planned_only_reason="audio_map_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioMap/objectID/name",
+        (("objectID", "audio_object_ref"), ("name", "non_empty_string")),
+        path="audioMap/objectID/{objectID}/name",
+        risk_tier="high",
+        planned_only_reason="audio_map_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioMap/object/colorName",
+        (("object", "audio_object_ref"), ("colorName", "audio_object_color_name")),
+        path="audioMap/object/{object}/colorName",
+        risk_tier="high",
+        planned_only_reason="audio_map_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioMap/objectID/colorName",
+        (("objectID", "audio_object_ref"), ("colorName", "audio_object_color_name")),
+        path="audioMap/objectID/{objectID}/colorName",
+        risk_tier="high",
+        planned_only_reason="audio_map_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioMap/object/position",
+        (("object", "audio_object_ref"), ("x", "number"), ("y", "number")),
+        path="audioMap/object/{object}/position",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="audio_map_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioMap/objectID/position",
+        (("objectID", "audio_object_ref"), ("x", "number"), ("y", "number")),
+        path="audioMap/objectID/{objectID}/position",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="audio_map_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioMap/object/position/x",
+        (("object", "audio_object_ref"), ("x", "number")),
+        path="audioMap/object/{object}/position/x",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="audio_map_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioMap/object/position/y",
+        (("object", "audio_object_ref"), ("y", "number")),
+        path="audioMap/object/{object}/position/y",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="audio_map_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioMap/objectID/position/x",
+        (("objectID", "audio_object_ref"), ("x", "number")),
+        path="audioMap/objectID/{objectID}/position/x",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="audio_map_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioMap/objectID/position/y",
+        (("objectID", "audio_object_ref"), ("y", "number")),
+        path="audioMap/objectID/{objectID}/position/y",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="audio_map_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioMap/object/spread",
+        (("object", "audio_object_ref"), ("spread", "non_negative_number")),
+        path="audioMap/object/{object}/spread",
+        modes=("saved", "live"),
+        risk_tier="high",
+        planned_only_reason="audio_map_editing_needs_dedicated_validation",
+    ),
+    _op(
+        "audioMap/objectID/spread",
+        (("objectID", "audio_object_ref"), ("spread", "non_negative_number")),
+        path="audioMap/objectID/{objectID}/spread",
+        modes=("saved", "live"),
         risk_tier="high",
         planned_only_reason="audio_map_editing_needs_dedicated_validation",
     ),
@@ -853,6 +1171,8 @@ def _validate_value(validator: str, value: Any) -> Any:
         return value
     if validator == "number":
         return _number(value, "value must be a number")
+    if validator == "decibel":
+        return _decibel(value)
     if validator == "non_negative_number":
         number = _number(value, "value must be a non-negative number")
         if number < 0:
@@ -894,6 +1214,18 @@ def _validate_value(validator: str, value: Any) -> Any:
         return _continue_mode(value)
     if validator == "color_name":
         return _color_name(value)
+    if validator == "audio_object_color_name":
+        return _audio_object_color_name(value)
+    if validator == "audio_level_row":
+        return _int_range(value, 0, 24, "value must be an integer from 0 to 24")
+    if validator == "audio_output_ref":
+        return _channel_ref(value, minimum=0, maximum=128, name="cue output")
+    if validator == "device_output_ref":
+        return _channel_ref(value, minimum=1, maximum=128, name="device output")
+    if validator == "audio_patch_channel_count":
+        return _int_range(value, 1, 128, "value must be an integer from 1 to 128")
+    if validator == "audio_object_ref":
+        return _non_empty_string(value, "value must be a non-empty object name or ID")
     if validator == "timecode_output_type":
         return _int_range(value, 0, 1, "value must be 0 for MTC or 1 for LTC")
     if validator == "timecode_framerate":
@@ -952,6 +1284,16 @@ def _number(value: Any, message: str) -> int | float:
     return value
 
 
+def _decibel(value: Any) -> int | float | str:
+    if isinstance(value, bool):
+        raise UnsafeWriteOperationError("value must be a number or '-inf'")
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str) and value.strip().casefold() == "-inf":
+        return "-inf"
+    raise UnsafeWriteOperationError("value must be a number or '-inf'")
+
+
 def _int(value: Any, message: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise UnsafeWriteOperationError(message)
@@ -974,6 +1316,25 @@ def _enum_string(value: Any, allowed: set[str], message: str) -> str:
     return normalized
 
 
+def _non_empty_string(value: Any, message: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise UnsafeWriteOperationError(message)
+    return value.strip()
+
+
+def _channel_ref(value: Any, *, minimum: int, maximum: int, name: str) -> int | str:
+    message = f"value must be an integer from {minimum} to {maximum} or a {name} name"
+    if isinstance(value, bool):
+        raise UnsafeWriteOperationError(message)
+    if isinstance(value, int):
+        if minimum <= value <= maximum:
+            return value
+        raise UnsafeWriteOperationError(message)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    raise UnsafeWriteOperationError(message)
+
+
 def _color_name(value: Any) -> str:
     if not isinstance(value, str):
         raise UnsafeWriteOperationError("colorName must be a string")
@@ -981,6 +1342,16 @@ def _color_name(value: Any) -> str:
     if normalized.casefold() not in QLAB_COLOR_NAMES:
         allowed = ", ".join(sorted(QLAB_COLOR_NAMES))
         raise UnsafeWriteOperationError(f"colorName must be one of: {allowed}")
+    return normalized
+
+
+def _audio_object_color_name(value: Any) -> str:
+    if not isinstance(value, str):
+        raise UnsafeWriteOperationError("value must be an audio object color name")
+    normalized = value.strip()
+    if normalized.casefold() not in AUDIO_OBJECT_COLOR_NAMES:
+        allowed = ", ".join(sorted(AUDIO_OBJECT_COLOR_NAMES))
+        raise UnsafeWriteOperationError(f"value must be one of: {allowed}")
     return normalized
 
 

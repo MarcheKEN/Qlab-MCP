@@ -4464,7 +4464,18 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(capabilities["recommended_profile"], "audio_basic")
         for prop in ("name", "flagged", "colorName", "rate", "startTime"):
             self.assertIn(prop, capabilities["real_write_properties"])
-        for prop in ("fileTarget", "level", "sliderLevel", "audioOutputPatchID"):
+        for prop in (
+            "fileTarget",
+            "level",
+            "sliderLevel",
+            "deleteSliceMarker",
+            "deleteSliceMarkers",
+            "objectIDLevel",
+            "audioOutputPatch/level",
+            "audioOutputPatch/routing/reset",
+            "audioMap/objectID/position",
+            "audioOutputPatchID",
+        ):
             self.assertIn(prop, capabilities["dry_run_only_properties"])
             self.assertNotIn(prop, capabilities["real_write_properties"])
         self.assertEqual(
@@ -4474,13 +4485,16 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(
             capabilities["operations"]["level"]["args"],
             [
-                {"name": "inChannel", "validator": "positive_int"},
-                {"name": "outChannel", "validator": "positive_int"},
-                {"name": "decibel", "validator": "number"},
+                {"name": "inChannel", "validator": "audio_level_row"},
+                {"name": "outChannel", "validator": "audio_output_ref"},
+                {"name": "decibel", "validator": "decibel"},
             ],
         )
         self.assertFalse(capabilities["operations"]["level"]["real_write_enabled"])
-        self.assertEqual(capabilities["validators"]["level"]["decibel"], "number")
+        self.assertEqual(capabilities["validators"]["level"]["decibel"], "decibel")
+        self.assertEqual(capabilities["validators"]["sliderLevel"]["channel"], "audio_output_ref")
+        self.assertEqual(capabilities["validators"]["objectIDLevel"]["row"], "audio_level_row")
+        self.assertEqual(capabilities["validators"]["audioOutputPatch/level"]["outChannel"], "device_output_ref")
         self.assertIn("operations", capabilities["arg_schema"])
         self.assertEqual(
             capabilities["requires_write_gates"],

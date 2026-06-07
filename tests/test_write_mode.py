@@ -205,6 +205,26 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
 
     assert catalog["audio_basic"]["properties"]["level"]["planned_only_reason"]
     assert catalog["audio_basic"]["properties"]["fileTarget"]["planned_only_reason"]
+    assert catalog["audio_basic"]["properties"]["level"]["args"] == [
+        {"name": "inChannel", "validator": "audio_level_row"},
+        {"name": "outChannel", "validator": "audio_output_ref"},
+        {"name": "decibel", "validator": "decibel"},
+    ]
+    assert catalog["audio_basic"]["properties"]["sliderLevel"]["args"] == [
+        {"name": "channel", "validator": "audio_output_ref"},
+        {"name": "decibel", "validator": "decibel"},
+    ]
+    for prop in (
+        "setDefaultLevels",
+        "setSilentLevels",
+        "deleteSliceMarker",
+        "deleteSliceMarkers",
+        "objectIDLevel",
+        "audioOutputPatch/level",
+        "audioMap/objectID/position",
+    ):
+        assert catalog["audio_basic"]["properties"][prop]["real_write_enabled"] is False
+        assert catalog["audio_basic"]["properties"][prop]["planned_only_reason"]
     assert catalog["group_basic"]["properties"]["moveCartCue"]["planned_only_reason"]
     assert catalog["mic_basic"]["real_write_enabled"] is True
     assert catalog["mic_basic"]["properties"]["channels"]["real_write_enabled"] is True
@@ -1464,6 +1484,70 @@ def test_update_cue_audio_basic_dry_run_allows_small_audio_profile() -> None:
     assert result["executed_operations"] == []
 
 
+def test_update_cue_audio_last_slice_properties_dry_run_reads_before_and_plans() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=False, passcode=None),
+        existing_cue_id=cue_id,
+        cue_values={
+            "uniqueID": cue_id,
+            "type": "Audio",
+            "lastSlicePlayCount": 1,
+            "lastSliceInfiniteLoop": False,
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "audio_basic",
+                "properties": {"lastSlicePlayCount": -1, "lastSliceInfiniteLoop": True},
+            }
+        ],
+        dry_run=True,
+    )
+
+    item = result["results"][0]
+    setters = [operation for operation in item["planned_operations"] if operation["operation"] == "set_property"]
+    assert result["ok"] is True
+    assert result["planned_count"] == 1
+    assert item["before"]["lastSlicePlayCount"] == 1
+    assert item["before"]["lastSliceInfiniteLoop"] is False
+    assert [setter["property"] for setter in setters] == ["lastSlicePlayCount", "lastSliceInfiniteLoop"]
+    assert all(setter["real_write_enabled"] is False for setter in setters)
+    assert item["executed_operations"] == []
+
+
+def test_update_cues_audio_last_slice_invalid_values_have_no_plan() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Audio", "lastSlicePlayCount": 1, "lastSliceInfiniteLoop": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": cue_id, "profile": "audio_basic", "properties": {"lastSlicePlayCount": 0}},
+            {"cue_ref": cue_id, "profile": "audio_basic", "properties": {"lastSliceInfiniteLoop": "banana"}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["planned_count"] == 0
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert "lastSlicePlayCount must be a positive integer or -1" in result["results"][0]["errors"]["validation"]
+    assert result["results"][0]["planned_operations"] == []
+    assert result["results"][1]["status"] == "dry_run_preflight_failed"
+    assert "lastSliceInfiniteLoop must be a boolean" in result["results"][1]["errors"]["validation"]
+    assert result["results"][1]["planned_operations"] == []
+
+
 def test_update_cue_audio_basic_real_updates_and_verifies() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = FakeWriteClient(
@@ -1721,6 +1805,107 @@ def test_update_cue_operations_dry_run_builds_structured_osc_paths() -> None:
         }
     ]
     assert result["executed_operations"] == []
+
+
+def test_update_cue_audio_dry_run_builds_slice_level_object_and_patch_paths() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=False, passcode=None),
+        existing_cue_id=cue_id,
+        cue_values={"uniqueID": cue_id, "type": "Audio"},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cue(
+        "ws-1",
+        cue_id,
+        operations=[
+            {"property": "sliceMarker/time", "args": {"index": 0, "time": 1.5}},
+            {"property": "sliceMarker/playCount", "args": {"index": 0, "playCount": -1}},
+            {"property": "deleteSliceMarker", "args": {"index": 2}},
+            {"property": "deleteSliceMarkers", "args": {}},
+            {"property": "setDefaultLevels", "args": {}},
+            {"property": "sliderLevel", "args": {"channel": 0, "decibel": "-inf"}, "mode": "live"},
+            {"property": "objectIDLevel", "args": {"row": 0, "objectID": "obj-1", "decibel": -12}},
+            {"property": "objectID/position", "args": {"objectID": "obj-1", "x": 1.25, "y": -2}},
+            {"property": "audioOutputPatch/level", "args": {"inChannel": 0, "outChannel": 1, "decibel": -3}},
+            {"property": "audioOutputPatch/routing/reset", "args": {}},
+            {"property": "audioMap/objectID/colorName", "args": {"objectID": "map-obj-1", "colorName": "sky blue"}},
+        ],
+        dry_run=True,
+        profile="audio_basic",
+    )
+
+    setters = [operation for operation in result["planned_operations"] if operation["operation"] == "set_property"]
+    assert result["ok"] is True
+    assert [setter["address"] for setter in setters] == [
+        f"/workspace/ws-1/cue_id/{cue_id}/sliceMarker/0/time",
+        f"/workspace/ws-1/cue_id/{cue_id}/sliceMarker/0/playCount",
+        f"/workspace/ws-1/cue_id/{cue_id}/deleteSliceMarker/2",
+        f"/workspace/ws-1/cue_id/{cue_id}/deleteSliceMarkers",
+        f"/workspace/ws-1/cue_id/{cue_id}/setDefaultLevels",
+        f"/workspace/ws-1/cue_id/{cue_id}/sliderLevel/0/live",
+        f"/workspace/ws-1/cue_id/{cue_id}/objectIDLevel/0/obj-1",
+        f"/workspace/ws-1/cue_id/{cue_id}/objectID/obj-1/position",
+        f"/workspace/ws-1/cue_id/{cue_id}/audioOutputPatch/level/0/1",
+        f"/workspace/ws-1/cue_id/{cue_id}/audioOutputPatch/routing/reset",
+        f"/workspace/ws-1/cue_id/{cue_id}/audioMap/objectID/map-obj-1/colorName",
+    ]
+    assert [setter["args"] for setter in setters] == [
+        [1.5],
+        [-1],
+        [],
+        [],
+        [],
+        ["-inf"],
+        [-12],
+        [1.25, -2],
+        [-3],
+        [],
+        ["sky blue"],
+    ]
+    assert all(setter["real_write_enabled"] is False for setter in setters)
+    assert result["executed_operations"] == []
+
+
+def test_update_cues_audio_invalid_structured_operation_has_no_plan() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Audio"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "audio_basic",
+                "operations": [
+                    {"property": "level", "args": {"inChannel": 25, "outChannel": 1, "decibel": -6}}
+                ],
+            },
+            {
+                "cue_ref": cue_id,
+                "profile": "audio_basic",
+                "operations": [
+                    {"property": "sliderLevel", "args": {"channel": 1, "decibel": "loud"}}
+                ],
+            },
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["planned_count"] == 0
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert "level.inChannel must be an integer from 0 to 24" in result["results"][0]["errors"]["validation"]
+    assert result["results"][0]["planned_operations"] == []
+    assert result["results"][1]["status"] == "dry_run_preflight_failed"
+    assert "sliderLevel.decibel must be a number or '-inf'" in result["results"][1]["errors"]["validation"]
+    assert result["results"][1]["planned_operations"] == []
 
 
 def test_update_cue_operations_support_video_text_and_midi_dry_run_shapes() -> None:

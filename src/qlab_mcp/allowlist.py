@@ -134,6 +134,8 @@ TYPE_SPECIFIC_PROPERTIES = {
     "preservePitch",
     "doFade",
     "lockFadeToCue",
+    "lastSlicePlayCount",
+    "lastSliceInfiniteLoop",
     "channelOffset",
     "channels",
     "stage",

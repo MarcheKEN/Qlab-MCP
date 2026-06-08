@@ -225,7 +225,38 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
     ):
         assert catalog["audio_basic"]["properties"][prop]["real_write_enabled"] is False
         assert catalog["audio_basic"]["properties"][prop]["planned_only_reason"]
-    assert catalog["group_basic"]["properties"]["moveCartCue"]["planned_only_reason"]
+    assert catalog["group_basic"]["properties"]["mode"]["args"] == [{"name": "value", "validator": "group_mode"}]
+    for prop in (
+        "playhead",
+        "playbackPosition",
+        "playbackPositionID",
+        "playhead/next",
+        "playbackPosition/previousSequence",
+        "moveCartCue",
+        "playlist/currentCue",
+        "playlist/currentCueID",
+        "playlistLoop",
+        "playlistShuffle",
+        "playlistCrossfade",
+        "playlistCrossfadeDuration",
+    ):
+        assert catalog["group_basic"]["properties"][prop]["real_write_enabled"] is False
+        assert catalog["group_basic"]["properties"][prop]["planned_only_reason"]
+    for prop in ("cartRows", "cartColumns", "cartPosition", "cartPosition/row", "cartPosition/column"):
+        assert prop not in catalog["group_basic"]["properties"]
+    for forbidden in (
+        "alwaysCollate",
+        "collateAndStart",
+        "go",
+        "start",
+        "stop",
+        "hardStop",
+        "load",
+        "pause",
+        "playlist/next",
+        "playlist/previous",
+    ):
+        assert forbidden not in catalog["group_basic"]["properties"]
     assert catalog["mic_basic"]["real_write_enabled"] is True
     assert catalog["mic_basic"]["properties"]["channels"]["real_write_enabled"] is True
     assert catalog["video_basic"]["real_write_enabled"] is True
@@ -1278,6 +1309,164 @@ def test_update_cues_target_profile_type_mismatch_fails_cleanly_without_plan() -
     assert result["results"][0]["status"] == "dry_run_preflight_failed"
     assert "target_basic update profile requires cue type" in result["results"][0]["errors"]["profile"]
     assert result["results"][0]["planned_operations"] == []
+
+
+def test_update_cues_group_basic_dry_run_plans_documented_group_list_cart_paths() -> None:
+    group_id = "11111111-1111-4111-8111-111111111111"
+    list_id = "22222222-2222-4222-8222-222222222222"
+    cart_id = "33333333-3333-4333-8333-333333333333"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={
+            group_id: {"type": "Group", "mode": 3, "playlist/doLoop": False},
+            list_id: {"type": "Cue List", "playbackPosition": "1", "playbackPositionID": "child-old"},
+            cart_id: {"type": "Cue Cart", "mode": 5},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": group_id,
+                "profile": "group_basic",
+                "properties": {
+                    "mode": 6,
+                    "playlist/doLoop": True,
+                    "playlist/doShuffle": True,
+                    "playlist/doCrossfade": True,
+                    "playlist/crossfade/duration": 2.5,
+                    "playlist/currentCue": "A1",
+                    "playlist/currentCueID": "child-new",
+                    "playlistLoop": False,
+                    "playlistShuffle": False,
+                    "playlistCrossfade": False,
+                    "playlistCrossfadeDuration": 1.25,
+                },
+            },
+            {
+                "cue_ref": list_id,
+                "profile": "group_basic",
+                "properties": {
+                    "playhead": "next",
+                    "playheadID": "none",
+                    "playbackPosition": "previous",
+                    "playbackPositionID": "child-id",
+                },
+                "operations": [{"property": "playhead/next"}, {"property": "playbackPosition/previousSequence"}],
+            },
+            {
+                "cue_ref": cart_id,
+                "profile": "group_basic",
+                "operations": [{"property": "moveCartCue", "args": {"child": "child-id", "row": 2, "column": 3}}],
+            },
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "dry_run"
+    planned_by_item = [
+        {
+            operation["property"]: operation
+            for operation in item["planned_operations"]
+            if operation["operation"] == "set_property"
+        }
+        for item in result["results"]
+    ]
+    assert planned_by_item[0]["mode"]["address"] == f"/workspace/ws-1/cue_id/{group_id}/mode"
+    assert planned_by_item[0]["mode"]["args"] == [6]
+    assert planned_by_item[0]["playlist/currentCueID"]["address"] == f"/workspace/ws-1/cue_id/{group_id}/playlist/currentCueID"
+    assert planned_by_item[0]["playlist/currentCueID"]["planned_only_reason"] == "playlist_navigation_needs_dedicated_validation"
+    assert planned_by_item[0]["playlistLoop"]["address"] == f"/workspace/ws-1/cue_id/{group_id}/playlistLoop"
+    assert planned_by_item[0]["playlistLoop"]["planned_only_reason"] == "deprecated_use_playlist_doLoop"
+    assert planned_by_item[1]["playhead"]["address"] == f"/workspace/ws-1/cue_id/{list_id}/playhead"
+    assert planned_by_item[1]["playhead/next"]["address"] == f"/workspace/ws-1/cue_id/{list_id}/playhead/next"
+    assert planned_by_item[1]["playbackPosition/previousSequence"]["address"] == (
+        f"/workspace/ws-1/cue_id/{list_id}/playbackPosition/previousSequence"
+    )
+    assert planned_by_item[2]["moveCartCue"]["address"] == f"/workspace/ws-1/cue_id/{cart_id}/moveCartCue/child-id"
+    assert planned_by_item[2]["moveCartCue"]["args"] == [2, 3]
+    for item in result["results"]:
+        assert item["executed_operations"] == []
+
+
+def test_update_cues_group_basic_invalid_values_have_no_plan() -> None:
+    group_id = "11111111-1111-4111-8111-111111111111"
+    list_id = "22222222-2222-4222-8222-222222222222"
+    cart_id = "33333333-3333-4333-8333-333333333333"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={
+            group_id: {"type": "Group", "mode": 3},
+            list_id: {"type": "Cue List", "playbackPosition": "1"},
+            cart_id: {"type": "Cue Cart", "mode": 5},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 0}},
+            {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": "yes"}},
+            {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/crossfade/duration": -0.1}},
+            {"cue_ref": list_id, "profile": "group_basic", "properties": {"playhead": ""}},
+            {
+                "cue_ref": cart_id,
+                "profile": "group_basic",
+                "operations": [{"property": "moveCartCue", "args": {"child": "child", "row": -1, "column": 0}}],
+            },
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["failed_count"] == 5
+    assert result["results"][0]["errors"]["validation"] == "mode must be 1, 2, 3, 4, or 6"
+    assert result["results"][1]["errors"]["validation"] == "playlist/doLoop must be a boolean"
+    assert result["results"][2]["errors"]["validation"] == "playlist/crossfade/duration must be a non-negative number"
+    assert result["results"][3]["errors"]["validation"] == "playhead must be a non-empty string"
+    assert result["results"][4]["errors"]["validation"] == "moveCartCue.row must be a non-negative integer"
+    assert all(item["planned_operations"] == [] for item in result["results"])
+
+
+def test_update_cues_group_basic_real_blocks_planned_only_before_setters() -> None:
+    group_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={group_id: {"type": "Group", "playbackPosition": "1"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
+        reader.update_cues(
+            "ws-1",
+            [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playbackPosition": "next"}}],
+            dry_run=False,
+        )
+
+    assert client.requests == []
+
+
+def test_update_cues_group_basic_profile_mismatch_fails_cleanly() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Memo", "mode": 3}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "group_basic", "properties": {"mode": 3}}],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["results"][0]["planned_operations"] == []
+    assert result["results"][0]["errors"]["profile"] == "group_basic update profile requires cue type: Group, Cue List, Cue Cart"
 
 
 def test_update_cues_fade_basic_dry_run_plans_documented_fade_fields() -> None:

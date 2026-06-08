@@ -179,9 +179,51 @@ def _rgba_args() -> tuple[tuple[str, str], ...]:
 
 def _group_properties() -> tuple[CuePropertySpec, ...]:
     return (
-        _prop("mode", "int", real_write_enabled=True),
-        _planned_prop("playbackPosition", "string", reason="playhead_changes_are_control_behavior"),
-        _planned_prop("playbackPositionID", "string", reason="playhead_changes_are_control_behavior"),
+        _prop("mode", "group_mode", real_write_enabled=True),
+        _planned_prop("playhead", "non_empty_string", reason="playhead_changes_are_control_behavior"),
+        _planned_prop("playheadID", "non_empty_string", reason="playhead_changes_are_control_behavior"),
+        _planned_prop("playbackPosition", "non_empty_string", reason="playhead_changes_are_control_behavior"),
+        _planned_prop("playbackPositionID", "non_empty_string", reason="playhead_changes_are_control_behavior"),
+        _op("playhead/next", (), path="playhead/next", risk_tier="high", planned_only_reason="playhead_changes_are_control_behavior"),
+        _op("playhead/previous", (), path="playhead/previous", risk_tier="high", planned_only_reason="playhead_changes_are_control_behavior"),
+        _op("playhead/none", (), path="playhead/none", risk_tier="high", planned_only_reason="playhead_changes_are_control_behavior"),
+        _op("playhead/nextSequence", (), path="playhead/nextSequence", risk_tier="high", planned_only_reason="playhead_changes_are_control_behavior"),
+        _op("playhead/previousSequence", (), path="playhead/previousSequence", risk_tier="high", planned_only_reason="playhead_changes_are_control_behavior"),
+        _op(
+            "playbackPosition/next",
+            (),
+            path="playbackPosition/next",
+            risk_tier="high",
+            planned_only_reason="playhead_changes_are_control_behavior",
+        ),
+        _op(
+            "playbackPosition/previous",
+            (),
+            path="playbackPosition/previous",
+            risk_tier="high",
+            planned_only_reason="playhead_changes_are_control_behavior",
+        ),
+        _op(
+            "playbackPosition/none",
+            (),
+            path="playbackPosition/none",
+            risk_tier="high",
+            planned_only_reason="playhead_changes_are_control_behavior",
+        ),
+        _op(
+            "playbackPosition/nextSequence",
+            (),
+            path="playbackPosition/nextSequence",
+            risk_tier="high",
+            planned_only_reason="playhead_changes_are_control_behavior",
+        ),
+        _op(
+            "playbackPosition/previousSequence",
+            (),
+            path="playbackPosition/previousSequence",
+            risk_tier="high",
+            planned_only_reason="playhead_changes_are_control_behavior",
+        ),
         _op(
             "moveCartCue",
             (("child", "non_empty_string"), ("row", "non_negative_int"), ("column", "non_negative_int")),
@@ -189,10 +231,21 @@ def _group_properties() -> tuple[CuePropertySpec, ...]:
             risk_tier="high",
             planned_only_reason="cart_child_order_changes_need_dedicated_validation",
         ),
+        _planned_prop("playlist/currentCue", "non_empty_string", reason="playlist_navigation_needs_dedicated_validation"),
+        _planned_prop("playlist/currentCueID", "non_empty_string", reason="playlist_navigation_needs_dedicated_validation"),
         _prop("playlist/doLoop", "boolean", real_write_enabled=True),
         _prop("playlist/doShuffle", "boolean", real_write_enabled=True),
         _prop("playlist/doCrossfade", "boolean", real_write_enabled=True),
         _prop("playlist/crossfade/duration", "non_negative_number", real_write_enabled=True),
+        _planned_prop("playlistLoop", "boolean", path="playlistLoop", reason="deprecated_use_playlist_doLoop"),
+        _planned_prop("playlistShuffle", "boolean", path="playlistShuffle", reason="deprecated_use_playlist_doShuffle"),
+        _planned_prop("playlistCrossfade", "boolean", path="playlistCrossfade", reason="deprecated_use_playlist_doCrossfade"),
+        _planned_prop(
+            "playlistCrossfadeDuration",
+            "non_negative_number",
+            path="playlistCrossfadeDuration",
+            reason="deprecated_use_playlist_crossfade_duration",
+        ),
         _prop("timecodeFreewheelTime", "non_negative_number", real_write_enabled=True),
         _prop("timecodeLookbackTime", "non_negative_number", real_write_enabled=True),
         _prop("timecodeSMPTEFormat", "int", real_write_enabled=True),
@@ -1321,6 +1374,8 @@ def _validate_value(validator: str, value: Any) -> Any:
         return _enum_string(value, {"audio", "video"}, "value must be audio or video")
     if validator == "continue_mode":
         return _continue_mode(value)
+    if validator == "group_mode":
+        return _group_mode(value)
     if validator == "color_name":
         return _color_name(value)
     if validator == "audio_object_color_name":
@@ -1403,6 +1458,13 @@ def _validate_named_value(name: str, validator: str, value: Any) -> Any:
         elif message.startswith("colorName must"):
             message = message.replace("colorName must", f"{name} must", 1)
         raise UnsafeWriteOperationError(message) from exc
+
+
+def _group_mode(value: Any) -> int:
+    number = _int(value, "value must be 1, 2, 3, 4, or 6")
+    if number not in {1, 2, 3, 4, 6}:
+        raise UnsafeWriteOperationError("value must be 1, 2, 3, 4, or 6")
+    return number
 
 
 def _number(value: Any, message: str) -> int | float:

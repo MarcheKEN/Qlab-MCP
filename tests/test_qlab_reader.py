@@ -4536,6 +4536,48 @@ class QLabReaderTests(unittest.TestCase):
                     self.assertIn(prop, capabilities["dry_run_only_properties"])
                     self.assertNotIn(prop, capabilities["real_write_properties"])
 
+    def test_editable_profile_exposes_group_list_cart_update_capabilities(self) -> None:
+        cases = ("Group", "Cue List", "Cue Cart")
+        for cue_type in cases:
+            with self.subTest(cue_type=cue_type):
+                responses = {
+                    "/workspace/ws-1/cue/10/valuesForKeys": {
+                        "uniqueID": "cue-id",
+                        "number": "10",
+                        "name": cue_type,
+                        "displayName": cue_type,
+                        "type": cue_type,
+                    },
+                }
+                with FakeQlabOscServer(responses) as server:
+                    reader = QLabReader(client_for(server))
+
+                    result = reader.get_cue_details("ws-1", "10", "editable")
+
+                capabilities = result["update_capabilities"]
+                self.assertEqual(capabilities["recommended_profile"], "group_basic")
+                self.assertIn("group_basic", capabilities["compatible_profiles"])
+                self.assertIn("mode", capabilities["real_write_properties"])
+                self.assertEqual(capabilities["validators"]["mode"]["value"], "group_mode")
+                for prop in (
+                    "playhead",
+                    "playbackPositionID",
+                    "playhead/next",
+                    "playbackPosition/previousSequence",
+                    "moveCartCue",
+                    "playlist/currentCueID",
+                    "playlistLoop",
+                    "playlistCrossfadeDuration",
+                ):
+                    self.assertIn(prop, capabilities["dry_run_only_properties"])
+                    self.assertNotIn(prop, capabilities["real_write_properties"])
+                    self.assertIn(prop, capabilities["operations"])
+                    self.assertIn(prop, capabilities["planned_only_reason"])
+                self.assertEqual(capabilities["validators"]["moveCartCue"]["row"], "non_negative_int")
+                self.assertEqual(capabilities["validators"]["playlist/currentCueID"]["value"], "non_empty_string")
+                self.assertNotIn("cartRows", capabilities["operations"])
+                self.assertNotIn("go", capabilities["operations"])
+
     def test_editable_profile_exposes_documented_timecode_update_capabilities(self) -> None:
         responses = {
             "/workspace/ws-1/cue/10/valuesForKeys": {

@@ -106,8 +106,10 @@ AUTO_MIDI_KEYS = (
     "midiPatchID",
 )
 AUTO_TIMECODE_KEYS = (
-    "timecodeString",
-    "timecodeFormat",
+    "outputType",
+    "framerate",
+    "startTime",
+    "endTime",
     "midiPatchName",
     "midiPatchNumber",
     "midiPatchID",

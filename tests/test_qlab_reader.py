@@ -4602,6 +4602,41 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIn("timecodeString", capabilities["dry_run_only_properties"])
         self.assertIn("timecodeFormat", capabilities["dry_run_only_properties"])
 
+    def test_auto_timecode_profile_excludes_midi_msc_timecode_aliases(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "number": "10",
+                "name": "TC",
+                "displayName": "TC",
+                "type": "Timecode",
+                "timecodeString": "01:00:00:00",
+                "timecodeFormat": 3,
+                "outputType": 1,
+                "framerate": 7,
+                "startTime": "01:00:00:00",
+                "endTime": "01:00:10:00",
+                "ltcChannel": 1,
+                "midiPatchName": "Patch 1",
+                "audioOutputPatchName": "Main",
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "auto")
+
+        type_specific = result["sections"]["type_specific"]
+        self.assertNotIn("timecodeString", type_specific)
+        self.assertNotIn("timecodeFormat", type_specific)
+        self.assertEqual(type_specific["outputType"], 1)
+        self.assertEqual(type_specific["framerate"], 7)
+        self.assertEqual(type_specific["startTime"], "01:00:00:00")
+        self.assertEqual(type_specific["endTime"], "01:00:10:00")
+        self.assertEqual(type_specific["ltcChannel"], 1)
+        self.assertEqual(type_specific["midiPatchName"], "Patch 1")
+        self.assertEqual(type_specific["audioOutputPatchName"], "Main")
+
     def test_health_profile_redacts_file_target_but_reports_presence(self) -> None:
         responses = {
             "/workspace/ws-1/cue/10/valuesForKeys": {

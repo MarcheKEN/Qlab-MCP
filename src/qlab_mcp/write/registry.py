@@ -816,21 +816,24 @@ FADE_CATALOG_PROPERTIES = (
 
 NETWORK_CATALOG_PROPERTIES = (
     *_planned_patch_refs("networkPatch", validator="patch_ref"),
-    _planned_prop("messageType", "int", reason="network_message_mode_needs_validation"),
-    _planned_prop("protocol", "string", reason="network_protocol_changes_need_validation"),
-    _planned_prop("message", "string", reason="network_messages_can_trigger_external_systems"),
     _planned_prop("customString", "string", reason="network_messages_can_trigger_external_systems"),
-    _op("oscMessage", (("address", "non_empty_string"), ("arguments", "list"),), path="message", risk_tier="high", planned_only_reason="network_messages_can_trigger_external_systems"),
-    _planned_prop("resend", "boolean", reason="network_resend_behavior_needs_validation"),
+    _op(
+        "parameterValue",
+        (("parameter", "non_empty_string"), ("value", "json_value")),
+        path="parameterValue/{parameter}",
+        risk_tier="high",
+        planned_only_reason="network_parameter_values_can_trigger_external_systems",
+    ),
+    _planned_prop("parameterValues", "list", reason="network_parameter_values_can_trigger_external_systems"),
 )
 
 MIDI_CATALOG_PROPERTIES = (
     *_planned_patch_refs("midiPatch", validator="patch_ref"),
-    _planned_prop("messageType", "int", reason="midi_message_mode_needs_validation"),
+    _planned_prop("messageType", "midi_message_type", reason="midi_message_mode_needs_validation"),
     _planned_prop("channel", "midi_channel", reason="midi_can_trigger_external_devices"),
     _planned_prop("command", "byte", reason="midi_can_trigger_external_devices"),
     _planned_prop("commandFormat", "byte", reason="midi_can_trigger_external_devices"),
-    _planned_prop("status", "byte", reason="midi_can_trigger_external_devices"),
+    _planned_prop("status", "midi_status", reason="midi_can_trigger_external_devices"),
     _planned_prop("note", "byte", path="byte1", read_key="byte1", reason="midi_voice_alias_needs_message_type_validation"),
     _planned_prop("velocity", "byte", path="byte2", read_key="byte2", reason="midi_voice_alias_needs_message_type_validation"),
     _planned_prop("programChange", "byte", path="byte1", read_key="byte1", reason="midi_voice_alias_needs_message_type_validation"),
@@ -848,7 +851,8 @@ MIDI_CATALOG_PROPERTIES = (
     _planned_prop("qNumber", "string", reason="msc_fields_need_validation"),
     _planned_prop("qPath", "string", reason="msc_fields_need_validation"),
     _planned_prop("timecodeString", "string", reason="msc_timecode_needs_validation"),
-    _planned_prop("timecodeFormat", "int", reason="msc_timecode_needs_validation"),
+    _planned_prop("timecodeFormat", "midi_timecode_format", reason="msc_timecode_needs_validation"),
+    _planned_prop("doFade", "boolean", reason="midi_fade_can_trigger_external_devices"),
 )
 
 MIDI_FILE_CATALOG_PROPERTIES = (
@@ -885,6 +889,7 @@ TIMECODE_CATALOG_PROPERTIES = (
     _prop("timecodeFrameRate", "timecode_framerate", path="framerate", read_key="framerate", risk_tier="medium", real_write_enabled=True),
     _prop("startTime", "string", risk_tier="medium", real_write_enabled=True),
     _prop("endTime", "string", risk_tier="medium", real_write_enabled=True),
+    _planned_prop("ltcChannel", "positive_int", reason="ltc_output_channel_affects_external_timecode_output"),
     *_planned_patch_refs("audioOutputPatch", validator="patch_ref"),
     *_planned_patch_refs("midiPatch", validator="patch_ref"),
 )
@@ -1420,6 +1425,12 @@ def _validate_value(validator: str, value: Any) -> Any:
         return _int_range(value, 0, 16383, "value must be an integer from 0 to 16383")
     if validator == "midi_channel":
         return _int_range(value, 1, 16, "value must be an integer from 1 to 16")
+    if validator == "midi_message_type":
+        return _int_range(value, 1, 3, "value must be 1 for MIDI voice, 2 for MSC, or 3 for SysEx")
+    if validator == "midi_status":
+        return _int_range(value, 0, 6, "value must be an integer from 0 to 6")
+    if validator == "midi_timecode_format":
+        return _int_range(value, 0, 3, "value must be 0 for 24 fps, 1 for 25 fps, 2 for 30 fps drop, or 3 for 30 fps non-drop")
     if validator == "unit_interval":
         number = _number(value, "value must be a number from 0 to 1")
         if number < 0 or number > 1:

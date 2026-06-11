@@ -4505,7 +4505,7 @@ class QLabReaderTests(unittest.TestCase):
         cases = (
             ("Memo", "memo_basic", ()),
             ("Text", "text_basic", ("text/format/color",)),
-            ("Network", "network_basic", ("message", "oscMessage")),
+            ("Network", "network_basic", ("customString", "parameterValue", "parameterValues")),
             ("Light", "light_basic", ("lightCommandText", "setLight")),
             ("Timecode", "timecode_basic", ("timecodeString", "timecodeFormat")),
             ("Script", "script_basic", ("scriptSource", "scriptText")),

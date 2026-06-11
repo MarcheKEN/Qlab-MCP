@@ -215,6 +215,7 @@ TYPE_SPECIFIC_PROPERTIES = {
     "outputType",
     "timecodeFrameRate",
     "framerate",
+    "ltcChannel",
     "devampType",
     "startNextCueWhenSliceEnds",
     "stopTargetWhenDone",

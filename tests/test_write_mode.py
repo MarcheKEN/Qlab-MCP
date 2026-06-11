@@ -174,6 +174,14 @@ class BatchFakeWriteClient:
         return None, None
 
 
+def planned_setters(result_item: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {
+        operation["property"]: operation
+        for operation in result_item["planned_operations"]
+        if operation["operation"] == "set_property"
+    }
+
+
 def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
     catalog = profile_catalog()
 
@@ -291,14 +299,24 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
         assert catalog["text_basic"]["properties"][prop]["real_write_enabled"] is False
         assert catalog["text_basic"]["properties"][prop]["planned_only_reason"]
     assert catalog["midi_file_basic"]["properties"]["rate"]["real_write_enabled"] is True
-    assert catalog["network_basic"]["properties"]["protocol"]["planned_only_reason"]
+    assert catalog["network_basic"]["properties"]["customString"]["planned_only_reason"]
+    assert catalog["network_basic"]["properties"]["parameterValue"]["planned_only_reason"]
+    assert catalog["network_basic"]["properties"]["parameterValue"]["path"] == "parameterValue/{parameter}"
+    assert catalog["network_basic"]["properties"]["parameterValues"]["args"][0]["validator"] == "list"
     assert catalog["network_basic"]["real_write_enabled"] is True
+    for unsupported_network_prop in ("message", "messageType", "protocol", "resend", "oscMessage"):
+        assert unsupported_network_prop not in catalog["network_basic"]["properties"]
     assert catalog["midi_basic"]["properties"]["note"]["path"] == "byte1"
     assert catalog["midi_basic"]["real_write_enabled"] is True
+    assert catalog["midi_basic"]["properties"]["messageType"]["args"][0]["validator"] == "midi_message_type"
+    assert catalog["midi_basic"]["properties"]["status"]["args"][0]["validator"] == "midi_status"
+    assert catalog["midi_basic"]["properties"]["timecodeFormat"]["args"][0]["validator"] == "midi_timecode_format"
+    assert catalog["midi_basic"]["properties"]["doFade"]["planned_only_reason"]
     assert catalog["timecode_basic"]["real_write_enabled"] is True
     assert catalog["timecode_basic"]["properties"]["outputType"]["real_write_enabled"] is True
     assert catalog["timecode_basic"]["properties"]["timecodeFrameRate"]["path"] == "framerate"
     assert catalog["timecode_basic"]["properties"]["timecodeFrameRate"]["args"][0]["validator"] == "timecode_framerate"
+    assert catalog["timecode_basic"]["properties"]["ltcChannel"]["planned_only_reason"]
     assert catalog["timecode_basic"]["properties"]["timecodeString"]["planned_only_reason"]
     assert catalog["timecode_basic"]["properties"]["timecodeFormat"]["planned_only_reason"]
     for prop in ("cueTargetID", "cueTargetNumber", "cueTargetName", "tempCueTargetID", "tempCueTargetNumber", "targetMode"):
@@ -2736,7 +2754,7 @@ def test_update_cue_real_blocks_dry_run_only_profiles_and_properties_before_osc(
 
     for profile, cue_type, properties in (
         ("light_basic", "Light", {"lightCommandText": "1 thru 5 @ 80"}),
-        ("network_basic", "Network", {"message": "/eos/cue/1/fire"}),
+        ("network_basic", "Network", {"customString": "/eos/cue/1/fire"}),
         ("midi_basic", "MIDI", {"note": 64}),
         ("timecode_basic", "Timecode", {"timecodeString": "01:00:00:00"}),
         ("fade_basic", "Fade", {"targetMode": 0}),
@@ -2799,6 +2817,497 @@ def test_update_cue_timecode_rejects_invalid_output_type_and_frame_rate() -> Non
         reader.update_cue("ws-1", "1", {"timecodeFrameRate": 8}, dry_run=True, profile="timecode_basic")
 
     assert client.requests == []
+
+
+def test_update_cues_mic_basic_dry_run_plans_documented_mic_and_audio_fields() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Mic", "channels": 1, "channelOffset": 0}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "mic_basic",
+                "properties": {
+                    "channels": 2,
+                    "channelOffset": 1,
+                    "audioInputPatchID": "input-patch",
+                    "audioOutputPatchName": "Main",
+                },
+                "operations": [
+                    {"property": "level", "args": {"inChannel": 1, "outChannel": 1, "decibel": -6}},
+                    {"property": "mute", "args": {"output": 1, "value": True}},
+                ],
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    setters = planned_setters(result["results"][0])
+    assert setters["channels"]["real_write_enabled"] is True
+    assert setters["channelOffset"]["real_write_enabled"] is True
+    for prop in ("audioInputPatchID", "audioOutputPatchName", "level", "mute"):
+        assert setters[prop]["real_write_enabled"] is False
+        assert setters[prop]["planned_only_reason"]
+    assert setters["level"]["address"] == f"/workspace/ws-1/cue_id/{cue_id}/level/1/1"
+    assert setters["level"]["args"] == [-6]
+    assert result["results"][0]["executed_operations"] == []
+
+
+def test_update_cues_mic_basic_invalid_values_and_profile_mismatch_have_no_plan() -> None:
+    mic_id = "11111111-1111-4111-8111-111111111111"
+    memo_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={mic_id: {"type": "Mic"}, memo_id: {"type": "Memo"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": mic_id, "profile": "mic_basic", "properties": {"channels": 0}},
+            {"cue_ref": mic_id, "profile": "mic_basic", "properties": {"channelOffset": -1}},
+            {
+                "cue_ref": mic_id,
+                "profile": "mic_basic",
+                "operations": [{"property": "level", "args": {"inChannel": 25, "outChannel": 1, "decibel": -6}}],
+            },
+            {"cue_ref": memo_id, "profile": "mic_basic", "properties": {"channels": 2}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["planned_count"] == 0
+    assert [item["status"] for item in result["results"]] == ["dry_run_preflight_failed"] * 4
+    assert result["results"][0]["errors"]["validation"] == "channels must be a positive integer"
+    assert result["results"][1]["errors"]["validation"] == "channelOffset must be a non-negative integer"
+    assert "level.inChannel must be an integer from 0 to 24" in result["results"][2]["errors"]["validation"]
+    assert result["results"][3]["errors"]["profile"] == "mic_basic update profile requires a Mic cue"
+    assert all(item["planned_operations"] == [] for item in result["results"])
+
+
+def test_update_cues_timecode_basic_dry_run_plans_ltc_mtc_fields() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Timecode", "outputType": 1, "framerate": 3, "ltcChannel": 1}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "timecode_basic",
+                "properties": {
+                    "outputType": 0,
+                    "timecodeFrameRate": 7,
+                    "startTime": "01:00:00:00",
+                    "endTime": "01:00:10:00",
+                    "ltcChannel": 2,
+                    "midiPatchID": "midi-patch",
+                    "audioOutputPatchNumber": 1,
+                },
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    setters = planned_setters(result["results"][0])
+    assert setters["timecodeFrameRate"]["address"] == f"/workspace/ws-1/cue_id/{cue_id}/framerate"
+    assert setters["timecodeFrameRate"]["real_write_enabled"] is True
+    assert setters["outputType"]["real_write_enabled"] is True
+    for prop in ("ltcChannel", "midiPatchID", "audioOutputPatchNumber"):
+        assert setters[prop]["real_write_enabled"] is False
+        assert setters[prop]["planned_only_reason"]
+
+
+def test_update_cues_timecode_basic_invalid_ltc_and_profile_mismatch_have_no_plan() -> None:
+    timecode_id = "11111111-1111-4111-8111-111111111111"
+    memo_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={timecode_id: {"type": "Timecode"}, memo_id: {"type": "Memo"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": timecode_id, "profile": "timecode_basic", "properties": {"ltcChannel": 0}},
+            {"cue_ref": memo_id, "profile": "timecode_basic", "properties": {"outputType": 0}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["planned_count"] == 0
+    assert result["results"][0]["errors"]["validation"] == "ltcChannel must be a positive integer"
+    assert result["results"][1]["errors"]["profile"] == "timecode_basic update profile requires a Timecode cue"
+    assert all(item["planned_operations"] == [] for item in result["results"])
+
+
+def test_update_cues_midi_file_basic_dry_run_plans_playback_and_patch_fields() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "MIDI File", "rate": 1, "playCount": 1}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "midi_file_basic",
+                "properties": {
+                    "fileTarget": "/show/foo.mid",
+                    "rate": 1.25,
+                    "startTime": 0,
+                    "endTime": 8,
+                    "duration": 8,
+                    "playCount": 2,
+                    "midiPatchName": "Synth",
+                },
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    setters = planned_setters(result["results"][0])
+    for prop in ("rate", "startTime", "endTime", "duration", "playCount"):
+        assert setters[prop]["real_write_enabled"] is True
+    for prop in ("fileTarget", "midiPatchName"):
+        assert setters[prop]["real_write_enabled"] is False
+        assert setters[prop]["planned_only_reason"]
+
+
+def test_update_cues_midi_file_invalid_values_and_profile_mismatch_have_no_plan() -> None:
+    midi_file_id = "11111111-1111-4111-8111-111111111111"
+    memo_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={midi_file_id: {"type": "MIDI File"}, memo_id: {"type": "Memo"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": midi_file_id, "profile": "midi_file_basic", "properties": {"rate": 0.01}},
+            {"cue_ref": midi_file_id, "profile": "midi_file_basic", "properties": {"playCount": 0}},
+            {"cue_ref": midi_file_id, "profile": "midi_file_basic", "properties": {"duration": -1}},
+            {"cue_ref": memo_id, "profile": "midi_file_basic", "properties": {"rate": 1}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["planned_count"] == 0
+    assert "rate must be a number from 0.03 to 33.0" in result["results"][0]["errors"]["validation"]
+    assert result["results"][1]["errors"]["validation"] == "playCount must be a positive integer"
+    assert result["results"][2]["errors"]["validation"] == "duration must be a non-negative number"
+    assert result["results"][3]["errors"]["profile"] == "midi_file_basic update profile requires a MIDI File cue"
+    assert all(item["planned_operations"] == [] for item in result["results"])
+
+
+def test_update_cues_midi_basic_dry_run_plans_documented_message_fields() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "MIDI", "messageType": 1, "status": 1}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "midi_basic",
+                "properties": {
+                    "midiPatchID": "midi-patch",
+                    "messageType": 2,
+                    "channel": 16,
+                    "command": 1,
+                    "commandFormat": 2,
+                    "status": 6,
+                    "note": 64,
+                    "velocity": 100,
+                    "programChange": 10,
+                    "pitchBend": 8192,
+                    "byte1": 65,
+                    "byte2": 66,
+                    "byteCombo": 1024,
+                    "controlNumber": 7,
+                    "controlValue": 127,
+                    "deviceID": 1,
+                    "endValue": 127,
+                    "macro": 2,
+                    "rawString": "7E 7F 09 01",
+                    "qList": "1",
+                    "qNumber": "2",
+                    "qPath": "3",
+                    "timecodeString": "01:00:00:00",
+                    "timecodeFormat": 3,
+                    "doFade": True,
+                },
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    setters = planned_setters(result["results"][0])
+    assert setters["note"]["address"] == f"/workspace/ws-1/cue_id/{cue_id}/byte1"
+    assert setters["velocity"]["address"] == f"/workspace/ws-1/cue_id/{cue_id}/byte2"
+    assert setters["pitchBend"]["address"] == f"/workspace/ws-1/cue_id/{cue_id}/byteCombo"
+    for setter in setters.values():
+        assert setter["real_write_enabled"] is False
+        assert setter["planned_only_reason"]
+
+
+def test_update_cues_midi_basic_invalid_values_and_profile_mismatch_have_no_plan() -> None:
+    midi_id = "11111111-1111-4111-8111-111111111111"
+    memo_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={midi_id: {"type": "MIDI"}, memo_id: {"type": "Memo"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": midi_id, "profile": "midi_basic", "properties": {"messageType": 4}},
+            {"cue_ref": midi_id, "profile": "midi_basic", "properties": {"channel": 17}},
+            {"cue_ref": midi_id, "profile": "midi_basic", "properties": {"byte1": 128}},
+            {"cue_ref": midi_id, "profile": "midi_basic", "properties": {"byteCombo": 16384}},
+            {"cue_ref": midi_id, "profile": "midi_basic", "properties": {"status": 7}},
+            {"cue_ref": midi_id, "profile": "midi_basic", "properties": {"timecodeFormat": 4}},
+            {"cue_ref": memo_id, "profile": "midi_basic", "properties": {"channel": 1}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["planned_count"] == 0
+    assert result["results"][0]["errors"]["validation"] == "messageType must be 1 for MIDI voice, 2 for MSC, or 3 for SysEx"
+    assert result["results"][1]["errors"]["validation"] == "channel must be an integer from 1 to 16"
+    assert result["results"][2]["errors"]["validation"] == "byte1 must be an integer from 0 to 127"
+    assert result["results"][3]["errors"]["validation"] == "byteCombo must be an integer from 0 to 16383"
+    assert result["results"][4]["errors"]["validation"] == "status must be an integer from 0 to 6"
+    assert result["results"][5]["errors"]["validation"] == (
+        "timecodeFormat must be 0 for 24 fps, 1 for 25 fps, 2 for 30 fps drop, or 3 for 30 fps non-drop"
+    )
+    assert result["results"][6]["errors"]["profile"] == "midi_basic update profile requires a MIDI cue"
+    assert all(item["planned_operations"] == [] for item in result["results"])
+
+
+def test_update_cues_network_basic_dry_run_plans_documented_non_ambiguous_fields() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Network", "customString": "/cue/1/start"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "network_basic",
+                "properties": {
+                    "customString": "/eos/cue/1/fire",
+                    "networkPatchID": "net-patch",
+                    "parameterValues": [1, "go"],
+                },
+                "operations": [{"property": "parameterValue", "args": {"parameter": "cueName", "value": "Intro"}}],
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    setters = planned_setters(result["results"][0])
+    assert setters["parameterValue"]["address"] == f"/workspace/ws-1/cue_id/{cue_id}/parameterValue/cueName"
+    assert setters["parameterValue"]["args"] == ["Intro"]
+    for setter in setters.values():
+        assert setter["real_write_enabled"] is False
+        assert setter["planned_only_reason"]
+
+
+def test_update_cues_network_basic_invalid_values_and_unsupported_fields_have_no_plan() -> None:
+    network_id = "11111111-1111-4111-8111-111111111111"
+    memo_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={network_id: {"type": "Network"}, memo_id: {"type": "Memo"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": network_id, "profile": "network_basic", "properties": {"parameterValues": "not-list"}},
+            {"cue_ref": network_id, "profile": "network_basic", "properties": {"networkPatchNumber": -1}},
+            {"cue_ref": network_id, "profile": "network_basic", "properties": {"message": "/unsupported"}},
+            {"cue_ref": network_id, "profile": "network_basic", "properties": {"protocol": "udp"}},
+            {"cue_ref": memo_id, "profile": "network_basic", "properties": {"customString": "/go"}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["planned_count"] == 0
+    assert result["results"][0]["errors"]["validation"] == "parameterValues must be a list"
+    assert result["results"][1]["errors"]["validation"] == "networkPatchNumber must be a non-negative integer"
+    assert "not allowlisted" in result["results"][2]["errors"]["validation"]
+    assert "not allowlisted" in result["results"][3]["errors"]["validation"]
+    assert result["results"][4]["errors"]["profile"] == "network_basic update profile requires a Network cue"
+    assert all(item["planned_operations"] == [] for item in result["results"])
+
+
+def test_update_cues_script_basic_dry_run_plans_source_alias_without_execution() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Script", "scriptSource": ""}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "script_basic",
+                "properties": {"scriptSource": "display dialog \"planned\""},
+                "operations": [{"property": "scriptText", "args": "display dialog \"alias\""}],
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    setters = planned_setters(result["results"][0])
+    assert setters["scriptSource"]["address"] == f"/workspace/ws-1/cue_id/{cue_id}/scriptSource"
+    assert setters["scriptText"]["address"] == f"/workspace/ws-1/cue_id/{cue_id}/scriptSource"
+    assert all(setter["real_write_enabled"] is False for setter in setters.values())
+    assert all(setter["planned_only_reason"] == "script_execution_risk" for setter in setters.values())
+    assert result["results"][0]["executed_operations"] == []
+
+
+def test_update_cues_script_basic_invalid_value_and_profile_mismatch_have_no_plan() -> None:
+    script_id = "11111111-1111-4111-8111-111111111111"
+    memo_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={script_id: {"type": "Script"}, memo_id: {"type": "Memo"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": script_id, "profile": "script_basic", "properties": {"scriptSource": 123}},
+            {"cue_ref": memo_id, "profile": "script_basic", "properties": {"scriptSource": ""}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["planned_count"] == 0
+    assert result["results"][0]["errors"]["validation"] == "scriptSource must be a string"
+    assert result["results"][1]["errors"]["profile"] == "script_basic update profile requires a Script cue"
+    assert all(item["planned_operations"] == [] for item in result["results"])
+
+
+def test_update_cues_wait_and_memo_basic_stay_common_only() -> None:
+    catalog = profile_catalog()
+    assert set(catalog["wait_basic"]["properties"]) == set(catalog["common"]["properties"])
+    assert set(catalog["memo_basic"]["properties"]) == set(catalog["common"]["properties"])
+
+    wait_id = "11111111-1111-4111-8111-111111111111"
+    memo_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={wait_id: {"type": "Wait", "duration": 0}, memo_id: {"type": "Memo", "notes": ""}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": wait_id, "profile": "wait_basic", "properties": {"duration": 3, "continueMode": "auto_follow"}},
+            {"cue_ref": memo_id, "profile": "memo_basic", "properties": {"name": "Memo", "notes": "Operator note"}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    assert result["planned_count"] == 2
+    assert planned_setters(result["results"][0])["continueMode"]["args"] == [2]
+    assert result["results"][0]["executed_operations"] == []
+    assert result["results"][1]["executed_operations"] == []
+
+
+def test_update_cues_wait_and_memo_invalid_common_values_have_no_plan() -> None:
+    wait_id = "11111111-1111-4111-8111-111111111111"
+    memo_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={wait_id: {"type": "Wait", "duration": 0}, memo_id: {"type": "Memo", "duration": 0}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": wait_id, "profile": "wait_basic", "properties": {"duration": -1}},
+            {"cue_ref": memo_id, "profile": "memo_basic", "properties": {"continueMode": "bad"}},
+            {"cue_ref": memo_id, "profile": "wait_basic", "properties": {"duration": 1}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["planned_count"] == 0
+    assert result["results"][0]["errors"]["validation"] == "duration must be a non-negative number"
+    assert "continueMode must be" in result["results"][1]["errors"]["validation"]
+    assert result["results"][2]["errors"]["profile"] == "wait_basic update profile requires a Wait cue"
+    assert all(item["planned_operations"] == [] for item in result["results"])
+
+
+def test_create_cue_dry_run_reviews_supported_and_unsupported_non_light_types() -> None:
+    supported_client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None))
+    supported_reader = QLabReader(supported_client)  # type: ignore[arg-type]
+    for cue_type in ("memo", "group", "wait", "audio"):
+        result = supported_reader.create_cue("ws-1", cue_type, properties={"name": cue_type}, dry_run=True)
+        assert result["ok"] is True
+        assert result["status"] == "dry_run"
+        assert result["planned_operations"][0]["operation"] == "new"
+    assert supported_client.requests == []
+
+    unsupported_client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"))
+    unsupported_reader = QLabReader(unsupported_client)  # type: ignore[arg-type]
+    for cue_type in ("mic", "midi", "midi file", "network", "script", "timecode"):
+        with pytest.raises(UnsafeWriteOperationError, match="cue_type is not allowed"):
+            unsupported_reader.create_cue("ws-1", cue_type, dry_run=True)
+    assert unsupported_client.requests == []
 
 
 @pytest.mark.parametrize(

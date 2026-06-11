@@ -95,8 +95,10 @@ AUTO_NETWORK_KEYS = (
     "networkPatchName",
     "networkPatchNumber",
     "networkPatchID",
+    "customString",
     "message",
     "messageError",
+    "parameterValues",
 )
 AUTO_MIDI_KEYS = (
     "midiPatchName",
@@ -112,6 +114,7 @@ AUTO_TIMECODE_KEYS = (
     "audioOutputPatchName",
     "audioOutputPatchNumber",
     "audioOutputPatchID",
+    "ltcChannel",
 )
 AUTO_GROUP_KEYS = tuple(sorted(GROUP_KEY for GROUP_KEY in (
     "cartColumns",

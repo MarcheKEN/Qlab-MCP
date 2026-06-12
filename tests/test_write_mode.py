@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from types import SimpleNamespace
 from typing import Any
 
@@ -10,6 +11,7 @@ from qlab_mcp.errors import OscTimeoutError, QLabReplyError, UnsafeWriteOperatio
 from qlab_mcp.models import CreateCueResult, UpdateCuesResult, WriteReadinessResult
 from qlab_mcp.qlab import QLabReader
 from qlab_mcp.runtime.read_cache import shared_read_cache
+import qlab_mcp.write.operations as write_operations
 from qlab_mcp.write.registry import UPDATE_PROFILE_NAMES, profile_catalog
 
 
@@ -49,11 +51,19 @@ class FakeWriteClient:
         self.missing_cue = missing_cue
         self.created = False
         self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
+        self.reply_timeouts: list[float | None] = []
 
-    def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+    def request(
+        self,
+        address: str,
+        *args: Any,
+        workspace_id: str | None = None,
+        reply_timeout: float | None = None,
+    ) -> Any:
         if address == "/workspaces" and not self.config.enable_write:
             return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
         self.requests.append((address, args, workspace_id))
+        self.reply_timeouts.append(reply_timeout)
         if address == "/workspaces":
             return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
         if address == "/workspace/ws-1/connect":
@@ -103,7 +113,10 @@ class BatchFakeWriteClient:
         cue_numbers: dict[str, str] | None = None,
         fail_set_property: tuple[str, str] | None = None,
         timeout_set_property: tuple[str, str] | None = None,
+        timeout_set_properties: set[tuple[str, str]] | None = None,
         timeout_without_apply: bool = False,
+        timeout_without_apply_properties: set[tuple[str, str]] | None = None,
+        delay_on_timeout: bool = False,
         timeout_apply_after_reads: int | None = None,
         ignore_set_property: tuple[str, str] | None = None,
         missing_refs: set[str] | None = None,
@@ -114,7 +127,10 @@ class BatchFakeWriteClient:
         self.cue_numbers = cue_numbers or {}
         self.fail_set_property = fail_set_property
         self.timeout_set_property = timeout_set_property
+        self.timeout_set_properties = timeout_set_properties or set()
         self.timeout_without_apply = timeout_without_apply
+        self.timeout_without_apply_properties = timeout_without_apply_properties or set()
+        self.delay_on_timeout = delay_on_timeout
         self.timeout_apply_after_reads = timeout_apply_after_reads
         self.ignore_set_property = ignore_set_property
         self.pending_timeout_applies: dict[tuple[str, str], Any] = {}
@@ -122,11 +138,19 @@ class BatchFakeWriteClient:
         self.missing_refs = missing_refs or set()
         self.show_mode_data = show_mode_data
         self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
+        self.reply_timeouts: list[float | None] = []
 
-    def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+    def request(
+        self,
+        address: str,
+        *args: Any,
+        workspace_id: str | None = None,
+        reply_timeout: float | None = None,
+    ) -> Any:
         if address == "/workspaces" and not self.config.enable_write:
             return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
         self.requests.append((address, args, workspace_id))
+        self.reply_timeouts.append(reply_timeout)
         if address == "/workspaces":
             return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
         if address == "/workspace/ws-1/connect":
@@ -148,8 +172,11 @@ class BatchFakeWriteClient:
             return SimpleNamespace(data=dict(self.cues[cue_id]), status="ok")
         if self.fail_set_property == (cue_id, prop):
             raise QLabReplyError("error", f"Failed setting {prop}", address)
-        if self.timeout_set_property == (cue_id, prop):
-            if not self.timeout_without_apply:
+        if self.timeout_set_property == (cue_id, prop) or (cue_id, prop) in self.timeout_set_properties:
+            timeout_without_apply = self.timeout_without_apply or (cue_id, prop) in self.timeout_without_apply_properties
+            if self.delay_on_timeout and reply_timeout is not None:
+                time.sleep(reply_timeout)
+            if not timeout_without_apply:
                 if self.timeout_apply_after_reads is None:
                     self.cues[cue_id][prop] = args[0] if args else None
                 else:
@@ -1939,6 +1966,64 @@ def test_update_cues_real_timeout_confirmed_by_after_read() -> None:
     assert result["results"][0]["after"]["flagged"] is True
 
 
+def test_update_cues_many_setter_timeouts_are_bounded_and_confirmed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(write_operations, "UPDATE_SETTER_REPLY_TIMEOUT_CAP_SECONDS", 0.001)
+    monkeypatch.setattr(write_operations, "UPDATE_SETTER_REPLY_TOTAL_BUDGET_SECONDS", 0.012)
+    monkeypatch.setattr(write_operations, "UPDATE_AFTER_READ_TIMEOUT_CAP_SECONDS", 0.01)
+    cues = {
+        f"{index:08d}-1111-4111-8111-111111111111": {
+            "type": "Memo",
+            "flagged": False,
+            "colorName": "none",
+        }
+        for index in range(12)
+    }
+    timeout_properties = {
+        (cue_id, prop)
+        for cue_id in cues
+        for prop in ("flagged", "colorName")
+    }
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass", timeout=5.0),
+        cues=cues,
+        timeout_set_properties=timeout_properties,
+        delay_on_timeout=True,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    started = time.monotonic()
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": cue_id, "properties": {"flagged": True, "colorName": "blue"}}
+            for cue_id in cues
+        ],
+        dry_run=False,
+    )
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 1.0
+    assert result["ok"] is True
+    assert result["status"] == "updated_with_confirmed_timeouts"
+    assert result["updated_count"] == 12
+    assert result["failed_count"] == 0
+    assert result["timeout_confirmed_count"] == 12
+    assert all(item["status"] == "updated_with_confirmed_timeouts" for item in result["results"])
+    assert all(
+        operation["status"] == "timeout_pending_verification"
+        for item in result["results"]
+        for operation in item["executed_operations"]
+    )
+    assert all(item["after"]["flagged"] is True and item["after"]["colorName"] == "blue" for item in result["results"])
+    setter_timeouts = [
+        timeout
+        for (address, _, _), timeout in zip(client.requests, client.reply_timeouts, strict=True)
+        if "/cue_id/" in address and not address.endswith("/valuesForKeys")
+    ]
+    assert setter_timeouts
+    assert max(timeout for timeout in setter_timeouts if timeout is not None) <= 0.001
+
+
 def test_update_cues_confirmed_timeouts_do_not_count_as_failures_across_batch() -> None:
     clean_id = "11111111-1111-4111-8111-111111111111"
     timeout_id = "22222222-2222-4222-8222-222222222222"
@@ -1989,6 +2074,39 @@ def test_update_cues_unconfirmed_timeout_counts_as_failure() -> None:
     assert result["timeout_confirmed_count"] == 0
     assert result["results"][0]["status"] == "partial_failed"
     assert "flagged" in result["results"][0]["errors"]
+
+
+def test_update_cues_timed_out_setter_without_after_confirmation_reports_property() -> None:
+    confirmed_id = "11111111-1111-4111-8111-111111111111"
+    unconfirmed_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            confirmed_id: {"type": "Memo", "colorName": "none"},
+            unconfirmed_id: {"type": "Memo", "colorName": "none"},
+        },
+        timeout_set_properties={(confirmed_id, "colorName"), (unconfirmed_id, "colorName")},
+        timeout_without_apply_properties={(unconfirmed_id, "colorName")},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": confirmed_id, "properties": {"colorName": "blue"}},
+            {"cue_ref": unconfirmed_id, "properties": {"colorName": "green"}},
+        ],
+        dry_run=False,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "partial_failed"
+    assert result["updated_count"] == 1
+    assert result["failed_count"] == 1
+    assert result["results"][0]["status"] == "updated_with_confirmed_timeouts"
+    assert result["results"][1]["status"] == "partial_failed"
+    assert result["results"][1]["after"]["colorName"] == "none"
+    assert "colorName" in result["results"][1]["errors"]
 
 
 def test_update_cues_retries_after_read_for_late_timeout_application() -> None:

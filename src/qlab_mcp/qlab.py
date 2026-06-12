@@ -60,15 +60,21 @@ class QLabReader(
         workspace_id: str | None = None,
         cacheable: bool = True,
         cache_profile: str | None = None,
+        request_timeout: float | None = None,
     ) -> Any:
-        if not cacheable or not cache_profile_is_safe(cache_profile):
-            return self.client.request(address, *args, workspace_id=workspace_id).data
+        def read() -> Any:
+            if request_timeout is None:
+                return self.client.request(address, *args, workspace_id=workspace_id).data
+            return self.client.request(address, *args, workspace_id=workspace_id, reply_timeout=request_timeout).data
 
-        key = (client_cache_namespace(self.client), workspace_id, address, args)
+        if not cacheable or not cache_profile_is_safe(cache_profile):
+            return read()
+
+        key = (client_cache_namespace(self.client), workspace_id, address, args, request_timeout)
         return self._read_cache.get_or_set(
             key,
             self._cache_ttl(),
-            lambda: self.client.request(address, *args, workspace_id=workspace_id).data,
+            read,
         )
 
     def _request_data_with_tcp_fallback(
@@ -300,6 +306,7 @@ class QLabReader(
         keys: list[str],
         cache_profile: str | None = None,
         cacheable: bool = True,
+        request_timeout: float | None = None,
     ) -> dict[str, Any]:
         normalized_keys = validate_value_keys(keys)
         data = self._request_data(
@@ -308,6 +315,7 @@ class QLabReader(
             workspace_id=workspace_id,
             cacheable=cacheable,
             cache_profile=cache_profile,
+            request_timeout=request_timeout,
         )
         return {
             "workspace_id": _clean_workspace_id(workspace_id),

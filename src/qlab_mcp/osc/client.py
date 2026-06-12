@@ -99,7 +99,13 @@ class QLabOscClient:
                 cls._locks[key] = threading.Lock()
             return cls._locks[key]
 
-    def request(self, address: str, *args: Any, workspace_id: str | None = None) -> QLabReply:
+    def request(
+        self,
+        address: str,
+        *args: Any,
+        workspace_id: str | None = None,
+        reply_timeout: float | None = None,
+    ) -> QLabReply:
         with self._lock:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                 sock.bind(("", self.config.reply_port))
@@ -110,7 +116,7 @@ class QLabOscClient:
                         self.config.passcode,
                     )
                     self._remember_connected_workspace(workspace_id, "udp")
-                reply = self._send_with_reply_on_socket(sock, address, *args)
+                reply = self._send_with_reply_on_socket(sock, address, *args, reply_timeout=reply_timeout)
                 self._remember_connect_reply(address, reply, "udp")
                 return reply
 
@@ -131,10 +137,10 @@ class QLabOscClient:
             self._remember_connect_reply(address, reply, "tcp")
             return reply
 
-    def _send_with_reply(self, address: str, *args: Any) -> QLabReply:
+    def _send_with_reply(self, address: str, *args: Any, reply_timeout: float | None = None) -> QLabReply:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.bind(("", self.config.reply_port))
-            return self._send_with_reply_on_socket(sock, address, *args)
+            return self._send_with_reply_on_socket(sock, address, *args, reply_timeout=reply_timeout)
 
     def _workspace_is_connected(self, workspace_id: str, transport: str) -> bool:
         return (workspace_id.strip("/"), transport) in self._connected_workspaces
@@ -151,9 +157,16 @@ class QLabOscClient:
         if workspace:
             self._remember_connected_workspace(workspace, transport)
 
-    def _send_with_reply_on_socket(self, sock: socket.socket, address: str, *args: Any) -> QLabReply:
+    def _send_with_reply_on_socket(
+        self,
+        sock: socket.socket,
+        address: str,
+        *args: Any,
+        reply_timeout: float | None = None,
+    ) -> QLabReply:
         packet = encode_message(address, *args)
-        deadline = time.monotonic() + self.config.timeout
+        timeout = self.config.timeout if reply_timeout is None else max(0.001, float(reply_timeout))
+        deadline = time.monotonic() + timeout
 
         sock.sendto(packet, (self.config.host, self.config.osc_port))
 

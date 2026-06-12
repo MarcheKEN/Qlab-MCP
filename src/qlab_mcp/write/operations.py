@@ -30,6 +30,11 @@ from .safety import check_write_readiness, ensure_write_ready, resolve_dry_run
 
 MAX_BATCH_UPDATES = 50
 AFTER_READ_RETRY_DELAYS = (0.2, 0.5, 1.0)
+UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS = 90.0
+UPDATE_SETTER_REPLY_TIMEOUT_CAP_SECONDS = 0.1
+UPDATE_SETTER_REPLY_TOTAL_BUDGET_SECONDS = 8.0
+UPDATE_AFTER_READ_TIMEOUT_CAP_SECONDS = 0.5
+UPDATE_MIN_REPLY_TIMEOUT_SECONDS = 0.001
 UPDATE_STATUS_ACTIONS = {
     "preflight_failed": "Inspect per-cue errors; no setters were sent, so fix cue refs/profiles before retrying.",
     "partial_failed": "Inspect per-cue errors and verify the affected cues in QLab before retrying only failed items.",
@@ -359,6 +364,9 @@ class QLabWriteMixin:
             )
 
         workspace = ensure_write_ready(self, workspace)
+        update_deadline = time.monotonic() + UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS
+        setter_count = sum(len(item["operations"]) for item in items)
+        setter_reply_timeout = _setter_reply_timeout(self, setter_count, update_deadline)
 
         read_cache = getattr(self, "_read_cache", shared_read_cache())
         read_cache.clear()
@@ -411,8 +419,19 @@ class QLabWriteMixin:
             for operation in item["operations"]:
                 key = operation["property"]
                 address = _cue_id_address(workspace, cue_id, operation["path"])
+                if _budget_remaining(update_deadline) <= 0:
+                    errors[key] = "Global update time budget exhausted before setter was sent."
+                    break
                 try:
-                    reply = self.client.request(address, *operation["args"])
+                    reply = self.client.request(
+                        address,
+                        *operation["args"],
+                        reply_timeout=_bounded_reply_timeout(
+                            self,
+                            setter_reply_timeout,
+                            update_deadline,
+                        ),
+                    )
                     status = reply.status
                     error = None
                 except OscTimeoutError as exc:
@@ -450,6 +469,12 @@ class QLabWriteMixin:
                 item["read_keys"],
                 item["properties"],
                 retry_on_mismatch=bool(result["_setter_timeouts"]),
+                request_timeout=_bounded_reply_timeout(
+                    self,
+                    UPDATE_AFTER_READ_TIMEOUT_CAP_SECONDS,
+                    update_deadline,
+                ),
+                deadline=update_deadline,
             )
             confirmed_by_after = _properties_match(after, item["properties"])
             setter_timeouts = result.pop("_setter_timeouts")
@@ -784,11 +809,45 @@ def _resolved_cue_id(values: dict[str, Any] | None) -> str | None:
     return None
 
 
+def _client_config_timeout(reader: Any, fallback: float) -> float:
+    value = getattr(getattr(getattr(reader, "client", None), "config", None), "timeout", fallback)
+    try:
+        return max(UPDATE_MIN_REPLY_TIMEOUT_SECONDS, float(value))
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _budget_remaining(deadline: float | None) -> float:
+    if deadline is None:
+        return UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS
+    return deadline - time.monotonic()
+
+
+def _bounded_reply_timeout(reader: Any, cap: float, deadline: float | None = None) -> float:
+    timeout = min(_client_config_timeout(reader, cap), cap)
+    if deadline is not None:
+        remaining = _budget_remaining(deadline)
+        if remaining <= 0:
+            return UPDATE_MIN_REPLY_TIMEOUT_SECONDS
+        timeout = min(timeout, remaining)
+    return max(UPDATE_MIN_REPLY_TIMEOUT_SECONDS, timeout)
+
+
+def _setter_reply_timeout(reader: Any, setter_count: int, deadline: float | None = None) -> float:
+    if setter_count <= 0:
+        return UPDATE_MIN_REPLY_TIMEOUT_SECONDS
+    per_setter_budget = UPDATE_SETTER_REPLY_TOTAL_BUDGET_SECONDS / setter_count
+    cap = min(UPDATE_SETTER_REPLY_TIMEOUT_CAP_SECONDS, per_setter_budget)
+    return _bounded_reply_timeout(reader, cap, deadline)
+
+
 def _try_read_update_values(
     reader: Any,
     workspace_id: str,
     cue_ref: str,
     read_keys: list[str],
+    *,
+    request_timeout: float | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, str]]:
     try:
         values = reader.read_cue_values(
@@ -797,6 +856,7 @@ def _try_read_update_values(
             read_keys,
             cache_profile="basic_safe",
             cacheable=False,
+            request_timeout=request_timeout,
         )["values"]
         if not isinstance(values, dict):
             raise ValueError("QLab valuesForKeys response must be an object")
@@ -813,13 +873,30 @@ def _try_read_update_values_with_retries(
     requested: dict[str, Any],
     *,
     retry_on_mismatch: bool,
+    request_timeout: float | None = None,
+    deadline: float | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, str]]:
-    after, errors = _try_read_update_values(reader, workspace_id, cue_ref, read_keys)
+    after, errors = _try_read_update_values(
+        reader,
+        workspace_id,
+        cue_ref,
+        read_keys,
+        request_timeout=request_timeout,
+    )
     if not retry_on_mismatch or _properties_match(after, requested):
         return after, errors
     for delay in AFTER_READ_RETRY_DELAYS:
-        time.sleep(delay)
-        after, errors = _try_read_update_values(reader, workspace_id, cue_ref, read_keys)
+        remaining = _budget_remaining(deadline)
+        if deadline is not None and remaining <= 0:
+            break
+        time.sleep(delay if deadline is None else min(delay, max(0.0, remaining)))
+        after, errors = _try_read_update_values(
+            reader,
+            workspace_id,
+            cue_ref,
+            read_keys,
+            request_timeout=request_timeout,
+        )
         if _properties_match(after, requested):
             return after, errors
     return after, errors

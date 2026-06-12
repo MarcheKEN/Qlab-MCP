@@ -86,8 +86,6 @@ AUTO_TEXT_KEYS = (
 )
 AUTO_LIGHT_KEYS = (
     "lightCommandText",
-    "parameterValues",
-    "parameterFadesEnabled",
     "alwaysCollate",
     "subcontroller",
 )

@@ -780,12 +780,31 @@ TEXT_CATALOG_PROPERTIES = (
 
 LIGHT_CATALOG_PROPERTIES = (
     _planned_prop("lightCommandText", "string", reason="light_commands_can_affect_visual_output"),
-    _op("setLight", (("command", "dict_or_json_string"),), risk_tier="high", planned_only_reason="light_commands_can_affect_visual_output"),
-    _op("replaceLightCommand", (("command", "dict_or_json_string"),), risk_tier="high", planned_only_reason="light_commands_can_affect_visual_output"),
-    _op("removeLightCommand", (("index", "non_negative_int"),), risk_tier="high", planned_only_reason="light_commands_can_affect_visual_output"),
-    _op("safeSortCommands", (), path="safeSortCommands", risk_tier="high", planned_only_reason="light_commands_can_affect_visual_output"),
-    _planned_prop("subcontroller", "string", reason="light_dashboard_changes_need_validation"),
-    _planned_prop("parameterValues", "dict_or_json_string", reason="fixture_parameter_changes_need_validation"),
+    _planned_prop("alwaysCollate", "boolean", reason="light_collation_can_change_cue_output"),
+    _planned_prop("subcontroller", "boolean", reason="light_dashboard_behavior_needs_validation"),
+    _op(
+        "setLight",
+        (("instrument_or_group", "non_empty_string"), ("setting", "json_value")),
+        path="setLight",
+        risk_tier="high",
+        planned_only_reason="light_commands_can_affect_visual_output",
+    ),
+    _op(
+        "replaceLightCommand",
+        (("oldCommand", "non_empty_string"), ("newCommand", "non_empty_string")),
+        risk_tier="high",
+        planned_only_reason="light_commands_can_affect_visual_output",
+    ),
+    _op(
+        "removeLightCommandsMatching",
+        (("match", "non_empty_string"),),
+        risk_tier="high",
+        planned_only_reason="light_command_removal_needs_validation",
+    ),
+    _op("safeSort", (), path="safeSort", risk_tier="high", planned_only_reason="light_command_order_changes_need_validation"),
+    _op("safeSortCommands", (), path="safeSortCommands", risk_tier="high", planned_only_reason="light_command_order_changes_need_validation"),
+    _op("prune", (), path="prune", risk_tier="high", planned_only_reason="light_command_removal_needs_validation"),
+    _op("pruneCommands", (), path="pruneCommands", risk_tier="high", planned_only_reason="light_command_removal_needs_validation"),
 )
 
 FADE_CATALOG_PROPERTIES = (

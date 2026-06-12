@@ -343,7 +343,48 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
         assert catalog["devamp_basic"]["properties"][prop]["real_write_enabled"] is False
         assert catalog["devamp_basic"]["properties"][prop]["planned_only_reason"]
     assert catalog["devamp_basic"]["properties"]["devampType"]["args"][0]["validator"] == "devamp_type"
-    assert catalog["light_basic"]["properties"]["lightCommandText"]["planned_only_reason"]
+    light_properties = catalog["light_basic"]["properties"]
+    light_specific = set(light_properties) - set(catalog["common"]["properties"])
+    assert light_specific == {
+        "alwaysCollate",
+        "lightCommandText",
+        "prune",
+        "pruneCommands",
+        "removeLightCommandsMatching",
+        "replaceLightCommand",
+        "safeSort",
+        "safeSortCommands",
+        "setLight",
+        "subcontroller",
+    }
+    for prop in light_specific:
+        assert light_properties[prop]["real_write_enabled"] is False
+        assert light_properties[prop]["planned_only_reason"]
+        assert light_properties[prop]["risk_tier"] == "high"
+    assert light_properties["lightCommandText"]["args"][0]["validator"] == "string"
+    assert light_properties["alwaysCollate"]["args"][0]["validator"] == "boolean"
+    assert light_properties["subcontroller"]["args"][0]["validator"] == "boolean"
+    assert light_properties["setLight"]["path"] == "setLight"
+    assert light_properties["setLight"]["args"] == [
+        {"name": "instrument_or_group", "validator": "non_empty_string"},
+        {"name": "setting", "validator": "json_value"},
+    ]
+    assert light_properties["replaceLightCommand"]["args"] == [
+        {"name": "oldCommand", "validator": "non_empty_string"},
+        {"name": "newCommand", "validator": "non_empty_string"},
+    ]
+    assert light_properties["removeLightCommandsMatching"]["args"] == [{"name": "match", "validator": "non_empty_string"}]
+    for forbidden_light_prop in (
+        "parameterValues",
+        "parameterFadesEnabled",
+        "removeLightCommand",
+        "collateAndStart",
+        "dashboard/setLight",
+        "dashboard/updateLatestCue",
+        "dashboard/updateSelectedCues",
+        "lightPatch",
+    ):
+        assert forbidden_light_prop not in light_properties
     for prop in (
         "stopTargetWhenDone",
         "audioMapTargetID",
@@ -2770,6 +2811,22 @@ def test_update_cue_real_blocks_dry_run_only_profiles_and_properties_before_osc(
             reader.update_cue("ws-1", cue_id, properties, dry_run=False, profile=profile)
         assert client.requests == []
 
+    light_op_client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        cue_values={"uniqueID": cue_id, "type": "Light"},
+    )
+    light_op = QLabReader(light_op_client)  # type: ignore[arg-type]
+    with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
+        light_op.update_cue(
+            "ws-1",
+            cue_id,
+            operations=[{"property": "setLight", "args": {"instrument_or_group": "1", "setting": 50}}],
+            dry_run=False,
+            profile="light_basic",
+        )
+    assert light_op_client.requests == []
+
 
 def test_update_cue_timecode_frame_rate_uses_documented_framerate_path() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
@@ -3179,6 +3236,120 @@ def test_update_cues_network_basic_invalid_values_and_unsupported_fields_have_no
     assert "not allowlisted" in result["results"][3]["errors"]["validation"]
     assert result["results"][4]["errors"]["profile"] == "network_basic update profile requires a Network cue"
     assert all(item["planned_operations"] == [] for item in result["results"])
+
+
+def test_update_cues_light_basic_dry_run_plans_documented_light_cue_messages() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Light", "lightCommandText": "1 = 50", "alwaysCollate": False, "subcontroller": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "light_basic",
+                "properties": {
+                    "lightCommandText": "1 = 50",
+                    "alwaysCollate": True,
+                    "subcontroller": False,
+                },
+                "operations": [
+                    {"property": "setLight", "args": {"instrument_or_group": "front.intensity", "setting": 50}},
+                    {
+                        "property": "replaceLightCommand",
+                        "args": {"oldCommand": "1 = 50", "newCommand": "1 = 60"},
+                    },
+                    {"property": "removeLightCommandsMatching", "args": {"match": "2 = 0"}},
+                    {"property": "safeSort"},
+                    {"property": "safeSortCommands"},
+                    {"property": "prune"},
+                    {"property": "pruneCommands"},
+                ],
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    assert result["planned_count"] == 1
+    assert result["results"][0]["executed_operations"] == []
+    setters = planned_setters(result["results"][0])
+    assert setters["setLight"]["address"] == f"/workspace/ws-1/cue_id/{cue_id}/setLight"
+    assert setters["setLight"]["args"] == ["front.intensity", 50]
+    assert setters["replaceLightCommand"]["args"] == ["1 = 50", "1 = 60"]
+    assert setters["removeLightCommandsMatching"]["args"] == ["2 = 0"]
+    for prop in (
+        "lightCommandText",
+        "alwaysCollate",
+        "subcontroller",
+        "setLight",
+        "replaceLightCommand",
+        "removeLightCommandsMatching",
+        "safeSort",
+        "safeSortCommands",
+        "prune",
+        "pruneCommands",
+    ):
+        assert setters[prop]["real_write_enabled"] is False
+        assert setters[prop]["planned_only_reason"]
+    assert all(request[0].endswith("/valuesForKeys") for request in client.requests)
+
+
+def test_update_cues_light_basic_invalid_values_and_profile_mismatch_have_no_plan() -> None:
+    light_id = "11111111-1111-4111-8111-111111111111"
+    memo_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={light_id: {"type": "Light"}, memo_id: {"type": "Memo"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": light_id, "profile": "light_basic", "properties": {"alwaysCollate": "yes"}},
+            {"cue_ref": light_id, "profile": "light_basic", "properties": {"subcontroller": "yes"}},
+            {
+                "cue_ref": light_id,
+                "profile": "light_basic",
+                "operations": [{"property": "setLight", "args": {"instrument_or_group": "1"}}],
+            },
+            {
+                "cue_ref": light_id,
+                "profile": "light_basic",
+                "operations": [
+                    {"property": "replaceLightCommand", "args": {"oldCommand": "", "newCommand": "1 = 60"}}
+                ],
+            },
+            {
+                "cue_ref": light_id,
+                "profile": "light_basic",
+                "operations": [{"property": "removeLightCommandsMatching", "args": {"match": ""}}],
+            },
+            {"cue_ref": light_id, "profile": "light_basic", "properties": {"parameterValues": {"intensity": 80}}},
+            {"cue_ref": memo_id, "profile": "light_basic", "properties": {"lightCommandText": "1 = 50"}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False
+    assert result["planned_count"] == 0
+    assert result["results"][0]["errors"]["validation"] == "alwaysCollate must be a boolean"
+    assert result["results"][1]["errors"]["validation"] == "subcontroller must be a boolean"
+    assert result["results"][2]["errors"]["validation"] == "setLight args missing required key: setting"
+    assert result["results"][3]["errors"]["validation"] == "replaceLightCommand.oldCommand must be a non-empty string"
+    assert (
+        result["results"][4]["errors"]["validation"]
+        == "removeLightCommandsMatching.match must be a non-empty string"
+    )
+    assert "not allowlisted" in result["results"][5]["errors"]["validation"]
+    assert result["results"][6]["errors"]["profile"] == "light_basic update profile requires a Light cue"
+    assert all(item["planned_operations"] == [] for item in result["results"])
+    assert all(item["executed_operations"] == [] for item in result["results"])
 
 
 def test_update_cues_script_basic_dry_run_plans_source_alias_without_execution() -> None:

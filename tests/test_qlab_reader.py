@@ -3865,10 +3865,8 @@ class QLabReaderTests(unittest.TestCase):
                 "Light",
                 {
                     "lightCommandText": "1 thru 5 @ 80",
-                    "parameterValues": {"intensity": 80},
-                    "parameterFadesEnabled": {"intensity": True},
                     "alwaysCollate": True,
-                    "subcontroller": "default",
+                    "subcontroller": False,
                 },
                 ("lightCommandText", "1 thru 5 @ 80"),
             ),
@@ -3916,7 +3914,13 @@ class QLabReaderTests(unittest.TestCase):
             ),
             (
                 "Light",
-                {"lightCommandText": "1 thru 5 @ 80", "alwaysCollate": True},
+                {
+                    "lightCommandText": "1 thru 5 @ 80",
+                    "alwaysCollate": True,
+                    "subcontroller": False,
+                    "parameterValues": {"intensity": 80},
+                    "parameterFadesEnabled": {"intensity": True},
+                },
                 ("type_specific", "lightCommandText", "1 thru 5 @ 80"),
             ),
             (
@@ -3986,6 +3990,33 @@ class QLabReaderTests(unittest.TestCase):
                     self.assertNotIn(key, result["sections"][section_name])
                 else:
                     self.assertEqual(result["sections"][section_name][key], expected_value)
+
+    def test_auto_light_details_keep_dashboard_and_fixture_values_out_of_type_specific(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "number": "10",
+                "name": "LX",
+                "displayName": "LX",
+                "type": "Light",
+                "lightCommandText": "1 = 50",
+                "alwaysCollate": True,
+                "subcontroller": False,
+                "parameterValues": {"intensity": 80},
+                "parameterFadesEnabled": {"intensity": True},
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "auto")
+
+        type_specific = result["sections"]["type_specific"]
+        self.assertEqual(type_specific["lightCommandText"], "1 = 50")
+        self.assertTrue(type_specific["alwaysCollate"])
+        self.assertFalse(type_specific["subcontroller"])
+        self.assertNotIn("parameterValues", type_specific)
+        self.assertNotIn("parameterFadesEnabled", type_specific)
 
     def test_auto_video_details_keep_compact_stage_fields(self) -> None:
         responses = {
@@ -4337,16 +4368,14 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["properties"]["sliceMarkers"], [{"time": 0}])
         self.assertEqual(result["properties"]["rate"], 1.25)
 
-    def test_exhaustive_light_details_include_command_parameter_fields(self) -> None:
+    def test_exhaustive_light_details_include_documented_command_fields(self) -> None:
         responses = {
             "/workspace/ws-1/cue/10/valuesForKeys": {
                 "uniqueID": "cue-id",
                 "type": "Light",
                 "lightCommandText": "1 thru 5 @ 80",
-                "parameterValues": {"intensity": 80},
-                "parameterFadesEnabled": {"intensity": True},
                 "alwaysCollate": True,
-                "subcontroller": "eos",
+                "subcontroller": False,
             },
         }
         with FakeQlabOscServer(responses) as server:
@@ -4355,8 +4384,8 @@ class QLabReaderTests(unittest.TestCase):
             result = reader.get_cue_details("ws-1", "10", "exhaustive")
 
         self.assertEqual(result["properties"]["lightCommandText"], "1 thru 5 @ 80")
-        self.assertEqual(result["properties"]["parameterValues"], {"intensity": 80})
         self.assertTrue(result["properties"]["alwaysCollate"])
+        self.assertFalse(result["properties"]["subcontroller"])
 
     def test_exhaustive_script_details_can_return_script_fields(self) -> None:
         responses = {
@@ -4506,7 +4535,7 @@ class QLabReaderTests(unittest.TestCase):
             ("Memo", "memo_basic", ()),
             ("Text", "text_basic", ("text/format/color",)),
             ("Network", "network_basic", ("customString", "parameterValue", "parameterValues")),
-            ("Light", "light_basic", ("lightCommandText", "setLight")),
+            ("Light", "light_basic", ("lightCommandText", "setLight", "alwaysCollate")),
             ("Timecode", "timecode_basic", ("timecodeString", "timecodeFormat")),
             ("Script", "script_basic", ("scriptSource", "scriptText")),
         )
@@ -4535,6 +4564,49 @@ class QLabReaderTests(unittest.TestCase):
                 for prop in dry_run_props:
                     self.assertIn(prop, capabilities["dry_run_only_properties"])
                     self.assertNotIn(prop, capabilities["real_write_properties"])
+
+    def test_editable_profile_exposes_documented_light_update_capabilities(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "number": "10",
+                "name": "LX",
+                "displayName": "LX",
+                "type": "Light",
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "editable")
+
+        capabilities = result["update_capabilities"]
+        self.assertEqual(capabilities["recommended_profile"], "light_basic")
+        for prop in (
+            "alwaysCollate",
+            "lightCommandText",
+            "prune",
+            "pruneCommands",
+            "removeLightCommandsMatching",
+            "replaceLightCommand",
+            "safeSort",
+            "safeSortCommands",
+            "setLight",
+            "subcontroller",
+        ):
+            self.assertIn(prop, capabilities["dry_run_only_properties"])
+            self.assertNotIn(prop, capabilities["real_write_properties"])
+            self.assertIn(prop, capabilities["planned_only_reason"])
+        self.assertEqual(capabilities["validators"]["alwaysCollate"]["value"], "boolean")
+        self.assertEqual(capabilities["validators"]["subcontroller"]["value"], "boolean")
+        self.assertEqual(capabilities["validators"]["setLight"]["instrument_or_group"], "non_empty_string")
+        self.assertEqual(capabilities["validators"]["setLight"]["setting"], "json_value")
+        self.assertEqual(capabilities["validators"]["replaceLightCommand"]["oldCommand"], "non_empty_string")
+        self.assertEqual(capabilities["validators"]["replaceLightCommand"]["newCommand"], "non_empty_string")
+        self.assertNotIn("parameterValues", capabilities["operations"])
+        self.assertNotIn("removeLightCommand", capabilities["operations"])
+        self.assertNotIn("collateAndStart", capabilities["operations"])
+        self.assertNotIn("dashboard/setLight", capabilities["operations"])
 
     def test_editable_profile_exposes_group_list_cart_update_capabilities(self) -> None:
         cases = ("Group", "Cue List", "Cue Cart")

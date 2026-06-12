@@ -96,6 +96,9 @@ Recommended edit flow:
 6. `dry_run=false` only in a deliberate gated write session
 7. Verify after with read tools
 
+For manual runtime smoke validation of batch timeouts, rollback, and
+planned-only blocking, use `docs/qlab_update_cues_runtime_checklist.md`.
+
 Batch contract:
 
 - Each MCP call accepts 1-50 update items.

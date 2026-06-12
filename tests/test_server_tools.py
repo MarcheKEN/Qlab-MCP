@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
@@ -31,6 +33,154 @@ from qlab_mcp.server import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SCHEMA_NOISE_KEYS = {"description", "title"}
+EXPECTED_FASTMCP_TOOL_CONTRACTS = {
+    "qlab_check_connection": {
+        "title": "Check QLab Connection",
+        "timeout": CHECK_CONNECTION_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["diagnostics", "orientation", "qlab", "safe-read"],
+        "input_schema_hash": "3c1421fec20d831fb3b0220cebf8f7e280875c06d85b4862946550d6f3717f57",
+        "output_schema_hash": "f0c06b61b1bf2863b649b46d386b3b199ec81449446f1631fc8b759c8a35cc4c",
+    },
+    "qlab_check_write_readiness": {
+        "title": "Check QLab Write Readiness",
+        "timeout": WRITE_READINESS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["diagnostics", "qlab", "safe-read", "write-mode"],
+        "input_schema_hash": "614f112549e5fdf796242506fdc6a63b4eadab384ea7c01460262a36efbde86c",
+        "output_schema_hash": "42caaba0a23ffe174d0ffce943c35b0dae73ef36c1970eb4ee1cfd43fe83518f",
+    },
+    "qlab_create_cue": {
+        "title": "Create QLab Cue",
+        "timeout": CREATE_CUE_TIMEOUT,
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+        "tags": ["cue-create", "gated-write", "qlab", "write-mode"],
+        "input_schema_hash": "a41f7916a34170006cd76c2cdce8590f2a93ee86f5f88fee91f4b3b836dac61b",
+        "output_schema_hash": "80ffefed7d3cb667574e96746da8caeac0680eb5731915c0f186b84d1f73e9c3",
+    },
+    "qlab_get_cue_details": {
+        "title": "Get QLab Cue Details",
+        "timeout": CUE_DETAILS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["details", "diagnostics", "qlab", "safe-read"],
+        "input_schema_hash": "de946587eaafac4ad9d9008f80053f003a98b672a92825476d042c77a7ec1a21",
+        "output_schema_hash": "1751f661f9eefdecfd32f191e96e81396cc7729c9d7e042b0e2df7a2d74dd6a5",
+    },
+    "qlab_get_workspace_overview": {
+        "title": "Get QLab Workspace Overview",
+        "timeout": WORKSPACE_OVERVIEW_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["orientation", "qlab", "safe-read", "structure"],
+        "input_schema_hash": "c5998c0720a3e7739effa3e59ec3bfd1fcea8eaacfbc2c859c7336d362cd11e0",
+        "output_schema_hash": "ccabd8baaa1d477f2f48c510a74c29ec7c47485d4b3d831a0351b8ba0b82bfee",
+    },
+    "qlab_get_workspace_setting_details": {
+        "title": "Get QLab Workspace Setting Details",
+        "timeout": WORKSPACE_SETTING_DETAILS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["details", "patches", "qlab", "routing", "safe-read", "settings"],
+        "input_schema_hash": "16bf8c7949fc7da4b9a8b304a26171893ea5cc0b99285a043dc447c6b62b9f6b",
+        "output_schema_hash": "951f6affba80b03fc2c0e0bee37708fff37d22c5a3fec9ab1c5caea2b1408a0f",
+    },
+    "qlab_get_workspace_settings": {
+        "title": "Get QLab Workspace Settings",
+        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["inventory", "patches", "qlab", "routing", "safe-read", "settings"],
+        "input_schema_hash": "8e9e711dc97be10e4f7d2c9a4c7d5253a7914a3f9dab15fe13c5a898d35bdc7e",
+        "output_schema_hash": "e70db7bddf81ee5fafca6627f8a1169ec779a8b56c0ee5c6030285c6a221a516",
+    },
+    "qlab_get_workspace_status": {
+        "title": "Get QLab Workspace Status",
+        "timeout": WORKSPACE_STATUS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["diagnostics", "qlab", "safe-read", "status", "timecode"],
+        "input_schema_hash": "8c37a0e921135fc27f9c02ae23e803d35c3ebb337efd275fe2c4c68cab5801f6",
+        "output_schema_hash": "8ce989ab84f82b2fc314a5b706128af9acdf2a9f2742b8d7c324c03de64ed789",
+    },
+    "qlab_query_cues": {
+        "title": "Query QLab Cues",
+        "timeout": QUERY_CUES_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["details", "inventory", "qlab", "query", "safe-read"],
+        "input_schema_hash": "a2d4ccfdccea8fe34e44d93282ac31e7b307c9c9cdf16c77f04c10d0a221e73a",
+        "output_schema_hash": "ca16d551401f0aac7b8032f47b31981e594a420b335a6e80da18029cd7697d9c",
+    },
+    "qlab_update_cues": {
+        "title": "Update QLab Cues",
+        "timeout": UPDATE_CUES_TIMEOUT,
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+        "tags": ["batch-update", "cue-update", "gated-write", "qlab", "write-mode"],
+        "input_schema_hash": "cbac3b98aad73a1db52c4c07101e5ad70f20e5f1b087851e3bdf3294c398b098",
+        "output_schema_hash": "29bfd67b1120e241e40b685f097ff24e5e499be805687c85c3a26126edc3f143",
+    },
+}
+EXPECTED_DESCRIPTION_PHRASES = {
+    "qlab_check_connection": ("passcode", "/connect permission scopes"),
+    "qlab_get_workspace_overview": ("first structural read", "bounded and shallow"),
+    "qlab_get_workspace_status": ("Workspace Status", "not expose"),
+    "qlab_get_workspace_settings": ("Summary mode", "one failed request does not block"),
+    "qlab_get_workspace_setting_details": ("Backwards-compatible wrapper", "safe profile"),
+    "qlab_query_cues": ("optional AND filters", "truncation metadata"),
+    "qlab_get_cue_details": ("editable for update capability discovery", "exhaustive only for deep audits"),
+    "qlab_check_write_readiness": ("without sending any mutating OSC commands", "Edit Mode"),
+    "qlab_create_cue": ("dry-run plan", "Dry-run planning never sends mutating OSC"),
+    "qlab_update_cues": ("Dry-run planning never sends mutating OSC", "High-risk profiles"),
+}
+
+
+def _normalized_schema(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _normalized_schema(child)
+            for key, child in sorted(value.items())
+            if key not in SCHEMA_NOISE_KEYS
+        }
+    if isinstance(value, list):
+        return [_normalized_schema(child) for child in value]
+    return value
+
+
+def _schema_hash(schema: dict[str, Any]) -> str:
+    normalized = json.dumps(_normalized_schema(schema), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(normalized.encode()).hexdigest()
+
+
+def _annotation_contract(tool: Any) -> dict[str, bool | None]:
+    return {
+        "readOnlyHint": tool.annotations.readOnlyHint,
+        "destructiveHint": tool.annotations.destructiveHint,
+        "idempotentHint": tool.annotations.idempotentHint,
+        "openWorldHint": tool.annotations.openWorldHint,
+    }
+
+
+async def _tool_contract_snapshot() -> dict[str, dict[str, Any]]:
+    async with Client(mcp) as client:
+        tools = await client.list_tools()
+    snapshot = {}
+    for tool in sorted(tools, key=lambda item: item.name):
+        runtime_tool = await mcp.get_tool(tool.name)
+        snapshot[tool.name] = {
+            "title": tool.title,
+            "timeout": runtime_tool.timeout,
+            "annotations": _annotation_contract(tool),
+            "tags": (tool.meta or {}).get("fastmcp", {}).get("tags", []),
+            "input_schema_hash": _schema_hash(tool.inputSchema),
+            "output_schema_hash": _schema_hash(tool.outputSchema or {}),
+        }
+    return snapshot
 
 
 def test_fastmcp_json_points_to_stdio_server_without_write_env() -> None:
@@ -46,6 +196,79 @@ def test_fastmcp_json_points_to_stdio_server_without_write_env() -> None:
     assert "QLAB_PASSCODE" not in deployment_env
     assert "QLAB_ENABLE_WRITE" not in deployment_env
     assert "QLAB_WRITE_DRY_RUN_DEFAULT" not in deployment_env
+
+
+def test_fastmcp_tool_contract_snapshot_matches_current_public_surface() -> None:
+    assert asyncio.run(_tool_contract_snapshot()) == EXPECTED_FASTMCP_TOOL_CONTRACTS
+
+
+def test_fastmcp_tool_descriptions_keep_agent_safety_phrases() -> None:
+    async def list_tools():
+        async with Client(mcp) as client:
+            return await client.list_tools()
+
+    tools = {tool.name: tool for tool in asyncio.run(list_tools())}
+    assert set(tools) == set(EXPECTED_DESCRIPTION_PHRASES)
+    for tool_name, phrases in EXPECTED_DESCRIPTION_PHRASES.items():
+        description = tools[tool_name].description or ""
+        for phrase in phrases:
+            assert phrase in description, f"{tool_name} description lost phrase: {phrase!r}"
+
+
+def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> None:
+    async def list_tools():
+        async with Client(mcp) as client:
+            return await client.list_tools()
+
+    tools = {tool.name: tool for tool in asyncio.run(list_tools())}
+    write_tools = {"qlab_create_cue", "qlab_update_cues"}
+    read_only_tools = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) - write_tools
+
+    for tool_name in read_only_tools:
+        assert tools[tool_name].annotations.readOnlyHint is True, f"{tool_name} lost readOnlyHint"
+        assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
+        assert tools[tool_name].outputSchema, f"{tool_name} lost outputSchema"
+
+    for tool_name in write_tools:
+        assert tools[tool_name].annotations.readOnlyHint is False, f"{tool_name} was marked read-only"
+        assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
+        assert tools[tool_name].annotations.idempotentHint is False, f"{tool_name} was marked idempotent"
+        assert tools[tool_name].outputSchema, f"{tool_name} lost outputSchema"
+
+
+def test_update_cues_fastmcp_schema_keeps_batch_contract() -> None:
+    async def list_tools():
+        async with Client(mcp) as client:
+            return await client.list_tools()
+
+    tools = {tool.name: tool for tool in asyncio.run(list_tools())}
+    update_schema = tools["qlab_update_cues"].inputSchema
+    update_properties = update_schema["properties"]
+    update_items = update_properties["updates"]["items"]
+    update_item_properties = update_items["properties"]
+    update_output = tools["qlab_update_cues"].outputSchema
+
+    assert update_schema["required"] == ["workspace_id", "updates"]
+    assert set(update_properties) == {"workspace_id", "updates", "dry_run"}
+    assert update_properties["updates"]["minItems"] == 1
+    assert update_properties["updates"]["maxItems"] == 50
+    assert update_items["required"] == ["cue_ref"]
+    assert set(update_item_properties) == {"cue_ref", "profile", "properties", "operations"}
+    assert "enum" not in update_item_properties["profile"]
+    assert update_output["required"] == [
+        "ok",
+        "status",
+        "workspace_id",
+        "dry_run",
+        "requested_count",
+        "planned_count",
+        "updated_count",
+        "failed_count",
+        "timeout_confirmed_count",
+        "results",
+        "message",
+    ]
+    assert "updated_with_confirmed_timeouts" in update_output["properties"]["status"]["enum"]
 
 
 def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -> None:

@@ -209,9 +209,233 @@ def planned_setters(result_item: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
-def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
-    catalog = profile_catalog()
+PROFILE_TEST_CUE_TYPES = {
+    "common": "Memo",
+    "memo_basic": "Memo",
+    "wait_basic": "Wait",
+    "group_basic": "Group",
+    "audio_basic": "Audio",
+    "mic_basic": "Mic",
+    "video_basic": "Video",
+    "camera_basic": "Camera",
+    "text_basic": "Text",
+    "light_basic": "Light",
+    "fade_basic": "Fade",
+    "network_basic": "Network",
+    "midi_basic": "MIDI",
+    "midi_file_basic": "MIDI File",
+    "timecode_basic": "Timecode",
+    "target_basic": "Start",
+    "reset_basic": "Reset",
+    "devamp_basic": "Devamp",
+    "script_basic": "Script",
+}
 
+
+def _base_cue_values(cue_id: str, cue_type: str) -> dict[str, Any]:
+    return {
+        "uniqueID": cue_id,
+        "number": "1",
+        "name": "Stale",
+        "displayName": "1 Stale",
+        "type": cue_type,
+        "armed": True,
+        "flagged": False,
+        "colorName": "none",
+    }
+
+
+def _valid_value_for_validator(validator: str) -> Any:
+    return {
+        "any": {"value": True},
+        "audio_level_row": 1,
+        "audio_object_color_name": "blue",
+        "audio_object_ref": "object-1",
+        "audio_output_ref": 1,
+        "audio_patch_channel_count": 2,
+        "boolean": True,
+        "byte": 64,
+        "byte_combo": 1024,
+        "color_name": "blue",
+        "continue_mode": "auto_continue",
+        "cue_target_id": "target-id",
+        "cue_target_number": "1",
+        "decibel": -6,
+        "devamp_type": 1,
+        "device_output_ref": 1,
+        "dict_or_json_string": {"fontSize": 24},
+        "fade_mode": 1,
+        "fade_type": 1,
+        "group_mode": 1,
+        "int": 1,
+        "int_or_minus_one": 1,
+        "json_value": {"value": 1},
+        "list": [1, 2],
+        "midi_channel": 1,
+        "midi_message_type": 1,
+        "midi_status": 1,
+        "midi_timecode_format": 1,
+        "non_empty_string": "value",
+        "non_negative_int": 1,
+        "non_negative_number": 1,
+        "number": 1,
+        "opacity": 0.5,
+        "patch_ref": "Patch 1",
+        "positive_int": 2,
+        "positive_number": 2,
+        "rate": 1,
+        "rotation_type": 1,
+        "string": "value",
+        "target_id": "target-id",
+        "target_mode": 1,
+        "text_alignment": "center",
+        "text_line_style": "single",
+        "timecode_framerate": 1,
+        "timecode_output_type": 1,
+        "unit_interval": 0.5,
+        "video_blend_mode": "normal",
+        "video_clock_type": "video",
+        "video_fill_style": 1,
+        "video_layer": 1,
+    }[validator]
+
+
+def _invalid_value_for_validator(validator: str) -> Any:
+    return {
+        "any": object(),
+        "audio_level_row": 25,
+        "audio_object_color_name": "not-a-color",
+        "audio_object_ref": "",
+        "audio_output_ref": -1,
+        "audio_patch_channel_count": 0,
+        "boolean": "yes",
+        "byte": 128,
+        "byte_combo": 16384,
+        "color_name": "not-a-color",
+        "continue_mode": "bad",
+        "cue_target_id": 123,
+        "cue_target_number": "",
+        "decibel": "loud",
+        "devamp_type": 3,
+        "device_output_ref": 0,
+        "dict_or_json_string": 1,
+        "fade_mode": 2,
+        "fade_type": 3,
+        "group_mode": 0,
+        "int": 1.5,
+        "int_or_minus_one": 0,
+        "json_value": {1: "bad"},
+        "list": "not-list",
+        "midi_channel": 17,
+        "midi_message_type": 4,
+        "midi_status": 7,
+        "midi_timecode_format": 4,
+        "non_empty_string": "",
+        "non_negative_int": -1,
+        "non_negative_number": -1,
+        "number": "not-number",
+        "opacity": 2,
+        "patch_ref": -1,
+        "positive_int": 0,
+        "positive_number": 0,
+        "rate": 0.01,
+        "rotation_type": 4,
+        "string": 123,
+        "target_id": "",
+        "target_mode": 2,
+        "text_alignment": "middle",
+        "text_line_style": "triple",
+        "timecode_framerate": 8,
+        "timecode_output_type": 2,
+        "unit_interval": 2,
+        "video_blend_mode": "not-a-blend",
+        "video_clock_type": "wall",
+        "video_fill_style": 3,
+        "video_layer": 1001,
+    }[validator]
+
+
+def _request_for_catalog_property(
+    prop_name: str,
+    prop: dict[str, Any],
+    *,
+    invalid_arg: str | None = None,
+    invalid_value: Any = None,
+) -> dict[str, Any]:
+    args = prop["args"]
+    if len(args) == 1 and args[0]["name"] == "value":
+        value = invalid_value if invalid_arg == "value" else _valid_value_for_validator(args[0]["validator"])
+        return {"properties": {prop_name: value}}
+
+    operation_args = {}
+    for arg in args:
+        operation_args[arg["name"]] = (
+            invalid_value
+            if invalid_arg == arg["name"]
+            else _valid_value_for_validator(arg["validator"])
+        )
+    return {"operations": [{"property": prop_name, "args": operation_args}]}
+
+
+def _real_write_property_cases() -> list[Any]:
+    cases = []
+    for profile, spec in profile_catalog().items():
+        for prop_name, prop in spec["properties"].items():
+            if prop["real_write_enabled"]:
+                cases.append(
+                    pytest.param(
+                        profile,
+                        PROFILE_TEST_CUE_TYPES[profile],
+                        prop_name,
+                        prop,
+                        id=f"{profile}:{prop_name}",
+                    )
+                )
+    return cases
+
+
+def _dry_run_only_property_cases() -> list[Any]:
+    cases = []
+    for profile, spec in profile_catalog().items():
+        for prop_name, prop in spec["properties"].items():
+            if not prop["real_write_enabled"]:
+                cases.append(
+                    pytest.param(
+                        profile,
+                        PROFILE_TEST_CUE_TYPES[profile],
+                        prop_name,
+                        prop,
+                        id=f"{profile}:{prop_name}",
+                    )
+                )
+    return cases
+
+
+def _validator_negative_cases() -> list[Any]:
+    seen = set()
+    cases = []
+    for profile, spec in profile_catalog().items():
+        for prop_name, prop in spec["properties"].items():
+            for arg in prop["args"]:
+                validator = arg["validator"]
+                if validator in seen or validator == "any":
+                    continue
+                seen.add(validator)
+                cases.append(
+                    pytest.param(
+                        validator,
+                        profile,
+                        PROFILE_TEST_CUE_TYPES[profile],
+                        prop_name,
+                        prop,
+                        arg["name"],
+                        id=f"{validator}:{profile}:{prop_name}.{arg['name']}",
+                    )
+                )
+    return cases
+
+
+def _assert_update_profile_names_and_shape(catalog: dict[str, Any]) -> None:
     assert set(UPDATE_PROFILE_NAMES) == {
         "common",
         "memo_basic",
@@ -238,6 +462,19 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
         assert "risk_tier" in profile
         assert "real_write_enabled" in profile
 
+
+def _assert_planned_only_props(catalog: dict[str, Any], profile: str, props: tuple[str, ...]) -> None:
+    for prop in props:
+        assert catalog[profile]["properties"][prop]["real_write_enabled"] is False
+        assert catalog[profile]["properties"][prop]["planned_only_reason"]
+
+
+def _assert_absent_props(catalog: dict[str, Any], profile: str, props: tuple[str, ...]) -> None:
+    for prop in props:
+        assert prop not in catalog[profile]["properties"]
+
+
+def _assert_audio_group_profile_catalog(catalog: dict[str, Any]) -> None:
     assert catalog["audio_basic"]["properties"]["level"]["planned_only_reason"]
     assert catalog["audio_basic"]["properties"]["fileTarget"]["planned_only_reason"]
     assert catalog["audio_basic"]["properties"]["level"]["args"] == [
@@ -249,49 +486,62 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
         {"name": "channel", "validator": "audio_output_ref"},
         {"name": "decibel", "validator": "decibel"},
     ]
-    for prop in (
-        "setDefaultLevels",
-        "setSilentLevels",
-        "deleteSliceMarker",
-        "deleteSliceMarkers",
-        "objectIDLevel",
-        "audioOutputPatch/level",
-        "audioMap/objectID/position",
-    ):
-        assert catalog["audio_basic"]["properties"][prop]["real_write_enabled"] is False
-        assert catalog["audio_basic"]["properties"][prop]["planned_only_reason"]
+    _assert_planned_only_props(
+        catalog,
+        "audio_basic",
+        (
+            "setDefaultLevels",
+            "setSilentLevels",
+            "deleteSliceMarker",
+            "deleteSliceMarkers",
+            "objectIDLevel",
+            "audioOutputPatch/level",
+            "audioMap/objectID/position",
+        ),
+    )
     assert catalog["group_basic"]["properties"]["mode"]["args"] == [{"name": "value", "validator": "group_mode"}]
-    for prop in (
-        "playhead",
-        "playbackPosition",
-        "playbackPositionID",
-        "playhead/next",
-        "playbackPosition/previousSequence",
-        "moveCartCue",
-        "playlist/currentCue",
-        "playlist/currentCueID",
-        "playlistLoop",
-        "playlistShuffle",
-        "playlistCrossfade",
-        "playlistCrossfadeDuration",
-    ):
-        assert catalog["group_basic"]["properties"][prop]["real_write_enabled"] is False
-        assert catalog["group_basic"]["properties"][prop]["planned_only_reason"]
-    for prop in ("cartRows", "cartColumns", "cartPosition", "cartPosition/row", "cartPosition/column"):
-        assert prop not in catalog["group_basic"]["properties"]
-    for forbidden in (
-        "alwaysCollate",
-        "collateAndStart",
-        "go",
-        "start",
-        "stop",
-        "hardStop",
-        "load",
-        "pause",
-        "playlist/next",
-        "playlist/previous",
-    ):
-        assert forbidden not in catalog["group_basic"]["properties"]
+    _assert_planned_only_props(
+        catalog,
+        "group_basic",
+        (
+            "playhead",
+            "playbackPosition",
+            "playbackPositionID",
+            "playhead/next",
+            "playbackPosition/previousSequence",
+            "moveCartCue",
+            "playlist/currentCue",
+            "playlist/currentCueID",
+            "playlistLoop",
+            "playlistShuffle",
+            "playlistCrossfade",
+            "playlistCrossfadeDuration",
+        ),
+    )
+    _assert_absent_props(
+        catalog,
+        "group_basic",
+        ("cartRows", "cartColumns", "cartPosition", "cartPosition/row", "cartPosition/column"),
+    )
+    _assert_absent_props(
+        catalog,
+        "group_basic",
+        (
+            "alwaysCollate",
+            "collateAndStart",
+            "go",
+            "start",
+            "stop",
+            "hardStop",
+            "load",
+            "pause",
+            "playlist/next",
+            "playlist/previous",
+        ),
+    )
+
+
+def _assert_media_profile_catalog(catalog: dict[str, Any]) -> None:
     assert catalog["mic_basic"]["real_write_enabled"] is True
     assert catalog["mic_basic"]["properties"]["channels"]["real_write_enabled"] is True
     assert catalog["video_basic"]["real_write_enabled"] is True
@@ -299,40 +549,46 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
     assert catalog["video_basic"]["properties"]["crop"]["planned_only_reason"]
     assert catalog["video_basic"]["properties"]["blendMode"]["args"][0]["validator"] == "video_blend_mode"
     assert catalog["video_basic"]["properties"]["clockType"]["args"][0]["validator"] == "video_clock_type"
-    for prop in (
-        "layer",
-        "fillStage",
-        "fillStyle",
-        "holdLastFrame",
-        "preserveAspectRatio",
-        "smooth",
-        "stageName",
-        "videoEffects/add",
-        "videoEffect/parameter",
-        "videoEffect/parameters",
-    ):
-        assert catalog["video_basic"]["properties"][prop]["real_write_enabled"] is False
-        assert catalog["video_basic"]["properties"][prop]["planned_only_reason"]
+    _assert_planned_only_props(
+        catalog,
+        "video_basic",
+        (
+            "layer",
+            "fillStage",
+            "fillStyle",
+            "holdLastFrame",
+            "preserveAspectRatio",
+            "smooth",
+            "stageName",
+            "videoEffects/add",
+            "videoEffect/parameter",
+            "videoEffect/parameters",
+        ),
+    )
     assert catalog["camera_basic"]["real_write_enabled"] is True
     assert catalog["camera_basic"]["properties"]["videoEffectIndex/parameter"]["planned_only_reason"]
     assert catalog["text_basic"]["properties"]["text/format/fontFamilyAndStyle"]["planned_only_reason"]
-    for prop in (
-        "text/format/backgroundColor",
-        "text/format/shadowOffset",
-        "text/format/lineSpacing",
-        "text/format/shadowBlurRadius",
-        "text/format/underlineStyle",
-    ):
-        assert catalog["text_basic"]["properties"][prop]["real_write_enabled"] is False
-        assert catalog["text_basic"]["properties"][prop]["planned_only_reason"]
+    _assert_planned_only_props(
+        catalog,
+        "text_basic",
+        (
+            "text/format/backgroundColor",
+            "text/format/shadowOffset",
+            "text/format/lineSpacing",
+            "text/format/shadowBlurRadius",
+            "text/format/underlineStyle",
+        ),
+    )
+
+
+def _assert_show_control_profile_catalog(catalog: dict[str, Any]) -> None:
     assert catalog["midi_file_basic"]["properties"]["rate"]["real_write_enabled"] is True
     assert catalog["network_basic"]["properties"]["customString"]["planned_only_reason"]
     assert catalog["network_basic"]["properties"]["parameterValue"]["planned_only_reason"]
     assert catalog["network_basic"]["properties"]["parameterValue"]["path"] == "parameterValue/{parameter}"
     assert catalog["network_basic"]["properties"]["parameterValues"]["args"][0]["validator"] == "list"
     assert catalog["network_basic"]["real_write_enabled"] is True
-    for unsupported_network_prop in ("message", "messageType", "protocol", "resend", "oscMessage"):
-        assert unsupported_network_prop not in catalog["network_basic"]["properties"]
+    _assert_absent_props(catalog, "network_basic", ("message", "messageType", "protocol", "resend", "oscMessage"))
     assert catalog["midi_basic"]["properties"]["note"]["path"] == "byte1"
     assert catalog["midi_basic"]["real_write_enabled"] is True
     assert catalog["midi_basic"]["properties"]["messageType"]["args"][0]["validator"] == "midi_message_type"
@@ -346,30 +602,39 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
     assert catalog["timecode_basic"]["properties"]["ltcChannel"]["planned_only_reason"]
     assert catalog["timecode_basic"]["properties"]["timecodeString"]["planned_only_reason"]
     assert catalog["timecode_basic"]["properties"]["timecodeFormat"]["planned_only_reason"]
-    for prop in ("cueTargetID", "cueTargetNumber", "cueTargetName", "tempCueTargetID", "tempCueTargetNumber", "targetMode"):
-        assert catalog["target_basic"]["properties"][prop]["real_write_enabled"] is False
-        assert catalog["target_basic"]["properties"][prop]["planned_only_reason"]
+    _assert_planned_only_props(
+        catalog,
+        "target_basic",
+        ("cueTargetID", "cueTargetNumber", "cueTargetName", "tempCueTargetID", "tempCueTargetNumber", "targetMode"),
+    )
     assert catalog["target_basic"]["properties"]["cueTargetID"]["args"][0]["validator"] == "cue_target_id"
     assert catalog["target_basic"]["properties"]["cueTargetNumber"]["args"][0]["validator"] == "cue_target_number"
     assert catalog["target_basic"]["properties"]["targetMode"]["args"][0]["validator"] == "target_mode"
-    for prop in ("cueTargetID", "cueTargetNumber", "patchTargetID", "audioMapTargetID", "targetMode"):
-        assert catalog["reset_basic"]["properties"][prop]["real_write_enabled"] is False
-        assert catalog["reset_basic"]["properties"][prop]["planned_only_reason"]
+    _assert_planned_only_props(
+        catalog,
+        "reset_basic",
+        ("cueTargetID", "cueTargetNumber", "patchTargetID", "audioMapTargetID", "targetMode"),
+    )
     assert catalog["reset_basic"]["properties"]["patchTargetID"]["args"][0]["validator"] == "target_id"
-    for prop in (
-        "cueTargetID",
-        "cueTargetNumber",
-        "cueTargetName",
-        "tempCueTargetID",
-        "tempCueTargetNumber",
-        "targetMode",
-        "devampType",
-        "startNextCueWhenSliceEnds",
-        "stopTargetWhenSliceEnds",
-    ):
-        assert catalog["devamp_basic"]["properties"][prop]["real_write_enabled"] is False
-        assert catalog["devamp_basic"]["properties"][prop]["planned_only_reason"]
+    _assert_planned_only_props(
+        catalog,
+        "devamp_basic",
+        (
+            "cueTargetID",
+            "cueTargetNumber",
+            "cueTargetName",
+            "tempCueTargetID",
+            "tempCueTargetNumber",
+            "targetMode",
+            "devampType",
+            "startNextCueWhenSliceEnds",
+            "stopTargetWhenSliceEnds",
+        ),
+    )
     assert catalog["devamp_basic"]["properties"]["devampType"]["args"][0]["validator"] == "devamp_type"
+
+
+def _assert_light_profile_catalog(catalog: dict[str, Any]) -> None:
     light_properties = catalog["light_basic"]["properties"]
     light_specific = set(light_properties) - set(catalog["common"]["properties"])
     assert light_specific == {
@@ -400,7 +665,9 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
         {"name": "oldCommand", "validator": "non_empty_string"},
         {"name": "newCommand", "validator": "non_empty_string"},
     ]
-    assert light_properties["removeLightCommandsMatching"]["args"] == [{"name": "match", "validator": "non_empty_string"}]
+    assert light_properties["removeLightCommandsMatching"]["args"] == [
+        {"name": "match", "validator": "non_empty_string"}
+    ]
     for forbidden_light_prop in (
         "parameterValues",
         "parameterFadesEnabled",
@@ -412,33 +679,38 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
         "lightPatch",
     ):
         assert forbidden_light_prop not in light_properties
-    for prop in (
-        "stopTargetWhenDone",
-        "audioMapTargetID",
-        "patchTargetID",
-        "targetMode",
-        "levelsMode",
-        "geoMode",
-        "mode",
-        "fadeType",
-        "pathHeight",
-        "pathWidth",
-        "rotation",
-        "rotationType",
-        "doOpacity",
-        "doRate",
-        "doRotation",
-        "doScale",
-        "doTranslation",
-        "doLevel",
-        "doObjectLevel",
-        "doObjectIDLevel",
-        "setGeometryFromTarget",
-        "setLevelsFromTarget",
-        "willFade",
-    ):
-        assert catalog["fade_basic"]["properties"][prop]["real_write_enabled"] is False
-        assert catalog["fade_basic"]["properties"][prop]["planned_only_reason"]
+
+
+def _assert_fade_script_profile_catalog(catalog: dict[str, Any]) -> None:
+    _assert_planned_only_props(
+        catalog,
+        "fade_basic",
+        (
+            "stopTargetWhenDone",
+            "audioMapTargetID",
+            "patchTargetID",
+            "targetMode",
+            "levelsMode",
+            "geoMode",
+            "mode",
+            "fadeType",
+            "pathHeight",
+            "pathWidth",
+            "rotation",
+            "rotationType",
+            "doOpacity",
+            "doRate",
+            "doRotation",
+            "doScale",
+            "doTranslation",
+            "doLevel",
+            "doObjectLevel",
+            "doObjectIDLevel",
+            "setGeometryFromTarget",
+            "setLevelsFromTarget",
+            "willFade",
+        ),
+    )
     assert catalog["fade_basic"]["properties"]["targetMode"]["args"][0]["validator"] == "target_mode"
     assert catalog["fade_basic"]["properties"]["levelsMode"]["args"][0]["validator"] == "fade_mode"
     assert catalog["fade_basic"]["properties"]["geoMode"]["args"][0]["validator"] == "fade_mode"
@@ -464,10 +736,219 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
         {"name": "value", "validator": "boolean"},
     ]
     assert catalog["fade_basic"]["properties"]["willFade"]["planned_only_reason"] == "deprecated_use_doLevel"
-    for network_only_prop in ("fadeEntries", "fadeFrom", "fadeTo", "fps"):
-        assert network_only_prop not in catalog["fade_basic"]["properties"]
+    _assert_absent_props(catalog, "fade_basic", ("fadeEntries", "fadeFrom", "fadeTo", "fps"))
     assert catalog["script_basic"]["real_write_enabled"] is True
     assert catalog["script_basic"]["properties"]["scriptSource"]["planned_only_reason"] == "script_execution_risk"
+
+
+def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
+    catalog = profile_catalog()
+
+    _assert_update_profile_names_and_shape(catalog)
+    _assert_audio_group_profile_catalog(catalog)
+    _assert_media_profile_catalog(catalog)
+    _assert_show_control_profile_catalog(catalog)
+    _assert_light_profile_catalog(catalog)
+    _assert_fade_script_profile_catalog(catalog)
+
+
+@pytest.mark.parametrize("profile", UPDATE_PROFILE_NAMES)
+def test_update_cues_dry_run_contract_covers_every_profile(profile: str) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    cue_type = PROFILE_TEST_CUE_TYPES[profile]
+    prop_name, prop = next(iter(profile_catalog()[profile]["properties"].items()))
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        cue_values=_base_cue_values(cue_id, cue_type),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = _request_for_catalog_property(prop_name, prop)
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": profile,
+                **update,
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True, (profile, result)
+    assert result["status"] == "dry_run"
+    assert result["planned_count"] == 1
+    assert result["results"][0]["executed_operations"] == []
+
+
+@pytest.mark.parametrize(("profile", "cue_type", "prop_name", "prop"), _real_write_property_cases())
+def test_update_cue_real_write_contract_covers_every_real_write_property(
+    profile: str,
+    cue_type: str,
+    prop_name: str,
+    prop: dict[str, Any],
+) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        cue_values=_base_cue_values(cue_id, cue_type),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = _request_for_catalog_property(prop_name, prop)
+
+    result = reader.update_cue(
+        "ws-1",
+        cue_id,
+        update.get("properties"),
+        dry_run=False,
+        profile=profile,
+        operations=update.get("operations"),
+    )
+
+    assert result["ok"] is True, (profile, prop_name, result)
+    assert result["status"] == "updated", (profile, prop_name, result)
+    assert result["executed_operations"], (profile, prop_name, result)
+    assert result["errors"] is None, (profile, prop_name, result)
+    for key, value in result["properties"].items():
+        assert result["after"][key] == value, (profile, prop_name, key, result)
+
+
+@pytest.mark.parametrize(("profile", "cue_type", "prop_name", "prop"), _dry_run_only_property_cases())
+def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_osc(
+    profile: str,
+    cue_type: str,
+    prop_name: str,
+    prop: dict[str, Any],
+) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    dry_client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        cue_values=_base_cue_values(cue_id, cue_type),
+    )
+    dry_reader = QLabReader(dry_client)  # type: ignore[arg-type]
+    update = _request_for_catalog_property(prop_name, prop)
+
+    dry_result = dry_reader.update_cue(
+        "ws-1",
+        cue_id,
+        update.get("properties"),
+        dry_run=True,
+        profile=profile,
+        operations=update.get("operations"),
+    )
+
+    assert dry_result["executed_operations"] == []
+    if dry_result["ok"]:
+        setters = planned_setters(dry_result)
+        assert prop_name in setters, (profile, prop_name, dry_result)
+        assert setters[prop_name]["real_write_enabled"] is False
+        assert setters[prop_name]["planned_only_reason"]
+    else:
+        assert dry_result["status"] == "dry_run_preflight_failed", (profile, prop_name, dry_result)
+        assert dry_result["planned_operations"] == []
+        assert "read_before" in dry_result["errors"], (profile, prop_name, dry_result)
+
+    real_client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        cue_values=_base_cue_values(cue_id, cue_type),
+    )
+    real_reader = QLabReader(real_client)  # type: ignore[arg-type]
+    with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
+        real_reader.update_cue(
+            "ws-1",
+            cue_id,
+            update.get("properties"),
+            dry_run=False,
+            profile=profile,
+            operations=update.get("operations"),
+        )
+    assert real_client.requests == []
+
+
+@pytest.mark.parametrize(
+    ("validator", "profile", "cue_type", "prop_name", "prop", "arg_name"),
+    _validator_negative_cases(),
+)
+def test_update_cues_validator_contract_rejects_one_bad_value_without_plan_or_osc(
+    validator: str,
+    profile: str,
+    cue_type: str,
+    prop_name: str,
+    prop: dict[str, Any],
+    arg_name: str,
+) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        cue_values=_base_cue_values(cue_id, cue_type),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = _request_for_catalog_property(
+        prop_name,
+        prop,
+        invalid_arg=arg_name,
+        invalid_value=_invalid_value_for_validator(validator),
+    )
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": profile,
+                **update,
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False, (validator, profile, prop_name, result)
+    assert result["status"] == "preflight_failed"
+    assert result["planned_count"] == 0
+    assert result["results"][0]["planned_operations"] == []
+    assert result["results"][0]["executed_operations"] == []
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert not any("/cue/" in address or "/cue_id/" in address for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize("profile", [name for name in UPDATE_PROFILE_NAMES if name != "common"])
+def test_update_cues_profile_mismatch_contract_has_no_plan_or_setters(profile: str) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    expected_type = PROFILE_TEST_CUE_TYPES[profile]
+    mismatched_type = "Wait" if expected_type == "Memo" else "Memo"
+    prop_name, prop = next(iter(profile_catalog()[profile]["properties"].items()))
+    update = _request_for_catalog_property(prop_name, prop)
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        cue_values=_base_cue_values(cue_id, mismatched_type),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": profile,
+                **update,
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is False, (profile, result)
+    assert result["status"] == "preflight_failed"
+    assert result["planned_count"] == 0
+    assert result["results"][0]["planned_operations"] == []
+    assert result["results"][0]["executed_operations"] == []
+    assert "profile" in result["results"][0]["errors"]
 
 
 def test_write_config_defaults_to_disabled_and_dry_run(monkeypatch: pytest.MonkeyPatch) -> None:

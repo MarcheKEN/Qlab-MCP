@@ -232,6 +232,7 @@ class CueDetailsResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     active_count: int | None = None
     message: str | None = None
+    read_coverage: dict[str, Any] | None = None
 
 
 class CueDetailsBatchResult(BaseModel):
@@ -246,6 +247,7 @@ class CueDetailsBatchResult(BaseModel):
     results: list[CueDetailsResult]
     errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
+    read_coverage: dict[str, Any] | None = None
 
 
 class WriteReadinessResult(BaseModel):
@@ -316,6 +318,7 @@ class UpdateCueResult(BaseModel):
     dry_run: bool
     properties: dict[str, Any] = Field(default_factory=dict)
     operations: list[dict[str, Any]] = Field(default_factory=list)
+    confirm_gates: list[str] = Field(default_factory=list)
     before: dict[str, Any] | None = None
     after: dict[str, Any] | None = None
     diff: dict[str, dict[str, Any]] = Field(default_factory=dict)
@@ -358,6 +361,13 @@ class CueUpdateInput(BaseModel):
             "Each operation uses {'property': string, 'args': object, 'mode': 'saved'|'live'}."
         ),
     )
+    confirm_gates: list[str] | None = Field(
+        default=None,
+        description=(
+            "Explicit capability gates accepted for this update item. "
+            "Dangerous planned-only operations remain blocked during real writes unless their gate is listed here."
+        ),
+    )
 
 
 class UpdateCueItemResult(BaseModel):
@@ -369,6 +379,7 @@ class UpdateCueItemResult(BaseModel):
     status: UpdateCueStatus = Field(description="Machine-readable result status for this cue update item.")
     properties: dict[str, Any] = Field(default_factory=dict)
     operations: list[dict[str, Any]] = Field(default_factory=list)
+    confirm_gates: list[str] = Field(default_factory=list)
     before: dict[str, Any] | None = None
     after: dict[str, Any] | None = None
     diff: dict[str, dict[str, Any]] = Field(default_factory=dict)

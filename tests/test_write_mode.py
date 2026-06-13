@@ -256,6 +256,7 @@ def _valid_value_for_validator(validator: str) -> Any:
         "boolean": True,
         "byte": 64,
         "byte_combo": 1024,
+        "color_condition": 1,
         "color_name": "blue",
         "continue_mode": "auto_continue",
         "cue_target_id": "target-id",
@@ -265,16 +266,21 @@ def _valid_value_for_validator(validator: str) -> Any:
         "device_output_ref": 1,
         "dict_or_json_string": {"fontSize": 24},
         "fade_mode": 1,
+        "fade_number_type": 1,
         "fade_type": 1,
         "group_mode": 1,
         "int": 1,
         "int_or_minus_one": 1,
         "json_value": {"value": 1},
         "list": [1, 2],
+        "list_or_json_string": [1, 2],
+        "midi_time_part": 1,
         "midi_channel": 1,
         "midi_message_type": 1,
         "midi_status": 1,
         "midi_timecode_format": 1,
+        "network_fade_type": 1,
+        "network_fps": 24,
         "non_empty_string": "value",
         "non_negative_int": 1,
         "non_negative_number": 1,
@@ -285,12 +291,14 @@ def _valid_value_for_validator(validator: str) -> Any:
         "positive_number": 2,
         "rate": 1,
         "rotation_type": 1,
+        "second_trigger_action": 1,
         "string": "value",
         "target_id": "target-id",
         "target_mode": 1,
         "text_alignment": "center",
         "text_line_style": "single",
         "timecode_framerate": 1,
+        "timecode_part": 1,
         "timecode_output_type": 1,
         "unit_interval": 0.5,
         "video_blend_mode": "normal",
@@ -311,6 +319,7 @@ def _invalid_value_for_validator(validator: str) -> Any:
         "boolean": "yes",
         "byte": 128,
         "byte_combo": 16384,
+        "color_condition": 3,
         "color_name": "not-a-color",
         "continue_mode": "bad",
         "cue_target_id": 123,
@@ -320,16 +329,21 @@ def _invalid_value_for_validator(validator: str) -> Any:
         "device_output_ref": 0,
         "dict_or_json_string": 1,
         "fade_mode": 2,
+        "fade_number_type": 2,
         "fade_type": 3,
         "group_mode": 0,
         "int": 1.5,
         "int_or_minus_one": 0,
         "json_value": {1: "bad"},
         "list": "not-list",
+        "list_or_json_string": 1,
+        "midi_time_part": 128,
         "midi_channel": 17,
         "midi_message_type": 4,
         "midi_status": 7,
         "midi_timecode_format": 4,
+        "network_fade_type": 3,
+        "network_fps": 0,
         "non_empty_string": "",
         "non_negative_int": -1,
         "non_negative_number": -1,
@@ -340,12 +354,14 @@ def _invalid_value_for_validator(validator: str) -> Any:
         "positive_number": 0,
         "rate": 0.01,
         "rotation_type": 4,
+        "second_trigger_action": 8,
         "string": 123,
         "target_id": "",
         "target_mode": 2,
         "text_alignment": "middle",
         "text_line_style": "triple",
         "timecode_framerate": 8,
+        "timecode_part": 100,
         "timecode_output_type": 2,
         "unit_interval": 2,
         "video_blend_mode": "not-a-blend",
@@ -639,6 +655,7 @@ def _assert_light_profile_catalog(catalog: dict[str, Any]) -> None:
     light_specific = set(light_properties) - set(catalog["common"]["properties"])
     assert light_specific == {
         "alwaysCollate",
+        "collateAndStart",
         "lightCommandText",
         "prune",
         "pruneCommands",
@@ -672,7 +689,6 @@ def _assert_light_profile_catalog(catalog: dict[str, Any]) -> None:
         "parameterValues",
         "parameterFadesEnabled",
         "removeLightCommand",
-        "collateAndStart",
         "dashboard/setLight",
         "dashboard/updateLatestCue",
         "dashboard/updateSelectedCues",
@@ -738,7 +754,7 @@ def _assert_fade_script_profile_catalog(catalog: dict[str, Any]) -> None:
     assert catalog["fade_basic"]["properties"]["willFade"]["planned_only_reason"] == "deprecated_use_doLevel"
     _assert_absent_props(catalog, "fade_basic", ("fadeEntries", "fadeFrom", "fadeTo", "fps"))
     assert catalog["script_basic"]["real_write_enabled"] is True
-    assert catalog["script_basic"]["properties"]["scriptSource"]["planned_only_reason"] == "script_execution_risk"
+    assert catalog["script_basic"]["properties"]["scriptSource"]["planned_only_reason"] == "not_editable_by_osc"
 
 
 def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
@@ -2775,10 +2791,12 @@ def test_update_cue_rejects_ambiguous_refs_and_bad_properties_before_osc() -> No
     with pytest.raises(UnsafeWriteOperationError, match="concrete cue"):
         reader.update_cue("ws-1", "selected", {"name": "Nope"}, dry_run=True)
 
-    with pytest.raises(UnsafeWriteOperationError, match="not allowlisted"):
-        reader.update_cue("ws-1", "1", {"fileTarget": "/tmp/nope.wav"}, dry_run=True)
+    planned = reader.update_cue("ws-1", "1", {"fileTarget": "/tmp/nope.wav"}, dry_run=True)
+    assert planned["ok"] is True
+    assert planned_setters(planned)["fileTarget"]["capability_gate"] == "file_target_access"
 
-    assert client.requests == []
+    with pytest.raises(UnsafeWriteOperationError, match="gated or dry-run only"):
+        reader.update_cue("ws-1", "1", {"fileTarget": "/tmp/nope.wav"}, dry_run=False)
 
 
 def test_update_cue_audio_basic_dry_run_allows_small_audio_profile() -> None:
@@ -3136,6 +3154,7 @@ def test_update_cue_operations_dry_run_builds_structured_osc_paths() -> None:
             "risk_tier": "high",
             "real_write_enabled": False,
             "planned_only_reason": "audio_levels_can_affect_live_output",
+            "capability_gate": "audio_output",
         }
     ]
     assert result["executed_operations"] == []
@@ -3427,6 +3446,29 @@ def test_update_cue_real_blocks_dry_run_only_profiles_and_properties_before_osc(
     assert light_op_client.requests == []
 
 
+def test_update_cue_real_allows_gated_common_property_with_explicit_gate() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        cue_values={"uniqueID": cue_id, "type": "Memo", "duckLevel": -12},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cue(
+        "ws-1",
+        cue_id,
+        {"duckLevel": -6},
+        dry_run=False,
+        confirm_gates=["cue_behavior"],
+    )
+
+    assert result["ok"] is True
+    assert result["after"]["duckLevel"] == -6
+    assert result["confirm_gates"] == ["cue_behavior"]
+    assert result["executed_operations"][0]["capability_gate"] == "cue_behavior"
+
+
 def test_update_cue_timecode_frame_rate_uses_documented_framerate_path() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = FakeWriteClient(
@@ -3458,6 +3500,7 @@ def test_update_cue_timecode_frame_rate_uses_documented_framerate_path() -> None
             "mode": "saved",
             "risk_tier": "medium",
             "real_write_enabled": True,
+            "capability_gate": None,
         }
     ]
 
@@ -3977,7 +4020,7 @@ def test_update_cues_script_basic_dry_run_plans_source_alias_without_execution()
     assert setters["scriptSource"]["address"] == f"/workspace/ws-1/cue_id/{cue_id}/scriptSource"
     assert setters["scriptText"]["address"] == f"/workspace/ws-1/cue_id/{cue_id}/scriptSource"
     assert all(setter["real_write_enabled"] is False for setter in setters.values())
-    assert all(setter["planned_only_reason"] == "script_execution_risk" for setter in setters.values())
+    assert all(setter["planned_only_reason"] == "not_editable_by_osc" for setter in setters.values())
     assert result["results"][0]["executed_operations"] == []
 
 
@@ -4008,8 +4051,11 @@ def test_update_cues_script_basic_invalid_value_and_profile_mismatch_have_no_pla
 
 def test_update_cues_wait_and_memo_basic_stay_common_only() -> None:
     catalog = profile_catalog()
-    assert set(catalog["wait_basic"]["properties"]) == set(catalog["common"]["properties"])
-    assert set(catalog["memo_basic"]["properties"]) == set(catalog["common"]["properties"])
+    safe_common = set(catalog["memo_basic"]["properties"])
+    assert set(catalog["wait_basic"]["properties"]) == safe_common
+    assert safe_common < set(catalog["common"]["properties"])
+    assert "duckLevel" not in safe_common
+    assert "fileTarget" not in safe_common
 
     wait_id = "11111111-1111-4111-8111-111111111111"
     memo_id = "22222222-2222-4222-8222-222222222222"

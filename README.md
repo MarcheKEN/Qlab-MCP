@@ -106,6 +106,8 @@ Batch contract:
   are not write targets.
 - Each item can choose its own registry `profile`, `properties`, and
   `operations`.
+- Each item may also include `confirm_gates` for deliberate real writes of
+  high-risk registry specs after a reviewed dry-run.
 - Validation and preflight failures are reported per item, not as a global tool
   error.
 - Items that already fail normalization or validation do not attempt
@@ -123,11 +125,12 @@ Safety gates for real writes:
 - `/connect` confirms `edit`
 - `/showMode` confirms Edit Mode
 - `dry_run=false` is supplied deliberately
+- high-risk update items include the exact `confirm_gates` required by their
+  planned operations
 
 The server does not expose playback, GO, stop, panic, or raw OSC. High-risk
-properties remain planned-only/dry-run-only, including light command text,
-network and MIDI output payloads, scripts, file targets, patch/routing refs,
-target refs, audio levels, and other unvalidated multi-argument changes.
+properties are planned in dry-run and require explicit gates for real writes;
+OSC read-only fields such as `scriptSource` remain non-editable by OSC.
 
 ## Compact By Default
 
@@ -201,6 +204,13 @@ Passcodes and credentials remain redacted.
 `full_sensitive` is deeper still. It can expose cue notes, local media paths,
 scripts, and heavy stage payloads. Use it only when that exposure is intentional.
 
+`qlab_get_cue_details(profile="exhaustive")` also returns `read_coverage`
+metadata comparing the allowlisted detail profile with the local QLab OSC
+Dictionary reference. This makes gaps explicit: saved properties may be direct,
+covered by aggregates, or still missing as `live`, indexed/channel/object, or
+runtime reads. Treat `exhaustive` as the deepest allowlisted read, not as full
+OSC route parity.
+
 `auto` is designed to be useful for technical inspection and may include compact
 type-specific fields such as `lightCommandText`. Use `basic_safe` or `health`
 when you want a stricter privacy posture.
@@ -242,8 +252,9 @@ Write mode is deliberately gated:
   dry-run-only properties, operation args, validators, and required write gates
   without sending mutating OSC.
 - Policy summary: all update profiles can exist for planning and targeting,
-  but real write is limited to safe properties only. Dangerous properties are
-  dry-run-only and are blocked when `dry_run=false`.
+  but real write is limited to safe properties unless the item explicitly lists
+  the required `confirm_gates`. Properties with no safe OSC write path, such as
+  `scriptSource`, remain non-editable by OSC.
 - `properties={...}` remains the simple one-argument setter path.
 - `operations=[...]` supports structured setters such as audio levels, crop,
   text colors, and MIDI fields in dry-run plans.
@@ -262,10 +273,13 @@ Write mode is deliberately gated:
   `audio_basic` transport metadata, `text_basic` simple text formatting,
   `mic_basic` channel metadata, `video_basic`/`camera_basic` one-axis geometry,
   `midi_file_basic` playback metadata, and `timecode_basic` metadata.
-- High-risk profiles and unvalidated properties are cataloged for dry-run only:
+- High-risk profiles and unvalidated properties are cataloged with explicit
+  gates:
   routing, targets, file paths, light commands, network/MIDI output, scripts,
   audio levels, slices, objects, live variants, text ranges/colors, and
   multi-argument geometry.
+- `fileTarget` real writes also require `QLAB_ALLOWED_FILE_ROOTS` to contain an
+  allowed absolute media root; paths outside those roots are blocked before OSC.
 - If a setter times out but a fresh after-read confirms the requested value,
   `qlab_update_cues` reports `updated_with_confirmed_timeouts` with a warning
   instead of treating the item as failed.
@@ -324,7 +338,8 @@ does not block other valid requests.
   "cue_ref": "1",
   "profile": "common",
   "properties": {"name": "New name"},
-  "operations": []
+  "operations": [],
+  "confirm_gates": []
 }
 ```
 
@@ -415,7 +430,8 @@ dry-run-only:
 }
 ```
 
-High-risk edits are useful in dry-run plans, but blocked for real writes:
+High-risk edits are useful in dry-run plans. Real writes require the matching
+`confirm_gates` per item:
 
 ```json
 {
@@ -424,7 +440,8 @@ High-risk edits are useful in dry-run plans, but blocked for real writes:
     {
       "cue_ref": "light-cue-id",
       "profile": "light_basic",
-      "properties": {"lightCommandText": "1 = 50"}
+      "properties": {"lightCommandText": "1 = 50"},
+      "confirm_gates": ["light_output"]
     },
     {
       "cue_ref": "audio-cue-id",
@@ -432,12 +449,14 @@ High-risk edits are useful in dry-run plans, but blocked for real writes:
       "operations": [
         {"property": "level", "args": {"inChannel": 1, "outChannel": 1, "decibel": -6}},
         {"property": "mute", "args": {"output": 1, "value": false}}
-      ]
+      ],
+      "confirm_gates": ["audio_output"]
     },
     {
       "cue_ref": "network-cue-id",
       "profile": "network_basic",
-      "properties": {"message": "/mcp/dryrun"}
+      "properties": {"customString": "/mcp/dryrun"},
+      "confirm_gates": ["network_output"]
     }
   ]
 }
@@ -509,6 +528,8 @@ Notes:
 - Write mode is disabled by default. When enabled, real writes require
   `QLAB_PASSCODE`, `edit` confirmed by `/connect`, Edit Mode confirmed by
   `/showMode`, and bypass/clear the read cache before fresh verification.
+- `QLAB_ALLOWED_FILE_ROOTS` is an optional `os.pathsep`-separated list used to
+  permit real `fileTarget` writes only under approved media roots.
 - `QLAB_UPDATE_DEBUG=true` adds per-cue debug details to `qlab_update_cues`
   results for troubleshooting batch verification.
 

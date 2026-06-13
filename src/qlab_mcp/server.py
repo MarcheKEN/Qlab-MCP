@@ -183,9 +183,8 @@ Use these tools to read QLab 5 workspace and cue information over OSC.
 
 The seven inspector tools are read-only and intentionally avoid playback, editing, deletion, and raw OSC.
 Write mode is a separate gated preface: it is disabled unless QLAB_ENABLE_WRITE=true and defaults to dry-run.
-When write mode is ready, all update profiles may exist, but only safe properties can execute as real writes.
-Dangerous or high-risk properties remain dry-run-only and are blocked for real writes.
-Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect, and currently only supports basic cue creation and safe batch cue updates.
+When write mode is ready, all update profiles may exist; safe properties can execute as real writes, while dangerous or high-risk properties require explicit per-item confirm_gates.
+Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect, and currently only supports basic cue creation plus gated batch cue updates.
 
 Start with qlab_check_connection to verify QLab, workspace candidates, passcode, and read access.
 
@@ -789,7 +788,7 @@ def qlab_update_cues(
             min_length=1,
             max_length=50,
             description=(
-                "Cue updates to plan or apply. Each item has cue_ref, profile, properties, and operations. "
+                "Cue updates to plan or apply. Each item has cue_ref, profile, properties, operations, and optional confirm_gates. "
                 "cue_ref must be a concrete cue number or unique ID; selected, active, playhead, and playbackPosition "
                 "are not accepted."
             ),
@@ -809,7 +808,7 @@ def qlab_update_cues(
 
     Real updates require QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
     Dry-run planning never sends mutating OSC.
-    High-risk profiles and unvalidated properties are cataloged for planning but blocked for real writes.
+    High-risk profiles and unvalidated properties are cataloged for planning and require explicit confirm_gates for real writes.
     Batch real writes run all preflight checks before sending any setter and use cue unique IDs for setters.
     """
     return _run_tool(

@@ -70,7 +70,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["details", "diagnostics", "qlab", "safe-read"],
         "input_schema_hash": "de946587eaafac4ad9d9008f80053f003a98b672a92825476d042c77a7ec1a21",
-        "output_schema_hash": "1751f661f9eefdecfd32f191e96e81396cc7729c9d7e042b0e2df7a2d74dd6a5",
+        "output_schema_hash": "329c81ae77216790768d5274598e0f0faf7d48e80d4e3a05a665815612962074",
     },
     "qlab_get_workspace_overview": {
         "title": "Get QLab Workspace Overview",
@@ -122,8 +122,8 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["batch-update", "cue-update", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "cbac3b98aad73a1db52c4c07101e5ad70f20e5f1b087851e3bdf3294c398b098",
-        "output_schema_hash": "29bfd67b1120e241e40b685f097ff24e5e499be805687c85c3a26126edc3f143",
+        "input_schema_hash": "d5202803e7b8b5bf7a07bc3693b27b3c86715258957fa8283284656cd6b280f6",
+        "output_schema_hash": "f25d575370b4d2e36f6b322ff63f028e42e3352ad96126effb3b867b2584ecdc",
     },
 }
 EXPECTED_DESCRIPTION_PHRASES = {
@@ -253,7 +253,7 @@ def test_update_cues_fastmcp_schema_keeps_batch_contract() -> None:
     assert update_properties["updates"]["minItems"] == 1
     assert update_properties["updates"]["maxItems"] == 50
     assert update_items["required"] == ["cue_ref"]
-    assert set(update_item_properties) == {"cue_ref", "profile", "properties", "operations"}
+    assert set(update_item_properties) == {"cue_ref", "profile", "properties", "operations", "confirm_gates"}
     assert "enum" not in update_item_properties["profile"]
     assert update_output["required"] == [
         "ok",

@@ -8,9 +8,12 @@ Hard limits:
 - Use explicit `workspace_id` on every tool call.
 - Do not use raw OSC.
 - Do not run GO, playback, start, stop, pause, load, or panic commands.
-- Do not test live/output fields as real writes: Light commands, Network sends,
-  MIDI output payloads, Script source/text, target refs, patch refs, file
-  targets, audio levels, dashboard, DMX/Art-Net, or Fade target/output fields.
+- Test high-risk real writes only in a disposable workspace with dummy/disabled
+  outputs, one capability family at a time.
+- `scriptSource` and `scriptText` are not editable by documented OSC; only
+  `compileSource` can be planned behind `script_compile`.
+- `fileTarget` real writes require `QLAB_ALLOWED_FILE_ROOTS` to include the
+  intended test media root.
 - Run `dry_run=true` before any `dry_run=false` write.
 
 Preflight:
@@ -77,6 +80,41 @@ Safety block smoke:
    - clean preflight exception or failed result before setters
    - no mutating setter execution
    - no playback/control/raw OSC
+
+Capability gate smoke:
+
+1. Pick one disposable cue and one high-risk property whose
+   `planned_operations[]` includes a `capability_gate`.
+2. Run `qlab_update_cues(..., dry_run=true)` with no `confirm_gates`.
+3. Run the same update with `dry_run=false` and no `confirm_gates`.
+4. Expected block:
+   - no setter sent
+   - error names the required gate
+5. Run the same update with `dry_run=false` and
+   `updates[].confirm_gates=[required_gate]`.
+6. Expected gated write:
+   - setter uses `/cue_id/{uniqueID}/...`
+   - fresh read-after-write verifies the requested value when the property is readable
+   - report any property that cannot be read back as inconclusive, not passed
+
+Recommended gate order on a dummy workspace:
+
+- `cue_behavior`
+- `target_resolution`
+- `file_target_access`
+- `patch_routing`
+- `audio_output`
+- `slice_editing`
+- `spatial_audio`
+- `audio_map_editing`
+- `video_visual`
+- `video_effects`
+- `text_rich_format`
+- `fade_targets`
+- `light_output`
+- `network_output`
+- `midi_output`
+- `script_compile`
 
 Report:
 

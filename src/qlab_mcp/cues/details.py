@@ -15,6 +15,7 @@ from .profiles import (
     _empty_auto_sections,
     _is_active_cue_ref,
 )
+from .coverage import default_read_coverage_report
 
 
 MAX_VALUES_FOR_KEYS = 100
@@ -66,6 +67,11 @@ def _profile_warnings(profile: str, requested_count: int = 1) -> list[str]:
     if requested_count > 1:
         warnings.append(EXHAUSTIVE_BATCH_WARNING)
     return warnings
+
+
+def _attach_read_coverage(result: dict[str, Any], profile: str) -> None:
+    if profile.strip().lower() == "exhaustive":
+        result["read_coverage"] = default_read_coverage_report()
 
 
 class CueDetailsMixin:
@@ -171,11 +177,18 @@ class CueDetailsMixin:
             "active_count": 0,
             "message": "No active cues are currently running or paused.",
         }
+        _attach_read_coverage(result, profile)
         if profile.strip().lower() == "auto":
             result["sections"] = _empty_auto_sections()
         return result
 
-    def _get_single_cue_details(self, workspace_id: str, cue_ref: str, profile: str = "auto") -> dict[str, Any]:
+    def _get_single_cue_details(
+        self,
+        workspace_id: str,
+        cue_ref: str,
+        profile: str = "auto",
+        include_read_coverage: bool = True,
+    ) -> dict[str, Any]:
         normalized_profile = profile.strip().lower()
         if normalized_profile == "auto":
             return self._get_auto_cue_details(workspace_id, cue_ref)
@@ -225,6 +238,8 @@ class CueDetailsMixin:
         warnings = _profile_warnings(normalized_profile)
         if warnings:
             result["warnings"] = warnings
+        if include_read_coverage:
+            _attach_read_coverage(result, normalized_profile)
         if normalized_profile == "inspector_safe":
             result["sections"] = _build_auto_sections(values)
         if errors:
@@ -282,7 +297,12 @@ class CueDetailsMixin:
                 failed_count += 1
                 continue
             try:
-                result = self._get_single_cue_details(resolved_workspace_id, ref, profile)
+                result = self._get_single_cue_details(
+                    resolved_workspace_id,
+                    ref,
+                    profile,
+                    include_read_coverage=False,
+                )
                 results.append(result)
                 if result.get("errors"):
                     errors[ref] = _batch_error_summary(result)
@@ -294,7 +314,7 @@ class CueDetailsMixin:
         succeeded_count = len(cue_ref) - failed_count
         if failed_count:
             warnings.append("One or more cue detail reads failed; inspect errors for per-cue failures.")
-        return {
+        batch_result = {
             "ok": failed_count == 0,
             "workspace_id": resolved_workspace_id,
             "requested_count": len(cue_ref),
@@ -305,3 +325,5 @@ class CueDetailsMixin:
             "errors": errors or None,
             "warnings": warnings,
         }
+        _attach_read_coverage(batch_result, profile)
+        return batch_result

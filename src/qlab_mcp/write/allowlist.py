@@ -42,7 +42,13 @@ def validate_writable_cue_type(cue_type: str) -> str:
 def validate_write_properties(properties: dict[str, Any] | None) -> dict[str, Any]:
     if properties is None:
         return {}
-    normalized_properties, _ = normalize_update_request(COMMON_UPDATE_PROFILE, properties, None)
+    normalized_properties, operations = normalize_update_request(COMMON_UPDATE_PROFILE, properties, None)
+    blocked = [operation["property"] for operation in operations if not operation["real_write_enabled"]]
+    if blocked:
+        blocked_text = ", ".join(blocked)
+        raise UnsafeWriteOperationError(
+            f"cue create property is not allowlisted for real create writes; blocked: {blocked_text}"
+        )
     return normalized_properties
 
 

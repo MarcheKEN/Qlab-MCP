@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from string import Formatter
 from typing import Any
 
@@ -80,6 +80,10 @@ class CuePropertySpec:
     risk_tier: str = "safe"
     real_write_enabled: bool = False
     planned_only_reason: str | None = None
+    doc_section: str | None = None
+    osc_paths: tuple[str, ...] = ()
+    capability_gate: str | None = None
+    readback: str = "value"
 
 
 @dataclass(frozen=True)
@@ -102,6 +106,10 @@ def _prop(
     risk_tier: str = "safe",
     real_write_enabled: bool = False,
     planned_only_reason: str | None = None,
+    doc_section: str | None = None,
+    osc_paths: tuple[str, ...] = (),
+    capability_gate: str | None = None,
+    readback: str = "value",
 ) -> CuePropertySpec:
     return CuePropertySpec(
         name=name,
@@ -113,6 +121,10 @@ def _prop(
         risk_tier=risk_tier,
         real_write_enabled=real_write_enabled,
         planned_only_reason=planned_only_reason,
+        doc_section=doc_section,
+        osc_paths=osc_paths,
+        capability_gate=capability_gate,
+        readback=readback,
     )
 
 
@@ -127,6 +139,10 @@ def _op(
     risk_tier: str = "medium",
     real_write_enabled: bool = False,
     planned_only_reason: str = "planned_only_until_real_world_validation",
+    doc_section: str | None = None,
+    osc_paths: tuple[str, ...] = (),
+    capability_gate: str | None = None,
+    readback: str = "value",
 ) -> CuePropertySpec:
     path_args = _path_arg_names(path or name)
     return CuePropertySpec(
@@ -139,6 +155,10 @@ def _op(
         risk_tier=risk_tier,
         real_write_enabled=real_write_enabled,
         planned_only_reason=planned_only_reason if not real_write_enabled else None,
+        doc_section=doc_section,
+        osc_paths=osc_paths,
+        capability_gate=capability_gate,
+        readback=readback,
     )
 
 
@@ -149,15 +169,23 @@ def _planned_prop(
     path: str | None = None,
     read_key: str | None = None,
     reason: str,
+    modes: tuple[str, ...] = ("saved",),
+    capability_gate: str | None = None,
+    doc_section: str | None = None,
+    osc_paths: tuple[str, ...] = (),
 ) -> CuePropertySpec:
     return _prop(
         name,
         validator,
         path=path,
         read_key=read_key,
+        modes=modes,
         risk_tier="high",
         real_write_enabled=False,
         planned_only_reason=reason,
+        capability_gate=capability_gate,
+        doc_section=doc_section,
+        osc_paths=osc_paths,
     )
 
 
@@ -167,9 +195,9 @@ def _path_arg_names(path: str) -> tuple[str, ...]:
 
 def _planned_patch_refs(prefix: str, *, validator: str) -> tuple[CuePropertySpec, ...]:
     return (
-        _planned_prop(f"{prefix}Name", "string", reason="patch_or_map_refs_need_dedicated_resolution"),
-        _planned_prop(f"{prefix}Number", "non_negative_int", reason="patch_or_map_refs_need_dedicated_resolution"),
-        _planned_prop(f"{prefix}ID", "string", reason="patch_or_map_refs_need_dedicated_resolution"),
+        _planned_prop(f"{prefix}Name", "string", reason="patch_or_map_refs_need_dedicated_resolution", capability_gate="patch_routing"),
+        _planned_prop(f"{prefix}Number", "non_negative_int", reason="patch_or_map_refs_need_dedicated_resolution", capability_gate="patch_routing"),
+        _planned_prop(f"{prefix}ID", "string", reason="patch_or_map_refs_need_dedicated_resolution", capability_gate="patch_routing"),
     )
 
 
@@ -269,6 +297,33 @@ COMMON_PROPERTIES = (
     _prop("continueMode", "continue_mode", real_write_enabled=True),
     _prop("skipIfDisarmed", "boolean", real_write_enabled=True),
     _prop("autoLoad", "boolean", real_write_enabled=True),
+    _prop("secondColorName", "color_name", modes=("saved", "live"), real_write_enabled=True),
+    _prop("useSecondColor", "boolean", real_write_enabled=True),
+)
+
+COMMON_CATALOG_PROPERTIES = (
+    _planned_prop("colorCondition", "color_condition", reason="deprecated_unsupported_in_current_qlab"),
+    _planned_prop("duckLevel", "decibel", reason="ducking_changes_cue_behavior"),
+    _planned_prop("duckOthers", "boolean", reason="ducking_changes_cue_behavior"),
+    _planned_prop("duckTime", "non_negative_number", reason="ducking_changes_cue_behavior"),
+    _planned_prop("fadeAndStopOthers", "number", reason="fade_and_stop_changes_other_cues"),
+    _planned_prop("fadeAndStopOthersTime", "non_negative_number", reason="fade_and_stop_changes_other_cues"),
+    _planned_prop("fileTarget", "string", reason="file_paths_need_dedicated_safety_policy"),
+    _planned_prop("cueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("cueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("tempCueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("patchTargetID", "target_id", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("targetMode", "target_mode", reason="target_behavior_needs_validation"),
+    _planned_prop("secondTriggerAction", "second_trigger_action", reason="second_trigger_changes_show_control_behavior"),
+    _planned_prop("secondTriggerOnRelease", "boolean", reason="second_trigger_changes_show_control_behavior"),
+    _op("timecodeTrigger", (("hours", "timecode_part"), ("minutes", "timecode_part"), ("seconds", "timecode_part"), ("frames", "timecode_part"), ("bits", "timecode_part")), planned_only_reason="timecode_trigger_changes_show_control_behavior"),
+    _planned_prop("timecodeTrigger/hours", "timecode_part", reason="timecode_trigger_changes_show_control_behavior"),
+    _planned_prop("timecodeTrigger/minutes", "timecode_part", reason="timecode_trigger_changes_show_control_behavior"),
+    _planned_prop("timecodeTrigger/seconds", "timecode_part", reason="timecode_trigger_changes_show_control_behavior"),
+    _planned_prop("timecodeTrigger/frames", "timecode_part", reason="timecode_trigger_changes_show_control_behavior"),
+    _planned_prop("timecodeTrigger/bits", "timecode_part", reason="timecode_trigger_changes_show_control_behavior"),
+    _planned_prop("timecodeTrigger/text", "string", reason="timecode_trigger_changes_show_control_behavior"),
 )
 
 AUDIO_SAFE_PROPERTIES = (
@@ -288,6 +343,15 @@ AUDIO_CATALOG_PROPERTIES = (
     _planned_prop("lockFadeToCue", "boolean", reason="integrated_fade_changes_playback_behavior"),
     _planned_prop("lastSlicePlayCount", "int_or_minus_one", reason="slice_editing_needs_dedicated_validation"),
     _planned_prop("lastSliceInfiniteLoop", "boolean", reason="slice_editing_needs_dedicated_validation"),
+    _planned_prop("patch", "non_negative_int", reason="deprecated_use_audioOutputPatchNumber"),
+    _planned_prop("sliceMarkers", "list", reason="slice_marker_collection_not_directly_settable_use_sliceMarker_operations"),
+    _op(
+        "inputChannelName",
+        (("number", "positive_int"), ("name", "string")),
+        path="inputChannelName/{number}",
+        risk_tier="medium",
+        planned_only_reason="input_channel_labels_need_dedicated_validation",
+    ),
     _op(
         "level",
         (("inChannel", "audio_level_row"), ("outChannel", "audio_output_ref"), ("decibel", "decibel")),
@@ -701,6 +765,47 @@ VIDEO_CATALOG_PROPERTIES = (
     _prop("cropRight", "number", risk_tier="medium", real_write_enabled=True),
     _prop("blendMode", "video_blend_mode", risk_tier="medium", real_write_enabled=True),
     _prop("clockType", "video_clock_type", risk_tier="medium", real_write_enabled=True),
+    _op("origin", (("x", "number"), ("y", "number")), modes=("saved", "live"), planned_only_reason="geometry_changes_need_visual_validation"),
+    _planned_prop("origin/x", "number", modes=("saved", "live"), reason="geometry_changes_need_visual_validation"),
+    _planned_prop("origin/y", "number", modes=("saved", "live"), reason="geometry_changes_need_visual_validation"),
+    _op("quaternion", (("a", "number"), ("b", "number"), ("c", "number"), ("d", "number")), risk_tier="high", planned_only_reason="3d_rotation_changes_need_visual_validation"),
+    _op("resetRotation", (), path="resetRotation", risk_tier="high", planned_only_reason="3d_rotation_changes_need_visual_validation"),
+    _planned_prop("stage/name", "non_empty_string", reason="stage_name_changes_need_visual_validation"),
+    _op("stage/region/bounds", (("region", "non_empty_string"), ("x", "number"), ("y", "number"), ("width", "positive_number"), ("height", "positive_number")), path="stage/region/{region}/bounds", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionID/bounds", (("id", "non_empty_string"), ("x", "number"), ("y", "number"), ("width", "positive_number"), ("height", "positive_number")), path="stage/regionID/{id}/bounds", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionIndex/bounds", (("index", "non_negative_int"), ("x", "number"), ("y", "number"), ("width", "positive_number"), ("height", "positive_number")), path="stage/regionIndex/{index}/bounds", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/region/bounds/origin", (("region", "non_empty_string"), ("x", "number"), ("y", "number")), path="stage/region/{region}/bounds/origin", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionID/bounds/origin", (("id", "non_empty_string"), ("x", "number"), ("y", "number")), path="stage/regionID/{id}/bounds/origin", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionIndex/bounds/origin", (("index", "non_negative_int"), ("x", "number"), ("y", "number")), path="stage/regionIndex/{index}/bounds/origin", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/region/bounds/origin/x", (("region", "non_empty_string"), ("x", "number")), path="stage/region/{region}/bounds/origin/x", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionID/bounds/origin/x", (("id", "non_empty_string"), ("x", "number")), path="stage/regionID/{id}/bounds/origin/x", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionIndex/bounds/origin/x", (("index", "non_negative_int"), ("x", "number")), path="stage/regionIndex/{index}/bounds/origin/x", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/region/bounds/origin/y", (("region", "non_empty_string"), ("y", "number")), path="stage/region/{region}/bounds/origin/y", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionID/bounds/origin/y", (("id", "non_empty_string"), ("y", "number")), path="stage/regionID/{id}/bounds/origin/y", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionIndex/bounds/origin/y", (("index", "non_negative_int"), ("y", "number")), path="stage/regionIndex/{index}/bounds/origin/y", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/region/bounds/size", (("region", "non_empty_string"), ("width", "positive_number"), ("height", "positive_number")), path="stage/region/{region}/bounds/size", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionID/bounds/size", (("id", "non_empty_string"), ("width", "positive_number"), ("height", "positive_number")), path="stage/regionID/{id}/bounds/size", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionIndex/bounds/size", (("index", "non_negative_int"), ("width", "positive_number"), ("height", "positive_number")), path="stage/regionIndex/{index}/bounds/size", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/region/bounds/size/height", (("region", "non_empty_string"), ("height", "positive_number")), path="stage/region/{region}/bounds/size/height", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionID/bounds/size/height", (("id", "non_empty_string"), ("height", "positive_number")), path="stage/regionID/{id}/bounds/size/height", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionIndex/bounds/size/height", (("index", "non_negative_int"), ("height", "positive_number")), path="stage/regionIndex/{index}/bounds/size/height", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/region/bounds/size/width", (("region", "non_empty_string"), ("width", "positive_number")), path="stage/region/{region}/bounds/size/width", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionID/bounds/size/width", (("id", "non_empty_string"), ("width", "positive_number")), path="stage/regionID/{id}/bounds/size/width", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionIndex/bounds/size/width", (("index", "non_negative_int"), ("width", "positive_number")), path="stage/regionIndex/{index}/bounds/size/width", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/region/enableGrid", (("region", "non_empty_string"), ("value", "boolean")), path="stage/region/{region}/enableGrid", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionID/enableGrid", (("id", "non_empty_string"), ("value", "boolean")), path="stage/regionID/{id}/enableGrid", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionIndex/enableGrid", (("index", "non_negative_int"), ("value", "boolean")), path="stage/regionIndex/{index}/enableGrid", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/region/enableGuide", (("region", "non_empty_string"), ("value", "boolean")), path="stage/region/{region}/enableGuide", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionID/enableGuide", (("id", "non_empty_string"), ("value", "boolean")), path="stage/regionID/{id}/enableGuide", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionIndex/enableGuide", (("index", "non_negative_int"), ("value", "boolean")), path="stage/regionIndex/{index}/enableGuide", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/region/moveBy", (("region", "non_empty_string"), ("x", "number"), ("y", "number")), path="stage/region/{region}/moveBy", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionID/moveBy", (("id", "non_empty_string"), ("x", "number"), ("y", "number")), path="stage/regionID/{id}/moveBy", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionIndex/moveBy", (("index", "non_negative_int"), ("x", "number"), ("y", "number")), path="stage/regionIndex/{index}/moveBy", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/region/resetControlPoints", (("region", "non_empty_string"),), path="stage/region/{region}/resetControlPoints", osc_args=(), risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionID/resetControlPoints", (("id", "non_empty_string"),), path="stage/regionID/{id}/resetControlPoints", osc_args=(), risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _op("stage/regionIndex/resetControlPoints", (("index", "non_negative_int"),), path="stage/regionIndex/{index}/resetControlPoints", osc_args=(), risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
+    _planned_prop("surfaceID", "string", reason="surface_refs_need_dedicated_resolution"),
+    _planned_prop("surfaceName", "string", reason="surface_refs_need_dedicated_resolution"),
     *_planned_patch_refs("stage", validator="patch_ref"),
     *_planned_patch_refs("videoOutputPatch", validator="patch_ref"),
     _op("videoEffects/add", (("name", "non_empty_string"),), path="videoEffects/add", read_key="videoEffects", risk_tier="high", planned_only_reason="video_effect_changes_need_visual_validation"),
@@ -760,6 +865,11 @@ TEXT_SAFE_PROPERTIES = (
     _prop("text/format/fontSize", "positive_number", real_write_enabled=True),
 )
 
+CAMERA_CATALOG_PROPERTIES = (
+    _planned_prop("cameraPatch", "non_negative_int", reason="camera_patch_refs_need_dedicated_resolution", capability_gate="patch_routing"),
+    *_planned_patch_refs("videoInputPatch", validator="patch_ref"),
+)
+
 TEXT_CATALOG_PROPERTIES = (
     _op("text/format", (("format", "dict_or_json_string"),), path="text/format", planned_only_reason="rich_text_format_needs_dedicated_validation"),
     _op("text/format/fontFamilyAndStyle", (("family", "non_empty_string"), ("style", "non_empty_string")), planned_only_reason="font_pair_needs_system_font_validation"),
@@ -782,6 +892,7 @@ LIGHT_CATALOG_PROPERTIES = (
     _planned_prop("lightCommandText", "string", reason="light_commands_can_affect_visual_output"),
     _planned_prop("alwaysCollate", "boolean", reason="light_collation_can_change_cue_output"),
     _planned_prop("subcontroller", "boolean", reason="light_dashboard_behavior_needs_validation"),
+    _op("collateAndStart", (), path="collateAndStart", risk_tier="high", planned_only_reason="light_commands_can_affect_visual_output"),
     _op(
         "setLight",
         (("instrument_or_group", "non_empty_string"), ("setting", "json_value")),
@@ -836,6 +947,17 @@ FADE_CATALOG_PROPERTIES = (
 NETWORK_CATALOG_PROPERTIES = (
     *_planned_patch_refs("networkPatch", validator="patch_ref"),
     _planned_prop("customString", "string", reason="network_messages_can_trigger_external_systems"),
+    _planned_prop("fadeEntries", "list_or_json_string", reason="network_fade_shape_can_trigger_external_systems"),
+    _planned_prop("fadeFrom", "number", reason="network_fade_shape_can_trigger_external_systems"),
+    _planned_prop("fadeNumberType", "fade_number_type", reason="network_fade_shape_can_trigger_external_systems"),
+    _planned_prop("fadeTo", "number", reason="network_fade_shape_can_trigger_external_systems"),
+    _planned_prop("fadeType", "network_fade_type", reason="network_fade_shape_can_trigger_external_systems"),
+    _planned_prop("fps", "network_fps", reason="network_fade_shape_can_trigger_external_systems"),
+    _planned_prop("pathHeight", "positive_number", reason="network_fade_shape_can_trigger_external_systems"),
+    _planned_prop("pathWidth", "positive_number", reason="network_fade_shape_can_trigger_external_systems"),
+    _planned_prop("patch", "non_negative_int", reason="deprecated_use_networkPatchNumber"),
+    _op("parameterFadeEnabled", (("parameter", "non_empty_string"), ("value", "boolean")), path="parameterFadeEnabled/{parameter}", risk_tier="high", planned_only_reason="network_parameter_values_can_trigger_external_systems"),
+    _planned_prop("parameterFadesEnabled", "list", reason="network_parameter_values_can_trigger_external_systems"),
     _op(
         "parameterValue",
         (("parameter", "non_empty_string"), ("value", "json_value")),
@@ -864,6 +986,11 @@ MIDI_CATALOG_PROPERTIES = (
     _planned_prop("controlValue", "byte_combo", reason="midi_can_trigger_external_devices"),
     _planned_prop("deviceID", "byte", reason="midi_can_trigger_external_devices"),
     _planned_prop("endValue", "byte_combo", reason="midi_can_trigger_external_devices"),
+    _planned_prop("hours", "midi_time_part", reason="msc_timecode_needs_validation"),
+    _planned_prop("minutes", "midi_time_part", reason="msc_timecode_needs_validation"),
+    _planned_prop("seconds", "midi_time_part", reason="msc_timecode_needs_validation"),
+    _planned_prop("frames", "midi_time_part", reason="msc_timecode_needs_validation"),
+    _planned_prop("subframes", "midi_time_part", reason="msc_timecode_needs_validation"),
     _planned_prop("macro", "byte", reason="midi_can_trigger_external_devices"),
     _planned_prop("rawString", "string", reason="sysex_can_trigger_external_devices"),
     _planned_prop("qList", "string", reason="msc_fields_need_validation"),
@@ -872,6 +999,7 @@ MIDI_CATALOG_PROPERTIES = (
     _planned_prop("timecodeString", "string", reason="msc_timecode_needs_validation"),
     _planned_prop("timecodeFormat", "midi_timecode_format", reason="msc_timecode_needs_validation"),
     _planned_prop("doFade", "boolean", reason="midi_fade_can_trigger_external_devices"),
+    _planned_prop("patch", "non_negative_int", reason="deprecated_use_midiPatchNumber"),
 )
 
 MIDI_FILE_CATALOG_PROPERTIES = (
@@ -882,6 +1010,7 @@ MIDI_FILE_CATALOG_PROPERTIES = (
     _prop("duration", "non_negative_number", risk_tier="medium", real_write_enabled=True),
     _prop("playCount", "positive_int", risk_tier="medium", real_write_enabled=True),
     *_planned_patch_refs("midiPatch", validator="patch_ref"),
+    _planned_prop("patch", "non_negative_int", reason="deprecated_use_midiPatchNumber"),
 )
 
 TIMECODE_CATALOG_PROPERTIES = (
@@ -943,8 +1072,9 @@ DEVAMP_CATALOG_PROPERTIES = (
 )
 
 SCRIPT_CATALOG_PROPERTIES = (
-    _planned_prop("scriptSource", "string", reason="script_execution_risk"),
-    _planned_prop("scriptText", "string", path="scriptSource", read_key="scriptSource", reason="script_execution_risk"),
+    _planned_prop("scriptSource", "string", reason="not_editable_by_osc"),
+    _planned_prop("scriptText", "string", path="scriptSource", read_key="scriptSource", reason="not_editable_by_osc"),
+    _op("compileSource", (), path="compileSource", risk_tier="high", planned_only_reason="script_compile_can_execute_or_surface_script_errors"),
 )
 
 
@@ -952,8 +1082,8 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
     COMMON_UPDATE_PROFILE: UpdateProfileSpec(
         COMMON_UPDATE_PROFILE,
         (),
-        COMMON_PROPERTIES,
-        "safe",
+        (*COMMON_PROPERTIES, *COMMON_CATALOG_PROPERTIES),
+        "medium",
         True,
         "Safe common cue properties.",
     ),
@@ -977,7 +1107,7 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
     ),
     "mic_basic": UpdateProfileSpec("mic_basic", ("Mic",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES), "medium", True, "Mic profile with safe channel metadata writes."),
     "video_basic": UpdateProfileSpec("video_basic", ("Video",), (*COMMON_PROPERTIES, *VIDEO_CATALOG_PROPERTIES), "medium", True, "Video profile with one-argument geometry writes."),
-    "camera_basic": UpdateProfileSpec("camera_basic", ("Camera",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES, *VIDEO_CATALOG_PROPERTIES), "medium", True, "Camera profile with safe channel and geometry writes."),
+    "camera_basic": UpdateProfileSpec("camera_basic", ("Camera",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES, *VIDEO_CATALOG_PROPERTIES, *CAMERA_CATALOG_PROPERTIES), "medium", True, "Camera profile with safe channel and geometry writes."),
     TEXT_BASIC_UPDATE_PROFILE: UpdateProfileSpec(
         TEXT_BASIC_UPDATE_PROFILE,
         ("Text",),
@@ -997,6 +1127,85 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
     "devamp_basic": UpdateProfileSpec("devamp_basic", ("Devamp",), (*COMMON_PROPERTIES, *DEVAMP_CATALOG_PROPERTIES), "high", True, "Devamp profile; devamp targets remain dry-run only."),
     "script_basic": UpdateProfileSpec("script_basic", ("Script",), (*COMMON_PROPERTIES, *SCRIPT_CATALOG_PROPERTIES), "high", True, "Script profile; script source remains dry-run only."),
 }
+
+CAPABILITY_GATES = {
+    "audio_map_editing",
+    "audio_output",
+    "cue_behavior",
+    "deprecated_osc",
+    "fade_targets",
+    "file_target_access",
+    "light_output",
+    "midi_output",
+    "network_output",
+    "patch_routing",
+    "script_compile",
+    "slice_editing",
+    "spatial_audio",
+    "target_resolution",
+    "text_rich_format",
+    "video_effects",
+    "video_visual",
+}
+
+
+def _default_capability_gate(profile: str, prop: CuePropertySpec) -> str | None:
+    if prop.real_write_enabled or not prop.planned_only_reason:
+        return prop.capability_gate
+    name = prop.name
+    if prop.planned_only_reason.startswith("deprecated_") or name == "patch":
+        return "deprecated_osc"
+    if name == "fileTarget":
+        return "file_target_access"
+    if "Patch" in name or "patchTarget" in name or "audioMapTarget" in name:
+        return "patch_routing"
+    if name.startswith(("cueTarget", "tempCueTarget", "targetMode")):
+        return "target_resolution"
+    if profile in {"target_basic", "reset_basic", "devamp_basic"}:
+        return "target_resolution"
+    if profile == "fade_basic":
+        return "fade_targets"
+    if profile == "light_basic":
+        return "light_output"
+    if profile == "network_basic":
+        return "network_output"
+    if profile == "midi_basic":
+        return "midi_output"
+    if profile == "script_basic":
+        return "script_compile" if name == "compileSource" else None
+    if name.startswith(("level", "sliderLevel", "gang", "doLevel", "mute", "solo", "setDefaultLevels", "setSilentLevels", "audioOutputPatch")):
+        return "audio_output"
+    if "Slice" in name or "sliceMarker" in name:
+        return "slice_editing"
+    if name.startswith(("object", "objectID", "objectLevel", "objectIDLevel", "doObject")):
+        return "spatial_audio"
+    if name.startswith("audioMap/"):
+        return "audio_map_editing"
+    if profile in {"audio_basic", "mic_basic"}:
+        return "audio_output"
+    if name.startswith("videoEffect") or name.startswith("videoEffects"):
+        return "video_effects"
+    if name.startswith("text/format"):
+        return "text_rich_format"
+    if profile in {"video_basic", "camera_basic", "text_basic"}:
+        return "video_visual"
+    if profile == COMMON_UPDATE_PROFILE:
+        return "cue_behavior"
+    return prop.capability_gate
+
+
+def _apply_default_capability_gates() -> None:
+    for profile_name, profile in list(UPDATE_PROFILES.items()):
+        properties = tuple(
+            replace(prop, capability_gate=_default_capability_gate(profile_name, prop))
+            if _default_capability_gate(profile_name, prop) and prop.capability_gate is None
+            else prop
+            for prop in profile.properties
+        )
+        UPDATE_PROFILES[profile_name] = replace(profile, properties=properties)
+
+
+_apply_default_capability_gates()
 
 UPDATE_PROFILE_NAMES = tuple(UPDATE_PROFILES)
 WRITE_GATE_REQUIREMENTS = (
@@ -1032,6 +1241,10 @@ def profile_catalog() -> dict[str, Any]:
                     "risk_tier": prop.risk_tier,
                     "real_write_enabled": prop.real_write_enabled,
                     "planned_only_reason": prop.planned_only_reason,
+                    "doc_section": prop.doc_section,
+                    "osc_paths": list(prop.osc_paths or (prop.path or prop.name,)),
+                    "capability_gate": prop.capability_gate,
+                    "readback": prop.readback,
                 }
                 for prop in spec.properties
             },
@@ -1071,6 +1284,9 @@ def editable_update_capabilities(cue_type: str | None) -> dict[str, Any]:
                 "risk_tier": prop["risk_tier"],
                 "real_write_enabled": prop["real_write_enabled"],
                 "planned_only_reason": prop["planned_only_reason"],
+                "capability_gate": prop["capability_gate"],
+                "doc_section": prop["doc_section"],
+                "osc_paths": prop["osc_paths"],
             }
             target = real_write_details if prop["real_write_enabled"] else dry_run_only_details
             if property_name in target:
@@ -1085,6 +1301,7 @@ def editable_update_capabilities(cue_type: str | None) -> dict[str, Any]:
                 "risk_tier": prop["risk_tier"],
                 "real_write_enabled": prop["real_write_enabled"],
                 "planned_only_reason": prop["planned_only_reason"],
+                "capability_gate": prop["capability_gate"],
             }
             validators[property_name] = {arg["name"]: arg["validator"] for arg in prop["args"]}
             if prop["planned_only_reason"]:
@@ -1116,6 +1333,7 @@ def editable_update_capabilities(cue_type: str | None) -> dict[str, Any]:
         },
         "planned_only_reason": planned_only_reason,
         "requires_write_gates": list(WRITE_GATE_REQUIREMENTS),
+        "available_capability_gates": sorted(CAPABILITY_GATES),
     }
 
 
@@ -1169,14 +1387,26 @@ def normalize_update_request(
     return normalized_properties, normalized_operations
 
 
-def ensure_real_write_allowed(profile: str, operations: list[dict[str, Any]]) -> None:
+def ensure_real_write_allowed(
+    profile: str,
+    operations: list[dict[str, Any]],
+    confirmed_gates: list[str] | tuple[str, ...] | set[str] | None = None,
+) -> None:
     spec = UPDATE_PROFILES[validate_update_profile(profile)]
     if not spec.real_write_enabled:
         raise UnsafeWriteOperationError(f"{profile} is cataloged for dry-run only; real write is not enabled yet.")
-    blocked = [operation for operation in operations if not operation["real_write_enabled"]]
+    confirmed = {gate.strip() for gate in confirmed_gates or () if isinstance(gate, str) and gate.strip()}
+    blocked = [
+        operation
+        for operation in operations
+        if not operation["real_write_enabled"] and operation.get("capability_gate") not in confirmed
+    ]
     if blocked:
-        names = ", ".join(operation["property"] for operation in blocked)
-        raise UnsafeWriteOperationError(f"These update operations are dry-run only for profile {profile}: {names}")
+        names = ", ".join(
+            f"{operation['property']} (requires {operation.get('capability_gate') or 'no_real_write_gate'})"
+            for operation in blocked
+        )
+        raise UnsafeWriteOperationError(f"These update operations are gated or dry-run only for profile {profile}: {names}")
 
 
 def read_keys_for_operations(operations: list[dict[str, Any]]) -> list[str]:
@@ -1209,6 +1439,7 @@ def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
         },
         "properties": [prop.name for prop in COMMON_PROPERTIES],
         "supports_operations": True,
+        "available_capability_gates": sorted(CAPABILITY_GATES),
         "dry_run_default": dry_run_default,
     }
     return {
@@ -1274,6 +1505,8 @@ def _normalize_one_operation(
         "risk_tier": spec.risk_tier,
         "real_write_enabled": spec.real_write_enabled,
         "planned_only_reason": spec.planned_only_reason,
+        "capability_gate": spec.capability_gate,
+        "readback": spec.readback,
     }
 
 
@@ -1398,6 +1631,12 @@ def _validate_value(validator: str, value: Any) -> Any:
         return _enum_string(value, {"audio", "video"}, "value must be audio or video")
     if validator == "continue_mode":
         return _continue_mode(value)
+    if validator == "color_condition":
+        return _int_range(value, 0, 2, "value must be 0, 1, or 2")
+    if validator == "second_trigger_action":
+        return _int_range(value, 0, 7, "value must be a second trigger action index from 0 to 7")
+    if validator == "timecode_part":
+        return _int_range(value, 0, 99, "value must be a non-negative timecode component")
     if validator == "group_mode":
         return _group_mode(value)
     if validator == "color_name":
@@ -1424,6 +1663,12 @@ def _validate_value(validator: str, value: Any) -> Any:
         return _int_range(value, 0, 1, "value must be 0 or 1")
     if validator == "fade_type":
         return _int_range(value, 1, 2, "value must be 1 for absolute or 2 for relative")
+    if validator == "network_fade_type":
+        return _int_range(value, 0, 2, "value must be 0, 1, or 2")
+    if validator == "fade_number_type":
+        return _int_range(value, 0, 1, "value must be 0 for integers or 1 for floats")
+    if validator == "network_fps":
+        return _int_range(value, 1, 120, "value must be an integer from 1 to 120")
     if validator == "rotation_type":
         return _int_range(value, 0, 3, "value must be an integer from 0 to 3")
     if validator == "devamp_type":
@@ -1450,6 +1695,8 @@ def _validate_value(validator: str, value: Any) -> Any:
         return _int_range(value, 0, 6, "value must be an integer from 0 to 6")
     if validator == "midi_timecode_format":
         return _int_range(value, 0, 3, "value must be 0 for 24 fps, 1 for 25 fps, 2 for 30 fps drop, or 3 for 30 fps non-drop")
+    if validator == "midi_time_part":
+        return _int_range(value, 0, 127, "value must be an integer from 0 to 127")
     if validator == "unit_interval":
         number = _number(value, "value must be a number from 0 to 1")
         if number < 0 or number > 1:
@@ -1459,6 +1706,10 @@ def _validate_value(validator: str, value: Any) -> Any:
         if isinstance(value, (dict, list)) or isinstance(value, str):
             return value
         raise UnsafeWriteOperationError("value must be a dict, list, or JSON string")
+    if validator == "list_or_json_string":
+        if isinstance(value, list) or isinstance(value, str):
+            return value
+        raise UnsafeWriteOperationError("value must be a list or JSON string")
     if validator == "json_value":
         return _json_value(value)
     if validator == "list":

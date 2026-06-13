@@ -4284,6 +4284,9 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["properties"]["cueSize/width"], 640)
         self.assertEqual(result["properties"]["layer"], 5)
         self.assertIn("large, sensitive", result["warnings"][0])
+        self.assertEqual(result["read_coverage"]["status"], "available")
+        self.assertGreater(result["read_coverage"]["status_counts"]["live_omitted"], 0)
+        self.assertGreater(result["read_coverage"]["status_counts"]["indexed_read_gap"], 0)
         self.assertTrue(all("/children" not in address for address in server.received))
 
     def test_exhaustive_text_details_include_format_and_geometry_fields(self) -> None:
@@ -4463,6 +4466,8 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(any("large, sensitive" in warning for warning in result["warnings"]))
         self.assertTrue(any("Batch exhaustive" in warning for warning in result["warnings"]))
         self.assertTrue(all(item["warnings"] for item in result["results"]))
+        self.assertEqual(result["read_coverage"]["status"], "available")
+        self.assertTrue(all("read_coverage" not in item for item in result["results"]))
 
     def test_editable_profile_returns_update_capabilities_for_audio(self) -> None:
         responses = {
@@ -4584,6 +4589,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(capabilities["recommended_profile"], "light_basic")
         for prop in (
             "alwaysCollate",
+            "collateAndStart",
             "lightCommandText",
             "prune",
             "pruneCommands",
@@ -4605,7 +4611,6 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(capabilities["validators"]["replaceLightCommand"]["newCommand"], "non_empty_string")
         self.assertNotIn("parameterValues", capabilities["operations"])
         self.assertNotIn("removeLightCommand", capabilities["operations"])
-        self.assertNotIn("collateAndStart", capabilities["operations"])
         self.assertNotIn("dashboard/setLight", capabilities["operations"])
 
     def test_editable_profile_exposes_group_list_cart_update_capabilities(self) -> None:

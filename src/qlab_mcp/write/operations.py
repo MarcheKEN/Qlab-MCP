@@ -258,6 +258,7 @@ class QLabWriteMixin:
         dry_run: bool | None = None,
         profile: str | None = None,
         operations: list[dict[str, Any]] | None = None,
+        confirm_gates: list[str] | None = None,
     ) -> dict[str, Any]:
         """Compatibility wrapper for local Python callers; MCP exposes qlab_update_cues."""
         raw_update = {
@@ -265,6 +266,7 @@ class QLabWriteMixin:
             "profile": profile or COMMON_UPDATE_PROFILE,
             "properties": properties,
             "operations": operations,
+            "confirm_gates": confirm_gates,
         }
         _normalize_batch_update_item(raw_update)
         batch = self.update_cues(
@@ -289,6 +291,7 @@ class QLabWriteMixin:
             "dry_run": batch["dry_run"],
             "properties": item["properties"],
             "operations": item["operations"],
+            "confirm_gates": item.get("confirm_gates", []),
             "before": item["before"],
             "after": item["after"],
             "diff": item["diff"],
@@ -318,7 +321,7 @@ class QLabWriteMixin:
         if not effective_dry_run:
             for item in items:
                 if not item.get("errors"):
-                    ensure_real_write_allowed(item["profile"], item["operations"])
+                    ensure_real_write_allowed(item["profile"], item["operations"], item["confirm_gates"])
         if effective_dry_run:
             try:
                 workspace = self._resolve_workspace_id_strict(workspace)
@@ -364,6 +367,7 @@ class QLabWriteMixin:
             )
 
         workspace = ensure_write_ready(self, workspace)
+        _validate_file_target_roots(self, items)
         update_deadline = time.monotonic() + UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS
         setter_count = sum(len(item["operations"]) for item in items)
         setter_reply_timeout = _setter_reply_timeout(self, setter_count, update_deadline)
@@ -448,6 +452,7 @@ class QLabWriteMixin:
                         "address": address,
                         "args": operation["args"],
                         "mode": operation["mode"],
+                        "capability_gate": operation.get("capability_gate"),
                         "status": status,
                         **({"error": error} if error else {}),
                     }
@@ -588,6 +593,9 @@ def _normalize_batch_update_item_for_batch(raw_update: Any) -> dict[str, Any]:
 
     properties: dict[str, Any] = {}
     operations: list[dict[str, Any]] = []
+    confirm_gates, gate_error = _normalize_confirm_gates(raw_update.get("confirm_gates"))
+    if gate_error:
+        errors["confirm_gates"] = gate_error
     if "profile" not in errors:
         try:
             properties, operations = normalize_update_request(
@@ -603,6 +611,7 @@ def _normalize_batch_update_item_for_batch(raw_update: Any) -> dict[str, Any]:
         "profile": profile,
         "properties": properties,
         "operations": operations,
+        "confirm_gates": confirm_gates,
         "read_keys": read_keys_for_operations(operations),
         "errors": errors or None,
     }
@@ -614,9 +623,52 @@ def _invalid_batch_update_item(cue_ref: str, profile: str, errors: dict[str, str
         "profile": profile,
         "properties": {},
         "operations": [],
+        "confirm_gates": [],
         "read_keys": read_keys_for_operations([]),
         "errors": errors,
     }
+
+
+def _normalize_confirm_gates(raw_gates: Any) -> tuple[list[str], str | None]:
+    if raw_gates is None:
+        return [], None
+    if not isinstance(raw_gates, list):
+        return [], "confirm_gates must be a list of gate strings"
+    gates: list[str] = []
+    for raw_gate in raw_gates:
+        if not isinstance(raw_gate, str) or not raw_gate.strip():
+            return [], "confirm_gates entries must be non-empty strings"
+        gates.append(raw_gate.strip())
+    return list(dict.fromkeys(gates)), None
+
+
+def _validate_file_target_roots(reader: Any, items: list[dict[str, Any]]) -> None:
+    requested_paths: list[str] = []
+    for item in items:
+        for operation in item["operations"]:
+            if operation["property"] == "fileTarget" and operation.get("capability_gate") == "file_target_access":
+                if operation["args"]:
+                    requested_paths.append(str(operation["args"][0]))
+    if not requested_paths:
+        return
+    config = getattr(getattr(reader, "client", None), "config", None)
+    roots = tuple(getattr(config, "allowed_file_roots", ()) or ())
+    if not roots:
+        raise UnsafeWriteOperationError(
+            "fileTarget real writes require QLAB_ALLOWED_FILE_ROOTS to include at least one allowed media root."
+        )
+    normalized_roots = tuple(os.path.abspath(root) for root in roots)
+    for requested_path in requested_paths:
+        absolute_path = os.path.abspath(requested_path)
+        if not any(_path_is_under_root(absolute_path, root) for root in normalized_roots):
+            raise UnsafeWriteOperationError(f"fileTarget path is outside QLAB_ALLOWED_FILE_ROOTS: {requested_path!r}")
+
+
+def _path_is_under_root(path: str, root: str) -> bool:
+    try:
+        return os.path.commonpath([path, root]) == root
+    except ValueError:
+        return False
 
 
 def _validate_profile_for_before(profile: str, before: dict[str, Any] | None) -> dict[str, str]:
@@ -655,6 +707,7 @@ def _batch_item_result(
         "status": status,
         "properties": item["properties"],
         "operations": item["operations"],
+        "confirm_gates": item["confirm_gates"],
         "before": before,
         "after": after,
         "diff": _diff_properties(before, item["properties"], after),
@@ -786,6 +839,7 @@ def _planned_update_operations(
             "mode": update_operation["mode"],
             "risk_tier": update_operation["risk_tier"],
             "real_write_enabled": update_operation["real_write_enabled"],
+            "capability_gate": update_operation.get("capability_gate"),
         }
         if update_operation.get("planned_only_reason"):
             planned["planned_only_reason"] = update_operation["planned_only_reason"]

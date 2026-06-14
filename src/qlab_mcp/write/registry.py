@@ -84,6 +84,7 @@ class CuePropertySpec:
     osc_paths: tuple[str, ...] = ()
     capability_gate: str | None = None
     readback: str = "value"
+    contextual_requirements: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -110,6 +111,7 @@ def _prop(
     osc_paths: tuple[str, ...] = (),
     capability_gate: str | None = None,
     readback: str = "value",
+    contextual_requirements: tuple[str, ...] = (),
 ) -> CuePropertySpec:
     return CuePropertySpec(
         name=name,
@@ -125,6 +127,7 @@ def _prop(
         osc_paths=osc_paths,
         capability_gate=capability_gate,
         readback=readback,
+        contextual_requirements=contextual_requirements,
     )
 
 
@@ -143,6 +146,7 @@ def _op(
     osc_paths: tuple[str, ...] = (),
     capability_gate: str | None = None,
     readback: str = "value",
+    contextual_requirements: tuple[str, ...] = (),
 ) -> CuePropertySpec:
     path_args = _path_arg_names(path or name)
     return CuePropertySpec(
@@ -159,6 +163,7 @@ def _op(
         osc_paths=osc_paths,
         capability_gate=capability_gate,
         readback=readback,
+        contextual_requirements=contextual_requirements,
     )
 
 
@@ -173,6 +178,7 @@ def _planned_prop(
     capability_gate: str | None = None,
     doc_section: str | None = None,
     osc_paths: tuple[str, ...] = (),
+    contextual_requirements: tuple[str, ...] = (),
 ) -> CuePropertySpec:
     return _prop(
         name,
@@ -186,6 +192,7 @@ def _planned_prop(
         capability_gate=capability_gate,
         doc_section=doc_section,
         osc_paths=osc_paths,
+        contextual_requirements=contextual_requirements,
     )
 
 
@@ -261,10 +268,15 @@ def _group_properties() -> tuple[CuePropertySpec, ...]:
         ),
         _planned_prop("playlist/currentCue", "non_empty_string", reason="playlist_navigation_needs_dedicated_validation"),
         _planned_prop("playlist/currentCueID", "non_empty_string", reason="playlist_navigation_needs_dedicated_validation"),
-        _prop("playlist/doLoop", "boolean", real_write_enabled=True),
-        _prop("playlist/doShuffle", "boolean", real_write_enabled=True),
-        _prop("playlist/doCrossfade", "boolean", real_write_enabled=True),
-        _prop("playlist/crossfade/duration", "non_negative_number", real_write_enabled=True),
+        _prop("playlist/doLoop", "boolean", real_write_enabled=True, contextual_requirements=("group_mode_is_playlist",)),
+        _prop("playlist/doShuffle", "boolean", real_write_enabled=True, contextual_requirements=("group_mode_is_playlist",)),
+        _prop("playlist/doCrossfade", "boolean", real_write_enabled=True, contextual_requirements=("group_mode_is_playlist",)),
+        _prop(
+            "playlist/crossfade/duration",
+            "non_negative_number",
+            real_write_enabled=True,
+            contextual_requirements=("group_mode_is_playlist",),
+        ),
         _planned_prop("playlistLoop", "boolean", path="playlistLoop", reason="deprecated_use_playlist_doLoop"),
         _planned_prop("playlistShuffle", "boolean", path="playlistShuffle", reason="deprecated_use_playlist_doShuffle"),
         _planned_prop("playlistCrossfade", "boolean", path="playlistCrossfade", reason="deprecated_use_playlist_doCrossfade"),
@@ -292,8 +304,18 @@ COMMON_PROPERTIES = (
     _prop("colorName", "color_name", real_write_enabled=True),
     _prop("preWait", "non_negative_number", real_write_enabled=True),
     _prop("postWait", "non_negative_number", real_write_enabled=True),
-    _prop("duration", "non_negative_number", real_write_enabled=True),
-    _prop("tempDuration", "non_negative_number", real_write_enabled=True),
+    _prop(
+        "duration",
+        "non_negative_number",
+        real_write_enabled=True,
+        contextual_requirements=("allows_editing_duration",),
+    ),
+    _prop(
+        "tempDuration",
+        "non_negative_number",
+        real_write_enabled=True,
+        contextual_requirements=("allows_editing_duration",),
+    ),
     _prop("continueMode", "continue_mode", real_write_enabled=True),
     _prop("skipIfDisarmed", "boolean", real_write_enabled=True),
     _prop("autoLoad", "boolean", real_write_enabled=True),
@@ -309,10 +331,10 @@ COMMON_CATALOG_PROPERTIES = (
     _planned_prop("fadeAndStopOthers", "number", reason="fade_and_stop_changes_other_cues"),
     _planned_prop("fadeAndStopOthersTime", "non_negative_number", reason="fade_and_stop_changes_other_cues"),
     _planned_prop("fileTarget", "string", reason="file_paths_need_dedicated_safety_policy"),
-    _planned_prop("cueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution"),
-    _planned_prop("cueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution"),
-    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution"),
-    _planned_prop("tempCueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("cueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("tempCueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("patchTargetID", "target_id", reason="target_refs_need_dedicated_resolution"),
     _planned_prop("targetMode", "target_mode", reason="target_behavior_needs_validation"),
     _planned_prop("secondTriggerAction", "second_trigger_action", reason="second_trigger_changes_show_control_behavior"),
@@ -734,7 +756,12 @@ AUDIO_CATALOG_PROPERTIES = (
 
 MIC_CATALOG_PROPERTIES = (
     *_planned_patch_refs("audioInputPatch", validator="patch_ref"),
-    _prop("channelOffset", "non_negative_int", risk_tier="medium", real_write_enabled=True),
+    _planned_prop(
+        "channelOffset",
+        "non_negative_int",
+        reason="audio_input_channel_offset_needs_patch_bounds_validation",
+        capability_gate="patch_routing",
+    ),
     _prop("channels", "positive_int", risk_tier="medium", real_write_enabled=True),
     *AUDIO_CATALOG_PROPERTIES,
 )
@@ -1043,28 +1070,28 @@ TIMECODE_CATALOG_PROPERTIES = (
 )
 
 TARGET_CATALOG_PROPERTIES = (
-    _planned_prop("cueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution"),
-    _planned_prop("cueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution"),
-    _planned_prop("cueTargetName", "non_empty_string", reason="target_refs_need_dedicated_resolution"),
-    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution"),
-    _planned_prop("tempCueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution"),
+    _planned_prop("cueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetName", "non_empty_string", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_name_resolution_unsupported",)),
+    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("tempCueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("targetMode", "target_mode", reason="target_behavior_needs_validation"),
 )
 
 RESET_CATALOG_PROPERTIES = (
-    _planned_prop("cueTargetNumber", "cue_target_number", reason="reset_targets_need_validation"),
-    _planned_prop("cueTargetID", "cue_target_id", reason="reset_targets_need_validation"),
+    _planned_prop("cueTargetNumber", "cue_target_number", reason="reset_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetID", "cue_target_id", reason="reset_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("patchTargetID", "target_id", reason="reset_targets_need_validation"),
     _planned_prop("audioMapTargetID", "target_id", reason="reset_targets_need_validation"),
     _planned_prop("targetMode", "target_mode", reason="reset_targets_need_validation"),
 )
 
 DEVAMP_CATALOG_PROPERTIES = (
-    _planned_prop("cueTargetNumber", "cue_target_number", reason="devamp_targets_need_validation"),
-    _planned_prop("cueTargetID", "cue_target_id", reason="devamp_targets_need_validation"),
-    _planned_prop("cueTargetName", "non_empty_string", reason="devamp_targets_need_validation"),
-    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="devamp_targets_need_validation"),
-    _planned_prop("tempCueTargetID", "cue_target_id", reason="devamp_targets_need_validation"),
+    _planned_prop("cueTargetNumber", "cue_target_number", reason="devamp_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetID", "cue_target_id", reason="devamp_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetName", "non_empty_string", reason="devamp_targets_need_validation", contextual_requirements=("target_name_resolution_unsupported",)),
+    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="devamp_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("tempCueTargetID", "cue_target_id", reason="devamp_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("targetMode", "target_mode", reason="devamp_targets_need_validation"),
     _planned_prop("devampType", "devamp_type", reason="devamp_targets_need_validation"),
     _planned_prop("startNextCueWhenSliceEnds", "boolean", reason="devamp_targets_need_validation"),
@@ -1245,6 +1272,7 @@ def profile_catalog() -> dict[str, Any]:
                     "osc_paths": list(prop.osc_paths or (prop.path or prop.name,)),
                     "capability_gate": prop.capability_gate,
                     "readback": prop.readback,
+                    "contextual_requirements": list(prop.contextual_requirements),
                 }
                 for prop in spec.properties
             },
@@ -1287,6 +1315,7 @@ def editable_update_capabilities(cue_type: str | None) -> dict[str, Any]:
                 "capability_gate": prop["capability_gate"],
                 "doc_section": prop["doc_section"],
                 "osc_paths": prop["osc_paths"],
+                "contextual_requirements": prop["contextual_requirements"],
             }
             target = real_write_details if prop["real_write_enabled"] else dry_run_only_details
             if property_name in target:
@@ -1302,6 +1331,7 @@ def editable_update_capabilities(cue_type: str | None) -> dict[str, Any]:
                 "real_write_enabled": prop["real_write_enabled"],
                 "planned_only_reason": prop["planned_only_reason"],
                 "capability_gate": prop["capability_gate"],
+                "contextual_requirements": prop["contextual_requirements"],
             }
             validators[property_name] = {arg["name"]: arg["validator"] for arg in prop["args"]}
             if prop["planned_only_reason"]:
@@ -1412,6 +1442,10 @@ def ensure_real_write_allowed(
 def read_keys_for_operations(operations: list[dict[str, Any]]) -> list[str]:
     keys = ["uniqueID", "type"]
     keys.extend(operation["read_key"] for operation in operations if operation.get("read_key"))
+    if any(str(operation.get("property", "")).startswith("playlist/") for operation in operations):
+        keys.append("mode")
+    if any(operation.get("property") in {"duration", "tempDuration"} for operation in operations):
+        keys.append("allowsEditingDuration")
     return list(dict.fromkeys(keys))
 
 
@@ -1507,6 +1541,7 @@ def _normalize_one_operation(
         "planned_only_reason": spec.planned_only_reason,
         "capability_gate": spec.capability_gate,
         "readback": spec.readback,
+        "contextual_requirements": list(spec.contextual_requirements),
     }
 
 
@@ -1554,7 +1589,10 @@ def _normalize_args(spec: CuePropertySpec, raw_args: Any, *, source: str) -> dic
 def _render_path(spec: CuePropertySpec, args: dict[str, Any]) -> str:
     path = spec.path or spec.name
     for arg_name in _path_arg_names(path):
-        path = path.replace(f"{{{arg_name}}}", str(args[arg_name]))
+        value = str(args[arg_name])
+        if "/" in value:
+            raise UnsafeWriteOperationError(f"{spec.name}.{arg_name} must not contain '/'")
+        path = path.replace(f"{{{arg_name}}}", value)
     return path
 
 

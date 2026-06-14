@@ -214,11 +214,10 @@ def _registry_index(catalog: dict[str, Any]) -> dict[str, dict[str, dict[str, An
     return indexed
 
 
-def _coverage_keys(property_path: str) -> set[str]:
-    return {
-        normalize_registry_key(property_path),
-        _base_key(property_path),
-    }
+def _coverage_keys(property_path: str) -> list[str]:
+    exact = normalize_registry_key(property_path)
+    base = _base_key(property_path)
+    return [exact] if exact == base else [exact, base]
 
 
 def _base_key(value: str) -> str:
@@ -226,7 +225,7 @@ def _base_key(value: str) -> str:
     return normalized.split("/{}")[0] if "/{}" in normalized else normalized
 
 
-def _best_match(profile: str, keys: set[str], indexed: dict[str, dict[str, dict[str, Any]]]) -> dict[str, Any]:
+def _best_match(profile: str, keys: list[str], indexed: dict[str, dict[str, dict[str, Any]]]) -> dict[str, Any]:
     for candidate_profile in (profile, "common"):
         for key in keys:
             prop = indexed.get(candidate_profile, {}).get(key)

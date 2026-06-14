@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import time
 from typing import Any
@@ -35,6 +36,8 @@ UPDATE_SETTER_REPLY_TIMEOUT_CAP_SECONDS = 0.1
 UPDATE_SETTER_REPLY_TOTAL_BUDGET_SECONDS = 8.0
 UPDATE_AFTER_READ_TIMEOUT_CAP_SECONDS = 0.5
 UPDATE_MIN_REPLY_TIMEOUT_SECONDS = 0.001
+UPDATE_NUMERIC_MATCH_ABS_TOLERANCE = 1e-5
+UPDATE_NUMERIC_MATCH_REL_TOLERANCE = 1e-6
 UPDATE_STATUS_ACTIONS = {
     "preflight_failed": "Inspect per-cue errors; no setters were sent, so fix cue refs/profiles before retrying.",
     "partial_failed": "Inspect per-cue errors and verify the affected cues in QLab before retrying only failed items.",
@@ -388,6 +391,8 @@ class QLabWriteMixin:
                 errors.setdefault("cue", "Cue could not be read before update.")
             if not item.get("errors"):
                 errors.update(_validate_profile_for_before(item["profile"], before))
+            if not item.get("errors"):
+                errors.update(_validate_contextual_real_write(self, workspace, item, before))
             if errors:
                 preflight_ok = False
             preflight_results.append(
@@ -657,9 +662,9 @@ def _validate_file_target_roots(reader: Any, items: list[dict[str, Any]]) -> Non
         raise UnsafeWriteOperationError(
             "fileTarget real writes require QLAB_ALLOWED_FILE_ROOTS to include at least one allowed media root."
         )
-    normalized_roots = tuple(os.path.abspath(root) for root in roots)
+    normalized_roots = tuple(os.path.realpath(root) for root in roots)
     for requested_path in requested_paths:
-        absolute_path = os.path.abspath(requested_path)
+        absolute_path = os.path.realpath(requested_path)
         if not any(_path_is_under_root(absolute_path, root) for root in normalized_roots):
             raise UnsafeWriteOperationError(f"fileTarget path is outside QLAB_ALLOWED_FILE_ROOTS: {requested_path!r}")
 
@@ -679,6 +684,40 @@ def _validate_profile_for_before(profile: str, before: dict[str, Any] | None) ->
     except Exception as exc:
         return {"profile": str(exc)}
     return {}
+
+
+def _validate_contextual_real_write(
+    reader: Any,
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    if before is None:
+        return {}
+    errors: dict[str, str] = {}
+    for operation in item.get("operations", []):
+        prop = str(operation.get("property", ""))
+        if prop.startswith("playlist/") and before.get("mode") != 6:
+            errors[prop] = "Playlist setters require the Group cue to already be in Playlist mode (mode 6)."
+        if prop in {"duration", "tempDuration"} and before.get("allowsEditingDuration") is False:
+            errors[prop] = f"{prop} requires a cue with editable duration."
+        if prop in {"cueTargetName"}:
+            errors[prop] = f"{prop} real writes require cueTargetID or cueTargetNumber; name resolution is not supported."
+        if prop in {"cueTargetID", "cueTargetNumber", "tempCueTargetID", "tempCueTargetNumber"}:
+            target_ref = operation["args"][0] if operation.get("args") else None
+            if _is_empty_target_ref(target_ref):
+                continue
+            target, target_errors = _try_read_update_values(reader, workspace_id, str(target_ref), ["uniqueID"])
+            target_id = _resolved_cue_id(target)
+            if target_errors or not target_id:
+                errors[prop] = f"{prop} target could not be resolved before update."
+            elif target_id == before.get("uniqueID"):
+                errors[prop] = f"{prop} target cannot be the cue being updated."
+    return errors
+
+
+def _is_empty_target_ref(value: Any) -> bool:
+    return isinstance(value, str) and value.strip().casefold() in {"", "none"}
 
 
 def _batch_item_result(
@@ -841,6 +880,8 @@ def _planned_update_operations(
             "real_write_enabled": update_operation["real_write_enabled"],
             "capability_gate": update_operation.get("capability_gate"),
         }
+        if update_operation.get("contextual_requirements"):
+            planned["contextual_requirements"] = update_operation["contextual_requirements"]
         if update_operation.get("planned_only_reason"):
             planned["planned_only_reason"] = update_operation["planned_only_reason"]
         operations.append(planned)
@@ -995,7 +1036,12 @@ def _property_values_match(key: str, actual: Any, requested: Any) -> bool:
     actual_value = _comparison_value(key, actual)
     requested_value = _comparison_value(key, requested)
     if _is_plain_number(actual_value) and _is_plain_number(requested_value):
-        return float(actual_value) == float(requested_value)
+        return math.isclose(
+            float(actual_value),
+            float(requested_value),
+            rel_tol=UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
+            abs_tol=UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
+        )
     return actual_value == requested_value
 
 

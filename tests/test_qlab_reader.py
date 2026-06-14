@@ -1881,6 +1881,28 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["known_total_cues_meaning"], "cue_items_including_cue_lists")
         self.assertTrue(result["summary"]["global_unique_ids_used"])
 
+    def test_workspace_overview_global_count_is_bounded_by_requested_limits(self) -> None:
+        responses = {
+            "/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}],
+            "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-1", "type": "Cue List"}],
+            "/workspace/ws-1/cue/list-1/children/shallow": [],
+            "/workspace/ws-1/cueLists/uniqueIDs": ["list-1", "child-1", "child-2", "child-3"],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_overview(
+                "ws-1",
+                max_cues=2,
+                max_index_cues=2,
+                include_cue_index=False,
+                include_global_count=True,
+            )
+
+        self.assertEqual(result["known_total_cues"], 2)
+        self.assertEqual(result["known_total_cues_status"], "partial")
+        self.assertIn("partial", " ".join(result["warnings"]))
+
     def test_workspace_overview_global_count_uses_tcp_after_udp_timeout(self) -> None:
         class GlobalTcpClient:
             config = QLabConfig(cache_ttl=0)
@@ -2151,9 +2173,16 @@ class QLabReaderTests(unittest.TestCase):
                 {
                     "name": "QLab Loopback",
                     "uniqueID": "network-1",
-                    "destinations": [
-                        {"ipAddress": "127.0.0.1", "port": 53000, "passcode": "9999"}
-                    ],
+                "destinations": [
+                    {
+                        "ipAddress": "127.0.0.1",
+                        "port": 53000,
+                        "passcode": "9999",
+                        "oscPasscode": "compound-secret",
+                        "apiToken": "token-secret",
+                        "authSecret": "auth-secret",
+                    }
+                ],
                 }
             ],
         }
@@ -2172,7 +2201,13 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIn("127.0.0.1", serialized)
         self.assertIn("53000", serialized)
         self.assertNotIn("9999", serialized)
+        self.assertNotIn("compound-secret", serialized)
+        self.assertNotIn("token-secret", serialized)
+        self.assertNotIn("auth-secret", serialized)
         self.assertEqual(result["details"]["destinations"][0]["passcode"], "[redacted]")
+        self.assertEqual(result["details"]["destinations"][0]["oscPasscode"], "[redacted]")
+        self.assertEqual(result["details"]["destinations"][0]["apiToken"], "[redacted]")
+        self.assertEqual(result["details"]["destinations"][0]["authSecret"], "[redacted]")
         self.assertEqual(result["redactions"][0]["reason"], "credential")
         self.assertIn("credential", result["redactions"][0]["impact"])
         self.assertEqual(server.received, ["/workspace/ws-1/settings/network/patchList"])

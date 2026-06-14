@@ -193,7 +193,7 @@ def _overview_refs_from_index_refs(
     return overview_refs
 
 
-def _global_cue_count_with_fallback(reader: Any, workspace_id: str) -> dict[str, Any]:
+def _global_cue_count_with_fallback(reader: Any, workspace_id: str, max_ids: int) -> dict[str, Any]:
     """Count cue IDs globally, then degrade to per-root ID reads when QLab times out."""
     errors: dict[str, str] = {}
     known_ids: set[str] = set()
@@ -205,10 +205,12 @@ def _global_cue_count_with_fallback(reader: Any, workspace_id: str) -> dict[str,
             workspace_id,
             include_children=True,
             tcp_fallback_on_timeout=True,
+            max_ids=max_ids,
         )
+        status = "partial" if global_ids.get("truncated") else "known"
         return {
             "known_total_cues": global_ids["cue_count"],
-            "known_total_cues_status": "known",
+            "known_total_cues_status": status,
             "known_total_cues_source": "cueLists/uniqueIDs",
             "read_transport": global_ids.get("read_transport", "udp"),
             "errors": {},
@@ -222,8 +224,11 @@ def _global_cue_count_with_fallback(reader: Any, workspace_id: str) -> dict[str,
             workspace_id,
             include_children=False,
             tcp_fallback_on_timeout=True,
+            max_ids=max_ids,
         )
         root_ids = root_result["cue_ids"]
+        if root_result.get("truncated"):
+            partial = True
     except Exception as exc:
         errors["cueLists/uniqueIDs/shallow"] = str(exc)
         message = str(exc)
@@ -236,6 +241,9 @@ def _global_cue_count_with_fallback(reader: Any, workspace_id: str) -> dict[str,
         }
 
     for root_id in root_ids:
+        if len(known_ids) >= max_ids:
+            partial = True
+            break
         known_ids.add(str(root_id))
         try:
             child_data = reader.get_cue_children(
@@ -266,6 +274,9 @@ def _global_cue_count_with_fallback(reader: Any, workspace_id: str) -> dict[str,
             cue_id = ref.get("uniqueID")
             if cue_id:
                 known_ids.add(str(cue_id))
+                if len(known_ids) >= max_ids:
+                    partial = True
+                    break
 
     status = "partial" if partial else "known"
     return {
@@ -490,7 +501,11 @@ class CueOverviewMixin:
         global_count_errors: dict[str, str] = {}
         if include_global_count:
             global_unique_ids_used = True
-            global_count = _global_cue_count_with_fallback(self, resolved_workspace_id)
+            global_count = _global_cue_count_with_fallback(
+                self,
+                resolved_workspace_id,
+                max_ids=max(max_cues, max_index_cues),
+            )
             known_total_cues = global_count["known_total_cues"]
             known_total_cues_status = global_count["known_total_cues_status"]
             known_total_cues_source = global_count["known_total_cues_source"]

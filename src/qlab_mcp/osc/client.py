@@ -177,10 +177,12 @@ class QLabOscClient:
             sock.settimeout(remaining)
 
             try:
-                data, _ = sock.recvfrom(65535)
+                data, reply_addr = sock.recvfrom(65535)
             except (socket.timeout, ConnectionResetError) as exc:
                 raise OscTimeoutError(f"Timed out waiting for QLab reply to {address}") from exc
 
+            if not self._reply_sender_matches(reply_addr):
+                continue
             reply = self._parse_reply(data, expected_address=address, ignore_unrelated=True)
             if reply is None:
                 continue
@@ -236,7 +238,30 @@ class QLabOscClient:
     def _reply_matches(reply: QLabReply, expected_address: str) -> bool:
         expected = expected_address.lstrip("/")
         invoked = reply.invoked_address.lstrip("/")
-        return invoked == expected or invoked.endswith(expected)
+        if invoked == expected:
+            return True
+        expected_parts = expected.split("/")
+        invoked_parts = invoked.split("/")
+        if expected_parts[:1] == ["workspace"]:
+            return False
+        return len(invoked_parts) >= 3 and invoked_parts[:1] == ["workspace"] and invoked_parts[2:] == expected_parts
+
+    def _reply_sender_matches(self, reply_addr: tuple[Any, ...]) -> bool:
+        if not reply_addr:
+            return False
+        try:
+            expected_hosts = {
+                info[4][0]
+                for info in socket.getaddrinfo(
+                    self.config.host,
+                    self.config.osc_port,
+                    family=socket.AF_INET,
+                    type=socket.SOCK_DGRAM,
+                )
+            }
+        except socket.gaierror:
+            expected_hosts = {self.config.host}
+        return str(reply_addr[0]) in expected_hosts
 
     @staticmethod
     def _parse_reply(
@@ -252,8 +277,12 @@ class QLabOscClient:
 
         invoked = message.address.removeprefix("/reply/")
         if ignore_unrelated and expected_address is not None:
-            expected = expected_address.lstrip("/")
-            if invoked != expected and not invoked.endswith(expected):
+            probe = QLabReply(
+                invoked_address=invoked,
+                reply_address=message.address,
+                status="ok",
+            )
+            if not QLabOscClient._reply_matches(probe, expected_address):
                 return None
 
         if len(message.args) != 1 or not isinstance(message.args[0], str):

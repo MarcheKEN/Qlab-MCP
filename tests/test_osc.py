@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from qlab_mcp.config import QLabConfig
-from qlab_mcp.osc.client import QLabOscClient, _slip_decode, _slip_encode
+from qlab_mcp.osc.client import QLabOscClient, QLabReply, _slip_decode, _slip_encode
 from qlab_mcp.errors import OscProtocolError
 from qlab_mcp.osc import decode_message, encode_message
 
@@ -62,6 +62,24 @@ class OscMessageTests(unittest.TestCase):
                 ignore_unrelated=True,
             )
         )
+
+    def test_reply_match_rejects_suffix_only_workspace_addresses(self) -> None:
+        reply = QLabReply(
+            invoked_address="evil/workspace/ws-1/showMode",
+            reply_address="/reply/evil/workspace/ws-1/showMode",
+            status="ok",
+        )
+
+        self.assertFalse(QLabOscClient._reply_matches(reply, "/workspace/ws-1/showMode"))
+
+    def test_reply_match_allows_workspace_prefix_for_unqualified_request(self) -> None:
+        reply = QLabReply(
+            invoked_address="workspace/ws-1/cue/1/name",
+            reply_address="/reply/workspace/ws-1/cue/1/name",
+            status="ok",
+        )
+
+        self.assertTrue(QLabOscClient._reply_matches(reply, "/cue/1/name"))
 
     def test_slip_roundtrip_escapes_reserved_bytes(self) -> None:
         packet = bytes([0x01, 0xC0, 0x02, 0xDB, 0x03])

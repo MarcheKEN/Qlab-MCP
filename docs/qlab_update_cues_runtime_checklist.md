@@ -81,6 +81,72 @@ Safety block smoke:
    - no mutating setter execution
    - no playback/control/raw OSC
 
+Playlist Group smoke:
+
+1. Pick one disposable Group cue whose `mode` is not `6`.
+2. Run `qlab_update_cues(..., dry_run=false)` for
+   `playlist/crossfade/duration`.
+3. Expected block:
+   - preflight fails before setters
+   - error says Playlist setters require Playlist mode `(mode 6)`
+4. Pick or create a disposable Playlist Group cue whose `mode` is already `6`.
+5. Run `dry_run=true`, then `dry_run=false`, for:
+   - `playlist/doCrossfade`
+   - `playlist/crossfade/duration`
+6. Expected real write:
+   - setter uses `/cue_id/{uniqueID}/playlist/...`
+   - read-after-write confirms values
+   - small floating-point readback differences are accepted
+
+Mic input routing smoke:
+
+1. Run `qlab_update_cues(..., dry_run=true)` for `mic_basic.channelOffset`.
+2. Expected dry-run:
+   - planned setter exists
+   - `real_write_enabled=false`
+   - `capability_gate="patch_routing"`
+3. Run the same with `dry_run=false` and no `confirm_gates`.
+4. Expected block:
+   - no `/channelOffset` setter is sent
+   - error names `patch_routing`
+
+Editable duration smoke:
+
+1. Pick one disposable Wait or Memo cue where
+   `qlab_get_cue_details(profile="editable")` reports
+   `allowsEditingDuration=false`.
+2. Run `qlab_update_cues(..., dry_run=false)` for `duration`.
+3. Expected block:
+   - preflight fails before setters
+   - no `/duration` setter is sent
+   - error says `duration requires a cue with editable duration`
+4. Pick one disposable Audio/Video/Fade cue where
+   `allowsEditingDuration=true`.
+5. Run `dry_run=true`, then `dry_run=false`, for a reversible `duration`
+   value.
+6. Expected real write:
+   - setter uses `/cue_id/{uniqueID}/duration`
+   - read-after-write confirms value within numeric tolerance
+
+Target resolution smoke:
+
+1. Pick one disposable target cue and one disposable Start/Stop/Pause/Load/GoTo/Arm/Disarm cue.
+2. Run `qlab_update_cues(..., dry_run=true)` for `cueTargetID` with
+   `confirm_gates=["target_resolution"]`.
+3. Run the same with `dry_run=false`.
+4. Expected real write:
+   - preflight reads the target cue before setters
+   - setter uses `/cue_id/{uniqueID}/cueTargetID`
+   - read-after-write confirms target ID
+5. Repeat with a missing target ID.
+6. Expected block:
+   - no `/cueTargetID` setter is sent
+   - error says target could not be resolved
+7. Repeat with `cueTargetName`.
+8. Expected block:
+   - no `/cueTargetName` setter is sent
+   - error says name resolution is unsupported; use `cueTargetID` or `cueTargetNumber`
+
 Capability gate smoke:
 
 1. Pick one disposable cue and one high-risk property whose

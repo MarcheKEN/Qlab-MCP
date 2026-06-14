@@ -15,6 +15,7 @@ from .osc.addressing import (
     _clean_cue_ref,
     _clean_workspace_id,
     _cue_address,
+    _id_list_reached_limit,
     _normalize_id_list,
     _workspace_address,
 )
@@ -198,6 +199,7 @@ class QLabReader(
         workspace_id: str,
         include_children: bool = True,
         tcp_fallback_on_timeout: bool = False,
+        max_ids: int | None = None,
     ) -> dict[str, Any]:
         command = "cueLists/uniqueIDs" if include_children else "cueLists/uniqueIDs/shallow"
         address = _workspace_address(workspace_id, command)
@@ -206,12 +208,13 @@ class QLabReader(
         else:
             data = self._request_data(address, workspace_id=workspace_id)
             read_transport = "udp"
-        cue_ids = _normalize_id_list(data)
+        cue_ids = _normalize_id_list(data, max_ids=max_ids)
         return {
             "workspace_id": _clean_workspace_id(workspace_id),
             "include_children": include_children,
             "cue_count": len(cue_ids),
             "cue_ids": cue_ids,
+            "truncated": _id_list_reached_limit(cue_ids, max_ids),
             "read_transport": read_transport,
         }
 

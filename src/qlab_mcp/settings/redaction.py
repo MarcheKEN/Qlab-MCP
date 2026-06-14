@@ -68,7 +68,7 @@ def _contains_any_key(value: Any, normalized_keys: set[str]) -> bool:
 
 def _redaction_reason(section: str, key: str, profile: str) -> str | None:
     normalized_key = _normalize_key_name(key)
-    if normalized_key in ALWAYS_REDACT_KEYS:
+    if normalized_key in ALWAYS_REDACT_KEYS or any(secret_key in normalized_key for secret_key in ALWAYS_REDACT_KEYS):
         return "credential"
     if profile != "safe":
         return None

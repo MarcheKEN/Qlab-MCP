@@ -12,8 +12,9 @@ Hard limits:
   outputs, one capability family at a time.
 - `scriptSource` and `scriptText` are not editable by documented OSC; only
   `compileSource` can be planned behind `script_compile`.
-- `fileTarget` real writes require `QLAB_ALLOWED_FILE_ROOTS` to include the
-  intended test media root.
+- `fileTarget` and file path writes are blocked by default; real writes require
+  both the exact dry-run `confirm_token` and `QLAB_ALLOWED_FILE_ROOTS` covering
+  the intended test media root.
 - Run `dry_run=true` before any `dry_run=false` write.
 
 Preflight:
@@ -77,7 +78,7 @@ Safety block smoke:
    the safe read allowlist.
 4. Run the exact same field with `dry_run=false`.
 5. Expected real-write block:
-   - clean preflight exception or failed result before setters
+   - structured failed result before setters
    - no mutating setter execution
    - no playback/control/raw OSC
 

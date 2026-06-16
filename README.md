@@ -129,8 +129,9 @@ Safety gates for real writes:
   their reviewed dry-run `planned_operations`
 
 The server does not expose playback, GO, stop, panic, or raw OSC. High-risk
-properties are planned in dry-run and require explicit gates for real writes;
-OSC read-only fields such as `scriptSource` remain non-editable by OSC.
+properties are planned in dry-run and require exact
+`planned_operations[].confirm_token` values from a reviewed dry-run for real
+writes; OSC read-only fields such as `scriptSource` remain non-editable by OSC.
 
 ## Compact By Default
 
@@ -245,7 +246,7 @@ Cue detail profiles are intentionally tiered:
 
 - `basic` / `basic_safe`: compact identity/status, no large notes, scripts, or media paths.
 - `auto` / `inspector_safe`: operational cue data; type-specific fields are summarized and compact.
-- `editable`: capability discovery for `qlab_update_cues`, including dry-run-only properties and write gates; it does not imply real writes are enabled.
+- `editable`: capability discovery for `qlab_update_cues`, including dry-run-only properties and dry-run confirmation tokens; it does not imply real writes are enabled.
 - `full_sensitive` / `exhaustive`: explicit large/sensitive reads; still no MCP implementation paths.
 
 Compact profiles truncate long text fields such as notes, memo text, script
@@ -324,13 +325,16 @@ Write mode is deliberately gated:
   `audio_basic` transport metadata, `text_basic` simple text formatting,
   `mic_basic` channel metadata, `video_basic`/`camera_basic` one-axis geometry,
   `midi_file_basic` playback metadata, and `timecode_basic` metadata.
-- High-risk profiles and unvalidated properties are cataloged with explicit
-  gates:
+- High-risk profiles and unvalidated properties are cataloged for dry-run
+  planning and require exact `planned_operations[].confirm_token` values from a
+  reviewed dry-run before any real write:
   routing, targets, file paths, light commands, network/MIDI output, scripts,
   audio levels, slices, objects, live variants, text ranges/colors, and
   multi-argument geometry.
-- `fileTarget` real writes also require `QLAB_ALLOWED_FILE_ROOTS` to contain an
-  allowed absolute media root; paths outside those roots are blocked before OSC.
+- `fileTarget` and local file paths are not generally safe and are blocked by
+  default; real writes require both a reviewed dry-run `confirm_token` and a
+  path inside `QLAB_ALLOWED_FILE_ROOTS`. Paths outside those roots are blocked
+  before OSC.
 - If a setter times out but a fresh after-read confirms the requested value,
   `qlab_update_cues` reports `updated_with_confirmed_timeouts` with a warning
   instead of treating the item as failed.
@@ -343,7 +347,8 @@ Write mode is deliberately gated:
   exact-match.
 - Playback control, raw OSC, GO, stop, panic, and ambiguous selected/active
   edits are not exposed. Target edits, file paths, scripts, and routing changes
-  are dry-run-only catalog entries.
+  are blocked by default and require exact dry-run `confirm_token` confirmation
+  when a real write is explicitly supported.
 
 ## Tool Signatures
 
@@ -585,7 +590,8 @@ Notes:
   `QLAB_PASSCODE`, `edit` confirmed by `/connect`, Edit Mode confirmed by
   `/showMode`, and bypass/clear the read cache before fresh verification.
 - `QLAB_ALLOWED_FILE_ROOTS` is an optional `os.pathsep`-separated list used to
-  permit real `fileTarget` writes only under approved media roots.
+  permit token-confirmed real `fileTarget` writes only under approved media
+  roots; file paths remain blocked by default.
 - `QLAB_UPDATE_DEBUG=true` adds per-cue debug details to `qlab_update_cues`
   results for troubleshooting batch verification.
 

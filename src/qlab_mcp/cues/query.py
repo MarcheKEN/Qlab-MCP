@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from ..allowlist import properties_for_profile, validate_value_keys
-from ..osc.addressing import _clean_workspace_id, _workspace_address
+from ..osc.addressing import _clean_workspace_id
+from ..sanitizer import sanitize_exception_message, truncate_profile_payload
 from .editorial import _is_ambiguous_label, _is_empty_text
 from .profiles import _coerce_qlab_bool, _derive_profile_fields, _is_positive_number
-from .refs import _flatten_cue_refs
+from .refs import _bounded_cue_refs_from_shallow
 
 
 QUERY_FILTERS = {
@@ -98,6 +99,9 @@ QUERY_BASE_PROPERTIES = (
     "hasFileTargets",
     "hasCueTargets",
     "isLoaded",
+    "cartPosition",
+    "cartPosition/row",
+    "cartPosition/column",
 )
 QUERY_DEFAULT_OUTPUT_KEYS = QUERY_BASE_PROPERTIES
 
@@ -202,6 +206,46 @@ def _cue_matches_filter(cue: dict[str, Any], cue_ref: dict[str, Any], query_filt
     raise ValueError(f"Unknown cue query filter {filter_name!r}")
 
 
+def _query_workspace_resolution_error(
+    workspace_id: str,
+    filters: list[dict[str, Any]],
+    profile: str,
+    max_results: int,
+    max_cues_scanned: int,
+    status: str,
+    message: str,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": status,
+        "error_code": status,
+        "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+        "workspace_id": workspace_id,
+        "filters": filters,
+        "profile": profile,
+        "scanned_count": 0,
+        "matched_count": 0,
+        "returned_count": 0,
+        "total_cue_ids": 0,
+        "query_completeness": "failed",
+        "query_completeness_reasons": ["workspace_resolution"],
+        "id_only_unscanned_count": 0,
+        "omitted_branches": [],
+        "partial_branches": [],
+        "truncated": False,
+        "truncation_reasons": [],
+        "scanned_all_cues": False,
+        "result_limited": False,
+        "limits": {
+            "max_results": max_results,
+            "max_cues_scanned": max_cues_scanned,
+        },
+        "cues": [],
+        "warnings": ["Requested workspace could not be resolved."],
+        "errors": {"workspace_resolution": message},
+    }
+
+
 class CueQueryMixin:
     def query_cues(
         self,
@@ -227,14 +271,28 @@ class CueQueryMixin:
             *_normalize_optional_filters(optional_filters),
         ]
         cacheable = not _query_uses_live_state(filters)
+        try:
+            resolved_workspace_id = self._resolve_workspace_id_strict(workspace_id)
+        except Exception as exc:
+            return _query_workspace_resolution_error(
+                _clean_workspace_id(workspace_id),
+                filters,
+                profile,
+                max_results,
+                max_cues_scanned,
+                getattr(exc, "status", "workspace_not_found"),
+                str(exc),
+            )
 
-        cue_ref_data = self._request_data(
-            _workspace_address(workspace_id, "cueLists/uniqueIDs"),
-            workspace_id=workspace_id,
+        bounded = _bounded_cue_refs_from_shallow(
+            self,
+            resolved_workspace_id,
+            limit=max_cues_scanned,
+            max_depth=None,
             cacheable=cacheable,
-            cache_profile=profile,
+            fallback_child_ids=True,
         )
-        cue_refs = _flatten_cue_refs(cue_ref_data)
+        cue_refs = bounded["refs"]
         profile_keys = list(properties_for_profile(profile))
         filter_keys: list[str] = []
         for query_filter in filters:
@@ -246,14 +304,14 @@ class CueQueryMixin:
         cues: list[dict[str, Any]] = []
         errors: dict[str, str] = {}
 
-        for cue_ref in cue_refs[:max_cues_scanned]:
+        for cue_ref in cue_refs:
             cue_id = cue_ref.get("uniqueID")
             if not cue_id:
                 continue
             scanned_count += 1
             try:
                 values = self.read_cue_values(
-                    workspace_id,
+                    resolved_workspace_id,
                     str(cue_id),
                     keys,
                     cache_profile=profile,
@@ -262,7 +320,7 @@ class CueQueryMixin:
                 if not isinstance(values, dict):
                     raise ValueError("QLab valuesForKeys response must be an object")
             except Exception as exc:
-                errors[str(cue_id)] = str(exc)
+                errors[str(cue_id)] = sanitize_exception_message(exc)
                 continue
 
             if not all(_cue_matches_filter(values, cue_ref, query_filter) for query_filter in filters):
@@ -278,25 +336,64 @@ class CueQueryMixin:
                 cue["parent_id"] = cue_ref.get("parent_id")
                 cue["cue_list_id"] = cue_ref.get("cue_list_id")
                 cue["depth"] = cue_ref.get("depth")
-                cue = _derive_profile_fields(profile, cue)
+                cue = truncate_profile_payload(profile, _derive_profile_fields(profile, cue))
                 cues.append(cue)
 
-        scanned_all_cues = len(cue_refs) <= max_cues_scanned
+        scanned_all_cues = not bounded["truncated"]
+        omitted_branches = [
+            {
+                "cue_ref": item.get("cue_ref"),
+                "number": item.get("number"),
+                "name": item.get("name"),
+                "type": item.get("type"),
+                "child_count": item.get("child_count"),
+                "child_count_source": item.get("child_count_source"),
+                "fallback_used": bool(item.get("fallback_used")),
+            }
+            for item in bounded.get("child_read_errors", [])
+        ]
+        id_only_unscanned_count = sum(
+            int(item.get("child_count") or 0)
+            for item in omitted_branches
+            if item.get("fallback_used") and item.get("child_count") is not None
+        )
         result_limited = matched_count > len(cues)
-        truncation_reasons: list[str] = []
-        if not scanned_all_cues:
-            truncation_reasons.append("max_cues_scanned")
+        truncation_reasons: list[str] = [
+            "max_cues_scanned" if reason == "max_cues" else reason
+            for reason in bounded["truncation_reasons"]
+        ]
         if result_limited:
             truncation_reasons.append("max_results")
+        query_completeness_reasons: list[str] = []
+        if "max_cues_scanned" in truncation_reasons:
+            query_completeness_reasons.append("max_cues_scanned")
+        if id_only_unscanned_count > 0:
+            query_completeness_reasons.append("id_only_unscanned")
+        query_completeness = "partial" if query_completeness_reasons else "complete"
+        warnings: list[str] = []
+        if id_only_unscanned_count > 0:
+            warnings.append(
+                "Query scanned only cues with metadata available from shallow traversal; "
+                "some ID-only branch children were counted but not searched."
+            )
+        if "max_cues_scanned" in query_completeness_reasons:
+            warnings.append(
+                "Query stopped at max_cues_scanned before all discoverable cue metadata was scanned."
+            )
         truncated = bool(truncation_reasons)
         return {
-            "workspace_id": _clean_workspace_id(workspace_id),
+            "workspace_id": resolved_workspace_id,
             "filters": filters,
             "profile": profile,
             "scanned_count": scanned_count,
             "matched_count": matched_count,
             "returned_count": len(cues),
             "total_cue_ids": len(cue_refs),
+            "query_completeness": query_completeness,
+            "query_completeness_reasons": query_completeness_reasons,
+            "id_only_unscanned_count": id_only_unscanned_count,
+            "omitted_branches": omitted_branches,
+            "partial_branches": omitted_branches,
             "truncated": truncated,
             "truncation_reasons": truncation_reasons,
             "scanned_all_cues": scanned_all_cues,
@@ -306,5 +403,6 @@ class CueQueryMixin:
                 "max_cues_scanned": max_cues_scanned,
             },
             "cues": cues,
-            "errors": errors or None,
+            "warnings": warnings,
+            "errors": {**bounded["errors"], **errors} or None,
         }

@@ -51,6 +51,8 @@ AUTO_TARGET_KEYS = (
     "hasCueTargets",
     "cueTargetID",
     "cueTargetNumber",
+    "tempCueTargetID",
+    "tempCueTargetNumber",
     "targetMode",
     "patchTargetID",
     "audioMapTargetID",
@@ -84,8 +86,6 @@ AUTO_TEXT_KEYS = (
 )
 AUTO_LIGHT_KEYS = (
     "lightCommandText",
-    "parameterValues",
-    "parameterFadesEnabled",
     "alwaysCollate",
     "subcontroller",
 )
@@ -93,8 +93,10 @@ AUTO_NETWORK_KEYS = (
     "networkPatchName",
     "networkPatchNumber",
     "networkPatchID",
+    "customString",
     "message",
     "messageError",
+    "parameterValues",
 )
 AUTO_MIDI_KEYS = (
     "midiPatchName",
@@ -102,14 +104,17 @@ AUTO_MIDI_KEYS = (
     "midiPatchID",
 )
 AUTO_TIMECODE_KEYS = (
-    "timecodeString",
-    "timecodeFormat",
+    "outputType",
+    "framerate",
+    "startTime",
+    "endTime",
     "midiPatchName",
     "midiPatchNumber",
     "midiPatchID",
     "audioOutputPatchName",
     "audioOutputPatchNumber",
     "audioOutputPatchID",
+    "ltcChannel",
 )
 AUTO_GROUP_KEYS = tuple(sorted(GROUP_KEY for GROUP_KEY in (
     "cartColumns",
@@ -139,13 +144,40 @@ AUTO_FADE_KEYS = (
     "audioMapTargetID",
     "audioOutputPatchName",
     "audioOutputPatchID",
+    "stopTargetWhenDone",
+    "levelsMode",
+    "geoMode",
+    "mode",
+    "fadeType",
+    "pathHeight",
+    "pathWidth",
+    "rotation",
+    "rotationType",
+    "doOpacity",
+    "doRate",
+    "doRotation",
+    "doScale",
+    "doTranslation",
 )
 AUTO_TRANSPORT_KEYS = (
     "cueTargetID",
     "cueTargetNumber",
+    "tempCueTargetID",
+    "tempCueTargetNumber",
     "currentCueTargetID",
     "currentCueTargetNumber",
     "targetMode",
+)
+AUTO_RESET_KEYS = (
+    *AUTO_TRANSPORT_KEYS,
+    "patchTargetID",
+    "audioMapTargetID",
+)
+AUTO_DEVAMP_KEYS = (
+    *AUTO_TRANSPORT_KEYS,
+    "devampType",
+    "startNextCueWhenSliceEnds",
+    "stopTargetWhenSliceEnds",
 )
 AUTO_TYPE_SPECIFIC_KEYS = {
     "audio": (*AUTO_AUDIO_KEYS,),
@@ -166,8 +198,8 @@ AUTO_TYPE_SPECIFIC_KEYS = {
     "stop": AUTO_TRANSPORT_KEYS,
     "pause": AUTO_TRANSPORT_KEYS,
     "load": AUTO_TRANSPORT_KEYS,
-    "reset": AUTO_TRANSPORT_KEYS,
-    "devamp": AUTO_TRANSPORT_KEYS,
+    "reset": AUTO_RESET_KEYS,
+    "devamp": AUTO_DEVAMP_KEYS,
     "go to": AUTO_TRANSPORT_KEYS,
     "goto": AUTO_TRANSPORT_KEYS,
     "target": AUTO_TRANSPORT_KEYS,
@@ -213,7 +245,7 @@ def _derive_profile_fields(profile: str, values: dict[str, Any]) -> dict[str, An
             derived.pop(heavy_key, None)
     if normalized in {"health", "targets"}:
         derived.pop("fileTarget", None)
-    if normalized == "type_specific":
+    if normalized in {"type_specific", "inspector_safe"}:
         for sensitive_or_heavy_key in ("notes", "fileTarget", "scriptSource", "stage", "stage/regions"):
             derived.pop(sensitive_or_heavy_key, None)
     if normalized == "full":

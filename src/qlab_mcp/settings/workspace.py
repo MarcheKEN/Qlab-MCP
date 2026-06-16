@@ -6,6 +6,7 @@ from typing import Any
 
 from ..osc.addressing import _clean_workspace_id, _workspace_address
 from ..errors import OscTimeoutError
+from ..sanitizer import sanitize_exception_message
 from .redaction import _record_redactions, _redact_payload
 from .summarizers import (
     _basic_item_summary,
@@ -27,7 +28,20 @@ from .summarizers import (
 
 
 WORKSPACE_SETTINGS_SECTIONS = ("audio", "video", "network", "midi", "light", "general")
-WORKSPACE_SETTINGS_PROFILES = {"safe", "technical"}
+WORKSPACE_SETTINGS_MODES = {"summary", "details"}
+WORKSPACE_SETTINGS_PROFILES = {"safe", "technical", "exhaustive"}
+SUMMARY_PROFILE_WARNING = (
+    "Summary mode stays compact and uses safe summaries; use mode='details' with profile='technical' "
+    "or profile='exhaustive' for deeper read-only payloads."
+)
+TECHNICAL_PROFILE_WARNING = (
+    "Technical profile can include low-level infrastructure such as IPs, ports, interfaces, devices, routes, "
+    "regions, and raw payloads. Passcodes and credentials remain redacted."
+)
+EXHAUSTIVE_PROFILE_WARNING = (
+    "Exhaustive profile returns the deepest allowlisted read-only workspace settings data and may be large. "
+    "Passcodes and credentials remain redacted."
+)
 TCP_FALLBACK_MEANING = (
     "TCP was used to retrieve a large response after UDP could not return it; "
     "this does not imply output failure, missing controllers, or degraded physical playback."
@@ -45,12 +59,54 @@ WORKSPACE_SETTING_DETAIL_KINDS = {
     "light_patch",
 }
 
+def _normalize_workspace_settings_mode(mode: str) -> str:
+    normalized = str(mode or "").strip().lower()
+    if normalized not in WORKSPACE_SETTINGS_MODES:
+        allowed = ", ".join(sorted(WORKSPACE_SETTINGS_MODES))
+        raise ValueError(f"Unknown workspace settings mode {mode!r}; use one of: {allowed}")
+    return normalized
+
 def _normalize_workspace_settings_profile(profile: str) -> str:
     normalized = str(profile or "").strip().lower()
     if normalized not in WORKSPACE_SETTINGS_PROFILES:
         allowed = ", ".join(sorted(WORKSPACE_SETTINGS_PROFILES))
         raise ValueError(f"Unknown workspace settings profile {profile!r}; use one of: {allowed}")
     return normalized
+
+
+def _settings_workspace_resolution_error(
+    workspace_id: str,
+    mode: str,
+    profile: str,
+    status: str,
+    message: str,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": status,
+        "error_code": status,
+        "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+        "workspace_id": workspace_id,
+        "mode": mode,
+        "profile": profile,
+        "requested_profile": profile,
+        "sections": {},
+        "summary": {
+            "requested_sections": [],
+            "returned_sections": [],
+            "section_count": 0,
+            "error_count": 1,
+            "redaction_count": 0,
+        },
+        "available_detail_requests": [],
+        "requested_count": 0 if mode == "details" else None,
+        "succeeded_count": 0 if mode == "details" else None,
+        "failed_count": 0 if mode == "details" else None,
+        "results": [],
+        "redactions": [],
+        "errors": {"workspace_resolution": message},
+        "warnings": ["Requested workspace could not be resolved."],
+    }
 
 def _normalize_workspace_settings_sections(sections: list[str] | tuple[str, ...] | str | None) -> list[str]:
     if sections is None:
@@ -81,6 +137,91 @@ def _normalize_workspace_setting_detail_kind(kind: str | None, section: str) -> 
         raise ValueError(f"Unknown workspace setting detail kind {kind!r}; use one of: {allowed}")
     return normalized
 
+def _detail_request_ref(item: dict[str, Any]) -> Any:
+    return _first_present(item, ("name", "displayName", "uniqueID", "id", "patchID", "routeID", "stageID", "_key"))
+
+def _detail_request(section: str, kind: str, item: dict[str, Any] | None = None) -> dict[str, Any]:
+    request: dict[str, Any] = {"section": section, "kind": kind, "ref": None}
+    if item:
+        ref = _detail_request_ref(item)
+        if ref is not None:
+            request["ref"] = str(ref)
+        for output_key, keys in {
+            "name": ("name", "displayName", "patchName", "routeName", "stageName"),
+            "uniqueID": ("uniqueID", "id", "patchID", "routeID", "stageID"),
+        }.items():
+            value = _first_present(item, keys)
+            if value is not None:
+                request[output_key] = value
+    return request
+
+def _available_detail_requests(sections: dict[str, Any]) -> list[dict[str, Any]]:
+    requests: list[dict[str, Any]] = []
+    audio = sections.get("audio")
+    if isinstance(audio, dict):
+        for item in audio.get("output_patches") or []:
+            if isinstance(item, dict):
+                requests.append(_detail_request("audio", "output_patch", item))
+        for item in audio.get("input_patches") or []:
+            if isinstance(item, dict):
+                requests.append(_detail_request("audio", "input_patch", item))
+        for item in audio.get("audio_maps") or []:
+            if isinstance(item, dict):
+                requests.append(_detail_request("audio", "audio_map", item))
+    video = sections.get("video")
+    if isinstance(video, dict):
+        for item in video.get("input_patches") or []:
+            if isinstance(item, dict):
+                requests.append(_detail_request("video", "video_input_patch", item))
+        for item in video.get("routes") or []:
+            if isinstance(item, dict):
+                requests.append(_detail_request("video", "route", item))
+        for item in video.get("stages") or []:
+            if isinstance(item, dict):
+                requests.append(_detail_request("video", "stage", item))
+    network = sections.get("network")
+    if isinstance(network, dict):
+        for item in network.get("patches") or []:
+            if isinstance(item, dict):
+                requests.append(_detail_request("network", "network_patch", item))
+    midi = sections.get("midi")
+    if isinstance(midi, dict):
+        for item in midi.get("patches") or []:
+            if isinstance(item, dict):
+                requests.append(_detail_request("midi", "midi_patch", item))
+    if "light" in sections:
+        requests.append(_detail_request("light", "light_patch"))
+    if "general" in sections:
+        requests.append(_detail_request("general", "all"))
+    return requests
+
+def _raw_detail_requests(requests: Any) -> list[Any]:
+    if requests is None:
+        raise ValueError("requests is required when mode='details'")
+    if isinstance(requests, dict):
+        return [requests]
+    if isinstance(requests, (list, tuple)):
+        if not requests:
+            raise ValueError("requests must include at least one detail request when mode='details'")
+        return list(requests)
+    raise ValueError("requests must be a detail request object or a list of request objects")
+
+def _normalize_detail_request(raw_request: Any) -> dict[str, Any]:
+    if not isinstance(raw_request, dict):
+        raise ValueError("detail request must be an object with section, kind, and optional ref")
+    section = _normalize_workspace_settings_sections([raw_request.get("section")])[0]
+    kind = _normalize_workspace_setting_detail_kind(raw_request.get("kind"), section)
+    raw_ref = raw_request.get("ref")
+    ref = None if raw_ref in (None, "") else str(raw_ref)
+    return {"section": section, "kind": kind, "ref": ref}
+
+def _profile_warnings(profile: str) -> list[str]:
+    if profile == "technical":
+        return [TECHNICAL_PROFILE_WARNING]
+    if profile == "exhaustive":
+        return [EXHAUSTIVE_PROFILE_WARNING]
+    return []
+
 
 class WorkspaceSettingsMixin:
     def _read_workspace_setting(
@@ -94,10 +235,10 @@ class WorkspaceSettingsMixin:
         try:
             return self.client.request(address, workspace_id=workspace_id).data
         except OscTimeoutError as exc:
-            errors[error_key] = str(exc)
+            errors[error_key] = sanitize_exception_message(exc)
             return None
         except Exception as exc:
-            errors[error_key] = str(exc)
+            errors[error_key] = sanitize_exception_message(exc)
             return None
 
     def _read_light_patch_setting(
@@ -112,12 +253,10 @@ class WorkspaceSettingsMixin:
             try:
                 return self.client.request_tcp(address, workspace_id=workspace_id).data, "tcp_fallback"
             except Exception as tcp_exc:
-                errors["light.patch"] = (
-                    f"{udp_exc}; TCP fallback also failed for large light patch reply: {tcp_exc}"
-                )
+                errors["light.patch"] = "Light patch read timed out over UDP; TCP fallback also failed."
                 return None, None
         except Exception as exc:
-            errors["light.patch"] = str(exc)
+            errors["light.patch"] = sanitize_exception_message(exc)
             return None, None
 
     def _workspace_settings_audio(
@@ -143,7 +282,7 @@ class WorkspaceSettingsMixin:
         )
         audio_maps = self._read_workspace_setting(workspace_id, "audio/maps", errors, "audio.maps")
 
-        if profile == "technical":
+        if profile in {"technical", "exhaustive"}:
             return {
                 "output_patches": _redact_payload(
                     output_patches,
@@ -209,7 +348,7 @@ class WorkspaceSettingsMixin:
                 continue
             stage_regions[region_key] = self._read_workspace_setting(workspace_id, command, errors, error_key)
 
-        if profile == "technical":
+        if profile in {"technical", "exhaustive"}:
             return {
                 "input_patches": _redact_payload(
                     input_patches,
@@ -268,7 +407,7 @@ class WorkspaceSettingsMixin:
         errors: dict[str, str],
     ) -> dict[str, Any]:
         patches = self._read_workspace_setting(workspace_id, "network/patchList", errors, "network.patchList")
-        if profile == "technical":
+        if profile in {"technical", "exhaustive"}:
             return {
                 "patches": _redact_payload(
                     patches,
@@ -289,7 +428,7 @@ class WorkspaceSettingsMixin:
         errors: dict[str, str],
     ) -> dict[str, Any]:
         patches = self._read_workspace_setting(workspace_id, "midi/patchList", errors, "midi.patchList")
-        if profile == "technical":
+        if profile in {"technical", "exhaustive"}:
             return {
                 "patches": _redact_payload(
                     patches,
@@ -309,7 +448,7 @@ class WorkspaceSettingsMixin:
         redactions: list[dict[str, str]],
         errors: dict[str, str],
     ) -> dict[str, Any]:
-        if profile != "technical":
+        if profile == "safe":
             return {
                 "summary": {
                     "details_available": True,
@@ -366,17 +505,22 @@ class WorkspaceSettingsMixin:
             ),
         }
 
-    def get_workspace_settings(
+    def _get_workspace_settings_summary(
         self,
         workspace_id: str,
         sections: list[str] | tuple[str, ...] | str | None = None,
+        profile: str = "safe",
     ) -> dict[str, Any]:
         resolved_workspace_id = _clean_workspace_id(workspace_id)
+        requested_profile = _normalize_workspace_settings_profile(profile)
         normalized_profile = "safe"
         normalized_sections = _normalize_workspace_settings_sections(sections)
         redactions: list[dict[str, str]] = []
         errors: dict[str, str] = {}
+        warnings: list[str] = []
         result_sections: dict[str, Any] = {}
+        if requested_profile != "safe":
+            warnings.append(SUMMARY_PROFILE_WARNING)
 
         if "audio" in normalized_sections:
             result_sections["audio"] = self._workspace_settings_audio(
@@ -440,11 +584,15 @@ class WorkspaceSettingsMixin:
 
         return {
             "workspace_id": resolved_workspace_id,
+            "mode": "summary",
             "profile": normalized_profile,
+            "requested_profile": requested_profile,
             "sections": result_sections,
             "summary": summary,
+            "available_detail_requests": _available_detail_requests(result_sections),
             "redactions": redactions,
             "errors": errors or None,
+            "warnings": warnings,
         }
 
     def _settings_details_result(
@@ -485,6 +633,19 @@ class WorkspaceSettingsMixin:
         errors: dict[str, str],
     ) -> dict[str, Any]:
         item_list = _collection_items(items)
+        if not item_list:
+            return self._settings_details_result(
+                workspace_id,
+                section,
+                kind,
+                ref,
+                profile,
+                details={"items": [], "empty": True, "available": False},
+                choices=[],
+                redactions=redactions,
+                errors=errors,
+                message="No settings items are configured for this request.",
+            )
         selected, choices, message = _select_setting_item(item_list, ref)
         if selected is None:
             return self._settings_details_result(
@@ -523,7 +684,7 @@ class WorkspaceSettingsMixin:
             message=None,
         )
 
-    def get_workspace_setting_details(
+    def _get_workspace_setting_details_single(
         self,
         workspace_id: str,
         section: str,
@@ -571,22 +732,22 @@ class WorkspaceSettingsMixin:
                 items = self._read_workspace_setting(resolved_workspace_id, "mic/patchList", errors, "audio.inputPatchList")
             elif normalized_kind == "audio_map":
                 items = self._read_workspace_setting(resolved_workspace_id, "audio/maps", errors, "audio.maps")
+                item_list = _collection_items(items)
+                selected, choices, message = _select_setting_item(item_list, ref)
+                if selected is None:
+                    return self._settings_details_result(
+                        resolved_workspace_id,
+                        normalized_section,
+                        normalized_kind,
+                        ref,
+                        normalized_profile,
+                        details=None,
+                        choices=choices,
+                        redactions=redactions,
+                        errors=errors,
+                        message=message,
+                    )
                 if normalized_profile == "safe":
-                    item_list = _collection_items(items)
-                    selected, choices, message = _select_setting_item(item_list, ref)
-                    if selected is None:
-                        return self._settings_details_result(
-                            resolved_workspace_id,
-                            normalized_section,
-                            normalized_kind,
-                            ref,
-                            normalized_profile,
-                            details=None,
-                            choices=choices,
-                            redactions=redactions,
-                            errors=errors,
-                            message=message,
-                        )
                     _record_redactions(
                         selected,
                         normalized_section,
@@ -606,6 +767,44 @@ class WorkspaceSettingsMixin:
                         errors=errors,
                         message=None,
                     )
+                map_id = _first_present(selected, ("uniqueID", "id", "mapID")) if isinstance(selected, dict) else None
+                map_name = _first_present(selected, ("name", "displayName", "_key")) if isinstance(selected, dict) else None
+                if map_id:
+                    detail_payload = self._read_workspace_setting(
+                        resolved_workspace_id,
+                        f"audio/mapID/{map_id}",
+                        errors,
+                        f"audio.mapID.{map_id}",
+                    )
+                elif map_name:
+                    detail_payload = self._read_workspace_setting(
+                        resolved_workspace_id,
+                        f"audio/map/{map_name}",
+                        errors,
+                        f"audio.map.{map_name}",
+                    )
+                else:
+                    detail_payload = selected
+                if detail_payload is None:
+                    detail_payload = selected
+                return self._settings_details_result(
+                    resolved_workspace_id,
+                    normalized_section,
+                    normalized_kind,
+                    ref,
+                    normalized_profile,
+                    details=_redact_payload(
+                        detail_payload,
+                        section=normalized_section,
+                        profile=normalized_profile,
+                        redactions=redactions,
+                        path=f"{normalized_section}.{normalized_kind}",
+                    ),
+                    choices=[],
+                    redactions=redactions,
+                    errors=errors,
+                    message=None,
+                )
             else:
                 raise ValueError("Audio details support kind output_patch, input_patch, audio_map, or all")
             return self._setting_details_from_collection(
@@ -780,3 +979,143 @@ class WorkspaceSettingsMixin:
                 redactions=redactions,
                 errors=errors,
             )
+
+    def _get_workspace_settings_details_batch(
+        self,
+        workspace_id: str,
+        requests: Any,
+        profile: str = "safe",
+    ) -> dict[str, Any]:
+        resolved_workspace_id = _clean_workspace_id(workspace_id)
+        normalized_profile = _normalize_workspace_settings_profile(profile)
+        results: list[dict[str, Any]] = []
+        batch_errors: dict[str, str] = {}
+        warnings = _profile_warnings(normalized_profile)
+
+        for index, raw_request in enumerate(_raw_detail_requests(requests)):
+            try:
+                request = _normalize_detail_request(raw_request)
+                result = self._get_workspace_setting_details_single(
+                    resolved_workspace_id,
+                    section=request["section"],
+                    kind=request["kind"],
+                    ref=request["ref"],
+                    profile=normalized_profile,
+                )
+                item_ok = result.get("details") is not None and not result.get("errors")
+                if result.get("choices") and result.get("details") is None:
+                    item_ok = False
+                result = {
+                    "ok": item_ok,
+                    "request_index": index,
+                    "request": request,
+                    **result,
+                }
+                if not item_ok:
+                    batch_errors[f"request_{index}"] = result.get("message") or "Workspace setting detail request failed."
+            except (ValueError, TypeError) as exc:
+                batch_errors[f"request_{index}"] = sanitize_exception_message(exc)
+                result = {
+                    "ok": False,
+                    "request_index": index,
+                    "request": raw_request if isinstance(raw_request, dict) else None,
+                    "workspace_id": resolved_workspace_id,
+                    "section": str(raw_request.get("section")) if isinstance(raw_request, dict) else None,
+                    "kind": str(raw_request.get("kind")) if isinstance(raw_request, dict) else None,
+                    "ref": raw_request.get("ref") if isinstance(raw_request, dict) else None,
+                    "profile": normalized_profile,
+                    "details": None,
+                    "choices": [],
+                    "redactions": [],
+                    "errors": {"request": sanitize_exception_message(exc)},
+                    "message": sanitize_exception_message(exc),
+                }
+            results.append(result)
+
+        succeeded_count = sum(1 for result in results if result.get("ok") is True)
+        failed_count = len(results) - succeeded_count
+        return {
+            "ok": failed_count == 0,
+            "workspace_id": resolved_workspace_id,
+            "mode": "details",
+            "profile": normalized_profile,
+            "requested_count": len(results),
+            "succeeded_count": succeeded_count,
+            "failed_count": failed_count,
+            "results": results,
+            "errors": batch_errors or None,
+            "warnings": warnings,
+        }
+
+    def get_workspace_settings(
+        self,
+        workspace_id: str,
+        mode: str = "summary",
+        sections: list[str] | tuple[str, ...] | str | None = None,
+        requests: Any = None,
+        profile: str = "safe",
+    ) -> dict[str, Any]:
+        normalized_mode = _normalize_workspace_settings_mode(mode)
+        normalized_profile = _normalize_workspace_settings_profile(profile)
+        try:
+            resolved_workspace_id = self._resolve_workspace_id_strict(workspace_id)
+        except Exception as exc:
+            return _settings_workspace_resolution_error(
+                _clean_workspace_id(workspace_id),
+                normalized_mode,
+                normalized_profile,
+                getattr(exc, "status", "workspace_not_found"),
+                str(exc),
+            )
+        if normalized_mode == "summary":
+            return self._get_workspace_settings_summary(resolved_workspace_id, sections=sections, profile=profile)
+        return self._get_workspace_settings_details_batch(resolved_workspace_id, requests=requests, profile=profile)
+
+    def get_workspace_setting_details(
+        self,
+        workspace_id: str,
+        section: str,
+        kind: str | None = None,
+        ref: str | None = None,
+        profile: str = "safe",
+    ) -> dict[str, Any]:
+        batch = self.get_workspace_settings(
+            workspace_id,
+            mode="details",
+            requests=[{"section": section, "kind": kind, "ref": ref}],
+            profile=profile,
+        )
+        if batch["results"]:
+            result = dict(batch["results"][0])
+            result.pop("request_index", None)
+            result.pop("request", None)
+            request_error = (result.get("errors") or {}).get("request")
+            if isinstance(request_error, str) and "Unknown workspace setting detail kind" in request_error:
+                result.update(
+                    {
+                        "ok": False,
+                        "status": "error",
+                        "partial": False,
+                        "error_code": "invalid_setting_kind",
+                        "message": request_error,
+                        "received": kind,
+                        "allowed": sorted(WORKSPACE_SETTING_DETAIL_KINDS),
+                        "details": {
+                            "section": section,
+                            "kind": kind,
+                            "ref": ref,
+                            "profile": profile,
+                        },
+                    }
+                )
+            return result
+        return self._settings_details_result(
+            workspace_id,
+            section,
+            kind or "all",
+            ref,
+            profile,
+            details=None,
+            errors=batch.get("errors"),
+            message="Workspace setting detail request failed.",
+        )

@@ -40,23 +40,40 @@ def _looks_like_unique_id(value: str) -> bool:
     return len(value) >= 32 and value.count("-") >= 4
 
 
-def _normalize_id_list(value: Any) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        return [value]
-    if isinstance(value, dict):
-        cue_ids: list[str] = []
-        unique_id = value.get("uniqueID")
-        if unique_id is not None:
-            cue_ids.append(str(unique_id))
-        children = value.get("cues")
-        if children is not None:
-            cue_ids.extend(_normalize_id_list(children))
-        return cue_ids
-    if isinstance(value, list):
-        cue_ids: list[str] = []
-        for item in value:
-            cue_ids.extend(_normalize_id_list(item))
-        return cue_ids
-    raise ValueError("QLab cue ID response must be a list, object, or string")
+def _normalize_id_list(value: Any, *, max_ids: int | None = None) -> list[str]:
+    cue_ids: list[str] = []
+
+    def append_id(raw_id: Any) -> None:
+        if max_ids is None or len(cue_ids) < max_ids:
+            cue_ids.append(str(raw_id))
+
+    def walk(item: Any) -> None:
+        if max_ids is not None and len(cue_ids) >= max_ids:
+            return
+        if item is None:
+            return
+        if isinstance(item, str):
+            append_id(item)
+            return
+        if isinstance(item, dict):
+            unique_id = item.get("uniqueID")
+            if unique_id is not None:
+                append_id(unique_id)
+            children = item.get("cues")
+            if children is not None:
+                walk(children)
+            return
+        if isinstance(item, list):
+            for child in item:
+                walk(child)
+                if max_ids is not None and len(cue_ids) >= max_ids:
+                    break
+            return
+        raise ValueError("QLab cue ID response must be a list, object, or string")
+
+    walk(value)
+    return cue_ids
+
+
+def _id_list_reached_limit(cue_ids: list[str], max_ids: int | None) -> bool:
+    return max_ids is not None and len(cue_ids) >= max_ids

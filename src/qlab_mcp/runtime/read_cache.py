@@ -17,10 +17,18 @@ class _CacheEntry:
     value: Any
 
 
+@dataclass
+class _InflightEntry:
+    event: threading.Event
+    value: Any = None
+    error: BaseException | None = None
+
+
 class ReadCache:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._entries: dict[Hashable, _CacheEntry] = {}
+        self._inflight: dict[Hashable, _InflightEntry] = {}
 
     def get_or_set(self, key: Hashable, ttl: float, factory: Callable[[], Any]) -> Any:
         if ttl <= 0:
@@ -33,15 +41,43 @@ class ReadCache:
                 return entry.value
             if entry is not None:
                 self._entries.pop(key, None)
+            inflight = self._inflight.get(key)
+            if inflight is None:
+                inflight = _InflightEntry(event=threading.Event())
+                self._inflight[key] = inflight
+                owner = True
+            else:
+                owner = False
 
-        value = factory()
+        if not owner:
+            inflight.event.wait()
+            if inflight.error is not None:
+                raise inflight.error
+            return inflight.value
+
+        try:
+            value = factory()
+        except BaseException as exc:
+            with self._lock:
+                inflight.error = exc
+                self._inflight.pop(key, None)
+                inflight.event.set()
+            raise
         with self._lock:
             self._entries[key] = _CacheEntry(expires_at=now + ttl, value=value)
+            inflight.value = value
+            self._inflight.pop(key, None)
+            inflight.event.set()
         return value
 
     def clear(self) -> None:
         with self._lock:
             self._entries.clear()
+            inflight = list(self._inflight.values())
+            self._inflight.clear()
+        for entry in inflight:
+            entry.error = RuntimeError("Read cache cleared while request was in flight")
+            entry.event.set()
 
 
 _SHARED_CACHE = ReadCache()
@@ -60,7 +96,9 @@ def cache_profile_is_safe(profile: str | None) -> bool:
 def client_cache_namespace(client: Any) -> tuple[Any, ...]:
     config = getattr(client, "config", None)
     if config is None:
-        return (id(client),)
+        return (client,)
+    if client.__class__.__module__ != "qlab_mcp.osc.client":
+        return (client,)
     passcode = getattr(config, "passcode", None)
     return (
         getattr(config, "host", None),

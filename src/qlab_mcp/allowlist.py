@@ -41,6 +41,11 @@ TIMING_PROPERTIES = {
     "maxTimeInCueSequence",
     "continueMode",
     "timecodeTrigger",
+    "timecodeTrigger/hours",
+    "timecodeTrigger/minutes",
+    "timecodeTrigger/seconds",
+    "timecodeTrigger/frames",
+    "timecodeTrigger/bits",
     "timecodeTrigger/text",
 }
 
@@ -60,6 +65,11 @@ STATUS_PROPERTIES = {
     "skipIfDisarmed",
     "secondTriggerAction",
     "secondTriggerOnRelease",
+    "duckLevel",
+    "duckOthers",
+    "duckTime",
+    "fadeAndStopOthers",
+    "fadeAndStopOthersTime",
 }
 
 TARGET_PROPERTIES = {
@@ -123,6 +133,7 @@ TYPE_SPECIFIC_PROPERTIES = {
     "audioInputPatchName",
     "audioInputPatchNumber",
     "audioInputPatchID",
+    "audioOutputPatch/name",
     "videoOutputPatchName",
     "videoOutputPatchNumber",
     "videoOutputPatchID",
@@ -134,6 +145,8 @@ TYPE_SPECIFIC_PROPERTIES = {
     "preservePitch",
     "doFade",
     "lockFadeToCue",
+    "lastSlicePlayCount",
+    "lastSliceInfiniteLoop",
     "channelOffset",
     "channels",
     "stage",
@@ -160,6 +173,8 @@ TYPE_SPECIFIC_PROPERTIES = {
     "blendMode",
     "clockType",
     "videoEffects",
+    "surfaceID",
+    "surfaceName",
     "videoInputPatchName",
     "videoInputPatchNumber",
     "videoInputPatchID",
@@ -210,10 +225,19 @@ TYPE_SPECIFIC_PROPERTIES = {
     "timecodeString",
     "timecodeFormat",
     "timecodeMode",
+    "outputType",
     "timecodeFrameRate",
     "framerate",
+    "ltcChannel",
+    "patch",
+    "cameraPatch",
+    "devampType",
+    "startNextCueWhenSliceEnds",
     "stopTargetWhenDone",
     "levelsMode",
+    "geoMode",
+    "pathHeight",
+    "pathWidth",
     "rotationType",
     "doOpacity",
     "doRate",
@@ -225,6 +249,73 @@ TYPE_SPECIFIC_PROPERTIES = {
     "scriptText",
     "alwaysCollate",
     "subcontroller",
+}
+
+EXHAUSTIVE_EXTRA_PROPERTIES = {
+    "audioMap/filters",
+    "audioMap/marks",
+    "audioMap/objects",
+    "audioMap/size/height",
+    "audioMap/size/width",
+    "audioMap/uniqueID",
+    "audioOutputPatch",
+    "audioOutputPatch/cueOutputChannels",
+    "audioOutputPatch/muteChannels",
+    "audioOutputPatch/routing",
+    "levels",
+    "muteChannels",
+    "muteObjects",
+    "numChannelsIn",
+    "objectLevels",
+    "objects",
+    "sliderLevels",
+    "sliceMarkers",
+    "soloChannels",
+    "soloObjects",
+    "stage/name",
+    "anchor",
+    "cueSize",
+    "cueSize/height",
+    "cueSize/width",
+    "fillStage",
+    "fillStyle",
+    "holdLastFrame",
+    "layer",
+    "origin",
+    "origin/x",
+    "origin/y",
+    "preserveAspectRatio",
+    "quaternion",
+    "smooth",
+    "text/format",
+    "text/outputSize/height",
+    "text/outputSize/width",
+    "text/format/backgroundColor",
+    "text/format/color",
+    "text/format/fontFamily",
+    "text/format/fontFamilyAndStyle",
+    "text/format/fontStyle",
+    "text/format/lineSpacing",
+    "text/format/shadowBlurRadius",
+    "text/format/shadowColor",
+    "text/format/shadowOffset",
+    "text/format/shadowOffset/height",
+    "text/format/shadowOffset/width",
+    "text/format/strikethroughColor",
+    "text/format/underlineColor",
+    "fadeNumberType",
+    "fadeEntries",
+    "fadeFrom",
+    "fadeTo",
+    "fadeType",
+    "fps",
+    "hours",
+    "minutes",
+    "seconds",
+    "frames",
+    "subframes",
+    "devampType",
+    "startNextCueWhenSliceEnds",
 }
 
 HEAVY_CUE_PROPERTIES = {
@@ -239,6 +330,7 @@ READ_ONLY_CUE_PROPERTIES = (
     | TARGET_PROPERTIES
     | GROUP_PROPERTIES
     | TYPE_SPECIFIC_PROPERTIES
+    | EXHAUSTIVE_EXTRA_PROPERTIES
 )
 
 SENSITIVE_CUE_PROPERTIES = {
@@ -341,6 +433,23 @@ HEALTH_PROFILE = (
     "messageError",
 )
 
+INSPECTOR_SAFE_PROFILE = tuple(
+    dict.fromkeys(
+        (
+            *AUTO_COMMON_PROFILE,
+            "defaultName",
+            "colorCondition",
+            "cartPosition/row",
+            "cartPosition/column",
+            *tuple(sorted(TIMING_PROPERTIES)),
+            *tuple(sorted(STATUS_PROPERTIES)),
+            *tuple(sorted(TARGET_PROPERTIES - SENSITIVE_CUE_PROPERTIES)),
+            *tuple(sorted(GROUP_PROPERTIES)),
+            *tuple(sorted(TYPE_SPECIFIC_PROPERTIES - SENSITIVE_CUE_PROPERTIES - HEAVY_CUE_PROPERTIES)),
+        )
+    )
+)
+
 PROFILE_PROPERTIES = {
     "auto": AUTO_COMMON_PROFILE,
     "basic_safe": BASIC_SAFE_PROFILE,
@@ -353,7 +462,6 @@ PROFILE_PROPERTIES = {
         "armed",
         "flagged",
         "colorName",
-        "notes",
     ),
     "technical": tuple(dict.fromkeys(TECHNICAL_PROFILE)),
     "health": tuple(dict.fromkeys(HEALTH_PROFILE)),
@@ -389,6 +497,7 @@ PROFILE_PROPERTIES = {
     ),
     "group": tuple(sorted(GROUP_PROPERTIES)),
     "type_specific": tuple(sorted(TYPE_SPECIFIC_PROPERTIES - SENSITIVE_CUE_PROPERTIES - HEAVY_CUE_PROPERTIES)),
+    "inspector_safe": INSPECTOR_SAFE_PROFILE,
 }
 
 BLOCKED_VALUE_KEYS = {
@@ -430,6 +539,8 @@ def validate_property_path(property_path: str) -> str:
 
 def properties_for_profile(profile: str) -> tuple[str, ...]:
     normalized = profile.strip().lower()
+    if normalized == "exhaustive":
+        return tuple(sorted(READ_ONLY_CUE_PROPERTIES))
     if normalized == "full_sensitive":
         merged: list[str] = []
         for key in ("basic", "timing", "status", "targets", "group", "type_specific"):
@@ -443,7 +554,7 @@ def properties_for_profile(profile: str) -> tuple[str, ...]:
         properties = tuple(dict.fromkeys(merged))
         return tuple(prop for prop in properties if prop not in SENSITIVE_CUE_PROPERTIES and prop not in HEAVY_CUE_PROPERTIES)
     if normalized not in PROFILE_PROPERTIES:
-        allowed = ", ".join([*PROFILE_PROPERTIES.keys(), "full", "full_sensitive"])
+        allowed = ", ".join([*PROFILE_PROPERTIES.keys(), "full", "full_sensitive", "exhaustive"])
         raise UnsafeCuePropertyError(f"Unknown cue detail profile {profile!r}; use one of: {allowed}")
     return PROFILE_PROPERTIES[normalized]
 

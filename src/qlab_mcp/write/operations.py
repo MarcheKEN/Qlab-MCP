@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import math
 import os
 import time
 from typing import Any
@@ -20,6 +23,7 @@ from .allowlist import (
     ensure_real_write_allowed,
     normalize_update_request,
     read_keys_for_operations,
+    real_write_permission_errors,
     validate_update_profile,
     validate_update_profile_for_cue,
     validate_writable_cue_type,
@@ -30,6 +34,78 @@ from .safety import check_write_readiness, ensure_write_ready, resolve_dry_run
 
 MAX_BATCH_UPDATES = 50
 AFTER_READ_RETRY_DELAYS = (0.2, 0.5, 1.0)
+UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS = 90.0
+UPDATE_SETTER_REPLY_TIMEOUT_CAP_SECONDS = 0.1
+UPDATE_SETTER_REPLY_TOTAL_BUDGET_SECONDS = 8.0
+UPDATE_AFTER_READ_TIMEOUT_CAP_SECONDS = 0.5
+UPDATE_MIN_REPLY_TIMEOUT_SECONDS = 0.001
+UPDATE_NUMERIC_MATCH_ABS_TOLERANCE = 1e-5
+UPDATE_NUMERIC_MATCH_REL_TOLERANCE = 1e-6
+UPDATE_STATUS_ACTIONS = {
+    "preflight_failed": "Inspect per-cue errors; no setters were sent, so fix cue refs/profiles before retrying.",
+    "partial_failed": "Inspect per-cue errors and verify the affected cues in QLab before retrying only failed items.",
+    "verification_failed": "Read the cue fresh and compare requested versus after values before retrying.",
+    "verification_inconclusive": "Treat the update as unsafe; inspect executed operations and add deterministic readback before retrying.",
+}
+UPDATE_STATUS_CODES = {
+    "preflight_failed": "QLAB_UPDATE_PREFLIGHT_FAILED",
+    "partial_failed": "QLAB_UPDATE_PARTIAL_FAILED",
+    "verification_failed": "QLAB_UPDATE_VERIFICATION_FAILED",
+    "verification_inconclusive": "QLAB_UPDATE_VERIFICATION_INCONCLUSIVE",
+}
+CONTINUE_MODE_VALUES = {
+    0: 0,
+    1: 1,
+    2: 2,
+    "0": 0,
+    "1": 1,
+    "2": 2,
+    "do_not_continue": 0,
+    "do-not-continue": 0,
+    "manual": 0,
+    "none": 0,
+    "auto_continue": 1,
+    "auto-continue": 1,
+    "autocontinue": 1,
+    "auto_follow": 2,
+    "auto-follow": 2,
+    "autofollow": 2,
+}
+CASEFOLD_COMPARISON_KEYS = {
+    "blendMode",
+    "clockType",
+    "colorName",
+    "text/format/alignment",
+}
+
+
+def _write_workspace_resolution_error(
+    workspace_id: str,
+    *,
+    dry_run: bool,
+    status: str,
+    message: str,
+    requested_count: int = 0,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": status,
+        "workspace_id": workspace_id,
+        "dry_run": dry_run,
+        "requested_count": requested_count,
+        "planned_count": 0,
+        "updated_count": 0,
+        "failed_count": requested_count,
+        "timeout_confirmed_count": 0,
+        "results": [],
+        "planned_operations": [],
+        "executed_operations": [],
+        "errors": {"workspace_resolution": message},
+        "warnings": ["Requested workspace could not be resolved."],
+        "error_code": status,
+        "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+        "message": "Requested workspace could not be resolved; no mutating OSC commands were planned or sent.",
+    }
 
 
 class QLabWriteMixin:
@@ -45,11 +121,10 @@ class QLabWriteMixin:
         after_cue_id: str | None = None,
     ) -> dict[str, Any]:
         workspace = _clean_workspace_id(workspace_id)
+        effective_dry_run = resolve_dry_run(self, dry_run)
         qlab_cue_type = validate_writable_cue_type(cue_type)
         normalized_properties = validate_write_properties(properties)
-        effective_dry_run = resolve_dry_run(self, dry_run)
         placement = _normalize_placement(after_cue_id)
-        planned_operations = _planned_create_operations(workspace, qlab_cue_type, normalized_properties, placement)
 
         if placement is not None and not effective_dry_run:
             raise UnsafeWriteOperationError(
@@ -57,6 +132,28 @@ class QLabWriteMixin:
             )
 
         if effective_dry_run:
+            try:
+                workspace = self._resolve_workspace_id_strict(workspace)
+            except Exception as exc:
+                return {
+                    "ok": False,
+                    "status": getattr(exc, "status", "workspace_not_found"),
+                    "workspace_id": _clean_workspace_id(workspace_id),
+                    "cue_type": qlab_cue_type,
+                    "dry_run": True,
+                    "created_cue_id": None,
+                    "placement": placement,
+                    "properties": normalized_properties,
+                    "planned_operations": [],
+                    "executed_operations": [],
+                    "verification": None,
+                    "errors": {"workspace_resolution": str(exc)},
+                    "warnings": ["Requested workspace could not be resolved."],
+                    "error_code": getattr(exc, "status", "workspace_not_found"),
+                    "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
+                    "message": "Requested workspace could not be resolved; no cue create operation was planned or sent.",
+                }
+            planned_operations = _planned_create_operations(workspace, qlab_cue_type, normalized_properties, placement)
             return {
                 "ok": True,
                 "status": "dry_run",
@@ -76,6 +173,7 @@ class QLabWriteMixin:
             }
 
         workspace = ensure_write_ready(self, workspace)
+        planned_operations = _planned_create_operations(workspace, qlab_cue_type, normalized_properties, placement)
 
         read_cache = getattr(self, "_read_cache", shared_read_cache())
         read_cache.clear()
@@ -168,21 +266,36 @@ class QLabWriteMixin:
         dry_run: bool | None = None,
         profile: str | None = None,
         operations: list[dict[str, Any]] | None = None,
+        confirm_gates: list[str] | None = None,
     ) -> dict[str, Any]:
         """Compatibility wrapper for local Python callers; MCP exposes qlab_update_cues."""
+        raw_update = {
+            "cue_ref": cue_ref,
+            "profile": profile or COMMON_UPDATE_PROFILE,
+            "properties": properties,
+            "operations": operations,
+            "confirm_gates": confirm_gates,
+        }
+        _normalize_batch_update_item(raw_update)
         batch = self.update_cues(
             workspace_id,
-            [
-                {
-                    "cue_ref": cue_ref,
-                    "profile": profile or COMMON_UPDATE_PROFILE,
-                    "properties": properties,
-                    "operations": operations,
-                }
-            ],
+            [raw_update],
             dry_run=dry_run,
         )
         item = dict(batch["results"][0])
+        if not batch["ok"] and batch["status"] == "preflight_failed" and not batch["dry_run"]:
+            messages = []
+            if item.get("errors"):
+                messages.extend(str(message) for message in item["errors"].values())
+            if batch.get("errors"):
+                messages.extend(str(message) for message in batch["errors"].values())
+            message = "; ".join(messages) or batch["message"]
+            if (
+                "gated or dry-run only" in message
+                or "outside QLAB_ALLOWED_FILE_ROOTS" in message
+                or item.get("errors", {}).get("write_readiness")
+            ):
+                raise UnsafeWriteOperationError(message)
         if not batch["ok"] and batch["status"] == "preflight_failed" and item.get("errors") and "profile" in item["errors"]:
             raise UnsafeWriteOperationError("; ".join(item["errors"].values()))
         status = item["status"]
@@ -199,6 +312,7 @@ class QLabWriteMixin:
             "dry_run": batch["dry_run"],
             "properties": item["properties"],
             "operations": item["operations"],
+            "confirm_gates": item.get("confirm_gates", []),
             "before": item["before"],
             "after": item["after"],
             "diff": item["diff"],
@@ -224,14 +338,60 @@ class QLabWriteMixin:
         if len(updates) > MAX_BATCH_UPDATES:
             raise UnsafeWriteOperationError(f"updates can include at most {MAX_BATCH_UPDATES} cue updates")
         effective_dry_run = resolve_dry_run(self, dry_run)
-        items = [_normalize_batch_update_item(raw_update) for raw_update in updates]
+        items = [_normalize_batch_update_item_for_batch(raw_update) for raw_update in updates]
+        for item in items:
+            _bind_confirm_tokens(workspace, item)
+        if not effective_dry_run:
+            gate_results = []
+            gate_ok = True
+            for item in items:
+                errors = dict(item.get("errors") or {})
+                if not item.get("errors"):
+                    errors.update(real_write_permission_errors(item["profile"], item["operations"], item["confirm_gates"]))
+                if errors:
+                    gate_ok = False
+                gate_results.append(
+                    _batch_item_result(
+                        workspace,
+                        item,
+                        cue_id=None,
+                        status="preflight_failed" if errors else "planned",
+                        before=None,
+                        after=None,
+                        errors=errors or None,
+                        warnings=[],
+                    )
+                )
+            if not gate_ok:
+                return _batch_update_result(
+                    workspace,
+                    dry_run=False,
+                    results=gate_results,
+                    status="preflight_failed",
+                    requested_count=len(updates),
+                    errors={"preflight": "One or more cue updates failed real-write gate preflight; no setters were sent."},
+                )
+        if effective_dry_run:
+            try:
+                workspace = self._resolve_workspace_id_strict(workspace)
+            except Exception as exc:
+                return _write_workspace_resolution_error(
+                    _clean_workspace_id(workspace_id),
+                    dry_run=True,
+                    status=getattr(exc, "status", "workspace_not_found"),
+                    message=str(exc),
+                    requested_count=len(updates),
+                )
 
         if effective_dry_run:
             results = []
             for item in items:
-                before, errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
-                profile_errors = _validate_profile_for_before(item["profile"], before)
-                errors.update(profile_errors)
+                errors = dict(item.get("errors") or {})
+                before = None
+                if not errors and item["cue_ref"]:
+                    before, read_errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
+                    errors.update(read_errors)
+                    errors.update(_validate_profile_for_before(item["profile"], before))
                 cue_id = _resolved_cue_id(before)
                 results.append(
                     _batch_item_result(
@@ -251,25 +411,77 @@ class QLabWriteMixin:
                 dry_run=True,
                 results=results,
                 status="dry_run" if failed_count == 0 else "preflight_failed",
-                requested_count=len(items),
+                requested_count=len(updates),
                 warnings=["Dry run only: no mutating OSC commands were sent to QLab."],
             )
 
-        for item in items:
-            ensure_real_write_allowed(item["profile"], item["operations"])
-        workspace = ensure_write_ready(self, workspace)
+        try:
+            workspace = ensure_write_ready(self, workspace)
+        except Exception as exc:
+            return _batch_update_result(
+                workspace,
+                dry_run=False,
+                results=[
+                    _batch_item_result(
+                        workspace,
+                        item,
+                        cue_id=None,
+                        status="preflight_failed",
+                        before=None,
+                        after=None,
+                        errors={"write_readiness": str(exc)},
+                        warnings=[],
+                    )
+                    for item in items
+                ],
+                status="preflight_failed",
+                requested_count=len(updates),
+                errors={"write_readiness": str(exc)},
+            )
+        file_root_errors = _file_target_root_errors(self, items)
+        if file_root_errors:
+            return _batch_update_result(
+                workspace,
+                dry_run=False,
+                results=[
+                    _batch_item_result(
+                        workspace,
+                        item,
+                        cue_id=None,
+                        status="preflight_failed" if index in file_root_errors else "planned",
+                        before=None,
+                        after=None,
+                        errors=file_root_errors.get(index),
+                        warnings=[],
+                    )
+                    for index, item in enumerate(items)
+                ],
+                status="preflight_failed",
+                requested_count=len(updates),
+                errors={"preflight": "One or more fileTarget paths failed root validation; no setters were sent."},
+            )
+        update_deadline = time.monotonic() + UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS
+        setter_count = sum(len(item["operations"]) for item in items)
+        setter_reply_timeout = _setter_reply_timeout(self, setter_count, update_deadline)
 
         read_cache = getattr(self, "_read_cache", shared_read_cache())
         read_cache.clear()
         preflight_results: list[dict[str, Any]] = []
         preflight_ok = True
         for item in items:
-            before, before_errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
+            before = None
+            before_errors: dict[str, str] = {}
+            errors = dict(item.get("errors") or {})
+            if not errors and item["cue_ref"]:
+                before, before_errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
             resolved_cue_id = _resolved_cue_id(before)
-            errors = dict(before_errors)
-            if before is None or not resolved_cue_id:
+            errors.update(before_errors)
+            if not item.get("errors") and (before is None or not resolved_cue_id):
                 errors.setdefault("cue", "Cue could not be read before update.")
-            errors.update(_validate_profile_for_before(item["profile"], before))
+            if not item.get("errors"):
+                errors.update(_validate_profile_for_before(item["profile"], before))
+            if not item.get("errors"):
+                errors.update(_validate_contextual_real_write(self, workspace, item, before))
             if errors:
                 preflight_ok = False
             preflight_results.append(
@@ -292,7 +504,7 @@ class QLabWriteMixin:
                 dry_run=False,
                 results=preflight_results,
                 status="preflight_failed",
-                requested_count=len(items),
+                requested_count=len(updates),
                 errors={"preflight": "One or more cue updates failed preflight; no setters were sent."},
             )
 
@@ -305,8 +517,19 @@ class QLabWriteMixin:
             for operation in item["operations"]:
                 key = operation["property"]
                 address = _cue_id_address(workspace, cue_id, operation["path"])
+                if _budget_remaining(update_deadline) <= 0:
+                    errors[key] = "Global update time budget exhausted before setter was sent."
+                    break
                 try:
-                    reply = self.client.request(address, *operation["args"])
+                    reply = self.client.request(
+                        address,
+                        *operation["args"],
+                        reply_timeout=_bounded_reply_timeout(
+                            self,
+                            setter_reply_timeout,
+                            update_deadline,
+                        ),
+                    )
                     status = reply.status
                     error = None
                 except OscTimeoutError as exc:
@@ -323,6 +546,7 @@ class QLabWriteMixin:
                         "address": address,
                         "args": operation["args"],
                         "mode": operation["mode"],
+                        "capability_gate": operation.get("capability_gate"),
                         "status": status,
                         **({"error": error} if error else {}),
                     }
@@ -337,23 +561,36 @@ class QLabWriteMixin:
         final_results: list[dict[str, Any]] = []
         timeout_confirmed_count = 0
         for item, result in zip(items, executed_items, strict=True):
+            requested_values = _verification_requested_values(item)
             after, after_errors = _try_read_update_values_with_retries(
                 self,
                 workspace,
                 result["cue_id"],
                 item["read_keys"],
-                item["properties"],
+                requested_values,
                 retry_on_mismatch=bool(result["_setter_timeouts"]),
+                request_timeout=_bounded_reply_timeout(
+                    self,
+                    UPDATE_AFTER_READ_TIMEOUT_CAP_SECONDS,
+                    update_deadline,
+                ),
+                deadline=update_deadline,
             )
-            confirmed_by_after = _properties_match(after, item["properties"])
+            confirmed_by_after = _properties_match(after, requested_values)
             setter_timeouts = result.pop("_setter_timeouts")
             setter_errors = result.pop("_setter_errors")
             unconfirmed_timeouts = {} if confirmed_by_after else setter_timeouts
             value_mismatch = {}
             if not confirmed_by_after and not setter_errors and not unconfirmed_timeouts and not after_errors:
-                value_mismatch["verification"] = _verification_mismatch_message(after, item["properties"])
+                value_mismatch["verification"] = _verification_mismatch_message(after, requested_values)
             errors = {**setter_errors, **unconfirmed_timeouts, **after_errors, **value_mismatch}
             warnings = list(result["warnings"])
+            unverifiable_operations = [
+                operation
+                for operation in item["operations"]
+                if not operation.get("read_key") or len(operation.get("args") or []) != 1
+            ]
+            inconclusive = bool(unverifiable_operations)
             if setter_timeouts and confirmed_by_after:
                 timeout_confirmed_count += 1
                 warnings.append("One or more setters did not reply, but fresh after-read confirmed requested values.")
@@ -361,6 +598,9 @@ class QLabWriteMixin:
             verification_failed = (bool(after_errors) or bool(value_mismatch)) and not failed
             if failed:
                 status = "partial_failed"
+            elif inconclusive:
+                status = "verification_inconclusive"
+                errors["verification"] = "No deterministic readback values were available for this real write."
             elif verification_failed:
                 status = "verification_failed"
             elif setter_timeouts:
@@ -371,17 +611,18 @@ class QLabWriteMixin:
                 {
                     "status": status,
                     "after": after,
-                    "diff": _diff_properties(result["before"], item["properties"], after),
+                    "diff": _diff_properties(result["before"], requested_values, after),
                     "errors": errors or None,
                     "warnings": warnings,
                 }
             )
-            if _update_debug_enabled():
+            if _update_debug_enabled(self):
                 result["debug"] = {
                     "cue_ref": item["cue_ref"],
                     "cue_id": result["cue_id"],
                     "requested_properties": item["properties"],
-                    "after_values": _after_values_for_requested(after, item["properties"]),
+                    "requested_values": requested_values,
+                    "after_values": _after_values_for_requested(after, requested_values),
                     "properties_match": confirmed_by_after,
                     "setter_timeouts": setter_timeouts,
                     "confirmed_timeouts": bool(setter_timeouts and confirmed_by_after),
@@ -395,6 +636,8 @@ class QLabWriteMixin:
             status = "partial_failed"
         elif any(result["status"] == "verification_failed" for result in final_results):
             status = "verification_failed"
+        elif any(result["status"] == "verification_inconclusive" for result in final_results):
+            status = "verification_inconclusive"
         elif any(result["status"] == "updated_with_confirmed_timeouts" for result in final_results):
             status = "updated_with_confirmed_timeouts"
         else:
@@ -404,7 +647,7 @@ class QLabWriteMixin:
             dry_run=False,
             results=final_results,
             status=status,
-            requested_count=len(items),
+            requested_count=len(updates),
             timeout_confirmed_count=timeout_confirmed_count,
         )
 
@@ -428,24 +671,145 @@ def _clean_update_cue_ref(cue_ref: str) -> str:
 
 
 def _normalize_batch_update_item(raw_update: Any) -> dict[str, Any]:
+    item = _normalize_batch_update_item_for_batch(raw_update)
+    if item.get("errors"):
+        raise UnsafeWriteOperationError("; ".join(str(message) for message in item["errors"].values()))
+    return item
+
+
+def _bind_confirm_tokens(workspace_id: str, item: dict[str, Any]) -> None:
+    for operation in item.get("operations") or []:
+        token = operation.get("confirm_token")
+        if not token:
+            continue
+        payload = {
+            "workspace_id": workspace_id,
+            "cue_ref": item["cue_ref"],
+            "profile": item["profile"],
+            "property": operation["property"],
+            "path": operation["path"],
+            "mode": operation["mode"],
+            "args": operation["args"],
+            "base_token": token,
+        }
+        digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        operation["confirm_token"] = f"confirm:{operation['property']}:{digest[:16]}"
+
+
+def _normalize_batch_update_item_for_batch(raw_update: Any) -> dict[str, Any]:
     if hasattr(raw_update, "model_dump"):
         raw_update = raw_update.model_dump()
     if not isinstance(raw_update, dict):
-        raise UnsafeWriteOperationError("each update must be an object")
-    cue = _clean_update_cue_ref(raw_update.get("cue_ref", ""))
-    profile = validate_update_profile(raw_update.get("profile") or COMMON_UPDATE_PROFILE)
-    properties, operations = normalize_update_request(
-        profile,
-        raw_update.get("properties"),
-        raw_update.get("operations"),
-    )
+        return _invalid_batch_update_item("", COMMON_UPDATE_PROFILE, {"update": "each update must be an object"})
+
+    errors: dict[str, str] = {}
+    raw_cue_ref = raw_update.get("cue_ref", "")
+    try:
+        cue = _clean_update_cue_ref(raw_cue_ref)
+    except Exception as exc:
+        cue = str(raw_cue_ref or "")
+        errors["cue_ref"] = str(exc)
+
+    raw_profile = raw_update.get("profile") or COMMON_UPDATE_PROFILE
+    try:
+        profile = validate_update_profile(raw_profile)
+    except Exception as exc:
+        profile = str(raw_profile or COMMON_UPDATE_PROFILE)
+        errors["profile"] = str(exc)
+
+    properties: dict[str, Any] = {}
+    operations: list[dict[str, Any]] = []
+    confirm_gates, gate_error = _normalize_confirm_gates(raw_update.get("confirm_gates"))
+    if gate_error:
+        errors["confirm_gates"] = gate_error
+    if "profile" not in errors:
+        try:
+            properties, operations = normalize_update_request(
+                profile,
+                raw_update.get("properties"),
+                raw_update.get("operations"),
+            )
+        except Exception as exc:
+            errors["validation"] = str(exc)
+
     return {
         "cue_ref": cue,
         "profile": profile,
         "properties": properties,
         "operations": operations,
+        "confirm_gates": confirm_gates,
         "read_keys": read_keys_for_operations(operations),
+        "errors": errors or None,
     }
+
+
+def _invalid_batch_update_item(cue_ref: str, profile: str, errors: dict[str, str]) -> dict[str, Any]:
+    return {
+        "cue_ref": cue_ref,
+        "profile": profile,
+        "properties": {},
+        "operations": [],
+        "confirm_gates": [],
+        "read_keys": read_keys_for_operations([]),
+        "errors": errors,
+    }
+
+
+def _normalize_confirm_gates(raw_gates: Any) -> tuple[list[str], str | None]:
+    if raw_gates is None:
+        return [], None
+    if not isinstance(raw_gates, list):
+        return [], "confirm_gates must be a list of gate strings"
+    gates: list[str] = []
+    for raw_gate in raw_gates:
+        if not isinstance(raw_gate, str) or not raw_gate.strip():
+            return [], "confirm_gates entries must be non-empty strings"
+        gates.append(raw_gate.strip())
+    return list(dict.fromkeys(gates)), None
+
+
+def _validate_file_target_roots(reader: Any, items: list[dict[str, Any]]) -> None:
+    errors = _file_target_root_errors(reader, items)
+    if errors:
+        first = next(iter(errors.values()))
+        raise UnsafeWriteOperationError(next(iter(first.values())))
+
+
+def _file_target_root_errors(reader: Any, items: list[dict[str, Any]]) -> dict[int, dict[str, str]]:
+    requested_paths: list[str] = []
+    requested_items: list[tuple[int, str]] = []
+    for index, item in enumerate(items):
+        for operation in item["operations"]:
+            if operation["property"] == "fileTarget" and operation.get("capability_gate") == "file_target_access":
+                if operation["args"]:
+                    requested_path = str(operation["args"][0])
+                    requested_paths.append(requested_path)
+                    requested_items.append((index, requested_path))
+    if not requested_paths:
+        return {}
+    config = getattr(getattr(reader, "client", None), "config", None)
+    roots = tuple(getattr(config, "allowed_file_roots", ()) or ())
+    if not roots:
+        return {
+            index: {
+                "fileTarget": "fileTarget real writes require QLAB_ALLOWED_FILE_ROOTS to include at least one allowed media root."
+            }
+            for index, _ in requested_items
+        }
+    normalized_roots = tuple(os.path.realpath(root) for root in roots)
+    errors: dict[int, dict[str, str]] = {}
+    for index, requested_path in requested_items:
+        absolute_path = os.path.realpath(requested_path)
+        if not any(_path_is_under_root(absolute_path, root) for root in normalized_roots):
+            errors[index] = {"fileTarget": f"fileTarget path is outside QLAB_ALLOWED_FILE_ROOTS: {requested_path!r}"}
+    return errors
+
+
+def _path_is_under_root(path: str, root: str) -> bool:
+    try:
+        return os.path.commonpath([path, root]) == root
+    except ValueError:
+        return False
 
 
 def _validate_profile_for_before(profile: str, before: dict[str, Any] | None) -> dict[str, str]:
@@ -456,6 +820,40 @@ def _validate_profile_for_before(profile: str, before: dict[str, Any] | None) ->
     except Exception as exc:
         return {"profile": str(exc)}
     return {}
+
+
+def _validate_contextual_real_write(
+    reader: Any,
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    if before is None:
+        return {}
+    errors: dict[str, str] = {}
+    for operation in item.get("operations", []):
+        prop = str(operation.get("property", ""))
+        if prop.startswith("playlist/") and before.get("mode") != 6:
+            errors[prop] = "Playlist setters require the Group cue to already be in Playlist mode (mode 6)."
+        if prop in {"duration", "tempDuration"} and before.get("allowsEditingDuration") is False:
+            errors[prop] = f"{prop} requires a cue with editable duration."
+        if prop in {"cueTargetName"}:
+            errors[prop] = f"{prop} real writes require cueTargetID or cueTargetNumber; name resolution is not supported."
+        if prop in {"cueTargetID", "cueTargetNumber", "tempCueTargetID", "tempCueTargetNumber"}:
+            target_ref = operation["args"][0] if operation.get("args") else None
+            if _is_empty_target_ref(target_ref):
+                continue
+            target, target_errors = _try_read_update_values(reader, workspace_id, str(target_ref), ["uniqueID"])
+            target_id = _resolved_cue_id(target)
+            if target_errors or not target_id:
+                errors[prop] = f"{prop} target could not be resolved before update."
+            elif target_id == before.get("uniqueID"):
+                errors[prop] = f"{prop} target cannot be the cue being updated."
+    return errors
+
+
+def _is_empty_target_ref(value: Any) -> bool:
+    return isinstance(value, str) and value.strip().casefold() in {"", "none"}
 
 
 def _batch_item_result(
@@ -469,6 +867,14 @@ def _batch_item_result(
     errors: dict[str, str] | None,
     warnings: list[str],
 ) -> dict[str, Any]:
+    planned_operations = []
+    if not errors:
+        planned_operations = _planned_update_operations(
+            workspace_id,
+            item["cue_ref"],
+            item["operations"],
+            resolved_cue_id=cue_id,
+        )
     return {
         "cue_ref": item["cue_ref"],
         "cue_id": cue_id,
@@ -476,15 +882,11 @@ def _batch_item_result(
         "status": status,
         "properties": item["properties"],
         "operations": item["operations"],
+        "confirm_gates": item["confirm_gates"],
         "before": before,
         "after": after,
         "diff": _diff_properties(before, item["properties"], after),
-        "planned_operations": _planned_update_operations(
-            workspace_id,
-            item["cue_ref"],
-            item["operations"],
-            resolved_cue_id=cue_id,
-        ),
+        "planned_operations": planned_operations,
         "executed_operations": [],
         "errors": errors,
         "warnings": warnings,
@@ -509,8 +911,13 @@ def _batch_update_result(
         for result in fixed_results
         if result.get("status") in {"updated", "updated_with_confirmed_timeouts"}
     )
-    planned_count = sum(1 for result in fixed_results if result.get("status") != "preflight_failed")
-    ok = failed_count == 0 and status not in {"preflight_failed", "partial_failed", "verification_failed"}
+    planned_count = sum(1 for result in fixed_results if result.get("planned_operations"))
+    ok = failed_count == 0 and status not in {
+        "preflight_failed",
+        "partial_failed",
+        "verification_failed",
+        "verification_inconclusive",
+    }
     if status == "dry_run":
         message = "Dry run succeeded; review planned_operations before disabling dry_run."
     elif status == "preflight_failed":
@@ -519,6 +926,8 @@ def _batch_update_result(
         message = "Batch cue update partially failed; inspect per-cue results and errors."
     elif status == "verification_failed":
         message = "Batch cue update commands completed, but fresh verification failed."
+    elif status == "verification_inconclusive":
+        message = "Batch cue update commands completed, but deterministic verification was not available."
     elif status == "updated_with_confirmed_timeouts":
         message = "Batch cue update completed; some setters timed out but fresh after-reads confirmed requested values."
     else:
@@ -539,6 +948,8 @@ def _batch_update_result(
         "results": fixed_results,
         "errors": errors,
         "warnings": global_warnings,
+        "error_code": None if ok else UPDATE_STATUS_CODES.get(status, f"QLAB_UPDATE_{status.upper()}"),
+        "suggested_action": None if ok else UPDATE_STATUS_ACTIONS.get(status, "Inspect per-cue results before retrying."),
         "message": message,
     }
 
@@ -610,7 +1021,12 @@ def _planned_update_operations(
             "mode": update_operation["mode"],
             "risk_tier": update_operation["risk_tier"],
             "real_write_enabled": update_operation["real_write_enabled"],
+            "capability_gate": update_operation.get("capability_gate"),
         }
+        if update_operation.get("confirm_token"):
+            planned["confirm_token"] = update_operation["confirm_token"]
+        if update_operation.get("contextual_requirements"):
+            planned["contextual_requirements"] = update_operation["contextual_requirements"]
         if update_operation.get("planned_only_reason"):
             planned["planned_only_reason"] = update_operation["planned_only_reason"]
         operations.append(planned)
@@ -633,11 +1049,45 @@ def _resolved_cue_id(values: dict[str, Any] | None) -> str | None:
     return None
 
 
+def _client_config_timeout(reader: Any, fallback: float) -> float:
+    value = getattr(getattr(getattr(reader, "client", None), "config", None), "timeout", fallback)
+    try:
+        return max(UPDATE_MIN_REPLY_TIMEOUT_SECONDS, float(value))
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _budget_remaining(deadline: float | None) -> float:
+    if deadline is None:
+        return UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS
+    return deadline - time.monotonic()
+
+
+def _bounded_reply_timeout(reader: Any, cap: float, deadline: float | None = None) -> float:
+    timeout = min(_client_config_timeout(reader, cap), cap)
+    if deadline is not None:
+        remaining = _budget_remaining(deadline)
+        if remaining <= 0:
+            return UPDATE_MIN_REPLY_TIMEOUT_SECONDS
+        timeout = min(timeout, remaining)
+    return max(UPDATE_MIN_REPLY_TIMEOUT_SECONDS, timeout)
+
+
+def _setter_reply_timeout(reader: Any, setter_count: int, deadline: float | None = None) -> float:
+    if setter_count <= 0:
+        return UPDATE_MIN_REPLY_TIMEOUT_SECONDS
+    per_setter_budget = UPDATE_SETTER_REPLY_TOTAL_BUDGET_SECONDS / setter_count
+    cap = min(UPDATE_SETTER_REPLY_TIMEOUT_CAP_SECONDS, per_setter_budget)
+    return _bounded_reply_timeout(reader, cap, deadline)
+
+
 def _try_read_update_values(
     reader: Any,
     workspace_id: str,
     cue_ref: str,
     read_keys: list[str],
+    *,
+    request_timeout: float | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, str]]:
     try:
         values = reader.read_cue_values(
@@ -646,6 +1096,7 @@ def _try_read_update_values(
             read_keys,
             cache_profile="basic_safe",
             cacheable=False,
+            request_timeout=request_timeout,
         )["values"]
         if not isinstance(values, dict):
             raise ValueError("QLab valuesForKeys response must be an object")
@@ -662,13 +1113,30 @@ def _try_read_update_values_with_retries(
     requested: dict[str, Any],
     *,
     retry_on_mismatch: bool,
+    request_timeout: float | None = None,
+    deadline: float | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, str]]:
-    after, errors = _try_read_update_values(reader, workspace_id, cue_ref, read_keys)
+    after, errors = _try_read_update_values(
+        reader,
+        workspace_id,
+        cue_ref,
+        read_keys,
+        request_timeout=request_timeout,
+    )
     if not retry_on_mismatch or _properties_match(after, requested):
         return after, errors
     for delay in AFTER_READ_RETRY_DELAYS:
-        time.sleep(delay)
-        after, errors = _try_read_update_values(reader, workspace_id, cue_ref, read_keys)
+        remaining = _budget_remaining(deadline)
+        if deadline is not None and remaining <= 0:
+            break
+        time.sleep(delay if deadline is None else min(delay, max(0.0, remaining)))
+        after, errors = _try_read_update_values(
+            reader,
+            workspace_id,
+            cue_ref,
+            read_keys,
+            request_timeout=request_timeout,
+        )
         if _properties_match(after, requested):
             return after, errors
     return after, errors
@@ -695,7 +1163,17 @@ def _resolve_created_cue_after_timeout(reader: Any, workspace_id: str, before_id
 def _properties_match(values: Any, requested: dict[str, Any]) -> bool:
     if not isinstance(values, dict):
         return False
-    return all(values.get(key) == value for key, value in requested.items())
+    return all(_property_values_match(key, values.get(key), value) for key, value in requested.items())
+
+
+def _verification_requested_values(item: dict[str, Any]) -> dict[str, Any]:
+    requested = dict(item["properties"])
+    for operation in item["operations"]:
+        read_key = operation.get("read_key")
+        args = operation.get("args") or []
+        if read_key and len(args) == 1:
+            requested[str(read_key)] = args[0]
+    return requested
 
 
 def _verification_mismatch_message(values: Any, requested: dict[str, Any]) -> str:
@@ -704,9 +1182,41 @@ def _verification_mismatch_message(values: Any, requested: dict[str, Any]) -> st
     mismatches = [
         {"key": key, "requested": requested_value, "after": values.get(key)}
         for key, requested_value in requested.items()
-        if values.get(key) != requested_value
+        if not _property_values_match(key, values.get(key), requested_value)
     ]
     return f"Fresh after-read did not confirm requested values: {mismatches}"
+
+
+def _property_values_match(key: str, actual: Any, requested: Any) -> bool:
+    actual_value = _comparison_value(key, actual)
+    requested_value = _comparison_value(key, requested)
+    if _is_plain_number(actual_value) and _is_plain_number(requested_value):
+        return math.isclose(
+            float(actual_value),
+            float(requested_value),
+            rel_tol=UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
+            abs_tol=UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
+        )
+    return actual_value == requested_value
+
+
+def _comparison_value(key: str, value: Any) -> Any:
+    if key == "continueMode":
+        return _continue_mode_comparison_value(value)
+    if key in CASEFOLD_COMPARISON_KEYS and isinstance(value, str):
+        return value.strip().casefold()
+    return value
+
+
+def _continue_mode_comparison_value(value: Any) -> Any:
+    if isinstance(value, str):
+        normalized = value.strip().casefold().replace(" ", "_")
+        return CONTINUE_MODE_VALUES.get(normalized, value)
+    return CONTINUE_MODE_VALUES.get(value, value)
+
+
+def _is_plain_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _after_values_for_requested(values: Any, requested: dict[str, Any]) -> dict[str, Any] | None:
@@ -715,7 +1225,10 @@ def _after_values_for_requested(values: Any, requested: dict[str, Any]) -> dict[
     return {key: values.get(key) for key in requested}
 
 
-def _update_debug_enabled() -> bool:
+def _update_debug_enabled(reader: Any) -> bool:
+    config = getattr(getattr(reader, "client", None), "config", None)
+    if config is not None and hasattr(config, "update_debug"):
+        return bool(getattr(config, "update_debug"))
     return os.getenv("QLAB_UPDATE_DEBUG", "").strip().casefold() in {"1", "true", "yes", "on"}
 
 

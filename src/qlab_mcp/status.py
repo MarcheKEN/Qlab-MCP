@@ -8,6 +8,7 @@ from .allowlist import validate_value_keys
 from .cues.profiles import _coerce_qlab_bool
 from .cues.refs import _bounded_cue_refs_from_shallow
 from .osc.addressing import _clean_workspace_id
+from .sanitizer import sanitize_exception_message
 
 
 WORKSPACE_STATUS_PROFILES = {"summary", "technical"}
@@ -58,7 +59,7 @@ def _count_bool(cues: list[dict[str, Any]], key: str) -> int:
 
 
 def _compact_error(exc: Exception) -> str:
-    return str(exc)
+    return sanitize_exception_message(exc)
 
 
 def _numbers_equal(left: Any, right: Any) -> bool:
@@ -256,7 +257,12 @@ class WorkspaceStatusMixin:
         if cue_scan["scan_completeness"] != "complete":
             warnings.append("Workspace status cue-derived sections are partial; inspect limits and errors.")
 
+        settings_errors = sections["settings_summary"].get("errors") or {}
+        partial = cue_scan["scan_completeness"] != "complete" or bool(settings_errors)
         return {
+            "ok": True,
+            "partial": partial,
+            "status": "partial" if partial else "ok",
             "workspace_id": resolved_workspace_id,
             "profile": normalized_profile,
             "sections": sections,
@@ -266,7 +272,7 @@ class WorkspaceStatusMixin:
                 "cue_scan_completeness": cue_scan["scan_completeness"],
                 "scanned_count": cue_scan["scanned_count"],
                 "matched_timecode_config_count": sections["timecode_config"].get("configured_count", 0),
-                "settings_error_count": len(sections["settings_summary"].get("errors") or {}),
+                "settings_error_count": len(settings_errors),
             },
             "limits": _workspace_status_limits(max_cues_scanned, sample_limit),
             "warnings": warnings,
@@ -445,17 +451,19 @@ class WorkspaceStatusMixin:
                 "derived_from_settings",
                 False,
                 status="error",
+                errors={"settings_summary": _compact_error(exc)},
                 notes=["Workspace settings summary failed."],
             )
 
         for key, value in (result.get("errors") or {}).items():
             errors[f"settings.{key}"] = str(value)
         summary = dict(result.get("summary") or {})
+        status = "partial" if result.get("errors") else "available"
         if profile == "summary":
             return _status_section(
                 "derived_from_settings",
                 True,
-                status="available",
+                status=status,
                 summary=summary,
                 errors=result.get("errors") or None,
                 notes=result.get("warnings") or [],
@@ -463,7 +471,7 @@ class WorkspaceStatusMixin:
         return _status_section(
             "derived_from_settings",
             True,
-            status="available",
+            status=status,
             summary=summary,
             sections=result.get("sections") or {},
             errors=result.get("errors") or None,

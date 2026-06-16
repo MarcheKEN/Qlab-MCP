@@ -7,6 +7,7 @@ from typing import Any
 from ..allowlist import properties_for_profile, validate_value_keys
 from ..errors import QLabReplyError
 from ..osc.addressing import _clean_cue_ref, _clean_workspace_id
+from ..sanitizer import sanitize_exception_message, truncate_profile_payload
 from ..write.registry import editable_update_capabilities
 from .profiles import (
     _auto_type_specific_keys,
@@ -74,6 +75,56 @@ def _attach_read_coverage(result: dict[str, Any], profile: str) -> None:
         result["read_coverage"] = default_read_coverage_report()
 
 
+def _failed_cue_detail_result(
+    workspace_id: str,
+    cue_ref: str,
+    profile: str,
+    error_code: str,
+    message: str,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": "error",
+        "partial": False,
+        "error_code": error_code,
+        "message": message,
+        "workspace_id": _clean_workspace_id(workspace_id),
+        "cue_ref": str(cue_ref).strip().strip("/"),
+        "profile": profile,
+        "cue_type": None,
+        "properties": {},
+        "sections": None,
+        "update_capabilities": None,
+        "errors": {"error_code": error_code, "message": message},
+        "warnings": [],
+        "active_count": None,
+    }
+
+
+def _normalize_cue_detail_result(result: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(result)
+    errors = normalized.get("errors")
+    error_code = errors.get("error_code") if isinstance(errors, dict) else None
+    has_readable_payload = bool(normalized.get("properties")) or normalized.get("cue_type") is not None
+    if normalized.get("ok") is False or (error_code == UNRESOLVED_CUE_ERROR_CODE and not has_readable_payload):
+        normalized["ok"] = False
+        normalized["status"] = "error"
+        normalized["partial"] = False
+        normalized["error_code"] = normalized.get("error_code") or error_code
+        if normalized.get("message") is None and isinstance(errors, dict):
+            normalized["message"] = errors.get("message")
+        return normalized
+    if errors:
+        normalized["ok"] = True
+        normalized["status"] = "partial"
+        normalized["partial"] = True
+        return normalized
+    normalized["ok"] = True
+    normalized["status"] = "ok"
+    normalized["partial"] = False
+    return normalized
+
+
 class CueDetailsMixin:
     def _read_cue_values_with_fallback(
         self,
@@ -104,13 +155,13 @@ class CueDetailsMixin:
                 values.update(batched_values)
                 continue
             except Exception as exc:
-                errors[chunk_error_key] = str(exc)
+                errors[chunk_error_key] = sanitize_exception_message(exc)
 
             for property_path in normalized_keys:
                 try:
                     values[property_path] = self.read_cue_property(workspace_id, cue_ref, property_path)["value"]
                 except Exception as property_exc:
-                    errors[property_path] = str(property_exc)
+                    errors[property_path] = sanitize_exception_message(property_exc)
         return values
 
     def _get_auto_cue_details(self, workspace_id: str, cue_ref: str) -> dict[str, Any]:
@@ -136,7 +187,7 @@ class CueDetailsMixin:
             values = self._read_cue_values_with_fallback(workspace_id, cue_ref, common_keys, errors, profile="auto")
         if _looks_unresolved(values, errors):
             errors = _compact_unresolved_errors()
-        values = _derive_profile_fields("auto", values)
+        values = truncate_profile_payload("auto", _derive_profile_fields("auto", values))
 
         type_specific_keys = [
             key for key in _auto_type_specific_keys(values.get("type")) if key not in values
@@ -153,7 +204,7 @@ class CueDetailsMixin:
                 cacheable=cacheable,
             )
             values.update(type_specific_values)
-            values = _derive_profile_fields("auto", values)
+            values = truncate_profile_payload("auto", _derive_profile_fields("auto", values))
 
         result: dict[str, Any] = {
             "workspace_id": _clean_workspace_id(workspace_id),
@@ -226,7 +277,7 @@ class CueDetailsMixin:
             )
         if _looks_unresolved(values, errors):
             errors = _compact_unresolved_errors()
-        values = _derive_profile_fields(profile, values)
+        values = truncate_profile_payload(profile, _derive_profile_fields(profile, values))
 
         result: dict[str, Any] = {
             "workspace_id": _clean_workspace_id(workspace_id),
@@ -251,34 +302,37 @@ class CueDetailsMixin:
         try:
             resolved_workspace_id = self._resolve_workspace_id_strict(workspace_id)
         except Exception as exc:
-            errors = _workspace_resolution_errors(getattr(exc, "status", "workspace_not_found"), str(exc))
+            errors = _workspace_resolution_errors(
+                getattr(exc, "status", "workspace_not_found"),
+                sanitize_exception_message(exc),
+            )
             if isinstance(cue_ref, str):
-                return {
-                    "workspace_id": requested_workspace_id,
-                    "cue_ref": cue_ref,
-                    "profile": profile,
-                    "cue_type": None,
-                    "properties": {},
-                    "sections": None,
-                    "update_capabilities": None,
-                    "errors": errors,
-                    "warnings": ["Requested workspace could not be resolved."],
-                    "active_count": None,
-                    "message": "Requested workspace could not be resolved.",
-                }
+                result = _failed_cue_detail_result(
+                    requested_workspace_id,
+                    cue_ref,
+                    profile,
+                    errors["error_code"],
+                    errors["message"],
+                )
+                result["warnings"] = ["Requested workspace could not be resolved."]
+                return result
             return {
                 "ok": False,
+                "status": "error",
+                "partial": False,
+                "error_code": errors["error_code"],
+                "message": "Requested workspace could not be resolved.",
                 "workspace_id": requested_workspace_id,
                 "requested_count": len(cue_ref) if isinstance(cue_ref, list) else 0,
                 "succeeded_count": 0,
                 "failed_count": len(cue_ref) if isinstance(cue_ref, list) else 0,
                 "profile": profile,
                 "results": [],
-                "errors": {"workspace_resolution": str(exc), "error_code": errors["error_code"]},
+                "errors": {"workspace_resolution": sanitize_exception_message(exc), "error_code": errors["error_code"]},
                 "warnings": ["Requested workspace could not be resolved."],
             }
         if isinstance(cue_ref, str):
-            return self._get_single_cue_details(resolved_workspace_id, cue_ref, profile)
+            return _normalize_cue_detail_result(self._get_single_cue_details(resolved_workspace_id, cue_ref, profile))
         if not isinstance(cue_ref, list):
             raise ValueError("cue_ref must be a string or a list of strings")
         if not cue_ref:
@@ -294,6 +348,15 @@ class CueDetailsMixin:
             if not isinstance(ref, str) or not ref.strip():
                 key = str(ref) if ref is not None else f"index:{index}"
                 errors[key] = "cue_ref entries must be non-empty strings"
+                results.append(
+                    _failed_cue_detail_result(
+                        resolved_workspace_id,
+                        key,
+                        profile,
+                        "invalid_cue_ref",
+                        "cue_ref entries must be non-empty strings",
+                    )
+                )
                 failed_count += 1
                 continue
             try:
@@ -303,19 +366,22 @@ class CueDetailsMixin:
                     profile,
                     include_read_coverage=False,
                 )
+                result = _normalize_cue_detail_result(result)
                 results.append(result)
                 if result.get("errors"):
                     errors[ref] = _batch_error_summary(result)
                     failed_count += 1
             except Exception as exc:
-                errors[ref] = str(exc)
+                errors[ref] = sanitize_exception_message(exc)
                 failed_count += 1
 
         succeeded_count = len(cue_ref) - failed_count
         if failed_count:
             warnings.append("One or more cue detail reads failed; inspect errors for per-cue failures.")
         batch_result = {
-            "ok": failed_count == 0,
+            "ok": failed_count == 0 or succeeded_count > 0,
+            "status": "error" if succeeded_count == 0 and failed_count else "partial" if failed_count else "ok",
+            "partial": bool(failed_count and succeeded_count),
             "workspace_id": resolved_workspace_id,
             "requested_count": len(cue_ref),
             "succeeded_count": succeeded_count,

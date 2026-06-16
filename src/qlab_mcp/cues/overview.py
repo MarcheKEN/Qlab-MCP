@@ -415,7 +415,14 @@ class CueOverviewMixin:
             raise ValueError("max_index_cues must be 5000 or lower")
         normalized_cue_index_profile = normalize_cue_index_profile(cue_index_profile)
 
-        workspaces_result = self.get_workspaces()
+        try:
+            workspaces_result = self.get_workspaces()
+        except Exception as exc:
+            return _overview_workspace_resolution_error(
+                _clean_workspace_id(workspace_id or ""),
+                "workspace_unavailable",
+                str(exc),
+            )
         workspaces = workspaces_result.get("workspaces") or []
         if workspace_id is not None:
             try:
@@ -504,7 +511,7 @@ class CueOverviewMixin:
             global_count = _global_cue_count_with_fallback(
                 self,
                 resolved_workspace_id,
-                max_ids=max(max_cues, max_index_cues),
+                max_ids=5000,
             )
             known_total_cues = global_count["known_total_cues"]
             known_total_cues_status = global_count["known_total_cues_status"]
@@ -538,6 +545,8 @@ class CueOverviewMixin:
             "warning": None,
             "health_counts_status": "not_calculated",
             "health_counts_source": count_source,
+            "health_authoritative": False,
+            "health_authoritative_source": None,
             "health_counts": {
                 "broken": 0,
                 "warning": 0,
@@ -596,8 +605,14 @@ class CueOverviewMixin:
             summary["broken"] = health_counts["broken"]
             summary["warning"] = health_counts["warning"]
             summary["health_counts_status"] = "known"
+            summary["health_authoritative"] = True
+            summary["health_authoritative_source"] = count_source
         else:
-            summary["health_counts_status"] = "partial"
+            summary["health_counts_status"] = "partial_non_authoritative"
+            summary["health_authoritative"] = False
+            summary["health_authoritative_source"] = (
+                "shallow cue traversal did not include reliable isBroken/isWarning for every cue"
+            )
 
         overview_cue_lists = _tree_from_bounded_refs(overview_refs, max_depth, limits["truncation_reasons"])
 
@@ -760,6 +775,8 @@ class CueOverviewMixin:
                 "rows": index_rows,
                 "total_cue_ids": len(cue_refs),
                 "indexed_count": len(index_rows),
+                "returned_index_cues": len(index_rows),
+                "index_truncated": bool(index_bounded["truncated"] or len(all_index_refs) > max_index_cues),
                 "truncated": bool(index_bounded["truncated"] or len(all_index_refs) > max_index_cues),
                 "max_index_cues": max_index_cues,
                 "errors": index_errors or None,

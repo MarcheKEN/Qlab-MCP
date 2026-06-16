@@ -177,6 +177,10 @@ The MCP reconstructs health from OSC-readable fields such as `isBroken`,
 `isWarning`, cue type, targets, message errors, and settings. It does not claim
 to read the full Workspace Status window directly because QLab's documented OSC
 dictionary does not expose a single complete Workspace Status warnings endpoint.
+When `qlab_get_workspace_overview` cannot read authoritative broken/warning
+fields from shallow cue data, health rows are marked partial/non-authoritative
+and callers should use `qlab_get_workspace_status` or `qlab_query_cues` with
+health filters for cue-level diagnostics.
 
 The read tools are the mature surface for normal agent work:
 `qlab_check_connection`, `qlab_get_workspace_status`,
@@ -188,6 +192,39 @@ the single-request compatibility wrapper for settings details.
 
 The read tools are intentionally read-only. The write-mode tools are separate,
 gated, and disabled by default.
+
+Read-tool validation and contract failures return stable JSON instead of raw
+schema or exception text:
+
+```json
+{
+  "ok": false,
+  "status": "error",
+  "partial": false,
+  "error_code": "validation_failed",
+  "message": "max_results must be 1 or greater",
+  "details": null,
+  "received": {"max_results": 0},
+  "allowed": {"max_results": "1..5000"}
+}
+```
+
+Successful read-tool responses expose a meaningful top-level shape:
+`ok: true`, `status: "ok"`, `partial: false` for complete reads; `ok: true`,
+`status: "partial"`, `partial: true` for partial but usable reads; and
+`ok: false`, `status: "error"` for failures. Legacy section-specific status
+fields remain in place.
+
+For cue details, one unresolved cue reference is a failure:
+`ok: false`, `status: "error"`, `partial: false`, with
+`error_code: "cue_ref_unresolved"`. In a batch, unresolved items are reported as
+per-item failures; the batch top level is `status: "partial"` when at least one
+other cue was read successfully, or `status: "error"` when all items failed.
+
+Responses remove MCP/project implementation paths such as `source_path`,
+tracebacks, and stack fields. QLab media targets are different: safe profiles do
+not expose them, but technical/sensitive profiles may return valid media paths
+when that exposure is intentional.
 
 `safe` is the normal profile. It is meant for agent use and redacts sensitive
 infrastructure where possible: destinations, routes, devices, passcodes,
@@ -203,6 +240,18 @@ Passcodes and credentials remain redacted.
 
 `full_sensitive` is deeper still. It can expose cue notes, local media paths,
 scripts, and heavy stage payloads. Use it only when that exposure is intentional.
+
+Cue detail profiles are intentionally tiered:
+
+- `basic` / `basic_safe`: compact identity/status, no large notes, scripts, or media paths.
+- `auto` / `inspector_safe`: operational cue data; type-specific fields are summarized and compact.
+- `editable`: capability discovery for `qlab_update_cues`, including dry-run-only properties and write gates; it does not imply real writes are enabled.
+- `full_sensitive` / `exhaustive`: explicit large/sensitive reads; still no MCP implementation paths.
+
+Compact profiles truncate long text fields such as notes, memo text, script
+text, light commands, and network messages. Truncated fields return
+`field_truncated: true` and `original_length`; request `full_sensitive` or
+`exhaustive` only when full content is required.
 
 `qlab_get_cue_details(profile="exhaustive")` also returns `read_coverage`
 metadata comparing the allowlisted detail profile with the local QLab OSC
@@ -323,6 +372,9 @@ such as:
 `qlab_get_workspace_settings(mode="details")` accepts one or more requests and
 returns a batch result. A failed request returns its own error or choices and
 does not block other valid requests.
+Empty settings/patch collections are successful empty results, for example
+`items: []`, `empty: true`, or `available: false`; this is distinct from a read
+error.
 
 ```json
 [

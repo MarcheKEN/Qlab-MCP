@@ -71,6 +71,10 @@ def cue_index_value_keys(profile: str) -> tuple[str, ...]:
 def _cue_index_row(cue_ref: dict[str, Any], values: dict[str, Any], profile: str = "health") -> list[Any]:
     cue = _derive_profile_fields("cue_index", values)
     cue.setdefault("uniqueID", cue_ref.get("uniqueID"))
+    if normalize_cue_index_profile(profile) == "health":
+        for key in ("isBroken", "isWarning"):
+            if key not in cue or cue.get(key) is None:
+                cue[key] = "unknown"
     cue["cue_list_id"] = cue_ref.get("cue_list_id")
     cue["parent_id"] = cue_ref.get("parent_id")
     cue["depth"] = cue_ref.get("depth")

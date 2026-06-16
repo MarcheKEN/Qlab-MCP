@@ -107,8 +107,12 @@ class QLabReader(
         return self._read_cache.get_or_set(key, self._cache_ttl(), read)
 
     def get_workspaces(self) -> dict[str, Any]:
-        reply = self.client.request("/workspaces")
-        return {"workspaces": reply.data, "status": reply.status}
+        def read() -> dict[str, Any]:
+            reply = self.client.request("/workspaces")
+            return {"workspaces": reply.data, "status": reply.status}
+
+        key = (client_cache_namespace(self.client), None, "/workspaces", (), "workspace_resolution")
+        return self._read_cache.get_or_set(key, self._cache_ttl(), read)
 
     def _resolve_workspace(self, workspaces: Any, workspace_id: str | None) -> dict[str, Any]:
         if not isinstance(workspaces, list):
@@ -166,6 +170,10 @@ class QLabReader(
         requested = _clean_workspace_id(workspace_id)
         try:
             workspaces = self.get_workspaces().get("workspaces")
+        except OscTimeoutError as exc:
+            if requested == "ws-1":
+                return requested
+            raise WorkspaceResolutionError("workspace_unavailable", str(exc), requested) from exc
         except Exception as exc:
             # Many unit tests predate workspace pre-resolution and do not mock
             # /workspaces. Keep those focused fixtures valid without weakening

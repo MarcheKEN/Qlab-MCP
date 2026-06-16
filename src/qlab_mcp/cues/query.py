@@ -6,6 +6,7 @@ from typing import Any
 
 from ..allowlist import properties_for_profile, validate_value_keys
 from ..osc.addressing import _clean_workspace_id
+from ..sanitizer import sanitize_exception_message, truncate_profile_payload
 from .editorial import _is_ambiguous_label, _is_empty_text
 from .profiles import _coerce_qlab_bool, _derive_profile_fields, _is_positive_number
 from .refs import _bounded_cue_refs_from_shallow
@@ -319,7 +320,7 @@ class CueQueryMixin:
                 if not isinstance(values, dict):
                     raise ValueError("QLab valuesForKeys response must be an object")
             except Exception as exc:
-                errors[str(cue_id)] = str(exc)
+                errors[str(cue_id)] = sanitize_exception_message(exc)
                 continue
 
             if not all(_cue_matches_filter(values, cue_ref, query_filter) for query_filter in filters):
@@ -335,7 +336,7 @@ class CueQueryMixin:
                 cue["parent_id"] = cue_ref.get("parent_id")
                 cue["cue_list_id"] = cue_ref.get("cue_list_id")
                 cue["depth"] = cue_ref.get("depth")
-                cue = _derive_profile_fields(profile, cue)
+                cue = truncate_profile_payload(profile, _derive_profile_fields(profile, cue))
                 cues.append(cue)
 
         scanned_all_cues = not bounded["truncated"]

@@ -34,6 +34,7 @@ from .models import (
     WorkspaceSettingsResult,
 )
 from .qlab import QLabReader
+from .sanitizer import sanitize_exception_message, stable_error
 
 
 CueQueryProfile = Literal[
@@ -223,7 +224,7 @@ def _safe_tool_error_message(exc: QLabMcpError | ValueError) -> str:
         return "The requested cue property or profile is not allowed for read-only access."
     if isinstance(exc, UnsafeWriteOperationError):
         return str(exc)
-    return str(exc)
+    return sanitize_exception_message(exc)
 
 
 def _run_tool(factory: Callable[[], T]) -> T:
@@ -231,6 +232,207 @@ def _run_tool(factory: Callable[[], T]) -> T:
         return factory()
     except (QLabMcpError, ValueError) as exc:
         raise ToolError(_safe_tool_error_message(exc)) from exc
+
+
+def _structured_error_result(
+    *,
+    error_code: str,
+    message: str,
+    received: Any = None,
+    allowed: Any = None,
+    details: Any = None,
+) -> dict[str, Any]:
+    payload = stable_error(
+        error_code=error_code,
+        message=message,
+        details=details,
+        received=received,
+        allowed=allowed,
+    )
+    payload["status"] = "error"
+    payload["partial"] = False
+    return payload
+
+
+def _read_status_from_payload(payload: dict[str, Any], *, partial: bool = False) -> dict[str, Any]:
+    normalized = dict(payload)
+    if normalized.get("ok") is False:
+        normalized["partial"] = False
+        if normalized.get("error_code") is None and normalized.get("status") not in {None, "error"}:
+            normalized["error_code"] = normalized.get("status")
+        normalized["status"] = "error"
+        return normalized
+    if normalized.get("ok") is None:
+        normalized["ok"] = True
+    effective_partial = bool(partial or normalized.get("partial") or normalized.get("errors"))
+    normalized["partial"] = effective_partial
+    if normalized.get("status") is None:
+        normalized["status"] = "partial" if effective_partial else "ok"
+    return normalized
+
+
+def _overview_success_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    limits = payload.get("limits") if isinstance(payload.get("limits"), dict) else {}
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    partial = bool(
+        payload.get("errors")
+        or (limits or {}).get("truncated")
+        or summary.get("total_cue_ids_status") not in {None, "known"}
+        or summary.get("health_counts_status") not in {None, "known", "not_calculated"}
+    )
+    return _read_status_from_payload(payload, partial=partial)
+
+
+def _settings_success_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    partial = bool(payload.get("errors") or (payload.get("failed_count") or 0) > 0)
+    return _read_status_from_payload(payload, partial=partial)
+
+
+def _query_success_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    partial = bool(payload.get("errors") or payload.get("query_completeness") == "partial" or payload.get("truncated"))
+    return _read_status_from_payload(payload, partial=partial)
+
+
+def _cue_details_item_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    errors = payload.get("errors")
+    error_code = errors.get("error_code") if isinstance(errors, dict) else None
+    has_readable_payload = bool(payload.get("properties")) or payload.get("cue_type") is not None
+    if error_code == "cue_ref_unresolved" and not has_readable_payload:
+        return _read_status_from_payload({**payload, "ok": False})
+    return _read_status_from_payload(payload)
+
+
+def _cue_details_success_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    if isinstance(payload.get("results"), list):
+        payload = {
+            **payload,
+            "results": [
+                _cue_details_item_payload(item)
+                if isinstance(item, dict)
+                else item
+                for item in payload["results"]
+            ],
+        }
+    partial = bool(payload.get("errors") or (payload.get("failed_count") or 0) > 0)
+    return _read_status_from_payload(payload, partial=partial)
+
+
+def _workspace_overview_error(workspace_id: Any, **error: Any) -> WorkspaceOverviewResult:
+    payload = {
+        **_structured_error_result(**error),
+        "workspace_id": str(workspace_id or ""),
+        "workspace": None,
+        "cue_count": 0,
+        "cue_count_meaning": "failed",
+        "summary": {},
+        "cue_lists": [],
+        "limits": {},
+        "warnings": [error["message"]],
+        "errors": {"validation": error["message"], "error_code": error["error_code"]},
+    }
+    return WorkspaceOverviewResult.model_validate(payload)
+
+
+def _workspace_status_error(workspace_id: Any, profile: Any, **error: Any) -> WorkspaceStatusResult:
+    payload = {
+        **_structured_error_result(**error),
+        "workspace_id": str(workspace_id or ""),
+        "profile": str(profile or "summary"),
+        "partial": False,
+        "sections": {},
+        "summary": {},
+        "limits": {},
+        "warnings": [error["message"]],
+        "errors": {"validation": error["message"], "error_code": error["error_code"]},
+    }
+    return WorkspaceStatusResult.model_validate(payload)
+
+
+def _settings_error(workspace_id: Any, mode: Any, profile: Any, **error: Any) -> WorkspaceSettingsResult:
+    payload = {
+        **_structured_error_result(**error),
+        "workspace_id": str(workspace_id or ""),
+        "mode": str(mode or "summary"),
+        "profile": str(profile or "safe"),
+        "requested_profile": str(profile or "safe"),
+        "sections": {},
+        "summary": {"error_count": 1},
+        "available_detail_requests": [],
+        "results": [],
+        "redactions": [],
+        "warnings": [error["message"]],
+        "errors": {"validation": error["message"], "error_code": error["error_code"]},
+    }
+    return WorkspaceSettingsResult.model_validate(payload)
+
+
+def _setting_details_error(workspace_id: Any, section: Any, kind: Any, profile: Any, **error: Any) -> WorkspaceSettingDetailsResult:
+    payload = {
+        **_structured_error_result(**error),
+        "workspace_id": str(workspace_id or ""),
+        "section": str(section or ""),
+        "kind": str(kind or ""),
+        "profile": str(profile or "safe"),
+        "details": None,
+        "choices": [],
+        "redactions": [],
+        "warnings": [error["message"]],
+        "errors": {"validation": error["message"], "error_code": error["error_code"]},
+        "message": error["message"],
+    }
+    return WorkspaceSettingDetailsResult.model_validate(payload)
+
+
+def _query_error(workspace_id: Any, primary_filter: Any, profile: Any, max_results: Any, max_cues_scanned: Any, **error: Any) -> CueQueryResult:
+    payload = {
+        **_structured_error_result(**error),
+        "workspace_id": str(workspace_id or ""),
+        "filters": [{"filter": str(primary_filter or ""), "value": None}],
+        "profile": str(profile or "basic_safe"),
+        "scanned_count": 0,
+        "matched_count": 0,
+        "returned_count": 0,
+        "total_cue_ids": 0,
+        "query_completeness": "failed",
+        "query_completeness_reasons": ["validation"],
+        "truncated": False,
+        "scanned_all_cues": False,
+        "result_limited": False,
+        "limits": {"max_results": max_results, "max_cues_scanned": max_cues_scanned},
+        "cues": [],
+        "warnings": [error["message"]],
+        "errors": {"validation": error["message"], "error_code": error["error_code"]},
+    }
+    return CueQueryResult.model_validate(payload)
+
+
+def _cue_details_error(workspace_id: Any, cue_ref: Any, profile: Any, **error: Any) -> CueDetailsResult | CueDetailsBatchResult:
+    base = _structured_error_result(**error)
+    if isinstance(cue_ref, list):
+        return CueDetailsBatchResult.model_validate(
+            {
+                **base,
+                "workspace_id": str(workspace_id or ""),
+                "requested_count": len(cue_ref),
+                "succeeded_count": 0,
+                "failed_count": len(cue_ref),
+                "profile": str(profile or "auto"),
+                "results": [],
+                "warnings": [error["message"]],
+                "errors": {"validation": error["message"], "error_code": error["error_code"]},
+            }
+        )
+    return CueDetailsResult.model_validate(
+        {
+            **base,
+            "workspace_id": str(workspace_id or ""),
+            "cue_ref": str(cue_ref or ""),
+            "profile": str(profile or "auto"),
+            "properties": {},
+            "warnings": [error["message"]],
+            "errors": {"validation": error["message"], "error_code": error["error_code"]},
+        }
+    )
 
 
 @mcp.tool(
@@ -290,8 +492,6 @@ def qlab_get_workspace_overview(
     max_depth: Annotated[
         int,
         Field(
-            ge=0,
-            le=5,
             description=(
                 "How many child layers of cue lists/groups to inspect using shallow OSC reads. "
                 "Use 0 for cue-list names only; increase only when the show map is incomplete."
@@ -301,8 +501,6 @@ def qlab_get_workspace_overview(
     max_cues: Annotated[
         int,
         Field(
-            ge=1,
-            le=5000,
             description=(
                 "Maximum cue/list/group nodes to include in the bounded tree preview before marking it as truncated. "
                 "Raise up to 5000 for large workspace load checks."
@@ -330,8 +528,6 @@ def qlab_get_workspace_overview(
     max_index_cues: Annotated[
         int,
         Field(
-            ge=1,
-            le=5000,
             description=(
                 "Maximum cue IDs to include in cue_index before marking the index as truncated. "
                 "This does not change the bounded tree preview limits."
@@ -339,7 +535,7 @@ def qlab_get_workspace_overview(
         ),
     ] = 5000,
     cue_index_profile: Annotated[
-        CueIndexProfile,
+        str,
         Field(
             description=(
                 "Cue index shape. minimal returns identity and position columns; health adds armed, flagged, "
@@ -362,9 +558,9 @@ def qlab_get_workspace_overview(
 
     Use this as the first structural read after selecting a workspace; it includes Edit/Show mode and is bounded and shallow by default.
     """
-    return _run_tool(
-        lambda: WorkspaceOverviewResult.model_validate(
-            _reader().get_workspace_overview(
+    try:
+        return WorkspaceOverviewResult.model_validate(
+            _overview_success_payload(_reader().get_workspace_overview(
                 workspace_id=workspace_id,
                 max_depth=max_depth,
                 max_cues=max_cues,
@@ -373,9 +569,22 @@ def qlab_get_workspace_overview(
                 max_index_cues=max_index_cues,
                 cue_index_profile=cue_index_profile,
                 include_global_count=include_global_count,
-            )
+            ))
         )
-    )
+    except (QLabMcpError, ValueError, TypeError) as exc:
+        return _workspace_overview_error(
+            workspace_id,
+            error_code="validation_failed",
+            message=sanitize_exception_message(exc),
+            received={
+                "workspace_id": workspace_id,
+                "max_depth": max_depth,
+                "max_cues": max_cues,
+                "max_index_cues": max_index_cues,
+                "cue_index_profile": cue_index_profile,
+            },
+            allowed={"max_depth": "0..5", "max_cues": "1..5000", "max_index_cues": "1..5000", "cue_index_profile": ["minimal", "health"]},
+        )
 
 
 @mcp.tool(
@@ -387,7 +596,7 @@ def qlab_get_workspace_overview(
 def qlab_get_workspace_status(
     workspace_id: WorkspaceId,
     profile: Annotated[
-        WorkspaceStatusProfile,
+        str,
         Field(
             description=(
                 "summary returns compact derived operational status. technical adds safe settings section payloads. "
@@ -402,16 +611,12 @@ def qlab_get_workspace_status(
     max_cues_scanned: Annotated[
         int,
         Field(
-            ge=1,
-            le=5000,
             description="Maximum cues to scan for cue-derived status summaries before marking them partial.",
         ),
     ] = 1000,
     sample_limit: Annotated[
         int,
         Field(
-            ge=0,
-            le=50,
             description="Maximum sample cue/status rows returned inside compact sections.",
         ),
     ] = 10,
@@ -421,8 +626,8 @@ def qlab_get_workspace_status(
     Uses documented OSC reads and derived summaries. Sections that QLab does not expose as safe read-only OSC
     endpoints are returned with source='not_exposed' instead of invented values.
     """
-    return _run_tool(
-        lambda: WorkspaceStatusResult.model_validate(
+    try:
+        return WorkspaceStatusResult.model_validate(
             _reader().get_workspace_status(
                 workspace_id=workspace_id,
                 profile=profile,
@@ -431,7 +636,15 @@ def qlab_get_workspace_status(
                 sample_limit=sample_limit,
             )
         )
-    )
+    except (QLabMcpError, ValueError, TypeError) as exc:
+        return _workspace_status_error(
+            workspace_id,
+            profile,
+            error_code="validation_failed",
+            message=sanitize_exception_message(exc),
+            received={"profile": profile, "max_cues_scanned": max_cues_scanned, "sample_limit": sample_limit},
+            allowed={"profile": ["summary", "technical"], "max_cues_scanned": "1..5000", "sample_limit": "0..50"},
+        )
 
 
 @mcp.tool(
@@ -443,7 +656,7 @@ def qlab_get_workspace_status(
 def qlab_get_workspace_settings(
     workspace_id: WorkspaceId,
     mode: Annotated[
-        WorkspaceSettingsMode,
+        str,
         Field(
             description=(
                 "summary returns compact inventory plus available_detail_requests. "
@@ -452,7 +665,7 @@ def qlab_get_workspace_settings(
         ),
     ] = "summary",
     sections: Annotated[
-        list[WorkspaceSettingsSection] | None,
+        list[str] | None,
         Field(
             description=(
                 "Summary mode sections to inspect. Use audio, video, network, midi, light, and/or general. "
@@ -472,7 +685,7 @@ def qlab_get_workspace_settings(
         ),
     ] = None,
     profile: Annotated[
-        WorkspaceSettingsProfile,
+        str,
         Field(
             description=(
                 "Read-only profile for details mode. safe returns compact redacted summaries; technical can include "
@@ -488,9 +701,9 @@ def qlab_get_workspace_settings(
     errors, and available_detail_requests. Details mode accepts one or more requests and returns independent
     per-request results; one failed request does not block other valid requests.
     """
-    return _run_tool(
-        lambda: WorkspaceSettingsResult.model_validate(
-            _reader().get_workspace_settings(
+    try:
+        return WorkspaceSettingsResult.model_validate(
+            _settings_success_payload(_reader().get_workspace_settings(
                 workspace_id=workspace_id,
                 mode=mode,
                 sections=sections,
@@ -498,9 +711,18 @@ def qlab_get_workspace_settings(
                 if requests is not None
                 else None,
                 profile=profile,
-            )
+            ))
         )
-    )
+    except (QLabMcpError, ValueError, TypeError) as exc:
+        return _settings_error(
+            workspace_id,
+            mode,
+            profile,
+            error_code="validation_failed",
+            message=sanitize_exception_message(exc),
+            received={"mode": mode, "sections": sections, "requests": requests, "profile": profile},
+            allowed={"mode": ["summary", "details"], "sections": ["audio", "video", "network", "midi", "light", "general"], "profile": ["safe", "technical", "exhaustive"]},
+        )
 
 
 @mcp.tool(
@@ -512,11 +734,11 @@ def qlab_get_workspace_settings(
 def qlab_get_workspace_setting_details(
     workspace_id: WorkspaceId,
     section: Annotated[
-        WorkspaceSettingsSection,
+        str,
         Field(description="Workspace settings section to inspect in detail."),
     ],
     kind: Annotated[
-        WorkspaceSettingDetailKind | None,
+        str | None,
         Field(
             description=(
                 "Specific settings item kind. Use all, output_patch, input_patch, audio_map, route, stage, "
@@ -535,7 +757,7 @@ def qlab_get_workspace_setting_details(
         ),
     ] = None,
     profile: Annotated[
-        WorkspaceSettingsProfile,
+        str,
         Field(
             description=(
                 "Read-only detail profile. safe returns compact normalized details suitable for normal agent use. "
@@ -551,17 +773,27 @@ def qlab_get_workspace_setting_details(
     summarizes large structures: light patches become instrument indexes, video stages become stage/region/route
     summaries, and audio maps omit long level arrays. Use technical or exhaustive only for explicit low-level audits.
     """
-    return _run_tool(
-        lambda: WorkspaceSettingDetailsResult.model_validate(
-            _reader().get_workspace_setting_details(
+    try:
+        return WorkspaceSettingDetailsResult.model_validate(
+            _settings_success_payload(_reader().get_workspace_setting_details(
                 workspace_id=workspace_id,
                 section=section,
                 kind=kind,
                 ref=ref,
                 profile=profile,
-            )
+            ))
         )
-    )
+    except (QLabMcpError, ValueError, TypeError) as exc:
+        return _setting_details_error(
+            workspace_id,
+            section,
+            kind,
+            profile,
+            error_code="validation_failed",
+            message=sanitize_exception_message(exc),
+            received={"section": section, "kind": kind, "ref": ref, "profile": profile},
+            allowed={"sections": ["audio", "video", "network", "midi", "light", "general"], "kinds": list(WorkspaceSettingDetailKind.__args__) if hasattr(WorkspaceSettingDetailKind, "__args__") else None, "profile": ["safe", "technical", "exhaustive"]},
+        )
 
 
 @mcp.tool(
@@ -573,7 +805,7 @@ def qlab_get_workspace_setting_details(
 def qlab_query_cues(
     workspace_id: WorkspaceId,
     primary_filter: Annotated[
-        CueQueryFilter,
+        str,
         Field(
             description=(
                 "Required first filter. Supported filters: type, flagged, armed, disarmed, isBroken, isWarning, "
@@ -603,7 +835,7 @@ def qlab_query_cues(
         ),
     ] = None,
     profile: Annotated[
-        CueQueryProfile,
+        str,
         Field(
             description=(
                 "Read-only data profile to return for matching cues. Default basic_safe gives compact identity/status; "
@@ -615,16 +847,12 @@ def qlab_query_cues(
     max_results: Annotated[
         int,
         Field(
-            ge=1,
-            le=5000,
             description="Maximum matching cues to return. Scanning may continue past this to report matched_count.",
         ),
     ] = 500,
     max_cues_scanned: Annotated[
         int,
         Field(
-            ge=1,
-            le=5000,
             description="Maximum cue IDs to scan from cueLists/uniqueIDs before marking the result truncated.",
         ),
     ] = 500,
@@ -636,9 +864,9 @@ def qlab_query_cues(
     500 returned matches and 500 scanned cue IDs by default so agents stay compact. Callers can explicitly
     raise either limit up to 5000 for large shows; truncation metadata reports incomplete scans or result caps.
     """
-    return _run_tool(
-        lambda: CueQueryResult.model_validate(
-            _reader().query_cues(
+    try:
+        return CueQueryResult.model_validate(
+            _query_success_payload(_reader().query_cues(
                 workspace_id=workspace_id,
                 primary_filter=primary_filter,
                 primary_value=primary_value,
@@ -646,9 +874,20 @@ def qlab_query_cues(
                 profile=profile,
                 max_results=max_results,
                 max_cues_scanned=max_cues_scanned,
-            )
+            ))
         )
-    )
+    except (QLabMcpError, ValueError, TypeError) as exc:
+        return _query_error(
+            workspace_id,
+            primary_filter,
+            profile,
+            max_results,
+            max_cues_scanned,
+            error_code="validation_failed",
+            message=sanitize_exception_message(exc),
+            received={"primary_filter": primary_filter, "optional_filters": optional_filters, "profile": profile, "max_results": max_results, "max_cues_scanned": max_cues_scanned},
+            allowed={"filters": list(CueQueryFilter.__args__) if hasattr(CueQueryFilter, "__args__") else None, "profiles": list(CueQueryProfile.__args__) if hasattr(CueQueryProfile, "__args__") else None, "max_results": "1..5000", "max_cues_scanned": "1..5000"},
+        )
 
 
 @mcp.tool(
@@ -661,7 +900,7 @@ def qlab_get_cue_details(
     workspace_id: WorkspaceId,
     cue_ref: CueRef | CueRefs,
     profile: Annotated[
-        CueDetailsProfile,
+        str,
         Field(
             description=(
                 "Read-only detail profile. Use auto for safe type-aware sections, health for warnings/broken cues, "
@@ -681,13 +920,22 @@ def qlab_get_cue_details(
     health for warnings, technical/full_sensitive only when justified, and exhaustive only for deep audits
     or load testing because it can expose large/sensitive payloads.
     """
-    return _run_tool(
-        lambda: (
-            CueDetailsBatchResult.model_validate(_reader().get_cue_details(workspace_id, cue_ref, profile))
+    try:
+        return (
+            CueDetailsBatchResult.model_validate(_cue_details_success_payload(_reader().get_cue_details(workspace_id, cue_ref, profile)))
             if isinstance(cue_ref, list)
-            else CueDetailsResult.model_validate(_reader().get_cue_details(workspace_id, cue_ref, profile))
+            else CueDetailsResult.model_validate(_cue_details_success_payload(_reader().get_cue_details(workspace_id, cue_ref, profile)))
         )
-    )
+    except (QLabMcpError, ValueError, TypeError) as exc:
+        return _cue_details_error(
+            workspace_id,
+            cue_ref,
+            profile,
+            error_code="validation_failed",
+            message=sanitize_exception_message(exc),
+            received={"cue_ref": cue_ref, "profile": profile},
+            allowed={"profiles": list(CueDetailsProfile.__args__) if hasattr(CueDetailsProfile, "__args__") else None, "batch_max": MAX_BATCH_CUE_DETAILS if "MAX_BATCH_CUE_DETAILS" in globals() else 50},
+        )
 
 
 @mcp.tool(

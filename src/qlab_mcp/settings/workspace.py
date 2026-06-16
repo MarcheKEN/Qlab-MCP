@@ -6,6 +6,7 @@ from typing import Any
 
 from ..osc.addressing import _clean_workspace_id, _workspace_address
 from ..errors import OscTimeoutError
+from ..sanitizer import sanitize_exception_message
 from .redaction import _record_redactions, _redact_payload
 from .summarizers import (
     _basic_item_summary,
@@ -234,10 +235,10 @@ class WorkspaceSettingsMixin:
         try:
             return self.client.request(address, workspace_id=workspace_id).data
         except OscTimeoutError as exc:
-            errors[error_key] = str(exc)
+            errors[error_key] = sanitize_exception_message(exc)
             return None
         except Exception as exc:
-            errors[error_key] = str(exc)
+            errors[error_key] = sanitize_exception_message(exc)
             return None
 
     def _read_light_patch_setting(
@@ -252,12 +253,10 @@ class WorkspaceSettingsMixin:
             try:
                 return self.client.request_tcp(address, workspace_id=workspace_id).data, "tcp_fallback"
             except Exception as tcp_exc:
-                errors["light.patch"] = (
-                    f"{udp_exc}; TCP fallback also failed for large light patch reply: {tcp_exc}"
-                )
+                errors["light.patch"] = "Light patch read timed out over UDP; TCP fallback also failed."
                 return None, None
         except Exception as exc:
-            errors["light.patch"] = str(exc)
+            errors["light.patch"] = sanitize_exception_message(exc)
             return None, None
 
     def _workspace_settings_audio(
@@ -634,6 +633,19 @@ class WorkspaceSettingsMixin:
         errors: dict[str, str],
     ) -> dict[str, Any]:
         item_list = _collection_items(items)
+        if not item_list:
+            return self._settings_details_result(
+                workspace_id,
+                section,
+                kind,
+                ref,
+                profile,
+                details={"items": [], "empty": True, "available": False},
+                choices=[],
+                redactions=redactions,
+                errors=errors,
+                message="No settings items are configured for this request.",
+            )
         selected, choices, message = _select_setting_item(item_list, ref)
         if selected is None:
             return self._settings_details_result(
@@ -1002,7 +1014,7 @@ class WorkspaceSettingsMixin:
                 if not item_ok:
                     batch_errors[f"request_{index}"] = result.get("message") or "Workspace setting detail request failed."
             except (ValueError, TypeError) as exc:
-                batch_errors[f"request_{index}"] = str(exc)
+                batch_errors[f"request_{index}"] = sanitize_exception_message(exc)
                 result = {
                     "ok": False,
                     "request_index": index,
@@ -1015,8 +1027,8 @@ class WorkspaceSettingsMixin:
                     "details": None,
                     "choices": [],
                     "redactions": [],
-                    "errors": {"request": str(exc)},
-                    "message": str(exc),
+                    "errors": {"request": sanitize_exception_message(exc)},
+                    "message": sanitize_exception_message(exc),
                 }
             results.append(result)
 
@@ -1075,9 +1087,27 @@ class WorkspaceSettingsMixin:
         )
         if batch["results"]:
             result = dict(batch["results"][0])
-            result.pop("ok", None)
             result.pop("request_index", None)
             result.pop("request", None)
+            request_error = (result.get("errors") or {}).get("request")
+            if isinstance(request_error, str) and "Unknown workspace setting detail kind" in request_error:
+                result.update(
+                    {
+                        "ok": False,
+                        "status": "error",
+                        "partial": False,
+                        "error_code": "invalid_setting_kind",
+                        "message": request_error,
+                        "received": kind,
+                        "allowed": sorted(WORKSPACE_SETTING_DETAIL_KINDS),
+                        "details": {
+                            "section": section,
+                            "kind": kind,
+                            "ref": ref,
+                            "profile": profile,
+                        },
+                    }
+                )
             return result
         return self._settings_details_result(
             workspace_id,

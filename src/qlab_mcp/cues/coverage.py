@@ -133,9 +133,7 @@ def default_read_coverage_report() -> dict[str, Any]:
             "note": READ_COVERAGE_NOTE,
             "message": "Local QLab OSC Dictionary reference file was not found.",
         }
-    report = read_coverage_report(path.read_text())
-    report["source_path"] = str(path)
-    return report
+    return read_coverage_report(path.read_text())
 
 
 def _classify_read_entry(entry: dict[str, Any], allowed: set[str]) -> dict[str, Any]:

@@ -462,7 +462,6 @@ PROFILE_PROPERTIES = {
         "armed",
         "flagged",
         "colorName",
-        "notes",
     ),
     "technical": tuple(dict.fromkeys(TECHNICAL_PROFILE)),
     "health": tuple(dict.fromkeys(HEALTH_PROFILE)),

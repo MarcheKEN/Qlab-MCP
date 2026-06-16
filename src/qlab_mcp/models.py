@@ -103,6 +103,15 @@ class QlabConnectionCheckResult(BaseModel):
 class WorkspaceOverviewResult(BaseModel):
     """Bounded structural map of a QLab workspace."""
 
+    ok: bool | None = None
+    status: str | None = None
+    partial: bool | None = None
+    error_code: str | None = None
+    suggested_action: str | None = None
+    message: str | None = None
+    details: Any = None
+    received: Any = None
+    allowed: Any = None
     workspace_id: str
     workspace: Any
     cue_count: int
@@ -133,6 +142,14 @@ class WorkspaceSettingsResult(BaseModel):
     summary: dict[str, Any] = Field(default_factory=dict)
     available_detail_requests: list[dict[str, Any]] = Field(default_factory=list)
     ok: bool | None = None
+    status: str | None = None
+    partial: bool | None = None
+    error_code: str | None = None
+    suggested_action: str | None = None
+    message: str | None = None
+    details: Any = None
+    received: Any = None
+    allowed: Any = None
     requested_count: int | None = None
     succeeded_count: int | None = None
     failed_count: int | None = None
@@ -148,9 +165,14 @@ class WorkspaceStatusResult(BaseModel):
     workspace_id: str
     profile: str = "summary"
     ok: bool | None = None
+    partial: bool | None = None
     status: str | None = None
     error_code: str | None = None
     suggested_action: str | None = None
+    message: str | None = None
+    details: Any = None
+    received: Any = None
+    allowed: Any = None
     sections: dict[str, Any] = Field(default_factory=dict)
     summary: dict[str, Any] = Field(default_factory=dict)
     limits: dict[str, Any] = Field(default_factory=dict)
@@ -166,6 +188,13 @@ class WorkspaceSettingDetailsResult(BaseModel):
     kind: str
     ref: str | None = None
     profile: str
+    ok: bool | None = None
+    status: str | None = None
+    partial: bool | None = None
+    error_code: str | None = None
+    suggested_action: str | None = None
+    received: Any = None
+    allowed: Any = None
     details: Any = None
     choices: list[dict[str, Any]] = Field(default_factory=list)
     redactions: list[dict[str, str]] = Field(default_factory=list)
@@ -196,6 +225,15 @@ class WorkspaceSettingRequestInput(BaseModel):
 class CueQueryResult(BaseModel):
     """Filtered cue query result."""
 
+    ok: bool | None = None
+    status: str | None = None
+    partial: bool | None = None
+    error_code: str | None = None
+    suggested_action: str | None = None
+    message: str | None = None
+    details: Any = None
+    received: Any = None
+    allowed: Any = None
     workspace_id: str
     filters: list[dict[str, Any]]
     profile: str
@@ -221,6 +259,15 @@ class CueQueryResult(BaseModel):
 class CueDetailsResult(BaseModel):
     """Grouped cue details for one cue."""
 
+    ok: bool | None = None
+    status: str | None = None
+    partial: bool | None = None
+    error_code: str | None = None
+    suggested_action: str | None = None
+    message: str | None = None
+    details: Any = None
+    received: Any = None
+    allowed: Any = None
     workspace_id: str
     cue_ref: str
     profile: str
@@ -231,7 +278,6 @@ class CueDetailsResult(BaseModel):
     errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
     active_count: int | None = None
-    message: str | None = None
     read_coverage: dict[str, Any] | None = None
 
 
@@ -239,6 +285,14 @@ class CueDetailsBatchResult(BaseModel):
     """Batch details for up to 50 cues."""
 
     ok: bool
+    status: str | None = None
+    partial: bool | None = None
+    error_code: str | None = None
+    suggested_action: str | None = None
+    message: str | None = None
+    details: Any = None
+    received: Any = None
+    allowed: Any = None
     workspace_id: str
     requested_count: int
     succeeded_count: int

@@ -27,6 +27,8 @@ from qlab_mcp.server import (
     mcp,
     qlab_get_workspace_overview,
     qlab_get_workspace_status,
+    qlab_get_workspace_setting_details,
+    qlab_get_workspace_settings,
     qlab_get_cue_details,
     qlab_query_cues,
 )
@@ -69,48 +71,48 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "timeout": CUE_DETAILS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["details", "diagnostics", "qlab", "safe-read"],
-        "input_schema_hash": "de946587eaafac4ad9d9008f80053f003a98b672a92825476d042c77a7ec1a21",
-        "output_schema_hash": "329c81ae77216790768d5274598e0f0faf7d48e80d4e3a05a665815612962074",
+        "input_schema_hash": "21bab2f935cc8a4e971975a26a1ed10d82dc315374d3a0646a5607fc6e356f35",
+        "output_schema_hash": "da79d543184f2edbba73a34704dde72e95dd60480905b788819f237692613acf",
     },
     "qlab_get_workspace_overview": {
         "title": "Get QLab Workspace Overview",
         "timeout": WORKSPACE_OVERVIEW_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["orientation", "qlab", "safe-read", "structure"],
-        "input_schema_hash": "c5998c0720a3e7739effa3e59ec3bfd1fcea8eaacfbc2c859c7336d362cd11e0",
-        "output_schema_hash": "ccabd8baaa1d477f2f48c510a74c29ec7c47485d4b3d831a0351b8ba0b82bfee",
+        "input_schema_hash": "7aa799e3dbf7884bd6d2b259568e83894d00c17212b3e882b8563132b8e134b9",
+        "output_schema_hash": "84484094570badc3b9d29073783b83e84c8e930d4ddeea4f26799b03f5ca8cc2",
     },
     "qlab_get_workspace_setting_details": {
         "title": "Get QLab Workspace Setting Details",
         "timeout": WORKSPACE_SETTING_DETAILS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["details", "patches", "qlab", "routing", "safe-read", "settings"],
-        "input_schema_hash": "16bf8c7949fc7da4b9a8b304a26171893ea5cc0b99285a043dc447c6b62b9f6b",
-        "output_schema_hash": "951f6affba80b03fc2c0e0bee37708fff37d22c5a3fec9ab1c5caea2b1408a0f",
+        "input_schema_hash": "d105b796940efc5714fd42001a733042c391a419c3207623925736fd40b79a7c",
+        "output_schema_hash": "e5c910941d0fd52c04cb8229a336b74b33fc1bb4ff96c921780e24dfed3ccba4",
     },
     "qlab_get_workspace_settings": {
         "title": "Get QLab Workspace Settings",
         "timeout": WORKSPACE_SETTINGS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["inventory", "patches", "qlab", "routing", "safe-read", "settings"],
-        "input_schema_hash": "8e9e711dc97be10e4f7d2c9a4c7d5253a7914a3f9dab15fe13c5a898d35bdc7e",
-        "output_schema_hash": "e70db7bddf81ee5fafca6627f8a1169ec779a8b56c0ee5c6030285c6a221a516",
+        "input_schema_hash": "0d11116604c2a2cf5f3fb06ee689d5a1225e4cc58fbb9a43f241a15a83c8779d",
+        "output_schema_hash": "b22ec5ba261a2cdb7bfc5d1423069c98961e6db0284b762ea9429188821c282d",
     },
     "qlab_get_workspace_status": {
         "title": "Get QLab Workspace Status",
         "timeout": WORKSPACE_STATUS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["diagnostics", "qlab", "safe-read", "status", "timecode"],
-        "input_schema_hash": "8c37a0e921135fc27f9c02ae23e803d35c3ebb337efd275fe2c4c68cab5801f6",
-        "output_schema_hash": "8ce989ab84f82b2fc314a5b706128af9acdf2a9f2742b8d7c324c03de64ed789",
+        "input_schema_hash": "23f7bda8ae859d4f82418863e6fa3ff2a3ff6b4ab9fb56fd2a93066ea74c221c",
+        "output_schema_hash": "9e61708ab098aec05fddf13e81b5e9751480ff0e478b7167728296407d39467c",
     },
     "qlab_query_cues": {
         "title": "Query QLab Cues",
         "timeout": QUERY_CUES_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["details", "inventory", "qlab", "query", "safe-read"],
-        "input_schema_hash": "a2d4ccfdccea8fe34e44d93282ac31e7b307c9c9cdf16c77f04c10d0a221e73a",
-        "output_schema_hash": "ca16d551401f0aac7b8032f47b31981e594a420b335a6e80da18029cd7697d9c",
+        "input_schema_hash": "b2c0c530c681dc61407675be8fd3b30006dbd113edb2c5f26dbbfd2100fda8d0",
+        "output_schema_hash": "4981dabcf1bfb2e82e83bbf29f9a2aed315ddbea4b0f5634c3ed4ad14dbe6060",
     },
     "qlab_update_cues": {
         "title": "Update QLab Cues",
@@ -301,8 +303,8 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert overview.title == "Get QLab Workspace Overview"
     assert "first structural read" in overview.description
     assert overview.inputSchema["properties"]["cue_index_profile"]["default"] == "minimal"
-    assert overview.inputSchema["properties"]["max_cues"]["maximum"] == 5000
-    assert overview.inputSchema["properties"]["max_index_cues"]["maximum"] == 5000
+    assert "maximum" not in overview.inputSchema["properties"]["max_cues"]
+    assert "maximum" not in overview.inputSchema["properties"]["max_index_cues"]
     assert overview.inputSchema["properties"]["max_index_cues"]["default"] == 5000
     assert overview.inputSchema["properties"]["include_global_count"]["default"] is False
     assert "cueLists/uniqueIDs" in overview.inputSchema["properties"]["include_global_count"]["description"]
@@ -320,9 +322,9 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert status.title == "Get QLab Workspace Status"
     assert "Workspace Status" in status.description
     assert status.inputSchema["properties"]["profile"]["default"] == "summary"
-    assert status.inputSchema["properties"]["profile"]["enum"] == ["summary", "technical"]
+    assert "enum" not in status.inputSchema["properties"]["profile"]
     assert status.inputSchema["properties"]["max_cues_scanned"]["default"] == 1000
-    assert status.inputSchema["properties"]["sample_limit"]["maximum"] == 50
+    assert "maximum" not in status.inputSchema["properties"]["sample_limit"]
     assert "sections" in status.outputSchema["properties"]
     assert status.annotations.readOnlyHint is True
     assert status.annotations.destructiveHint is False
@@ -333,9 +335,9 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert settings.annotations.readOnlyHint is True
     assert settings.annotations.destructiveHint is False
     assert settings.inputSchema["properties"]["mode"]["default"] == "summary"
-    assert settings.inputSchema["properties"]["mode"]["enum"] == ["summary", "details"]
+    assert "enum" not in settings.inputSchema["properties"]["mode"]
     assert settings.inputSchema["properties"]["profile"]["default"] == "safe"
-    assert settings.inputSchema["properties"]["profile"]["enum"] == ["safe", "technical", "exhaustive"]
+    assert "enum" not in settings.inputSchema["properties"]["profile"]
     assert "requests" in settings.inputSchema["properties"]
     assert "available_detail_requests" in settings.outputSchema["properties"]
     assert "succeeded_count" in settings.outputSchema["properties"]
@@ -347,7 +349,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert setting_details.title == "Get QLab Workspace Setting Details"
     assert "Backwards-compatible wrapper" in setting_details.description
     assert setting_details.inputSchema["properties"]["profile"]["default"] == "safe"
-    assert "exhaustive" in setting_details.inputSchema["properties"]["profile"]["enum"]
+    assert "enum" not in setting_details.inputSchema["properties"]["profile"]
     assert setting_details.annotations.readOnlyHint is True
     assert setting_details.annotations.destructiveHint is False
 
@@ -355,11 +357,10 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert query.title == "Query QLab Cues"
     assert "optional AND filters" in query.description
     assert query.inputSchema["properties"]["max_results"]["default"] == 500
-    assert query.inputSchema["properties"]["max_results"]["maximum"] == 5000
+    assert "maximum" not in query.inputSchema["properties"]["max_results"]
     assert query.inputSchema["properties"]["max_cues_scanned"]["default"] == 500
-    assert query.inputSchema["properties"]["max_cues_scanned"]["maximum"] == 5000
-    query_filters = set(query.inputSchema["properties"]["primary_filter"]["enum"])
-    assert {"name_empty", "displayName_empty", "number_empty", "ambiguous_label", "flagged_or_broken"} <= query_filters
+    assert "maximum" not in query.inputSchema["properties"]["max_cues_scanned"]
+    assert "enum" not in query.inputSchema["properties"]["primary_filter"]
     assert "query_completeness" in query.outputSchema["properties"]
     assert "query_completeness_reasons" in query.outputSchema["properties"]
     assert "id_only_unscanned_count" in query.outputSchema["properties"]
@@ -372,12 +373,10 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     details = tools["qlab_get_cue_details"]
     assert details.title == "Get QLab Cue Details"
     assert "valuesForKeys" in details.description
-    assert "editable" in details.inputSchema["properties"]["profile"]["enum"]
-    assert "inspector_safe" in details.inputSchema["properties"]["profile"]["enum"]
-    assert "exhaustive" in details.inputSchema["properties"]["profile"]["enum"]
+    assert "enum" not in details.inputSchema["properties"]["profile"]
     assert "Inspector-style" in details.inputSchema["properties"]["profile"]["description"]
     assert "heavy/sensitive" in details.inputSchema["properties"]["profile"]["description"]
-    assert "exhaustive" not in query.inputSchema["properties"]["profile"]["enum"]
+    assert "enum" not in query.inputSchema["properties"]["profile"]
     cue_ref_schema = details.inputSchema["properties"]["cue_ref"]
     assert cue_ref_schema["anyOf"][0]["type"] == "string"
     assert cue_ref_schema["anyOf"][1]["type"] == "array"
@@ -501,28 +500,277 @@ def test_expected_tool_errors_are_sanitized() -> None:
     assert "patchList" not in message
 
 
-def test_tool_wrapper_converts_validation_errors_to_tool_error() -> None:
-    try:
-        qlab_query_cues("ws-1", "type", "Audio", max_results=0)
-    except ToolError as exc:
-        assert "max_results must be 1 or greater" in str(exc)
-    else:
-        raise AssertionError("Expected ToolError")
+def test_public_tool_validation_returns_structured_json_error() -> None:
+    result = qlab_query_cues("ws-1", "type", "Audio", max_results=0)
+    payload = result.model_dump()
+
+    assert payload["ok"] is False
+    assert payload["status"] == "error"
+    assert payload["partial"] is False
+    assert payload["error_code"] == "validation_failed"
+    assert "max_results must be 1 or greater" in payload["message"]
+    assert payload["received"]["max_results"] == 0
+    assert payload["allowed"]["max_results"] == "1..5000"
+    assert "Traceback" not in json.dumps(payload)
 
 
-def test_public_cue_details_reports_clear_batch_limit(monkeypatch) -> None:
+def test_public_cue_details_reports_clear_batch_limit_as_structured_json(monkeypatch) -> None:
     class FakeReader:
         def get_cue_details(self, workspace_id, cue_ref, profile):
             raise ValueError("cue_ref list can include at most 50 cues")
 
     monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
 
-    try:
-        qlab_get_cue_details("ws-1", ["10"] * 51)
-    except ToolError as exc:
-        assert "cue_ref list can include at most 50 cues" in str(exc)
-    else:
-        raise AssertionError("Expected ToolError")
+    result = qlab_get_cue_details("ws-1", ["10"] * 51)
+    payload = result.model_dump()
+
+    assert payload["ok"] is False
+    assert payload["status"] == "error"
+    assert payload["partial"] is False
+    assert payload["error_code"] == "validation_failed"
+    assert "cue_ref list can include at most 50 cues" in payload["message"]
+    assert payload["requested_count"] == 51
+    assert payload["failed_count"] == 51
+
+
+def test_public_read_tools_redact_internal_exception_paths(monkeypatch) -> None:
+    internal_message = "/Users/filarmonica/Documents/qlab-mcp-osc/src/qlab_mcp/server.py: bad profile"
+
+    class FakeReader:
+        def get_workspace_overview(self, **kwargs):
+            raise ValueError(internal_message)
+
+        def get_workspace_status(self, **kwargs):
+            raise ValueError(internal_message)
+
+        def get_workspace_settings(self, **kwargs):
+            raise ValueError(internal_message)
+
+        def get_workspace_setting_details(self, **kwargs):
+            raise ValueError(internal_message)
+
+        def query_cues(self, **kwargs):
+            raise ValueError(internal_message)
+
+        def get_cue_details(self, workspace_id, cue_ref, profile):
+            raise ValueError(internal_message)
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    results = [
+        qlab_get_workspace_overview("ws-1").model_dump(),
+        qlab_get_workspace_status("ws-1").model_dump(),
+        qlab_get_workspace_settings("ws-1").model_dump(),
+        qlab_get_workspace_setting_details("ws-1", "audio", "bad_kind").model_dump(),
+        qlab_query_cues("ws-1", "type", "Audio").model_dump(),
+        qlab_get_cue_details("ws-1", "10", "bad_profile").model_dump(),
+    ]
+
+    for payload in results:
+        serialized = json.dumps(payload)
+        assert payload["ok"] is False
+        assert payload["status"] == "error"
+        assert payload["partial"] is False
+        assert payload["error_code"] == "validation_failed"
+        assert payload["message"] == "[redacted_internal_path]"
+        assert "/qlab-mcp-osc/" not in serialized
+        assert "Traceback" not in serialized
+        assert "pydantic" not in serialized.lower()
+
+
+def test_public_setting_details_validation_error_preserves_received_allowed_details(monkeypatch) -> None:
+    class FakeReader:
+        def get_workspace_setting_details(self, **kwargs):
+            raise ValueError("Unsupported setting kind: bad_kind")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    result = qlab_get_workspace_setting_details("ws-1", "audio", "bad_kind", profile="bad_profile")
+    payload = result.model_dump()
+
+    assert payload["ok"] is False
+    assert payload["status"] == "error"
+    assert payload["partial"] is False
+    assert payload["error_code"] == "validation_failed"
+    assert payload["received"] == {"section": "audio", "kind": "bad_kind", "ref": None, "profile": "bad_profile"}
+    assert "audio" in payload["allowed"]["sections"]
+    assert "output_patch" in payload["allowed"]["kinds"]
+    assert payload["details"] is None
+
+
+def test_public_read_success_shapes_have_meaningful_ok_status_partial(monkeypatch) -> None:
+    class FakeReader:
+        def get_workspace_overview(self, **kwargs):
+            return {
+                "workspace_id": "ws-1",
+                "workspace": {"displayName": "demo.qlab5"},
+                "cue_count": 1,
+                "summary": {"total_cue_ids_status": "known", "health_counts_status": "known"},
+                "cue_lists": [],
+                "limits": {"truncated": False},
+                "warnings": [],
+                "errors": None,
+            }
+
+        def query_cues(self, **kwargs):
+            return {
+                "workspace_id": "ws-1",
+                "filters": [{"filter": "type", "value": "Audio"}],
+                "profile": "basic_safe",
+                "scanned_count": 1,
+                "matched_count": 1,
+                "returned_count": 1,
+                "total_cue_ids": 1,
+                "query_completeness": "complete",
+                "truncated": False,
+                "scanned_all_cues": True,
+                "result_limited": False,
+                "limits": {"max_results": 500, "max_cues_scanned": 500},
+                "cues": [{"uniqueID": "cue-1", "type": "Audio"}],
+                "warnings": [],
+                "errors": None,
+            }
+
+        def get_cue_details(self, workspace_id, cue_ref, profile):
+            return {
+                "workspace_id": workspace_id,
+                "cue_ref": cue_ref,
+                "profile": profile,
+                "cue_type": "Audio",
+                "properties": {"uniqueID": "cue-1", "type": "Audio"},
+                "errors": None,
+                "warnings": [],
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    overview = qlab_get_workspace_overview("ws-1").model_dump()
+    query = qlab_query_cues("ws-1", "type", "Audio").model_dump()
+    details = qlab_get_cue_details("ws-1", "cue-1").model_dump()
+
+    for payload in (overview, query, details):
+        assert payload["ok"] is True
+        assert payload["status"] == "ok"
+        assert payload["partial"] is False
+
+
+def test_public_read_partial_success_shapes_have_meaningful_ok_status_partial(monkeypatch) -> None:
+    class FakeReader:
+        def get_workspace_overview(self, **kwargs):
+            return {
+                "workspace_id": "ws-1",
+                "workspace": {"displayName": "demo.qlab5"},
+                "cue_count": 1,
+                "summary": {"total_cue_ids_status": "partial", "health_counts_status": "partial_non_authoritative"},
+                "cue_lists": [],
+                "limits": {"truncated": True},
+                "warnings": ["partial"],
+                "errors": None,
+            }
+
+        def query_cues(self, **kwargs):
+            return {
+                "workspace_id": "ws-1",
+                "filters": [{"filter": "type", "value": "Audio"}],
+                "profile": "basic_safe",
+                "scanned_count": 1,
+                "matched_count": 1,
+                "returned_count": 1,
+                "total_cue_ids": 2,
+                "query_completeness": "partial",
+                "query_completeness_reasons": ["max_cues_scanned"],
+                "truncated": True,
+                "truncation_reasons": ["max_cues_scanned"],
+                "scanned_all_cues": False,
+                "result_limited": False,
+                "limits": {"max_results": 500, "max_cues_scanned": 1},
+                "cues": [{"uniqueID": "cue-1", "type": "Audio"}],
+                "warnings": ["partial"],
+                "errors": None,
+            }
+
+        def get_cue_details(self, workspace_id, cue_ref, profile):
+            return {
+                "workspace_id": workspace_id,
+                "cue_ref": cue_ref,
+                "profile": profile,
+                "cue_type": None,
+                "properties": {},
+                "errors": {"error_code": "cue_ref_unresolved"},
+                "warnings": ["partial"],
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    overview = qlab_get_workspace_overview("ws-1").model_dump()
+    query = qlab_query_cues("ws-1", "type", "Audio", max_cues_scanned=1).model_dump()
+    details = qlab_get_cue_details("ws-1", "missing").model_dump()
+
+    for payload in (overview, query, details):
+        assert payload["status"] in {"partial", "error"}
+        if payload["status"] == "partial":
+            assert payload["ok"] is True
+            assert payload["partial"] is True
+        else:
+            assert payload["ok"] is False
+            assert payload["partial"] is False
+
+
+def test_public_cue_details_batch_normalizes_item_shapes(monkeypatch) -> None:
+    class FakeReader:
+        def get_cue_details(self, workspace_id, cue_ref, profile):
+            return {
+                "ok": True,
+                "workspace_id": workspace_id,
+                "requested_count": 3,
+                "succeeded_count": 2,
+                "failed_count": 1,
+                "profile": profile,
+                "results": [
+                    {
+                        "workspace_id": workspace_id,
+                        "cue_ref": "ok",
+                        "profile": profile,
+                        "cue_type": "Audio",
+                        "properties": {"uniqueID": "ok"},
+                        "errors": None,
+                        "warnings": [],
+                    },
+                    {
+                        "workspace_id": workspace_id,
+                        "cue_ref": "partial",
+                        "profile": profile,
+                        "cue_type": "Audio",
+                        "properties": {"uniqueID": "partial"},
+                        "errors": {"notes": "read failed"},
+                        "warnings": [],
+                    },
+                    {
+                        "workspace_id": workspace_id,
+                        "cue_ref": "missing",
+                        "profile": profile,
+                        "cue_type": None,
+                        "properties": {},
+                        "errors": {"error_code": "cue_ref_unresolved", "message": "Cue ref could not be resolved or read."},
+                        "warnings": [],
+                    },
+                ],
+                "errors": {"missing": "cue_ref_unresolved"},
+                "warnings": ["partial"],
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    payload = qlab_get_cue_details("ws-1", ["ok", "partial", "missing"]).model_dump()
+
+    assert payload["ok"] is True
+    assert payload["status"] == "partial"
+    assert payload["partial"] is True
+    assert [(item["ok"], item["status"], item["partial"]) for item in payload["results"]] == [
+        (True, "ok", False),
+        (True, "partial", True),
+        (False, "error", False),
+    ]
 
 
 def test_overview_public_tool_preserves_agent_summary(monkeypatch) -> None:

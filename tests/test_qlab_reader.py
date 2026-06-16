@@ -18,8 +18,10 @@ from qlab_mcp.config import QLabConfig
 from qlab_mcp.errors import OscTimeoutError, QLabReplyError, UnsafeCuePropertyError
 from qlab_mcp.osc import decode_message, encode_message
 from qlab_mcp.qlab import QLabReader
+from qlab_mcp.cues.coverage import default_read_coverage_report
 from qlab_mcp.runtime.connection import OVERRIDE_ENDPOINTS, normalize_workspace_mode, parse_connect_scopes
 from qlab_mcp.runtime.read_cache import shared_read_cache
+from qlab_mcp.sanitizer import REDACTED_INTERNAL_PATH, sanitize_response
 
 
 class FakeQlabOscServer:
@@ -238,6 +240,56 @@ class QLabReaderTests(unittest.TestCase):
 
         self.assertEqual(result["workspaces"], workspaces)
         self.assertEqual(server.received, ["/workspaces"])
+
+    def test_get_workspaces_single_flight_shares_concurrent_resolution(self) -> None:
+        class SlowCountingClient:
+            config = QLabConfig(cache_ttl=10)
+
+            def __init__(self) -> None:
+                self.count = 0
+                self.lock = threading.Lock()
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                with self.lock:
+                    self.count += 1
+                time.sleep(0.05)
+                return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+
+        client = SlowCountingClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+        barrier = threading.Barrier(2)
+        results: list[dict[str, Any]] = []
+
+        def read() -> None:
+            barrier.wait()
+            results.append(reader.get_workspaces())
+
+        threads = [threading.Thread(target=read) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=1)
+
+        self.assertEqual(client.count, 1)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0]["workspaces"], results[1]["workspaces"])
+
+    def test_workspace_resolution_timeout_is_unavailable_not_not_found(self) -> None:
+        class TimeoutClient:
+            config = QLabConfig(cache_ttl=0)
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                raise OscTimeoutError("Timed out waiting for QLab reply to /workspaces")
+
+        reader = QLabReader(TimeoutClient())  # type: ignore[arg-type]
+
+        result = reader.get_cue_details("ws-timeout", "cue-1")
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "error")
+        self.assertFalse(result["partial"])
+        self.assertEqual(result["error_code"], "workspace_unavailable")
+        self.assertEqual(result["errors"]["error_code"], "workspace_unavailable")
 
     def test_check_connection_ready_when_workspace_is_readable(self) -> None:
         workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5", "version": "5.5.10"}]
@@ -662,6 +714,9 @@ class QLabReaderTests(unittest.TestCase):
 
             result = reader.get_cue_details("missing-ws", "cue-1")
 
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "error")
+        self.assertFalse(result["partial"])
         self.assertEqual(result["errors"]["error_code"], "workspace_not_found")
         self.assertEqual(result["properties"], {})
         self.assertIn("Requested workspace could not be resolved", result["warnings"][0])
@@ -1175,7 +1230,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["summary"]["flagged"], 1)
         self.assertIsNone(result["summary"]["broken"])
         self.assertIsNone(result["summary"]["warning"])
-        self.assertEqual(result["summary"]["health_counts_status"], "partial")
+        self.assertEqual(result["summary"]["health_counts_status"], "partial_non_authoritative")
         self.assertIn("Overview health counts are partial", result["warnings"][-1])
         self.assertFalse(result["limits"]["truncated"])
         self.assertEqual(result["cue_lists"][0]["label"], "Main")
@@ -1546,7 +1601,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertFalse(result["limits"]["child_read_errors"][0]["isBroken"])
         self.assertFalse(result["limits"]["child_read_errors"][0]["isWarning"])
         self.assertEqual(result["summary"]["total_cue_ids_status"], "partial")
-        self.assertEqual(result["summary"]["health_counts_status"], "partial")
+        self.assertEqual(result["summary"]["health_counts_status"], "partial_non_authoritative")
         self.assertIsNone(result["summary"]["broken"])
         self.assertIn("Some container children could not be read", " ".join(result["warnings"]))
         self.assertIn(list_id, result["errors"])
@@ -1881,7 +1936,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["known_total_cues_meaning"], "cue_items_including_cue_lists")
         self.assertTrue(result["summary"]["global_unique_ids_used"])
 
-    def test_workspace_overview_global_count_is_bounded_by_requested_limits(self) -> None:
+    def test_workspace_overview_global_count_is_not_bounded_by_preview_or_index_limits(self) -> None:
         responses = {
             "/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}],
             "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-1", "type": "Cue List"}],
@@ -1899,9 +1954,9 @@ class QLabReaderTests(unittest.TestCase):
                 include_global_count=True,
             )
 
-        self.assertEqual(result["known_total_cues"], 2)
-        self.assertEqual(result["known_total_cues_status"], "partial")
-        self.assertIn("partial", " ".join(result["warnings"]))
+        self.assertEqual(result["known_total_cues"], 4)
+        self.assertEqual(result["known_total_cues_status"], "known")
+        self.assertEqual(result["known_total_cues_source"], "cueLists/uniqueIDs")
 
     def test_workspace_overview_global_count_uses_tcp_after_udp_timeout(self) -> None:
         class GlobalTcpClient:
@@ -1945,6 +2000,54 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["limits"]["count_status"]["global_count_read_transport"], "tcp_fallback")
         self.assertNotIn("/workspace/ws-1/cueLists/uniqueIDs", result["errors"] or {})
         self.assertNotIn("/workspace/ws-1/cueLists/uniqueIDs/shallow", client.udp_requests)
+
+    def test_workspace_status_settings_timeout_keeps_stable_partial_shape(self) -> None:
+        responses = {
+            "/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}],
+            "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-id", "type": "Cue List", "name": "Main"}],
+            "/workspace/ws-1/cue/list-id/children/shallow": [],
+            "/workspace/ws-1/cue/list-id/valuesForKeys": {
+                "uniqueID": "list-id",
+                "type": "Cue List",
+                "isWarning": False,
+                "isBroken": False,
+                "flagged": False,
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server, timeout=0.05))
+
+            result = reader.get_workspace_status("ws-1", max_cues_scanned=10)
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["partial"])
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["sections"]["warnings_summary"]["status"], "complete")
+        self.assertIn("settings_summary", result["sections"])
+        self.assertEqual(result["sections"]["settings_summary"]["status"], "partial")
+        self.assertGreater(result["summary"]["settings_error_count"], 0)
+
+    def test_workspace_settings_details_empty_patch_collection_is_successful_empty_result(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/midi/patchList": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_settings(
+                "ws-1",
+                mode="details",
+                requests=[{"section": "midi", "kind": "midi_patch"}],
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["requested_count"], 1)
+        self.assertEqual(result["succeeded_count"], 1)
+        self.assertEqual(result["failed_count"], 0)
+        self.assertTrue(result["results"][0]["details"]["empty"])
+        self.assertEqual(result["results"][0]["details"]["items"], [])
+        self.assertEqual(result["results"][0]["details"]["available"], False)
+        self.assertEqual(server.received, ["/workspace/ws-1/settings/midi/patchList"])
 
     def test_workspace_overview_global_count_timeout_does_not_break_overview(self) -> None:
         class GlobalTimeoutClient:
@@ -2680,6 +2783,23 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIn("Audio details support", result["errors"]["request_1"])
         self.assertEqual(server.received, ["/workspace/ws-1/settings/network/patchList"])
 
+    def test_workspace_setting_details_invalid_kind_returns_complete_structured_error(self) -> None:
+        with FakeQlabOscServer({}) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_setting_details("ws-1", section="midi", kind="not_a_kind")
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "error")
+        self.assertFalse(result["partial"])
+        self.assertEqual(result["error_code"], "invalid_setting_kind")
+        self.assertEqual(result["received"], "not_a_kind")
+        self.assertIn("midi_patch", result["allowed"])
+        self.assertEqual(result["details"]["section"], "midi")
+        self.assertEqual(result["details"]["kind"], "not_a_kind")
+        self.assertIn("Unknown workspace setting detail kind", result["message"])
+        self.assertEqual(server.received, [])
+
     def test_workspace_settings_details_mode_exhaustive_warns_and_redacts_credentials(self) -> None:
         responses = {
             "/workspace/ws-1/settings/network/patchList": [
@@ -3111,6 +3231,50 @@ class QLabReaderTests(unittest.TestCase):
 
         self.assertEqual(result["matched_count"], 1)
         self.assertEqual(result["cues"][0]["uniqueID"], light_1)
+
+    def test_query_cues_name_contains_preserves_unicode_and_nbsp_literal_matching(self) -> None:
+        emoji_id = "11111111-1111-4111-8111-111111111111"
+        accents_id = "22222222-2222-4222-8222-222222222222"
+        nbsp_id = "33333333-3333-4333-8333-333333333333"
+        responses = {
+            "/workspace/ws-1/cueLists/uniqueIDs": [emoji_id, accents_id, nbsp_id],
+            f"/workspace/ws-1/cue_id/{emoji_id}/valuesForKeys": {
+                "uniqueID": emoji_id,
+                "number": "🤣",
+                "name": "UNICODE_EMOJI_🤣",
+                "displayName": "UNICODE_EMOJI_🤣",
+                "type": "Memo",
+            },
+            f"/workspace/ws-1/cue_id/{accents_id}/valuesForKeys": {
+                "uniqueID": accents_id,
+                "number": "ÑÓÁ",
+                "name": "UNICODE_ACCENTS_ÑÓÁ",
+                "displayName": "UNICODE_ACCENTS_ÑÓÁ",
+                "type": "Memo",
+            },
+            f"/workspace/ws-1/cue_id/{nbsp_id}/valuesForKeys": {
+                "uniqueID": nbsp_id,
+                "number": "NBSP",
+                "name": "NBSP_A\u00a0B",
+                "displayName": "NBSP_A\u00a0B",
+                "type": "Memo",
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            emoji = reader.query_cues("ws-1", "name_contains", "🤣")
+            accents = reader.query_cues("ws-1", "name_contains", "ñóá")
+            nbsp_literal = reader.query_cues("ws-1", "name_contains", "A\u00a0B")
+            nbsp_normal_space = reader.query_cues("ws-1", "name_contains", "A B")
+
+        self.assertEqual(emoji["matched_count"], 1)
+        self.assertEqual(emoji["cues"][0]["uniqueID"], emoji_id)
+        self.assertEqual(accents["matched_count"], 1)
+        self.assertEqual(accents["cues"][0]["uniqueID"], accents_id)
+        self.assertEqual(nbsp_literal["matched_count"], 1)
+        self.assertEqual(nbsp_literal["cues"][0]["uniqueID"], nbsp_id)
+        self.assertEqual(nbsp_normal_space["matched_count"], 0)
 
     def test_query_cues_supports_safe_state_and_target_filters(self) -> None:
         audio_1 = "11111111-1111-4111-8111-111111111111"
@@ -3757,11 +3921,15 @@ class QLabReaderTests(unittest.TestCase):
 
         result = reader.get_cue_details("ws-1", ["10", ""])
 
-        self.assertFalse(result["ok"])
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["status"], "partial")
+        self.assertTrue(result["partial"])
         self.assertEqual(result["succeeded_count"], 1)
         self.assertEqual(result["failed_count"], 1)
         self.assertIn("", result["errors"])
         self.assertEqual(result["results"][0]["properties"]["name"], "Ten")
+        self.assertEqual(result["results"][0]["status"], "ok")
+        self.assertEqual(result["results"][1]["status"], "error")
 
     def test_batch_cue_details_counts_items_with_internal_errors_as_failures(self) -> None:
         responses = {
@@ -3781,7 +3949,9 @@ class QLabReaderTests(unittest.TestCase):
 
             result = reader.get_cue_details("ws-1", ["10", "missing"], "basic_safe")
 
-        self.assertFalse(result["ok"])
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["status"], "partial")
+        self.assertTrue(result["partial"])
         self.assertEqual(result["requested_count"], 2)
         self.assertEqual(result["succeeded_count"], 1)
         self.assertEqual(result["failed_count"], 1)
@@ -3789,8 +3959,34 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIsNotNone(result["results"][1]["errors"])
         self.assertEqual(result["errors"]["missing"], "cue_ref_unresolved")
         self.assertEqual(result["results"][1]["errors"]["error_code"], "cue_ref_unresolved")
+        self.assertFalse(result["results"][1]["ok"])
+        self.assertEqual(result["results"][1]["status"], "error")
+        self.assertFalse(result["results"][1]["partial"])
         self.assertLessEqual(len(result["results"][1]["errors"]), 2)
         self.assertIn("One or more cue detail reads failed", result["warnings"][0])
+
+    def test_single_cue_details_unresolved_returns_error_contract(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/missing/valuesForKeys": {"status": "error", "data": "not found"},
+            "/workspace/ws-1/cue/missing/uniqueID": {"status": "error", "data": "not found"},
+            "/workspace/ws-1/cue/missing/number": {"status": "error", "data": "not found"},
+            "/workspace/ws-1/cue/missing/name": {"status": "error", "data": "not found"},
+            "/workspace/ws-1/cue/missing/displayName": {"status": "error", "data": "not found"},
+            "/workspace/ws-1/cue/missing/type": {"status": "error", "data": "not found"},
+            "/workspace/ws-1/cue/missing/armed": {"status": "error", "data": "not found"},
+            "/workspace/ws-1/cue/missing/flagged": {"status": "error", "data": "not found"},
+            "/workspace/ws-1/cue/missing/colorName": {"status": "error", "data": "not found"},
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "missing", "basic_safe")
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "error")
+        self.assertFalse(result["partial"])
+        self.assertEqual(result["error_code"], "cue_ref_unresolved")
+        self.assertEqual(result["errors"]["error_code"], "cue_ref_unresolved")
 
     def test_batch_cue_details_rejects_more_than_50_cues(self) -> None:
         reader = QLabReader(SimpleNamespace(config=QLabConfig()))  # type: ignore[arg-type]
@@ -4253,6 +4449,64 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIn("fileTarget", properties_for_profile("full_sensitive"))
         self.assertIn("scriptSource", properties_for_profile("full_sensitive"))
         self.assertIn("stage", properties_for_profile("full_sensitive"))
+
+    def test_sanitizer_removes_internal_paths_without_redacting_media_targets(self) -> None:
+        payload = {
+            "source_path": "/Users/filarmonica/Documents/qlab-mcp-osc/src/qlab_mcp/cues/coverage.py",
+            "message": "/Users/filarmonica/Documents/qlab-mcp-osc/src/qlab_mcp/server.py failed",
+            "fileTarget": "/Users/filarmonica/Documents/qlab-mcp-osc/media/valid.wav",
+        }
+
+        result = sanitize_response(payload)
+
+        self.assertNotIn("source_path", result)
+        self.assertEqual(result["message"], REDACTED_INTERNAL_PATH)
+        self.assertEqual(result["fileTarget"], "/Users/filarmonica/Documents/qlab-mcp-osc/media/valid.wav")
+
+    def test_exhaustive_read_coverage_does_not_expose_local_source_path(self) -> None:
+        report = default_read_coverage_report()
+
+        serialized = json.dumps(report)
+        self.assertNotIn("source_path", report)
+        self.assertNotIn("/qlab-mcp-osc/", serialized)
+
+    def test_compact_profiles_truncate_long_text_fields_with_metadata(self) -> None:
+        long_message = "/eos/cue/" + ("1234567890" * 80)
+        long_notes = "operator note " * 80
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "number": "10",
+                "name": "Network",
+                "displayName": "10 Network",
+                "type": "Network",
+                "message": long_message,
+                "messageError": "",
+            },
+            "/workspace/ws-1/cue/11/valuesForKeys": {
+                "uniqueID": "cue-11",
+                "type": "Memo",
+                "notes": long_notes,
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            auto_result = reader.get_cue_details("ws-1", "10", "auto")
+            technical_result = reader.get_cue_details("ws-1", "11", "technical")
+            full_sensitive_result = reader.get_cue_details("ws-1", "11", "full_sensitive")
+
+        auto_message = auto_result["sections"]["type_specific"]["message"]
+        self.assertTrue(auto_message["field_truncated"])
+        self.assertEqual(auto_message["original_length"], len(long_message))
+        self.assertLess(len(auto_message["value"]), len(long_message))
+
+        technical_notes = technical_result["properties"]["notes"]
+        self.assertTrue(technical_notes["field_truncated"])
+        self.assertEqual(technical_notes["original_length"], len(long_notes))
+
+        self.assertEqual(full_sensitive_result["properties"]["notes"], long_notes)
+        self.assertNotIn("field_truncated", json.dumps(full_sensitive_result["properties"]["notes"]))
 
     def test_exhaustive_profile_includes_sensitive_heavy_and_deep_allowlisted_keys(self) -> None:
         exhaustive = properties_for_profile("exhaustive")

@@ -57,6 +57,7 @@ UpdateCueStatus = Literal[
     "updated_with_confirmed_timeouts",
     "partial_failed",
     "verification_failed",
+    "verification_inconclusive",
     "cue_not_found",
 ]
 UpdateCuesStatus = Literal[
@@ -66,6 +67,7 @@ UpdateCuesStatus = Literal[
     "updated_with_confirmed_timeouts",
     "partial_failed",
     "verification_failed",
+    "verification_inconclusive",
     "workspace_not_found",
     "workspace_ambiguous",
     "workspace_unavailable",
@@ -418,8 +420,8 @@ class CueUpdateInput(BaseModel):
     confirm_gates: list[str] | None = Field(
         default=None,
         description=(
-            "Explicit capability gates accepted for this update item. "
-            "Dangerous planned-only operations remain blocked during real writes unless their gate is listed here."
+            "Exact confirm_token values accepted for this update item after reviewing a dry-run plan. "
+            "Broad capability gate labels are discovery metadata, not real-write approval tokens."
         ),
     )
 

@@ -106,8 +106,8 @@ Batch contract:
   are not write targets.
 - Each item can choose its own registry `profile`, `properties`, and
   `operations`.
-- Each item may also include `confirm_gates` for deliberate real writes of
-  high-risk registry specs after a reviewed dry-run.
+- Each item may also include `confirm_gates` containing the exact
+  `planned_operations[].confirm_token` values emitted by a reviewed dry-run.
 - Validation and preflight failures are reported per item, not as a global tool
   error.
 - Items that already fail normalization or validation do not attempt
@@ -125,8 +125,8 @@ Safety gates for real writes:
 - `/connect` confirms `edit`
 - `/showMode` confirms Edit Mode
 - `dry_run=false` is supplied deliberately
-- high-risk update items include the exact `confirm_gates` required by their
-  planned operations
+- high-risk update items include the exact `confirm_token` values emitted by
+  their reviewed dry-run `planned_operations`
 
 The server does not expose playback, GO, stop, panic, or raw OSC. High-risk
 properties are planned in dry-run and require explicit gates for real writes;
@@ -298,12 +298,14 @@ Write mode is deliberately gated:
 - `qlab_get_cue_details(..., profile="editable")` returns safe current cue
   details plus `update_capabilities` derived from the same update registry, so
   agents can choose compatible edit profiles, real-write properties,
-  dry-run-only properties, operation args, validators, and required write gates
-  without sending mutating OSC.
+  dry-run-only properties, operation args, validators, and dry-run
+  confirmation tokens without sending mutating OSC.
 - Policy summary: all update profiles can exist for planning and targeting,
   but real write is limited to safe properties unless the item explicitly lists
-  the required `confirm_gates`. Properties with no safe OSC write path, such as
-  `scriptSource`, remain non-editable by OSC.
+  the exact `confirm_token` values from the reviewed dry-run plan. Broad
+  capability gate names are discovery labels, not real-write approval tokens.
+  Properties with no safe OSC write path, such as `scriptSource`, remain
+  non-editable by OSC.
 - `properties={...}` remains the simple one-argument setter path.
 - `operations=[...]` supports structured setters such as audio levels, crop,
   text colors, and MIDI fields in dry-run plans.
@@ -482,8 +484,10 @@ dry-run-only:
 }
 ```
 
-High-risk edits are useful in dry-run plans. Real writes require the matching
-`confirm_gates` per item:
+High-risk edits are useful in dry-run plans. Dry-run responses include
+`planned_operations[].confirm_token` for gated operations; pass those exact
+tokens in `confirm_gates` only after reviewing the plan. Broad labels such as
+`audio_output` are discovery labels and do not authorize real writes:
 
 ```json
 {
@@ -493,7 +497,7 @@ High-risk edits are useful in dry-run plans. Real writes require the matching
       "cue_ref": "light-cue-id",
       "profile": "light_basic",
       "properties": {"lightCommandText": "1 = 50"},
-      "confirm_gates": ["light_output"]
+      "confirm_gates": []
     },
     {
       "cue_ref": "audio-cue-id",
@@ -502,13 +506,13 @@ High-risk edits are useful in dry-run plans. Real writes require the matching
         {"property": "level", "args": {"inChannel": 1, "outChannel": 1, "decibel": -6}},
         {"property": "mute", "args": {"output": 1, "value": false}}
       ],
-      "confirm_gates": ["audio_output"]
+      "confirm_gates": []
     },
     {
       "cue_ref": "network-cue-id",
       "profile": "network_basic",
       "properties": {"customString": "/mcp/dryrun"},
-      "confirm_gates": ["network_output"]
+      "confirm_gates": []
     }
   ]
 }

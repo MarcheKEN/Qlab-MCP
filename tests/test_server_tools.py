@@ -125,7 +125,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         },
         "tags": ["batch-update", "cue-update", "gated-write", "qlab", "write-mode"],
         "input_schema_hash": "d5202803e7b8b5bf7a07bc3693b27b3c86715258957fa8283284656cd6b280f6",
-        "output_schema_hash": "f25d575370b4d2e36f6b322ff63f028e42e3352ad96126effb3b867b2584ecdc",
+        "output_schema_hash": "748245a9a4bccbd1764f91827536bed33e0e29b735eff3b6034d35bfcfbcd808",
     },
 }
 EXPECTED_DESCRIPTION_PHRASES = {

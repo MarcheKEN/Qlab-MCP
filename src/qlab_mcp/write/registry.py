@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, replace
 from string import Formatter
 from typing import Any
@@ -947,6 +949,10 @@ LIGHT_CATALOG_PROPERTIES = (
 
 FADE_CATALOG_PROPERTIES = (
     _planned_prop("stopTargetWhenDone", "boolean", reason="fade_target_behavior_needs_validation"),
+    _planned_prop("cueTargetNumber", "cue_target_number", reason="fade_target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetID", "cue_target_id", reason="fade_target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="fade_target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("tempCueTargetID", "cue_target_id", reason="fade_target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("audioMapTargetID", "target_id", reason="target_refs_need_dedicated_resolution"),
     _planned_prop("patchTargetID", "target_id", reason="target_refs_need_dedicated_resolution"),
     _planned_prop("targetMode", "target_mode", reason="target_behavior_needs_validation"),
@@ -1308,6 +1314,8 @@ def editable_update_capabilities(cue_type: str | None) -> dict[str, Any]:
                 "profiles": [profile_name],
                 "path": prop["path"],
                 "args": prop["args"],
+                "read_key": prop["read_key"],
+                "readback": prop["readback"],
                 "modes": prop["modes"],
                 "risk_tier": prop["risk_tier"],
                 "real_write_enabled": prop["real_write_enabled"],
@@ -1327,6 +1335,8 @@ def editable_update_capabilities(cue_type: str | None) -> dict[str, Any]:
                 "path": prop["path"],
                 "args": prop["args"],
                 "modes": prop["modes"],
+                "read_key": prop["read_key"],
+                "readback": prop["readback"],
                 "risk_tier": prop["risk_tier"],
                 "real_write_enabled": prop["real_write_enabled"],
                 "planned_only_reason": prop["planned_only_reason"],
@@ -1342,9 +1352,11 @@ def editable_update_capabilities(cue_type: str | None) -> dict[str, Any]:
         "recommended_profile": recommended_profile,
         "real_write_properties": sorted(real_write_details),
         "dry_run_only_properties": sorted(dry_run_only_details),
+        "gated_or_dry_run_only_properties": sorted(dry_run_only_details),
         "property_details": {
             "real_write": real_write_details,
             "dry_run_only": dry_run_only_details,
+            "gated_or_dry_run_only": dry_run_only_details,
         },
         "operations": operations,
         "risk_tier": max_risk,
@@ -1422,21 +1434,37 @@ def ensure_real_write_allowed(
     operations: list[dict[str, Any]],
     confirmed_gates: list[str] | tuple[str, ...] | set[str] | None = None,
 ) -> None:
+    errors = real_write_permission_errors(profile, operations, confirmed_gates)
+    if errors:
+        raise UnsafeWriteOperationError("; ".join(errors.values()))
+
+
+def real_write_permission_errors(
+    profile: str,
+    operations: list[dict[str, Any]],
+    confirmed_gates: list[str] | tuple[str, ...] | set[str] | None = None,
+) -> dict[str, str]:
     spec = UPDATE_PROFILES[validate_update_profile(profile)]
     if not spec.real_write_enabled:
-        raise UnsafeWriteOperationError(f"{profile} is cataloged for dry-run only; real write is not enabled yet.")
+        return {"profile": f"{profile} is cataloged for dry-run only; real write is not enabled yet."}
     confirmed = {gate.strip() for gate in confirmed_gates or () if isinstance(gate, str) and gate.strip()}
-    blocked = [
-        operation
-        for operation in operations
-        if not operation["real_write_enabled"] and operation.get("capability_gate") not in confirmed
-    ]
-    if blocked:
-        names = ", ".join(
-            f"{operation['property']} (requires {operation.get('capability_gate') or 'no_real_write_gate'})"
-            for operation in blocked
-        )
-        raise UnsafeWriteOperationError(f"These update operations are gated or dry-run only for profile {profile}: {names}")
+    errors: dict[str, str] = {}
+    for operation in operations:
+        prop = str(operation["property"])
+        if operation["real_write_enabled"]:
+            continue
+        token = str(operation.get("confirm_token") or "")
+        if token not in confirmed:
+            errors[prop] = (
+                f"{prop} is gated or dry-run only for real writes and requires confirm_token {token!r}; broad capability gate "
+                f"{operation.get('capability_gate') or 'no_real_write_gate'!r} is dry-run discovery only."
+            )
+        if not operation.get("read_key") or len(operation.get("args") or []) != 1:
+            errors[prop] = (
+                f"{prop} is gated or dry-run only because it has no deterministic one-value readback; "
+                "dry-run only until a verifier is implemented."
+            )
+    return errors
 
 
 def read_keys_for_operations(operations: list[dict[str, Any]]) -> list[str]:
@@ -1528,7 +1556,7 @@ def _normalize_one_operation(
     if normalized_mode == "live":
         path = f"{path}/live"
     osc_args = [normalized_args[arg_name] for arg_name in spec.osc_args]
-    return {
+    operation = {
         "operation": "set_property",
         "property": spec.name,
         "path": path,
@@ -1543,6 +1571,21 @@ def _normalize_one_operation(
         "readback": spec.readback,
         "contextual_requirements": list(spec.contextual_requirements),
     }
+    if not spec.real_write_enabled:
+        operation["confirm_token"] = _confirm_token(profile, spec.name, path, normalized_mode, osc_args)
+    return operation
+
+
+def _confirm_token(profile: str, property_name: str, path: str, mode: str, args: list[Any]) -> str:
+    payload = {
+        "profile": profile,
+        "property": property_name,
+        "path": path,
+        "mode": mode,
+        "args": args,
+    }
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    return f"confirm:{property_name}:{digest[:16]}"
 
 
 def _property_spec(profile: str, property_name: str) -> CuePropertySpec:

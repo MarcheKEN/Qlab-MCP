@@ -209,6 +209,16 @@ def planned_setters(result_item: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
+def confirm_token_for(reader: QLabReader, cue_ref: str, update: dict[str, Any], profile: str = "common") -> str:
+    dry_result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_ref, "profile": profile, **update}],
+        dry_run=True,
+    )
+    setters = planned_setters(dry_result["results"][0])
+    return setters[next(iter(setters))]["confirm_token"]
+
+
 PROFILE_TEST_CUE_TYPES = {
     "common": "Memo",
     "memo_basic": "Memo",
@@ -2034,13 +2044,15 @@ def test_update_cues_group_basic_real_blocks_planned_only_before_setters() -> No
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
-        reader.update_cues(
-            "ws-1",
-            [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playbackPosition": "next"}}],
-            dry_run=False,
-        )
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playbackPosition": "next"}}],
+        dry_run=False,
+    )
 
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert "dry-run only" in result["results"][0]["errors"]["playbackPosition"]
     assert client.requests == []
 
 
@@ -2406,7 +2418,7 @@ def test_update_cues_real_preflight_invalid_value_blocks_all_setters_without_sec
     assert result["results"][1]["errors"]["validation"] == "preWait must be a non-negative number"
     assert "read_before" not in result["results"][1]["errors"]
     assert result["message"] == "Batch cue update was blocked during preflight; no mutating OSC commands were sent."
-    assert f"/workspace/ws-1/cue_id/{memo_id}/valuesForKeys" in addresses
+    assert f"/workspace/ws-1/cue_id/{memo_id}/valuesForKeys" not in addresses
     assert f"/workspace/ws-1/cue_id/{group_id}/valuesForKeys" not in addresses
     assert f"/workspace/ws-1/cue_id/{memo_id}/name" not in addresses
     assert f"/workspace/ws-1/cue_id/{group_id}/preWait" not in addresses
@@ -2471,21 +2483,21 @@ def test_update_cues_real_blocks_dry_run_only_property_before_osc() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
-        reader.update_cues(
-            "ws-1",
-            [
-                {
-                    "cue_ref": cue_id,
-                    "profile": "audio_basic",
-                    "operations": [
-                        {"property": "level", "args": {"inChannel": 1, "outChannel": 1, "decibel": -6}}
-                    ],
-                }
-            ],
-            dry_run=False,
-        )
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "audio_basic",
+                "operations": [{"property": "level", "args": {"inChannel": 1, "outChannel": 1, "decibel": -6}}],
+            }
+        ],
+        dry_run=False,
+    )
 
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert "dry-run only" in result["results"][0]["errors"]["level"]
     assert client.requests == []
 
 
@@ -2497,13 +2509,15 @@ def test_update_cues_real_blocks_target_refs_before_osc() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
-        reader.update_cues(
-            "ws-1",
-            [{"cue_ref": cue_id, "profile": "target_basic", "properties": {"cueTargetID": "target-id"}}],
-            dry_run=False,
-        )
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "target_basic", "properties": {"cueTargetID": "target-id"}}],
+        dry_run=False,
+    )
 
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert "dry-run only" in result["results"][0]["errors"]["cueTargetID"]
     assert client.requests == []
 
 
@@ -2516,6 +2530,7 @@ def test_update_cues_real_blocks_unresolved_target_ref_with_gate_before_setter()
         missing_refs={target_id},
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
+    token = confirm_token_for(reader, cue_id, {"profile": "target_basic", "properties": {"cueTargetID": target_id}})
 
     result = reader.update_cues(
         "ws-1",
@@ -2524,7 +2539,7 @@ def test_update_cues_real_blocks_unresolved_target_ref_with_gate_before_setter()
                 "cue_ref": cue_id,
                 "profile": "target_basic",
                 "properties": {"cueTargetID": target_id},
-                "confirm_gates": ["target_resolution"],
+                "confirm_gates": [token],
             }
         ],
         dry_run=False,
@@ -2543,6 +2558,7 @@ def test_update_cues_real_blocks_self_target_ref_with_gate_before_setter() -> No
         cues={cue_id: {"type": "Start", "cueTargetID": ""}},
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
+    token = confirm_token_for(reader, cue_id, {"profile": "target_basic", "properties": {"cueTargetID": cue_id}})
 
     result = reader.update_cues(
         "ws-1",
@@ -2551,7 +2567,7 @@ def test_update_cues_real_blocks_self_target_ref_with_gate_before_setter() -> No
                 "cue_ref": cue_id,
                 "profile": "target_basic",
                 "properties": {"cueTargetID": cue_id},
-                "confirm_gates": ["target_resolution"],
+                "confirm_gates": [token],
             }
         ],
         dry_run=False,
@@ -2571,6 +2587,7 @@ def test_update_cues_real_allows_resolved_target_ref_with_gate() -> None:
         cues={cue_id: {"type": "Start", "cueTargetID": ""}, target_id: {"type": "Memo"}},
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
+    token = confirm_token_for(reader, cue_id, {"profile": "target_basic", "properties": {"cueTargetID": target_id}})
 
     result = reader.update_cues(
         "ws-1",
@@ -2579,7 +2596,7 @@ def test_update_cues_real_allows_resolved_target_ref_with_gate() -> None:
                 "cue_ref": cue_id,
                 "profile": "target_basic",
                 "properties": {"cueTargetID": target_id},
-                "confirm_gates": ["target_resolution"],
+                "confirm_gates": [token],
             }
         ],
         dry_run=False,
@@ -2597,6 +2614,9 @@ def test_update_cues_real_blocks_target_name_resolution_with_gate_before_setter(
         cues={cue_id: {"type": "Start", "cueTargetName": ""}},
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
+    token = confirm_token_for(
+        reader, cue_id, {"profile": "target_basic", "properties": {"cueTargetName": "Target by name"}}
+    )
 
     result = reader.update_cues(
         "ws-1",
@@ -2605,7 +2625,7 @@ def test_update_cues_real_blocks_target_name_resolution_with_gate_before_setter(
                 "cue_ref": cue_id,
                 "profile": "target_basic",
                 "properties": {"cueTargetName": "Target by name"},
-                "confirm_gates": ["target_resolution"],
+                "confirm_gates": [token],
             }
         ],
         dry_run=False,
@@ -3053,6 +3073,7 @@ def test_update_cue_rejects_file_target_symlink_escape(tmp_path: Any) -> None:
         },
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
+    token = confirm_token_for(reader, "1", {"properties": {"fileTarget": str(symlink_path)}})
 
     with pytest.raises(UnsafeWriteOperationError, match="outside QLAB_ALLOWED_FILE_ROOTS"):
         reader.update_cue(
@@ -3060,7 +3081,7 @@ def test_update_cue_rejects_file_target_symlink_escape(tmp_path: Any) -> None:
             "1",
             {"fileTarget": str(symlink_path)},
             dry_run=False,
-            confirm_gates=["file_target_access"],
+            confirm_gates=[token],
         )
 
 
@@ -3409,6 +3430,8 @@ def test_update_cue_operations_dry_run_builds_structured_osc_paths() -> None:
     setters = [operation for operation in result["planned_operations"] if operation["operation"] == "set_property"]
     assert result["ok"] is True
     assert result["properties"] == {}
+    assert setters[0]["confirm_token"].startswith("confirm:level:")
+    setters[0].pop("confirm_token")
     assert setters == [
         {
             "operation": "set_property",
@@ -3719,19 +3742,67 @@ def test_update_cue_real_allows_gated_common_property_with_explicit_gate() -> No
         cue_values={"uniqueID": cue_id, "type": "Memo", "duckLevel": -12},
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
+    token = confirm_token_for(reader, cue_id, {"properties": {"duckLevel": -6}})
 
     result = reader.update_cue(
         "ws-1",
         cue_id,
         {"duckLevel": -6},
         dry_run=False,
-        confirm_gates=["cue_behavior"],
+        confirm_gates=[token],
     )
 
     assert result["ok"] is True
     assert result["after"]["duckLevel"] == -6
-    assert result["confirm_gates"] == ["cue_behavior"]
+    assert result["confirm_gates"] == [token]
     assert result["executed_operations"][0]["capability_gate"] == "cue_behavior"
+
+
+def test_update_cues_real_operation_with_readback_verifies_as_updated() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "secondColorName": "none"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "common",
+                "operations": [{"property": "secondColorName", "args": {"value": "red"}}],
+            }
+        ],
+        dry_run=False,
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "updated"
+    assert result["results"][0]["status"] == "updated"
+    assert result["results"][0]["after"]["secondColorName"] == "red"
+    assert result["results"][0]["errors"] is None
+
+
+def test_update_cues_confirm_token_is_bound_to_cue_ref() -> None:
+    cue_a = "11111111-1111-4111-8111-111111111111"
+    cue_b = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_a: {"type": "Audio"}, cue_b: {"type": "Audio"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "profile": "audio_basic",
+        "operations": [{"property": "level", "args": {"inChannel": 1, "outChannel": 1, "decibel": -6}}],
+    }
+
+    token_a = confirm_token_for(reader, cue_a, update)
+    token_b = confirm_token_for(reader, cue_b, update)
+
+    assert token_a.startswith("confirm:level:")
+    assert token_a != token_b
 
 
 def test_update_cue_timecode_frame_rate_uses_documented_framerate_path() -> None:
@@ -3867,12 +3938,14 @@ def test_update_cues_mic_channel_offset_blocks_real_write_without_patch_gate() -
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    with pytest.raises(UnsafeWriteOperationError, match=r"channelOffset \(requires patch_routing\)"):
-        reader.update_cues(
-            "ws-1",
-            [{"cue_ref": mic_id, "profile": "mic_basic", "properties": {"channelOffset": 1}}],
-            dry_run=False,
-        )
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": mic_id, "profile": "mic_basic", "properties": {"channelOffset": 1}}],
+        dry_run=False,
+    )
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert "channelOffset" in result["results"][0]["errors"]["channelOffset"]
     assert all(not request[0].endswith("/channelOffset") for request in client.requests)
 
 

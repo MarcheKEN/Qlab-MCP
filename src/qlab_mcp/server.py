@@ -1036,7 +1036,8 @@ def qlab_update_cues(
             min_length=1,
             max_length=50,
             description=(
-                "Cue updates to plan or apply. Each item has cue_ref, profile, properties, operations, and optional confirm_gates. "
+                "Cue updates to plan or apply. Each item has cue_ref, profile, properties, operations, and optional confirm_gates "
+                "containing exact confirm_token values from reviewed dry-run planned_operations. "
                 "cue_ref must be a concrete cue number or unique ID; selected, active, playhead, and playbackPosition "
                 "are not accepted."
             ),
@@ -1056,7 +1057,7 @@ def qlab_update_cues(
 
     Real updates require QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
     Dry-run planning never sends mutating OSC.
-    High-risk profiles and unvalidated properties are cataloged for planning and require explicit confirm_gates for real writes.
+    High-risk profiles and unvalidated properties are cataloged for planning and require exact dry-run confirm_tokens for real writes.
     Batch real writes run all preflight checks before sending any setter and use cue unique IDs for setters.
     """
     return _run_tool(

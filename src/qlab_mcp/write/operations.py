@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import os
 import time
@@ -21,6 +23,7 @@ from .allowlist import (
     ensure_real_write_allowed,
     normalize_update_request,
     read_keys_for_operations,
+    real_write_permission_errors,
     validate_update_profile,
     validate_update_profile_for_cue,
     validate_writable_cue_type,
@@ -42,11 +45,13 @@ UPDATE_STATUS_ACTIONS = {
     "preflight_failed": "Inspect per-cue errors; no setters were sent, so fix cue refs/profiles before retrying.",
     "partial_failed": "Inspect per-cue errors and verify the affected cues in QLab before retrying only failed items.",
     "verification_failed": "Read the cue fresh and compare requested versus after values before retrying.",
+    "verification_inconclusive": "Treat the update as unsafe; inspect executed operations and add deterministic readback before retrying.",
 }
 UPDATE_STATUS_CODES = {
     "preflight_failed": "QLAB_UPDATE_PREFLIGHT_FAILED",
     "partial_failed": "QLAB_UPDATE_PARTIAL_FAILED",
     "verification_failed": "QLAB_UPDATE_VERIFICATION_FAILED",
+    "verification_inconclusive": "QLAB_UPDATE_VERIFICATION_INCONCLUSIVE",
 }
 CONTINUE_MODE_VALUES = {
     0: 0,
@@ -278,6 +283,19 @@ class QLabWriteMixin:
             dry_run=dry_run,
         )
         item = dict(batch["results"][0])
+        if not batch["ok"] and batch["status"] == "preflight_failed" and not batch["dry_run"]:
+            messages = []
+            if item.get("errors"):
+                messages.extend(str(message) for message in item["errors"].values())
+            if batch.get("errors"):
+                messages.extend(str(message) for message in batch["errors"].values())
+            message = "; ".join(messages) or batch["message"]
+            if (
+                "gated or dry-run only" in message
+                or "outside QLAB_ALLOWED_FILE_ROOTS" in message
+                or item.get("errors", {}).get("write_readiness")
+            ):
+                raise UnsafeWriteOperationError(message)
         if not batch["ok"] and batch["status"] == "preflight_failed" and item.get("errors") and "profile" in item["errors"]:
             raise UnsafeWriteOperationError("; ".join(item["errors"].values()))
         status = item["status"]
@@ -321,10 +339,38 @@ class QLabWriteMixin:
             raise UnsafeWriteOperationError(f"updates can include at most {MAX_BATCH_UPDATES} cue updates")
         effective_dry_run = resolve_dry_run(self, dry_run)
         items = [_normalize_batch_update_item_for_batch(raw_update) for raw_update in updates]
+        for item in items:
+            _bind_confirm_tokens(workspace, item)
         if not effective_dry_run:
+            gate_results = []
+            gate_ok = True
             for item in items:
+                errors = dict(item.get("errors") or {})
                 if not item.get("errors"):
-                    ensure_real_write_allowed(item["profile"], item["operations"], item["confirm_gates"])
+                    errors.update(real_write_permission_errors(item["profile"], item["operations"], item["confirm_gates"]))
+                if errors:
+                    gate_ok = False
+                gate_results.append(
+                    _batch_item_result(
+                        workspace,
+                        item,
+                        cue_id=None,
+                        status="preflight_failed" if errors else "planned",
+                        before=None,
+                        after=None,
+                        errors=errors or None,
+                        warnings=[],
+                    )
+                )
+            if not gate_ok:
+                return _batch_update_result(
+                    workspace,
+                    dry_run=False,
+                    results=gate_results,
+                    status="preflight_failed",
+                    requested_count=len(updates),
+                    errors={"preflight": "One or more cue updates failed real-write gate preflight; no setters were sent."},
+                )
         if effective_dry_run:
             try:
                 workspace = self._resolve_workspace_id_strict(workspace)
@@ -369,8 +415,51 @@ class QLabWriteMixin:
                 warnings=["Dry run only: no mutating OSC commands were sent to QLab."],
             )
 
-        workspace = ensure_write_ready(self, workspace)
-        _validate_file_target_roots(self, items)
+        try:
+            workspace = ensure_write_ready(self, workspace)
+        except Exception as exc:
+            return _batch_update_result(
+                workspace,
+                dry_run=False,
+                results=[
+                    _batch_item_result(
+                        workspace,
+                        item,
+                        cue_id=None,
+                        status="preflight_failed",
+                        before=None,
+                        after=None,
+                        errors={"write_readiness": str(exc)},
+                        warnings=[],
+                    )
+                    for item in items
+                ],
+                status="preflight_failed",
+                requested_count=len(updates),
+                errors={"write_readiness": str(exc)},
+            )
+        file_root_errors = _file_target_root_errors(self, items)
+        if file_root_errors:
+            return _batch_update_result(
+                workspace,
+                dry_run=False,
+                results=[
+                    _batch_item_result(
+                        workspace,
+                        item,
+                        cue_id=None,
+                        status="preflight_failed" if index in file_root_errors else "planned",
+                        before=None,
+                        after=None,
+                        errors=file_root_errors.get(index),
+                        warnings=[],
+                    )
+                    for index, item in enumerate(items)
+                ],
+                status="preflight_failed",
+                requested_count=len(updates),
+                errors={"preflight": "One or more fileTarget paths failed root validation; no setters were sent."},
+            )
         update_deadline = time.monotonic() + UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS
         setter_count = sum(len(item["operations"]) for item in items)
         setter_reply_timeout = _setter_reply_timeout(self, setter_count, update_deadline)
@@ -472,12 +561,13 @@ class QLabWriteMixin:
         final_results: list[dict[str, Any]] = []
         timeout_confirmed_count = 0
         for item, result in zip(items, executed_items, strict=True):
+            requested_values = _verification_requested_values(item)
             after, after_errors = _try_read_update_values_with_retries(
                 self,
                 workspace,
                 result["cue_id"],
                 item["read_keys"],
-                item["properties"],
+                requested_values,
                 retry_on_mismatch=bool(result["_setter_timeouts"]),
                 request_timeout=_bounded_reply_timeout(
                     self,
@@ -486,15 +576,21 @@ class QLabWriteMixin:
                 ),
                 deadline=update_deadline,
             )
-            confirmed_by_after = _properties_match(after, item["properties"])
+            confirmed_by_after = _properties_match(after, requested_values)
             setter_timeouts = result.pop("_setter_timeouts")
             setter_errors = result.pop("_setter_errors")
             unconfirmed_timeouts = {} if confirmed_by_after else setter_timeouts
             value_mismatch = {}
             if not confirmed_by_after and not setter_errors and not unconfirmed_timeouts and not after_errors:
-                value_mismatch["verification"] = _verification_mismatch_message(after, item["properties"])
+                value_mismatch["verification"] = _verification_mismatch_message(after, requested_values)
             errors = {**setter_errors, **unconfirmed_timeouts, **after_errors, **value_mismatch}
             warnings = list(result["warnings"])
+            unverifiable_operations = [
+                operation
+                for operation in item["operations"]
+                if not operation.get("read_key") or len(operation.get("args") or []) != 1
+            ]
+            inconclusive = bool(unverifiable_operations)
             if setter_timeouts and confirmed_by_after:
                 timeout_confirmed_count += 1
                 warnings.append("One or more setters did not reply, but fresh after-read confirmed requested values.")
@@ -502,6 +598,9 @@ class QLabWriteMixin:
             verification_failed = (bool(after_errors) or bool(value_mismatch)) and not failed
             if failed:
                 status = "partial_failed"
+            elif inconclusive:
+                status = "verification_inconclusive"
+                errors["verification"] = "No deterministic readback values were available for this real write."
             elif verification_failed:
                 status = "verification_failed"
             elif setter_timeouts:
@@ -512,7 +611,7 @@ class QLabWriteMixin:
                 {
                     "status": status,
                     "after": after,
-                    "diff": _diff_properties(result["before"], item["properties"], after),
+                    "diff": _diff_properties(result["before"], requested_values, after),
                     "errors": errors or None,
                     "warnings": warnings,
                 }
@@ -522,7 +621,8 @@ class QLabWriteMixin:
                     "cue_ref": item["cue_ref"],
                     "cue_id": result["cue_id"],
                     "requested_properties": item["properties"],
-                    "after_values": _after_values_for_requested(after, item["properties"]),
+                    "requested_values": requested_values,
+                    "after_values": _after_values_for_requested(after, requested_values),
                     "properties_match": confirmed_by_after,
                     "setter_timeouts": setter_timeouts,
                     "confirmed_timeouts": bool(setter_timeouts and confirmed_by_after),
@@ -536,6 +636,8 @@ class QLabWriteMixin:
             status = "partial_failed"
         elif any(result["status"] == "verification_failed" for result in final_results):
             status = "verification_failed"
+        elif any(result["status"] == "verification_inconclusive" for result in final_results):
+            status = "verification_inconclusive"
         elif any(result["status"] == "updated_with_confirmed_timeouts" for result in final_results):
             status = "updated_with_confirmed_timeouts"
         else:
@@ -573,6 +675,25 @@ def _normalize_batch_update_item(raw_update: Any) -> dict[str, Any]:
     if item.get("errors"):
         raise UnsafeWriteOperationError("; ".join(str(message) for message in item["errors"].values()))
     return item
+
+
+def _bind_confirm_tokens(workspace_id: str, item: dict[str, Any]) -> None:
+    for operation in item.get("operations") or []:
+        token = operation.get("confirm_token")
+        if not token:
+            continue
+        payload = {
+            "workspace_id": workspace_id,
+            "cue_ref": item["cue_ref"],
+            "profile": item["profile"],
+            "property": operation["property"],
+            "path": operation["path"],
+            "mode": operation["mode"],
+            "args": operation["args"],
+            "base_token": token,
+        }
+        digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        operation["confirm_token"] = f"confirm:{operation['property']}:{digest[:16]}"
 
 
 def _normalize_batch_update_item_for_batch(raw_update: Any) -> dict[str, Any]:
@@ -648,25 +769,40 @@ def _normalize_confirm_gates(raw_gates: Any) -> tuple[list[str], str | None]:
 
 
 def _validate_file_target_roots(reader: Any, items: list[dict[str, Any]]) -> None:
+    errors = _file_target_root_errors(reader, items)
+    if errors:
+        first = next(iter(errors.values()))
+        raise UnsafeWriteOperationError(next(iter(first.values())))
+
+
+def _file_target_root_errors(reader: Any, items: list[dict[str, Any]]) -> dict[int, dict[str, str]]:
     requested_paths: list[str] = []
-    for item in items:
+    requested_items: list[tuple[int, str]] = []
+    for index, item in enumerate(items):
         for operation in item["operations"]:
             if operation["property"] == "fileTarget" and operation.get("capability_gate") == "file_target_access":
                 if operation["args"]:
-                    requested_paths.append(str(operation["args"][0]))
+                    requested_path = str(operation["args"][0])
+                    requested_paths.append(requested_path)
+                    requested_items.append((index, requested_path))
     if not requested_paths:
-        return
+        return {}
     config = getattr(getattr(reader, "client", None), "config", None)
     roots = tuple(getattr(config, "allowed_file_roots", ()) or ())
     if not roots:
-        raise UnsafeWriteOperationError(
-            "fileTarget real writes require QLAB_ALLOWED_FILE_ROOTS to include at least one allowed media root."
-        )
+        return {
+            index: {
+                "fileTarget": "fileTarget real writes require QLAB_ALLOWED_FILE_ROOTS to include at least one allowed media root."
+            }
+            for index, _ in requested_items
+        }
     normalized_roots = tuple(os.path.realpath(root) for root in roots)
-    for requested_path in requested_paths:
+    errors: dict[int, dict[str, str]] = {}
+    for index, requested_path in requested_items:
         absolute_path = os.path.realpath(requested_path)
         if not any(_path_is_under_root(absolute_path, root) for root in normalized_roots):
-            raise UnsafeWriteOperationError(f"fileTarget path is outside QLAB_ALLOWED_FILE_ROOTS: {requested_path!r}")
+            errors[index] = {"fileTarget": f"fileTarget path is outside QLAB_ALLOWED_FILE_ROOTS: {requested_path!r}"}
+    return errors
 
 
 def _path_is_under_root(path: str, root: str) -> bool:
@@ -776,7 +912,12 @@ def _batch_update_result(
         if result.get("status") in {"updated", "updated_with_confirmed_timeouts"}
     )
     planned_count = sum(1 for result in fixed_results if result.get("planned_operations"))
-    ok = failed_count == 0 and status not in {"preflight_failed", "partial_failed", "verification_failed"}
+    ok = failed_count == 0 and status not in {
+        "preflight_failed",
+        "partial_failed",
+        "verification_failed",
+        "verification_inconclusive",
+    }
     if status == "dry_run":
         message = "Dry run succeeded; review planned_operations before disabling dry_run."
     elif status == "preflight_failed":
@@ -785,6 +926,8 @@ def _batch_update_result(
         message = "Batch cue update partially failed; inspect per-cue results and errors."
     elif status == "verification_failed":
         message = "Batch cue update commands completed, but fresh verification failed."
+    elif status == "verification_inconclusive":
+        message = "Batch cue update commands completed, but deterministic verification was not available."
     elif status == "updated_with_confirmed_timeouts":
         message = "Batch cue update completed; some setters timed out but fresh after-reads confirmed requested values."
     else:
@@ -880,6 +1023,8 @@ def _planned_update_operations(
             "real_write_enabled": update_operation["real_write_enabled"],
             "capability_gate": update_operation.get("capability_gate"),
         }
+        if update_operation.get("confirm_token"):
+            planned["confirm_token"] = update_operation["confirm_token"]
         if update_operation.get("contextual_requirements"):
             planned["contextual_requirements"] = update_operation["contextual_requirements"]
         if update_operation.get("planned_only_reason"):
@@ -1019,6 +1164,16 @@ def _properties_match(values: Any, requested: dict[str, Any]) -> bool:
     if not isinstance(values, dict):
         return False
     return all(_property_values_match(key, values.get(key), value) for key, value in requested.items())
+
+
+def _verification_requested_values(item: dict[str, Any]) -> dict[str, Any]:
+    requested = dict(item["properties"])
+    for operation in item["operations"]:
+        read_key = operation.get("read_key")
+        args = operation.get("args") or []
+        if read_key and len(args) == 1:
+            requested[str(read_key)] = args[0]
+    return requested
 
 
 def _verification_mismatch_message(values: Any, requested: dict[str, Any]) -> str:

@@ -131,9 +131,9 @@ Editable duration smoke:
 Target resolution smoke:
 
 1. Pick one disposable target cue and one disposable Start/Stop/Pause/Load/GoTo/Arm/Disarm cue.
-2. Run `qlab_update_cues(..., dry_run=true)` for `cueTargetID` with
-   `confirm_gates=["target_resolution"]`.
-3. Run the same with `dry_run=false`.
+2. Run `qlab_update_cues(..., dry_run=true)` for `cueTargetID`.
+3. Copy the exact `planned_operations[].confirm_token` for `cueTargetID` into
+   `updates[].confirm_gates`, then run the same with `dry_run=false`.
 4. Expected real write:
    - preflight reads the target cue before setters
    - setter uses `/cue_id/{uniqueID}/cueTargetID`
@@ -152,18 +152,19 @@ Capability gate smoke:
 1. Pick one disposable cue and one high-risk property whose
    `planned_operations[]` includes a `capability_gate`.
 2. Run `qlab_update_cues(..., dry_run=true)` with no `confirm_gates`.
-3. Run the same update with `dry_run=false` and no `confirm_gates`.
-4. Expected block:
+3. Confirm the dry-run plan includes `capability_gate` and `confirm_token`.
+4. Run the same update with `dry_run=false` and no `confirm_gates`.
+5. Expected block:
    - no setter sent
-   - error names the required gate
-5. Run the same update with `dry_run=false` and
-   `updates[].confirm_gates=[required_gate]`.
-6. Expected gated write:
+   - error names the exact required `confirm_token`
+6. Run the same update with `dry_run=false` and
+   `updates[].confirm_gates=[confirm_token_from_dry_run]`.
+7. Expected gated write:
    - setter uses `/cue_id/{uniqueID}/...`
    - fresh read-after-write verifies the requested value when the property is readable
    - report any property that cannot be read back as inconclusive, not passed
 
-Recommended gate order on a dummy workspace:
+Recommended dry-run capability labels to exercise on a dummy workspace:
 
 - `cue_behavior`
 - `target_resolution`

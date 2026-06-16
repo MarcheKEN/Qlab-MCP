@@ -16,6 +16,7 @@ from .registry import (
     planned_write_capabilities,
     profile_catalog,
     read_keys_for_operations,
+    real_write_permission_errors,
     validate_update_profile,
     validate_update_profile_for_cue,
 )

@@ -7,7 +7,7 @@ from qlab_mcp.write.registry import profile_catalog
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DICTIONARY_PATH = PROJECT_ROOT / "references" / "qlab" / "QLab's OSC Dictionary.txt"
+DICTIONARY_PATH = PROJECT_ROOT / "references" / "qlab" / "qlab_osc_dictionary.md"
 
 
 def test_update_registry_has_specs_for_all_mutating_cue_osc_routes() -> None:

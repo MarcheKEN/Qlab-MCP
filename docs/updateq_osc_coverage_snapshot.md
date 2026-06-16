@@ -1,6 +1,6 @@
 # UpdateQ OSC Coverage Snapshot
 
-Source of truth: `references/qlab/QLab's OSC Dictionary.txt`.
+Source of truth: `references/qlab/qlab_osc_dictionary.md`.
 
 Generated view: `extract_cue_osc_inventory(...)` + `registry_coverage(...)` against
 `profile_catalog()`.
@@ -66,7 +66,7 @@ from qlab_mcp.write.osc_inventory import extract_cue_osc_inventory, registry_cov
 from qlab_mcp.write.registry import profile_catalog
 
 root = Path.cwd()
-dictionary = root / "references" / "qlab" / "QLab's OSC Dictionary.txt"
+dictionary = root / "references" / "qlab" / "qlab_osc_dictionary.md"
 coverage = registry_coverage(extract_cue_osc_inventory(dictionary.read_text()), profile_catalog())
 print(coverage_summary(coverage))
 print([entry for entry in coverage if entry["registry_status"] == "missing"])

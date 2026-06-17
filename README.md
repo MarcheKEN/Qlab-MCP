@@ -1,20 +1,69 @@
 # QLab MCP
 
-A FastMCP server for inspecting QLab 5 workspaces over OSC, with an optional
-gated write-mode preface for dry-run cue creation and batch cue updates.
+FastMCP server for safely inspecting QLab 5 workspaces over OSC.
 
-This project helps an agent understand what is inside an open QLab workspace:
-cues, cue lists, cue health, workspace settings, patches, routes, stages, MIDI,
-network, and light infrastructure. The default inspector mode does not expose
-playback, editing, deletion, raw OSC, or mutating commands.
+**Read-only by default.** The normal toolset inspects workspace status, cue
+structure, cue details, settings, patches, and routes without exposing playback
+or mutation controls. Write-mode tools are separate, disabled unless explicitly
+gated, and dry-run-first.
 
-By default the server remains read-only. Write mode is disabled unless
-`QLAB_ENABLE_WRITE=true`, and mutating tools default to dry-run unless
-`QLAB_WRITE_DRY_RUN_DEFAULT=false`.
+## What It Does
 
-## Best First Flow
+- Checks QLab connection status, workspace candidates, passcode state,
+  `/connect` scopes, and Edit/Show mode.
+- Builds a bounded workspace overview: cue lists, groups, cue counts, live state
+  when requested, and optional cue index.
+- Reads compact workspace status derived from documented read-only OSC reads.
+- Searches cues by type, state, color, name, number prefix, target presence,
+  timing, and health filters.
+- Reads focused cue details, including single-cue or up-to-50-cue batch reads.
+- Reads workspace settings in `mode="summary"` or batched `mode="details"`.
+- Provides optional dry-run-first write tools for basic cue creation and gated
+  batch cue updates.
 
-For read-only inspection, use the tools in this order:
+## What It Does Not Do
+
+- No GO, playback, stop, or panic controls.
+- No deletion tools.
+- No raw OSC tool.
+- No ambiguous selected, active, playhead, or playback-position edits.
+- High-risk families are not ungated/simple writes. They require dry-run review
+  plus exact `planned_operations[].confirm_token` values when supported, or they
+  remain blocked.
+
+## Quick Start
+
+Install and run with the existing project commands:
+
+```bash
+uv sync --extra dev
+uv run qlab-mcp
+```
+
+Or run the FastMCP server directly:
+
+```bash
+uv run fastmcp run src/qlab_mcp/server.py:mcp
+```
+
+`fastmcp.json` also points FastMCP at `src/qlab_mcp/server.py:mcp` with STDIO
+transport and the project environment.
+
+Manual QLab check:
+
+1. Open QLab 5.
+2. Open or create a workspace with at least one cue list and one cue.
+3. Enable OSC access for the workspace if needed.
+4. Start this MCP server.
+5. Call `qlab_check_connection`.
+6. If several workspaces are open, pass a `workspace_id` from
+   `available_workspaces`.
+
+For passcode-protected workspaces, set `QLAB_PASSCODE` before starting the MCP.
+
+## Recommended Workflows
+
+Read-only inspection flow:
 
 1. `qlab_check_connection`
 2. `qlab_get_workspace_overview`
@@ -24,364 +73,70 @@ For read-only inspection, use the tools in this order:
 6. `qlab_get_cue_details`
 7. `qlab_get_workspace_settings(mode="details")`
 
-The core idea is simple: start broad and compact, then ask for details only
-when you know exactly what needs inspection.
-
-For cue edits, use this stricter workflow:
+Cue edit flow:
 
 1. `qlab_check_connection`
 2. `qlab_check_write_readiness`
 3. `qlab_query_cues` and `qlab_get_cue_details(profile="editable")`
 4. `qlab_update_cues(..., dry_run=true)`
-5. Review `planned_operations`, `diff`, warnings, and per-item errors with the user.
+5. Review `planned_operations`, `diff`, warnings, and per-item errors.
 6. Use `dry_run=false` only in a deliberate gated write session.
-7. Verify after with `qlab_get_cue_details`, `qlab_query_cues`, or other read tools.
+7. Verify after with `qlab_get_cue_details`, `qlab_query_cues`, or other read
+   tools.
 
-## Project Layout
+## Tool Groups
 
-The public entry points stay at the package root:
+### Connection And Status
 
-- `src/qlab_mcp/server.py` exposes the read tools plus gated write-mode tools.
-- `src/qlab_mcp/qlab.py` keeps the compatibility facade for `QLabReader`.
-- `src/qlab_mcp/models.py`, `config.py`, `errors.py`, and `allowlist.py` hold shared API types and policy.
-- `fastmcp.json` points FastMCP at `src/qlab_mcp/server.py:mcp` with STDIO transport and the project environment.
-
-Internal readers are grouped by responsibility:
-
-- `src/qlab_mcp/osc/` handles OSC encoding, transport, and addressing.
-- `src/qlab_mcp/cues/` handles overview, indexing, querying, profiles, and cue details.
-- `src/qlab_mcp/settings/` handles workspace settings, summarizers, and redaction.
-- `src/qlab_mcp/runtime/` handles shared reader runtime helpers such as connection diagnostics and read cache.
-- `src/qlab_mcp/write/` handles disabled-by-default write readiness, allowlists,
-  and gated mutating OSC operations.
-
-Project-local agent skills and transcript scratch files are intentionally not
-part of the runtime package. QLab learning/reference material should live in a
-clear documentation or reference location, not at the package root.
-
-## Tools
-
-| Tool | Use it for | Default shape |
-| --- | --- | --- |
-| `qlab_check_connection` | Confirm QLab is reachable, pick a workspace, verify safe read access, and report Edit/Show mode. | Small diagnostic result |
-| `qlab_get_workspace_overview` | Get the show map, Edit/Show mode, cue lists, groups, cue counts, and optional cue index. | Bounded tree plus compact index |
-| `qlab_get_workspace_status` | Get compact operational status: warnings, triggers, timecode config, settings summary, and explicit unavailable sections. | Derived summary |
-| `qlab_get_workspace_settings` | Summary inventory, available detail requests, or batched setting details. | `summary` mode |
-| `qlab_get_workspace_setting_details` | Backwards-compatible wrapper for one setting detail request. | `safe` profile |
-| `qlab_query_cues` | Search cues by type, state, color, name, number prefix, targets, timing, or health. | Up to 500 scanned/returned cues |
-| `qlab_get_cue_details` | Inspect one cue after finding it in overview or query results. | `auto` profile |
-| `qlab_check_write_readiness` | Check disabled-by-default write-mode readiness without mutation. | Safety/readiness report |
-| `qlab_create_cue` | Dry-run or create one blank allowlisted cue with safe initial properties. | Dry-run by default |
-| `qlab_update_cues` | Dry-run or update 1-50 concrete cues through the cue editing registry. | Dry-run by default |
-
-## Batch Edit Safety
-
-The read tools are the mature surface for normal agent work:
-`qlab_check_connection`, `qlab_get_workspace_status`,
-`qlab_get_workspace_overview`, `qlab_query_cues`, `qlab_get_cue_details`, and
-`qlab_get_workspace_settings`.
-
-`qlab_update_cues` is the single batch edit tool. Use it only after the agent has
-found concrete cue refs and inspected `qlab_get_cue_details(profile="editable")`
-for compatible profiles, editable properties, validators, and dry-run-only
-operations.
-
-Recommended edit flow:
-
-1. `qlab_check_connection`
-2. `qlab_check_write_readiness`
-3. `qlab_query_cues` / `qlab_get_cue_details(profile="editable")`
-4. `qlab_update_cues(..., dry_run=true)`
-5. Human review of `planned_operations`, `diff`, `before`, warnings, and errors
-6. `dry_run=false` only in a deliberate gated write session
-7. Verify after with read tools
-
-For manual runtime smoke validation of batch timeouts, rollback, and
-planned-only blocking, use `docs/qlab_update_cues_runtime_checklist.md`.
-
-Batch contract:
-
-- Each MCP call accepts 1-50 update items.
-- Each item must use a concrete cue ref. Ambiguous selected/playhead-style refs
-  are not write targets.
-- Each item can choose its own registry `profile`, `properties`, and
-  `operations`.
-- Each item may also include `confirm_gates` containing the exact
-  `planned_operations[].confirm_token` values emitted by a reviewed dry-run.
-- Validation and preflight failures are reported per item, not as a global tool
-  error.
-- Items that already fail normalization or validation do not attempt
-  `read_before`; their result should show only the relevant validation/preflight
-  error.
-- If any item fails real-write preflight, zero setters are sent for the whole
-  batch.
-- Once real setters start, the batch is not transactional. Later failures are
-  reported per item and require normal readback/manual review.
-
-Safety gates for real writes:
-
-- `QLAB_ENABLE_WRITE=true`
-- `QLAB_PASSCODE` configured on the server, never passed as a tool argument
-- `/connect` confirms `edit`
-- `/showMode` confirms Edit Mode
-- `dry_run=false` is supplied deliberately
-- high-risk update items include the exact `confirm_token` values emitted by
-  their reviewed dry-run `planned_operations`
-
-The server does not expose playback, GO, stop, panic, or raw OSC. High-risk
-properties are planned in dry-run and require exact
-`planned_operations[].confirm_token` values from a reviewed dry-run for real
-writes; OSC read-only fields such as `scriptSource` remain non-editable by OSC.
-
-## Compact By Default
-
-The server is designed to make everything accessible without dumping everything
-at once.
-
-- Overview gives a bounded tree and a compact cue index.
-- When cue_index is enabled, overview also derives editorial health from that
-  index: empty labels, duplicate names/numbers, and ambiguous placeholders.
-- Settings summary gives infrastructure summaries plus `available_detail_requests` without heavy raw payloads.
-- Settings details goes deeper only when the caller asks for specific setting requests.
-- `technical` and `full_sensitive` are explicit audit modes, not normal defaults.
-
-For large shows, `qlab_query_cues` keeps `max_results=500` and
-`max_cues_scanned=500` by default. Callers can raise either limit up to `5000`.
-Results report whether they are complete with:
-
-- `truncated`
-- `truncation_reasons`
-- `scanned_all_cues`
-- `result_limited`
-
-## Cue Index Profiles
-
-`qlab_get_workspace_overview` supports two cue index profiles.
-
-| Profile | Columns |
+| Tool | Use it for |
 | --- | --- |
-| `minimal` | Identity and position: ID, number, name, display name, type, list name, cue list ID, parent ID, depth |
-| `health` | Everything in `minimal`, plus armed, flagged, color, broken/warning state, continue mode, and continue mode label |
+| `qlab_check_connection` | Confirm QLab is reachable, resolve workspace choices, verify safe read access, report passcode state, `/connect` scopes, and Edit/Show mode. |
+| `qlab_get_workspace_status` | Get compact operational status: cue warnings, trigger/timecode summaries, settings summary, and explicit unavailable sections. |
 
-The default is `minimal`, so orientation stays fast and readable. Use `health`
-when you need a diagnostic map of the whole show.
+### Workspace Overview And Settings
 
-## Diagnostic Context
+| Tool | Use it for |
+| --- | --- |
+| `qlab_get_workspace_overview` | Get a bounded show map, cue lists, groups, cue counts, Edit/Show mode, optional live state, optional cue index, and optional global count. |
+| `qlab_get_workspace_settings` | Read compact settings summary or batched setting details. |
+| `qlab_get_workspace_setting_details` | Backwards-compatible wrapper for one settings detail request. |
 
-QLab reports cue and workspace fields; the MCP derives cautious summaries from
-those fields; physical output still needs a human check. A broken cue summary
-can include evidence, probable causes, diagnostic hints, and checks such as
-mounting media, opening QLab Workspace Status, or checking DMX/Art-Net/sACN
-output. These are derived hints, not claims about the actual room output.
+### Cue Query And Details
 
-The MCP reconstructs health from OSC-readable fields such as `isBroken`,
-`isWarning`, cue type, targets, message errors, and settings. It does not claim
-to read the full Workspace Status window directly because QLab's documented OSC
-dictionary does not expose a single complete Workspace Status warnings endpoint.
-When `qlab_get_workspace_overview` cannot read authoritative broken/warning
-fields from shallow cue data, health rows are marked partial/non-authoritative
-and callers should use `qlab_get_workspace_status` or `qlab_query_cues` with
-health filters for cue-level diagnostics.
+| Tool | Use it for |
+| --- | --- |
+| `qlab_query_cues` | Search cues by type, state, color, name, number prefix, target presence, timing, or health. |
+| `qlab_get_cue_details` | Inspect one cue or a batch of up to 50 cues. Use `profile="editable"` to discover update capabilities. |
 
-The read tools are the mature surface for normal agent work:
-`qlab_check_connection`, `qlab_get_workspace_status`,
-`qlab_get_workspace_overview`, `qlab_query_cues`, `qlab_get_cue_details`, and
-`qlab_get_workspace_settings`. Use `qlab_get_workspace_setting_details` only as
-the single-request compatibility wrapper for settings details.
+### Gated Write-Mode
 
-## Privacy And Safety
-
-The read tools are intentionally read-only. The write-mode tools are separate,
-gated, and disabled by default.
-
-Read-tool validation and contract failures return stable JSON instead of raw
-schema or exception text:
-
-```json
-{
-  "ok": false,
-  "status": "error",
-  "partial": false,
-  "error_code": "validation_failed",
-  "message": "max_results must be 1 or greater",
-  "details": null,
-  "received": {"max_results": 0},
-  "allowed": {"max_results": "1..5000"}
-}
-```
-
-Successful read-tool responses expose a meaningful top-level shape:
-`ok: true`, `status: "ok"`, `partial: false` for complete reads; `ok: true`,
-`status: "partial"`, `partial: true` for partial but usable reads; and
-`ok: false`, `status: "error"` for failures. Legacy section-specific status
-fields remain in place.
-
-For cue details, one unresolved cue reference is a failure:
-`ok: false`, `status: "error"`, `partial: false`, with
-`error_code: "cue_ref_unresolved"`. In a batch, unresolved items are reported as
-per-item failures; the batch top level is `status: "partial"` when at least one
-other cue was read successfully, or `status: "error"` when all items failed.
-
-Responses remove MCP/project implementation paths such as `source_path`,
-tracebacks, and stack fields. QLab media targets are different: safe profiles do
-not expose them, but technical/sensitive profiles may return valid media paths
-when that exposure is intentional.
-
-`safe` is the normal profile. It is meant for agent use and redacts sensitive
-infrastructure where possible: destinations, routes, devices, passcodes,
-credentials, and similar details.
-
-`technical` is for deliberate technical audits. It can reveal IP addresses,
-ports, interfaces, screens, devices, routes, raw regions, mesh/warp data,
-audio-map levels, light patch payloads, and routing payloads.
-
-For workspace settings, `exhaustive` is the deepest allowlisted read-only
-settings profile. It may return large payloads and always includes warnings.
-Passcodes and credentials remain redacted.
-
-`full_sensitive` is deeper still. It can expose cue notes, local media paths,
-scripts, and heavy stage payloads. Use it only when that exposure is intentional.
-
-Cue detail profiles are intentionally tiered:
-
-- `basic` / `basic_safe`: compact identity/status, no large notes, scripts, or media paths.
-- `auto` / `inspector_safe`: operational cue data; type-specific fields are summarized and compact.
-- `editable`: capability discovery for `qlab_update_cues`, including dry-run-only properties and dry-run confirmation tokens; it does not imply real writes are enabled.
-- `full_sensitive` / `exhaustive`: explicit large/sensitive reads; still no MCP implementation paths.
-
-Compact profiles truncate long text fields such as notes, memo text, script
-text, light commands, and network messages. Truncated fields return
-`field_truncated: true` and `original_length`; request `full_sensitive` or
-`exhaustive` only when full content is required.
-
-`qlab_get_cue_details(profile="exhaustive")` also returns `read_coverage`
-metadata comparing the allowlisted detail profile with the local QLab OSC
-Dictionary reference. This makes gaps explicit: saved properties may be direct,
-covered by aggregates, or still missing as `live`, indexed/channel/object, or
-runtime reads. Treat `exhaustive` as the deepest allowlisted read, not as full
-OSC route parity.
-
-`auto` is designed to be useful for technical inspection and may include compact
-type-specific fields such as `lightCommandText`. Use `basic_safe` or `health`
-when you want a stricter privacy posture.
-
-Redaction records include an `impact` field so agents can tell which conclusions
-are limited, such as exact network destination, display identity, route details,
-or hidden credentials.
-
-Write mode is deliberately gated:
-
-- `QLAB_PASSCODE` is a server-side credential and is never a tool argument.
-- `qlab_check_connection` uses `/connect` as the source of truth for
-  `view`, `edit`, and `control` permission scopes when `QLAB_PASSCODE` is set.
-- `qlab_check_connection` and `qlab_get_workspace_overview` read `/showMode`
-  so callers can tell whether the workspace is in Edit Mode or Show Mode.
-- `qlab_check_write_readiness` does not mutate anything.
-- `qlab_check_write_readiness` reports `batch_update_cues` capabilities for
-  `qlab_update_cues`; `edit_existing_cue` may appear only as a compatibility
-  alias for older callers.
-- `qlab_create_cue` and `qlab_update_cues` are blocked unless `QLAB_ENABLE_WRITE=true` and
-  `QLAB_PASSCODE` is configured, `/connect` confirms `edit`, and `/showMode`
-  confirms the workspace is in Edit Mode.
-- `dry_run` defaults to true through `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
-- `qlab_create_cue(..., dry_run=true)` and `qlab_update_cues(..., dry_run=true)`
-  are planning-only and can run without enabling write mode or configuring a passcode.
-- `qlab_update_cues` is the single batch edit tool. It plans or updates existing
-  cues; it does not expose playback, GO, stop, panic, or raw OSC.
-- Real writes bypass and clear the read cache before verifying fresh cue details.
-- Only blank cue creation is allowed in this preface.
-- Allowed cue types are `memo`, `group`, `wait`, and `audio`.
-- `qlab_update_cues` uses a registry of cue-family profiles:
-  `common`, `memo_basic`, `wait_basic`, `group_basic`, `audio_basic`, `mic_basic`,
-  `video_basic`, `camera_basic`, `text_basic`, `light_basic`, `fade_basic`,
-  `network_basic`, `midi_basic`, `midi_file_basic`, `timecode_basic`,
-  `target_basic`, `reset_basic`, `devamp_basic`, and `script_basic`.
-- `qlab_get_cue_details(..., profile="editable")` returns safe current cue
-  details plus `update_capabilities` derived from the same update registry, so
-  agents can choose compatible edit profiles, real-write properties,
-  dry-run-only properties, operation args, validators, and dry-run
-  confirmation tokens without sending mutating OSC.
-- Policy summary: all update profiles can exist for planning and targeting,
-  but real write is limited to safe properties unless the item explicitly lists
-  the exact `confirm_token` values from the reviewed dry-run plan. Broad
-  capability gate names are discovery labels, not real-write approval tokens.
-  Properties with no safe OSC write path, such as `scriptSource`, remain
-  non-editable by OSC.
-- `properties={...}` remains the simple one-argument setter path.
-- `operations=[...]` supports structured setters such as audio levels, crop,
-  text colors, and MIDI fields in dry-run plans.
-- `qlab_update_cues` accepts 1-50 update items in one MCP call. Each item can
-  use a different concrete `cue_ref`, `profile`, `properties`, and `operations`
-  set. Real batch writes complete all preflight checks before sending any setter
-  and use `/cue_id/{uniqueID}/...` addresses for mutation.
-- Batch validation and preflight errors are reported per item. One bad item
-  should not become a global tool error, and items that already fail
-  normalization or validation do not attempt a noisy `read_before`.
-- If any item fails real-write preflight, no setters are sent for any item.
-- Once a real batch begins sending setters, it is not transactional; later
-  failures are reported per item and require normal readback/manual review.
-- Every cue-family profile can real-write safe one-argument setters with direct
-  fresh readback. This includes common props plus `group_basic` metadata,
-  `audio_basic` transport metadata, `text_basic` simple text formatting,
-  `mic_basic` channel metadata, `video_basic`/`camera_basic` one-axis geometry,
-  `midi_file_basic` playback metadata, and `timecode_basic` metadata.
-- High-risk profiles and unvalidated properties are cataloged for dry-run
-  planning and require exact `planned_operations[].confirm_token` values from a
-  reviewed dry-run before any real write:
-  routing, targets, file paths, light commands, network/MIDI output, scripts,
-  audio levels, slices, objects, live variants, text ranges/colors, and
-  multi-argument geometry.
-- `fileTarget` and local file paths are not generally safe and are blocked by
-  default; real writes require both a reviewed dry-run `confirm_token` and a
-  path inside `QLAB_ALLOWED_FILE_ROOTS`. Paths outside those roots are blocked
-  before OSC.
-- If a setter times out but a fresh after-read confirms the requested value,
-  `qlab_update_cues` reports `updated_with_confirmed_timeouts` with a warning
-  instead of treating the item as failed.
-- When write readiness or batch updates fail, results include stable
-  `error_code` and `suggested_action` fields so agents can decide whether to
-  fix configuration, retry a smaller batch, or inspect QLab manually.
-- Fresh verification tolerates QLab's harmless normalization for numeric values,
-  `continueMode` labels, and safe enum-like strings such as `colorName`,
-  `blendMode`, `clockType`, and `text/format/alignment`; free text remains
-  exact-match.
-- Playback control, raw OSC, GO, stop, panic, and ambiguous selected/active
-  edits are not exposed. Target edits, file paths, scripts, and routing changes
-  are blocked by default and require exact dry-run `confirm_token` confirmation
-  when a real write is explicitly supported.
+| Tool | Use it for |
+| --- | --- |
+| `qlab_check_write_readiness` | Check disabled-by-default write readiness without mutation. |
+| `qlab_create_cue` | Dry-run or create one blank allowlisted cue with safe initial properties. |
+| `qlab_update_cues` | Dry-run or update 1-50 concrete cues through the cue editing registry. |
 
 ## Tool Signatures
 
 ```text
 qlab_check_connection(workspace_id=None, require_read_access=True)
 qlab_get_workspace_overview(workspace_id=None, max_depth=2, max_cues=1000, include_live_state=False, include_cue_index=True, max_index_cues=5000, cue_index_profile="minimal", include_global_count=False)
-qlab_get_workspace_status(workspace_id, profile="summary", max_cues_scanned=500, sample_limit=10, include_timecode=True)
+qlab_get_workspace_status(workspace_id, profile="summary", include_timecode=True, max_cues_scanned=1000, sample_limit=10)
 qlab_get_workspace_settings(workspace_id, mode="summary", sections=None, requests=None, profile="safe")
-qlab_get_workspace_setting_details(workspace_id, section, kind=None, ref=None, profile="safe")  # compatibility wrapper
+qlab_get_workspace_setting_details(workspace_id, section, kind=None, ref=None, profile="safe")
 qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=None, profile="basic_safe", max_results=500, max_cues_scanned=500)
-qlab_get_cue_details(workspace_id, cue_ref, profile="auto")  # profile also supports "editable"
+qlab_get_cue_details(workspace_id, cue_ref, profile="auto")
 qlab_check_write_readiness(workspace_id)
 qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
 qlab_update_cues(workspace_id, updates, dry_run=None)
 ```
 
-`qlab_get_workspace_settings(mode="summary")` returns `available_detail_requests`
-such as:
-
-```json
-[
-  {"section": "audio", "kind": "output_patch", "ref": "Main"},
-  {"section": "video", "kind": "stage", "ref": "TELON"},
-  {"section": "light", "kind": "light_patch", "ref": null}
-]
-```
+`qlab_get_workspace_settings(mode="summary")` returns compact inventory plus
+`available_detail_requests`.
 
 `qlab_get_workspace_settings(mode="details")` accepts one or more requests and
-returns a batch result. A failed request returns its own error or choices and
+returns a batch result. One failed request returns its own error or choices and
 does not block other valid requests.
-Empty settings/patch collections are successful empty results, for example
-`items: []`, `empty: true`, or `available: false`; this is distinct from a read
-error.
 
 ```json
 [
@@ -402,12 +157,6 @@ error.
 }
 ```
 
-FastMCP note: the input schema exposes each update item's `profile` as a string
-so one batch can carry different registry profiles. The registry validates that
-string per item and returns profile errors inside the batch result. `dry_run`
-defaults to the server's `QLAB_WRITE_DRY_RUN_DEFAULT` setting, which is true by
-default; callers should pass `dry_run=true` explicitly for reviewable plans.
-
 Structured update operations inside each item use this shape:
 
 ```json
@@ -418,110 +167,137 @@ Structured update operations inside each item use this shape:
 }
 ```
 
-### `qlab_update_cues` Examples
+## Compact Reads
 
-Common dry-run batch:
+The server is designed to make QLab workspaces inspectable without dumping the
+whole show at once.
 
-```json
-{
-  "workspace_id": "A192C068-0974-4624-90BD-56D68BF0286B",
-  "dry_run": true,
-  "updates": [
-    {
-      "cue_ref": "E50F1869-027D-4433-AD38-13BD753663C0",
-      "profile": "common",
-      "properties": {
-        "name": "Preset note",
-        "notes": "Planned by MCP dry-run",
-        "flagged": false,
-        "colorName": "red",
-        "preWait": 0.5,
-        "continueMode": "auto_continue"
-      }
-    }
-  ]
-}
+- Overview gives a bounded tree and compact cue index.
+- `cue_index_profile="minimal"` returns identity and position columns.
+- `cue_index_profile="health"` adds armed, flagged, color, broken/warning, and
+  continue-mode diagnostics.
+- Settings summary gives infrastructure summaries plus
+  `available_detail_requests` without heavy raw payloads.
+- Settings details goes deeper only for requested settings items.
+- `technical`, `full_sensitive`, and `exhaustive` are explicit audit modes, not
+  normal defaults.
+
+For large shows, `qlab_query_cues` defaults to `max_results=500` and
+`max_cues_scanned=500`. Callers can raise either limit up to `5000`. Results
+report `truncated`, `truncation_reasons`, `scanned_all_cues`, and
+`result_limited`.
+
+## Privacy Profiles
+
+`safe` is the normal workspace settings profile. It redacts sensitive
+infrastructure where possible: destinations, routes, devices, passcodes,
+credentials, and similar details.
+
+`technical` is for deliberate technical audits. It can reveal IP addresses,
+ports, interfaces, screens, devices, routes, raw regions, mesh/warp data,
+audio-map levels, light patch payloads, and routing payloads.
+
+For workspace settings, `exhaustive` is the deepest allowlisted read-only
+settings profile. It may return large payloads and always includes warnings.
+Passcodes and credentials remain redacted.
+
+`full_sensitive` can expose cue notes, local media paths, scripts, and heavy
+stage payloads. Use it only when that exposure is intentional.
+
+Cue detail profiles are tiered:
+
+- `basic` / `basic_safe`: compact identity/status, no large notes, scripts, or
+  media paths.
+- `auto` / `inspector_safe`: operational cue data; type-specific fields are
+  summarized and compact.
+- `editable`: capability discovery for `qlab_update_cues`, including
+  dry-run-only properties and dry-run confirmation tokens; it does not imply
+  real writes are enabled.
+- `full_sensitive` / `exhaustive`: explicit large/sensitive reads; still no MCP
+  implementation paths.
+
+Compact profiles truncate long text fields such as notes, memo text, script
+text, light commands, and network messages. Truncated fields return
+`field_truncated: true` and `original_length`.
+
+## Write-Mode Safety
+
+Write mode is deliberately gated:
+
+- `QLAB_ENABLE_WRITE=true` is required before real write commands can run.
+- `QLAB_PASSCODE` is a server-side credential only. It is never a tool argument.
+- `dry_run=true` is the default through `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
+- `qlab_check_write_readiness` does not mutate anything.
+- Safe real writes require write readiness, per-item preflight, and fresh
+  readback.
+- Real writes require `/connect` to confirm `edit` and `/showMode` to confirm
+  Edit Mode.
+- If any item fails real-write preflight, zero setters are sent for the whole
+  batch.
+- Once real setters start, batch writes are not transactional. Later failures
+  are reported per item and require normal readback/manual review.
+- Real writes bypass and clear the read cache before fresh verification.
+- High-risk real writes require the exact
+  `planned_operations[].confirm_token` when exposed by the reviewed dry-run.
+- Broad capability gate names are discovery labels, not real-write approval
+  tokens.
+- Operations without deterministic readback must be blocked or reported
+  inconclusive, not clean success.
+
+Allowed cue creation is intentionally narrow:
+
+- Only blank cue creation is allowed in this preface.
+- Allowed cue types are `memo`, `group`, `wait`, and `audio`.
+- Safe initial properties are `name`, `number`, `armed`, `flagged`, `colorName`,
+  `preWait`, `postWait`, `duration`, and `continueMode`.
+- `after_cue_id` placement is dry-run planning only.
+
+Cue updates use concrete cue numbers or unique IDs. `selected`, `active`,
+`playhead`, and `playbackPosition` are rejected for updates.
+
+`qlab_update_cues` supports these update profiles:
+
+```text
+common
+memo_basic
+wait_basic
+group_basic
+audio_basic
+mic_basic
+video_basic
+camera_basic
+text_basic
+light_basic
+fade_basic
+network_basic
+midi_basic
+midi_file_basic
+timecode_basic
+target_basic
+reset_basic
+devamp_basic
+script_basic
 ```
 
-Video opacity uses QLab's unit interval, not percentages:
+Policy summary: all update profiles can exist for planning and targeting, but
+real writes are limited to safe properties unless the item explicitly lists the
+exact `confirm_token` values from reviewed dry-run `planned_operations`. Some
+properties have no safe OSC write path, such as `scriptSource`, and remain
+non-editable by OSC.
 
-```json
-{
-  "cue_ref": "17FC3233-1C11-4A23-9A57-27F8053344CB",
-  "profile": "video_basic",
-  "properties": {
-    "opacity": 0.8,
-    "translation/x": 10,
-    "translation/y": 0
-  }
-}
-```
+High-risk profiles and unvalidated properties are cataloged for dry-run
+planning and require exact confirmation when real write is supported: routing,
+targets, file paths, light commands, network/MIDI output, scripts, audio levels,
+slices, objects, live variants, text ranges/colors, and multi-argument geometry.
 
-Text RGBA components also use `0..1`:
+`fileTarget` and local file paths are blocked by default. Real writes require
+both a reviewed dry-run `confirm_token` and a path inside
+`QLAB_ALLOWED_FILE_ROOTS`. Paths outside those roots are blocked before OSC.
 
-```json
-{
-  "cue_ref": "89D6FBC5-1D1B-4EE4-B0FD-E1D12759B969",
-  "profile": "text_basic",
-  "operations": [
-    {
-      "property": "text/format/color",
-      "args": {"red": 1, "green": 0.5, "blue": 0, "alpha": 1}
-    }
-  ]
-}
-```
-
-Timecode uses documented registry fields. `timecodeFrameRate` plans the OSC
-path `/framerate`; legacy `timecodeString` and `timecodeFormat` remain
-dry-run-only:
-
-```json
-{
-  "cue_ref": "timecode-cue-id",
-  "profile": "timecode_basic",
-  "properties": {
-    "outputType": 1,
-    "timecodeFrameRate": 0,
-    "startTime": "01:00:00:00",
-    "endTime": "01:00:10:00"
-  }
-}
-```
-
-High-risk edits are useful in dry-run plans. Dry-run responses include
-`planned_operations[].confirm_token` for gated operations; pass those exact
-tokens in `confirm_gates` only after reviewing the plan. Broad labels such as
-`audio_output` are discovery labels and do not authorize real writes:
-
-```json
-{
-  "dry_run": true,
-  "updates": [
-    {
-      "cue_ref": "light-cue-id",
-      "profile": "light_basic",
-      "properties": {"lightCommandText": "1 = 50"},
-      "confirm_gates": []
-    },
-    {
-      "cue_ref": "audio-cue-id",
-      "profile": "audio_basic",
-      "operations": [
-        {"property": "level", "args": {"inChannel": 1, "outChannel": 1, "decibel": -6}},
-        {"property": "mute", "args": {"output": 1, "value": false}}
-      ],
-      "confirm_gates": []
-    },
-    {
-      "cue_ref": "network-cue-id",
-      "profile": "network_basic",
-      "properties": {"customString": "/mcp/dryrun"},
-      "confirm_gates": []
-    }
-  ]
-}
-```
+If a setter times out but a fresh after-read confirms the requested value,
+`qlab_update_cues` reports `updated_with_confirmed_timeouts` with a warning. If
+fresh verification cannot prove the requested value, the result is failed or
+inconclusive.
 
 ## Query Filters
 
@@ -535,6 +311,11 @@ Common filters:
 - `disarmed`
 - `isBroken`
 - `isWarning`
+- `isRunning`
+- `isPaused`
+- `isLoaded`
+- `isOverridden`
+- `isAuditioning`
 - `colorName`
 - `name_contains`
 - `number_prefix`
@@ -542,6 +323,8 @@ Common filters:
 - `parent_id`
 - `hasFileTargets`
 - `hasCueTargets`
+- `skipIfDisarmed`
+- `autoLoad`
 - `continueMode`
 - `hasPreWait`
 - `hasPostWait`
@@ -573,7 +356,7 @@ QLAB_CACHE_TTL=10.0
 QLAB_PASSCODE=
 QLAB_ENABLE_WRITE=false
 QLAB_WRITE_DRY_RUN_DEFAULT=true
-QLAB_UPDATE_DEBUG=false
+QLAB_ALLOWED_FILE_ROOTS=
 ```
 
 Notes:
@@ -585,72 +368,60 @@ Notes:
 - Live selected/running/active state bypasses the cache.
 - Queries using live state filters such as `isRunning`, `isPaused`, `isLoaded`,
   `isOverridden`, or `isAuditioning` bypass the cache.
-- Sensitive `technical` and `full_sensitive` reads bypass the cache.
-- Write mode is disabled by default. When enabled, real writes require
-  `QLAB_PASSCODE`, `edit` confirmed by `/connect`, Edit Mode confirmed by
-  `/showMode`, and bypass/clear the read cache before fresh verification.
-- `QLAB_ALLOWED_FILE_ROOTS` is an optional `os.pathsep`-separated list used to
-  permit token-confirmed real `fileTarget` writes only under approved media
-  roots; file paths remain blocked by default.
-- `QLAB_UPDATE_DEBUG=true` adds per-cue debug details to `qlab_update_cues`
-  results for troubleshooting batch verification.
+- Sensitive `technical`, `full_sensitive`, and `exhaustive` reads bypass the
+  cache.
 
-## Run
+## Diagnostic Limits
 
-```bash
-uv sync --extra dev
-uv run qlab-mcp
-```
+QLab reports cue and workspace fields. The MCP derives cautious summaries from
+those fields. Physical output still needs a human check.
 
-or:
+`qlab_get_workspace_status` is not a full clone of QLab's Workspace Status
+window. Sections that QLab does not expose as safe read-only OSC endpoints are
+returned with `source="not_exposed"` instead of invented values.
 
-```bash
-uv run fastmcp run
-```
+When `qlab_get_workspace_overview` cannot read authoritative broken/warning
+fields from shallow cue data, health rows are marked partial/non-authoritative.
+Use `qlab_get_workspace_status` or `qlab_query_cues` with health filters for
+cue-level diagnostics.
 
-or:
-
-```bash
-uv run fastmcp run src/qlab_mcp/server.py:mcp
-```
-
-`fastmcp.json` does not set QLab credentials or enable write mode. Keep
-`QLAB_PASSCODE`, `QLAB_ENABLE_WRITE`, and `QLAB_WRITE_DRY_RUN_DEFAULT` in the
-server environment for each deliberate run.
-
-## Manual QLab Check
-
-1. Open QLab 5.
-2. Open or create a workspace with at least one cue list and one cue.
-3. Enable OSC access for the workspace if needed.
-4. Start this MCP server.
-5. Call `qlab_check_connection`.
-6. If several workspaces are open, pass a `workspace_id` from `available_workspaces`.
-7. Call `qlab_get_workspace_overview`.
-8. Call `qlab_get_workspace_settings(mode="summary")`.
-9. Use `qlab_query_cues` to find candidate cues.
-10. Use `qlab_get_cue_details` or `qlab_get_workspace_settings(mode="details")` for focused inspection.
-
-For large lighting workspaces, also check:
+For large lighting workspaces, this safe detail read should summarize the light
+patch:
 
 ```text
-qlab_get_workspace_settings(mode="details", requests=[{"section":"light", "kind":"light_patch"}])
+qlab_get_workspace_settings(mode="details", requests=[{"section": "light", "kind": "light_patch"}])
 ```
 
-The expected safe result should summarize the light patch. If the UDP reply is
-too large, the result should still succeed through `read_transport="tcp_fallback"`.
-That means TCP was used to retrieve a large response; it does not imply output
-failure, missing controllers, or degraded physical playback.
+If the UDP reply is too large, the result should still succeed through
+`read_transport="tcp_fallback"`. That means TCP was used to retrieve a large
+response; it does not imply output failure, missing controllers, or degraded
+physical playback.
 
-For passcode-protected workspaces, set `QLAB_PASSCODE` before starting the MCP.
+## Project Layout
 
-For write-mode smoke checks on a copy of a workspace:
+- `src/qlab_mcp/server.py` exposes the read tools plus gated write-mode tools.
+- `src/qlab_mcp/qlab.py` keeps the compatibility facade for `QLabReader`.
+- `src/qlab_mcp/models.py`, `config.py`, `errors.py`, and `allowlist.py` hold
+  shared API types and policy.
+- `fastmcp.json` points FastMCP at the server entry point.
+- `src/qlab_mcp/osc/` handles OSC encoding, transport, and addressing.
+- `src/qlab_mcp/cues/` handles overview, indexing, querying, profiles, and cue
+  details.
+- `src/qlab_mcp/settings/` handles workspace settings, summarizers, and
+  redaction.
+- `src/qlab_mcp/status.py` handles read-only workspace status summaries.
+- `src/qlab_mcp/runtime/` handles shared reader runtime helpers such as
+  connection diagnostics and read cache.
+- `src/qlab_mcp/write/` handles disabled-by-default write readiness,
+  allowlists, gated mutating OSC operations, and OSC inventory coverage.
 
-1. Set `QLAB_ENABLE_WRITE=true`.
-2. Keep `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
-3. Set `QLAB_PASSCODE` on the server.
-4. Call `qlab_check_write_readiness(workspace_id=...)` and confirm `edit` is
-   granted by `/connect`.
-5. Call `qlab_create_cue(..., dry_run=true)` or `qlab_update_cues(..., dry_run=true)`
-   and inspect `planned_operations`.
-6. Only then call the same tool with `dry_run=false` on a safe test workspace.
+Project-local agent skills and transcript scratch files are intentionally not
+part of the runtime package. QLab learning/reference material should live in a
+clear documentation or reference location, not at the package root.
+
+## Development And References
+
+- [QLab update cues runtime checklist](docs/qlab_update_cues_runtime_checklist.md)
+- [Update cue OSC coverage snapshot](docs/updateq_osc_coverage_snapshot.md)
+- [QLab OSC dictionary](references/qlab/qlab_osc_dictionary.md)
+- [QLab OSC queries](references/qlab/osc_queries.md)

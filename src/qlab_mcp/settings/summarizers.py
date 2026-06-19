@@ -363,22 +363,27 @@ def _light_instruments(value: Any) -> list[Any]:
 def _light_definition_summary(definition: Any) -> dict[str, Any]:
     if not isinstance(definition, dict):
         return {}
-    summary: dict[str, Any] = {}
-    for key in ("name", "manufacturer", "definitionVersion", "defaultParameter", "isBroken"):
-        if key in definition:
-            summary[key] = definition[key]
+    summary: dict[str, Any] = {
+        "name": definition.get("name"),
+        "manufacturer": definition.get("manufacturer"),
+        "version": definition.get("definitionVersion"),
+        "broken": definition.get("isBroken"),
+        "default_parameter_index": definition.get("defaultParameter"),
+        "default_parameter_name": None,
+    }
     parameters = definition.get("parameters")
     parameter_items = _collection_items(parameters)
     if parameter_items:
-        summary["parameter_count"] = len(parameter_items)
         parameter_names: list[str] = []
         for item in parameter_items:
             if isinstance(item, dict):
                 name = item.get("name")
                 if name not in (None, "") and str(name) not in parameter_names:
                     parameter_names.append(str(name))
-        if parameter_names:
-            summary["parameter_names"] = parameter_names
+                if str(item.get("_key")) == str(definition.get("defaultParameter")):
+                    summary["default_parameter_name"] = name
+        summary["parameter_count"] = len(parameter_items)
+        summary["parameter_names"] = parameter_names
     return summary
 
 
@@ -425,19 +430,78 @@ def _light_instrument_summary(item: Any) -> dict[str, Any]:
     return summary
 
 
+def _light_parameter_summary(parameter: Any, *, scope: str, owner_name: Any) -> dict[str, Any]:
+    if not isinstance(parameter, dict):
+        return {
+            "scope": scope,
+            "owner_name": owner_name,
+            "name": None,
+            "unique_name": None,
+            "type": "unknown",
+            "broken": None,
+            "home_value": None,
+            "home_value_dmx": None,
+            "value_is_percentage": None,
+            "two_bytes": None,
+        }
+    definition_parameter = parameter.get("definitionParameter")
+    definition_parameter = definition_parameter if isinstance(definition_parameter, dict) else {}
+
+    def value(*keys: str) -> Any:
+        for source in (parameter, definition_parameter):
+            result = _first_present_case_insensitive(source, keys)
+            if result not in (None, ""):
+                return result
+        return None
+
+    return {
+        "scope": scope,
+        "owner_name": owner_name,
+        "name": value("name"),
+        "unique_name": value("uniqueName"),
+        "type": value("type") or "unknown",
+        "broken": value("isBroken"),
+        "home_value": value("homeValue"),
+        "home_value_dmx": value("homeValueInDMX"),
+        "value_is_percentage": value("valueIsPercentage"),
+        "two_bytes": value("twoBytes"),
+    }
+
+
+def _light_parameters(owner: Any, *, scope: str) -> list[dict[str, Any]]:
+    if not isinstance(owner, dict):
+        return []
+    parameters = _collection_items(owner.get("parameters"))
+    if not parameters and scope == "instrument" and isinstance(owner.get("definition"), dict):
+        parameters = _collection_items(owner["definition"].get("parameters"))
+    return [
+        _light_parameter_summary(parameter, scope=scope, owner_name=owner.get("name"))
+        for parameter in parameters
+    ]
+
+
 def _summarize_light_patch_detail(value: Any) -> dict[str, Any]:
     summary = _summarize_light_patch(value)
-    instruments = [_light_instrument_summary(item) for item in _light_instruments(value)]
+    instrument_items = _light_instruments(value)
+    instruments = [_light_instrument_summary(item) for item in instrument_items]
+    parameters = [parameter for item in instrument_items for parameter in _light_parameters(item, scope="instrument")]
     groups = []
     for group in _light_groups(value):
         group_summary = _basic_item_summary(group)
         group_instruments = _collection_items(group.get("instruments")) if isinstance(group, dict) else []
+        group_parameters = _light_parameters(group, scope="group")
         group_summary["instrument_count"] = len(group_instruments)
         group_summary["instrument_names"] = [
             str(item.get("name"))
             for item in group_instruments
             if isinstance(item, dict) and item.get("name") not in (None, "")
         ]
+        group_summary["parameter_names"] = [
+            str(parameter["name"])
+            for parameter in group_parameters
+            if parameter.get("name") not in (None, "")
+        ]
+        parameters.extend(group_parameters)
         groups.append(group_summary)
 
     definition_counts: dict[str, int] = {}
@@ -454,7 +518,9 @@ def _summarize_light_patch_detail(value: Any) -> dict[str, Any]:
 
     return {
         "summary": summary,
+        "instruments": instruments,
         "groups": groups,
+        "parameters": parameters,
         "instrument_index": {
             "columns": [
                 "name",

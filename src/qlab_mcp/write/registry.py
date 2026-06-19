@@ -918,7 +918,7 @@ TEXT_CATALOG_PROPERTIES = (
 )
 
 LIGHT_CATALOG_PROPERTIES = (
-    _planned_prop("lightCommandText", "string", reason="light_commands_can_affect_visual_output"),
+    _planned_prop("lightCommandText", "string", reason="light_command_real_write_not_enabled"),
     _planned_prop("alwaysCollate", "boolean", reason="light_collation_can_change_cue_output"),
     _planned_prop("subcontroller", "boolean", reason="light_dashboard_behavior_needs_validation"),
     _op("collateAndStart", (), path="collateAndStart", risk_tier="high", planned_only_reason="light_commands_can_affect_visual_output"),
@@ -1451,6 +1451,12 @@ def real_write_permission_errors(
     errors: dict[str, str] = {}
     for operation in operations:
         prop = str(operation["property"])
+        if profile == "light_basic" and prop == "lightCommandText":
+            errors[prop] = (
+                "lightCommandText is gated or dry-run only; real write remains disabled "
+                "in PLAN LUCES Phase 3."
+            )
+            continue
         if operation["real_write_enabled"]:
             continue
         token = str(operation.get("confirm_token") or "")

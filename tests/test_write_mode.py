@@ -121,6 +121,8 @@ class BatchFakeWriteClient:
         ignore_set_property: tuple[str, str] | None = None,
         missing_refs: set[str] | None = None,
         show_mode_data: Any = False,
+        light_patch: dict[str, Any] | None = None,
+        light_patch_error: bool = False,
     ):
         self.config = config
         self.cues = {cue_id: dict(values, uniqueID=cue_id) for cue_id, values in cues.items()}
@@ -137,6 +139,8 @@ class BatchFakeWriteClient:
         self.after_read_counts: dict[str, int] = {}
         self.missing_refs = missing_refs or set()
         self.show_mode_data = show_mode_data
+        self.light_patch = light_patch or {"instruments": [], "groups": []}
+        self.light_patch_error = light_patch_error
         self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
         self.reply_timeouts: list[float | None] = []
 
@@ -157,6 +161,10 @@ class BatchFakeWriteClient:
             return SimpleNamespace(data="ok:view|edit", status="ok")
         if address == "/workspace/ws-1/showMode":
             return SimpleNamespace(data=self.show_mode_data, status="ok")
+        if address == "/workspace/ws-1/settings/light/patch":
+            if self.light_patch_error:
+                raise QLabReplyError("error", "Light Patch unavailable", address)
+            return SimpleNamespace(data=self.light_patch, status="ok")
         cue_id, prop = self._cue_id_and_property(address)
         if cue_id is None or prop is None:
             raise AssertionError(f"Unexpected fake batch request: {address}")
@@ -206,6 +214,43 @@ def planned_setters(result_item: dict[str, Any]) -> dict[str, dict[str, Any]]:
         operation["property"]: operation
         for operation in result_item["planned_operations"]
         if operation["operation"] == "set_property"
+    }
+
+
+def normalized_light_patch_fixture() -> dict[str, Any]:
+    front = {
+        "name": "Front",
+        "parameters": {"0": {"name": "intensity"}},
+        "definition": {
+            "name": "Dimmer",
+            "defaultParameter": 0,
+            "parameters": {"0": {"name": "intensity"}},
+        },
+    }
+    red = {
+        "name": "Red Fixture",
+        "parameters": {"0": {"name": "intensity"}, "1": {"name": "red"}},
+        "definition": {
+            "name": "RGB",
+            "defaultParameter": 0,
+            "parameters": {"0": {"name": "intensity"}, "1": {"name": "red"}},
+        },
+    }
+    dimmer = {
+        "name": "Dimmer Only",
+        "parameters": {"0": {"name": "intensity"}},
+        "definition": {
+            "name": "Dimmer",
+            "defaultParameter": 0,
+            "parameters": {"0": {"name": "intensity"}},
+        },
+    }
+    return {
+        "instruments": [front, red, dimmer],
+        "groups": [
+            {"name": "Back", "instruments": [red, dimmer]},
+            {"name": "all", "instruments": [front, red, dimmer]},
+        ],
     }
 
 
@@ -4264,7 +4309,8 @@ def test_update_cues_light_basic_dry_run_plans_documented_light_cue_messages() -
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
-        cues={cue_id: {"type": "Light", "lightCommandText": "1 = 50", "alwaysCollate": False, "subcontroller": False}},
+        cues={cue_id: {"type": "Light", "lightCommandText": "Front = 20", "alwaysCollate": False, "subcontroller": False}},
+        light_patch=normalized_light_patch_fixture(),
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
@@ -4275,7 +4321,7 @@ def test_update_cues_light_basic_dry_run_plans_documented_light_cue_messages() -
                 "cue_ref": cue_id,
                 "profile": "light_basic",
                 "properties": {
-                    "lightCommandText": "1 = 50",
+                    "lightCommandText": "Front = 50",
                     "alwaysCollate": True,
                     "subcontroller": False,
                 },
@@ -4304,6 +4350,16 @@ def test_update_cues_light_basic_dry_run_plans_documented_light_cue_messages() -
     assert setters["setLight"]["args"] == ["front.intensity", 50]
     assert setters["replaceLightCommand"]["args"] == ["1 = 50", "1 = 60"]
     assert setters["removeLightCommandsMatching"]["args"] == ["2 = 0"]
+    analysis = setters["lightCommandText"]["light_command_analysis"]
+    assert analysis["overall_status"] == "valid"
+    assert analysis["affected_instruments"] == ["Front"]
+    assert analysis["affected_parameters"] == ["intensity"]
+    assert setters["lightCommandText"]["real_write_possible"] is True
+    assert setters["lightCommandText"]["requires_confirm_token"] is True
+    assert result["results"][0]["diff"]["lightCommandText"] == {
+        "before": "Front = 20",
+        "requested": "Front = 50",
+    }
     for prop in (
         "lightCommandText",
         "alwaysCollate",
@@ -4318,7 +4374,144 @@ def test_update_cues_light_basic_dry_run_plans_documented_light_cue_messages() -
     ):
         assert setters[prop]["real_write_enabled"] is False
         assert setters[prop]["planned_only_reason"]
-    assert all(request[0].endswith("/valuesForKeys") for request in client.requests)
+    assert [request[0] for request in client.requests].count("/workspace/ws-1/settings/light/patch") == 1
+    assert result["results"][0]["executed_operations"] == []
+
+
+def test_update_cues_light_analysis_policies_share_one_patch_read() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Light", "lightCommandText": "Front = 20"}},
+        light_patch=normalized_light_patch_fixture(),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Back.red = 50"}},
+            {"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Missing = 50"}},
+            {"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "1 - 3 = 50"}},
+        ],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "dry_run"
+    assert result["planned_count"] == 3
+    setters = [planned_setters(item)["lightCommandText"] for item in result["results"]]
+    assert [setter["light_command_analysis"]["overall_status"] for setter in setters] == [
+        "warning",
+        "invalid",
+        "unsupported",
+    ]
+    assert setters[0]["light_command_analysis"]["affected_instruments"] == ["Red Fixture"]
+    assert setters[0]["light_command_analysis"]["skipped_member_count"] == 1
+    assert setters[0]["real_write_possible"] is True
+    assert "confirm_token" in setters[0]
+    assert setters[1]["real_write_possible"] is False
+    assert setters[1]["planned_only_reason"] == "light_command_analysis_failed"
+    assert "confirm_token" not in setters[1]
+    assert setters[2]["real_write_possible"] is False
+    assert setters[2]["planned_only_reason"] == "unsupported_light_command_syntax"
+    assert "confirm_token" not in setters[2]
+    assert [request[0] for request in client.requests].count("/workspace/ws-1/settings/light/patch") == 1
+    assert all(item["executed_operations"] == [] for item in result["results"])
+
+
+def test_update_cues_light_analysis_unavailable_keeps_dry_run_planned() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Light", "lightCommandText": "Front = 20"}},
+        light_patch_error=True,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Front = 50"}}],
+        dry_run=True,
+    )
+
+    setter = planned_setters(result["results"][0])["lightCommandText"]
+    assert result["ok"] is True
+    assert result["planned_count"] == 1
+    assert setter["light_command_analysis"]["availability"] == "unavailable"
+    assert setter["light_command_analysis"]["error"]["code"] == "light_patch_read_failed"
+    assert setter["real_write_possible"] is False
+    assert setter["planned_only_reason"] == "light_command_analysis_unavailable"
+    assert "confirm_token" not in setter
+    assert result["results"][0]["errors"] is None
+
+
+def test_update_cues_light_analyzer_failure_is_nonfatal(monkeypatch: pytest.MonkeyPatch) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Light", "lightCommandText": "Front = 20"}},
+        light_patch=normalized_light_patch_fixture(),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    monkeypatch.setattr(write_operations, "analyze_light_command_text", lambda *_: (_ for _ in ()).throw(RuntimeError()))
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Front = 50"}}],
+        dry_run=True,
+    )
+
+    analysis = planned_setters(result["results"][0])["lightCommandText"]["light_command_analysis"]
+    assert result["ok"] is True
+    assert analysis["availability"] == "unavailable"
+    assert analysis["error"]["code"] == "light_command_analyzer_failed"
+
+
+def test_update_cues_light_non_command_updates_do_not_read_patch() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Light", "alwaysCollate": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "light_basic", "properties": {"alwaysCollate": True}}],
+        dry_run=True,
+    )
+
+    assert result["ok"] is True
+    assert "/workspace/ws-1/settings/light/patch" not in [request[0] for request in client.requests]
+
+
+def test_update_cues_light_command_real_write_stays_blocked_with_token() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Light", "lightCommandText": "Front = 20"}},
+        light_patch=normalized_light_patch_fixture(),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Front = 50"}}
+    dry_run = reader.update_cues("ws-1", [update], dry_run=True)
+    token = planned_setters(dry_run["results"][0])["lightCommandText"]["confirm_token"]
+    client.requests.clear()
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"]["lightCommandText"] == (
+        "lightCommandText is gated or dry-run only; real write remains disabled "
+        "in PLAN LUCES Phase 3."
+    )
+    assert client.requests == []
 
 
 def test_update_cues_light_basic_invalid_values_and_profile_mismatch_have_no_plan() -> None:

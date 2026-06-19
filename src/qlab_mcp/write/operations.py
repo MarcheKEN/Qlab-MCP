@@ -18,6 +18,7 @@ from ..osc.addressing import (
     _workspace_address,
 )
 from ..runtime.read_cache import shared_read_cache
+from ..settings.light_commands import analyze_light_command_text
 from .allowlist import (
     COMMON_UPDATE_PROFILE,
     ensure_real_write_allowed,
@@ -77,6 +78,7 @@ CASEFOLD_COMPARISON_KEYS = {
     "colorName",
     "text/format/alignment",
 }
+LIGHT_COMMAND_PROPERTY = "lightCommandText"
 
 
 def _write_workspace_resolution_error(
@@ -385,13 +387,28 @@ class QLabWriteMixin:
 
         if effective_dry_run:
             results = []
+            light_patch: dict[str, Any] | None = None
+            light_patch_error: dict[str, str] | None = None
+            light_patch_loaded = False
             for item in items:
                 errors = dict(item.get("errors") or {})
                 before = None
+                warnings = ["Dry run only: no mutating OSC commands were sent to QLab."]
                 if not errors and item["cue_ref"]:
                     before, read_errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
                     errors.update(read_errors)
                     errors.update(_validate_profile_for_before(item["profile"], before))
+                if not errors and _light_command_operation(item) is not None:
+                    if not light_patch_loaded:
+                        light_patch, light_patch_error = _try_read_safe_light_patch(self, workspace)
+                        light_patch_loaded = True
+                    warnings.extend(
+                        _annotate_light_command_operation(
+                            item,
+                            light_patch=light_patch,
+                            patch_error=light_patch_error,
+                        )
+                    )
                 cue_id = _resolved_cue_id(before)
                 results.append(
                     _batch_item_result(
@@ -402,7 +419,7 @@ class QLabWriteMixin:
                         before=before,
                         after=None,
                         errors=errors or None,
-                        warnings=["Dry run only: no mutating OSC commands were sent to QLab."],
+                        warnings=warnings,
                     )
                 )
             failed_count = sum(1 for result in results if result["errors"])
@@ -856,6 +873,157 @@ def _is_empty_target_ref(value: Any) -> bool:
     return isinstance(value, str) and value.strip().casefold() in {"", "none"}
 
 
+def _light_command_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") == LIGHT_COMMAND_PROPERTY
+        ),
+        None,
+    )
+
+
+def _try_read_safe_light_patch(
+    reader: Any,
+    workspace_id: str,
+) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
+    try:
+        result = reader._get_workspace_setting_details_single(
+            workspace_id,
+            section="light",
+            kind="light_patch",
+            profile="safe",
+        )
+    except Exception:
+        return None, {
+            "code": "light_patch_read_failed",
+            "message": "Light Patch safe model could not be read.",
+        }
+    details = result.get("details") if isinstance(result, dict) else None
+    if not isinstance(details, dict) or result.get("errors"):
+        return None, {
+            "code": "light_patch_read_failed",
+            "message": "Light Patch safe model could not be read.",
+        }
+    return details, None
+
+
+def _annotate_light_command_operation(
+    item: dict[str, Any],
+    *,
+    light_patch: dict[str, Any] | None,
+    patch_error: dict[str, str] | None,
+) -> list[str]:
+    operation = _light_command_operation(item)
+    if operation is None:
+        return []
+    if light_patch is None:
+        analysis = _unavailable_light_command_analysis(
+            patch_error
+            or {
+                "code": "light_patch_read_failed",
+                "message": "Light Patch safe model could not be read.",
+            }
+        )
+    else:
+        try:
+            helper_result = analyze_light_command_text(str(operation["args"][0]), light_patch)
+            analysis = _summarize_light_command_analysis(helper_result)
+        except Exception:
+            analysis = _unavailable_light_command_analysis(
+                {
+                    "code": "light_command_analyzer_failed",
+                    "message": "Internal LCL analyzer failed.",
+                }
+            )
+
+    overall_status = analysis["overall_status"]
+    real_write_possible = overall_status in {"valid", "warning"}
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": real_write_possible,
+            "requires_confirm_token": True,
+            "planned_only_reason": {
+                "invalid": "light_command_analysis_failed",
+                "unsupported": "unsupported_light_command_syntax",
+                "unavailable": "light_command_analysis_unavailable",
+            }.get(overall_status, "light_command_real_write_not_enabled"),
+            "light_command_analysis": analysis,
+        }
+    )
+    if not real_write_possible:
+        operation.pop("confirm_token", None)
+    if overall_status == "valid":
+        return []
+    return [
+        {
+            "warning": "LCL analysis returned warnings; inspect results before future confirmation.",
+            "invalid": "LCL analysis found invalid commands; real write is not possible.",
+            "unsupported": "LCL analysis found unsupported syntax; real write is not possible.",
+            "unavailable": "LCL analysis is unavailable; real write is not possible.",
+        }[overall_status]
+    ]
+
+
+def _summarize_light_command_analysis(helper_result: dict[str, Any]) -> dict[str, Any]:
+    results = helper_result.get("results") if isinstance(helper_result.get("results"), list) else []
+    status_counts = {status: 0 for status in ("valid", "warning", "invalid", "unsupported")}
+    affected_pairs: set[tuple[str, str]] = set()
+    skipped_member_count = 0
+    for result in results:
+        status = result.get("status")
+        if status in status_counts:
+            status_counts[status] += 1
+        for affected in result.get("affected", []):
+            instrument = affected.get("instrument") if isinstance(affected, dict) else None
+            parameter = affected.get("parameter") if isinstance(affected, dict) else None
+            if isinstance(instrument, str) and isinstance(parameter, str):
+                affected_pairs.add((instrument, parameter))
+        skipped = result.get("skipped_members")
+        if isinstance(skipped, list):
+            skipped_member_count += len(skipped)
+
+    if status_counts["invalid"]:
+        overall_status = "invalid"
+    elif status_counts["unsupported"]:
+        overall_status = "unsupported"
+    elif status_counts["warning"]:
+        overall_status = "warning"
+    else:
+        overall_status = "valid"
+    return {
+        "availability": "available",
+        "overall_status": overall_status,
+        "line_count": helper_result.get("line_count", 0),
+        "analyzed_count": helper_result.get("analyzed_count", len(results)),
+        "status_counts": status_counts,
+        "affected_instruments": sorted({instrument for instrument, _ in affected_pairs}),
+        "affected_parameters": sorted({parameter for _, parameter in affected_pairs}),
+        "affected_pair_count": len(affected_pairs),
+        "skipped_member_count": skipped_member_count,
+        "results": results,
+    }
+
+
+def _unavailable_light_command_analysis(error: dict[str, str]) -> dict[str, Any]:
+    return {
+        "availability": "unavailable",
+        "overall_status": "unavailable",
+        "line_count": None,
+        "analyzed_count": None,
+        "status_counts": {status: 0 for status in ("valid", "warning", "invalid", "unsupported")},
+        "affected_instruments": [],
+        "affected_parameters": [],
+        "affected_pair_count": 0,
+        "skipped_member_count": 0,
+        "results": [],
+        "error": error,
+    }
+
+
 def _batch_item_result(
     workspace_id: str,
     item: dict[str, Any],
@@ -1025,6 +1193,13 @@ def _planned_update_operations(
         }
         if update_operation.get("confirm_token"):
             planned["confirm_token"] = update_operation["confirm_token"]
+        for key in (
+            "real_write_possible",
+            "requires_confirm_token",
+            "light_command_analysis",
+        ):
+            if key in update_operation:
+                planned[key] = update_operation[key]
         if update_operation.get("contextual_requirements"):
             planned["contextual_requirements"] = update_operation["contextual_requirements"]
         if update_operation.get("planned_only_reason"):

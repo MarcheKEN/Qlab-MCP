@@ -2506,9 +2506,31 @@ class QLabReaderTests(unittest.TestCase):
                                 "definition": {
                                     "manufacturer": "Generic",
                                     "name": "Dimmer",
-                                    "parameters": {"0": {"name": "intensity"}},
+                                    "definitionVersion": 2,
+                                    "defaultParameter": 0,
+                                    "isBroken": False,
+                                    "parameters": {
+                                        "0": {
+                                            "name": "intensity",
+                                            "type": "scalar",
+                                            "homeValue": 0,
+                                            "valueIsPercentage": True,
+                                            "twoBytes": False,
+                                            "isBroken": False,
+                                        }
+                                    },
                                 },
-                                "parameters": [{"name": "intensity", "definitionParameter": {"large": "payload"}}],
+                                "parameters": [
+                                    {
+                                        "name": "intensity",
+                                        "uniqueName": "1.intensity",
+                                        "homeValue": 0,
+                                        "homeValueInDMX": 0,
+                                        "valueIsPercentage": True,
+                                        "twoBytes": False,
+                                        "definitionParameter": {"large": "payload", "type": "scalar", "isBroken": False},
+                                    }
+                                ],
                             }
                         ],
                         "groups": [
@@ -2523,9 +2545,22 @@ class QLabReaderTests(unittest.TestCase):
                                         "definition": {
                                             "manufacturer": "Generic",
                                             "name": "Dimmer",
+                                            "definitionVersion": 2,
+                                            "defaultParameter": 0,
+                                            "isBroken": False,
                                             "parameters": {"0": {"name": "intensity"}},
                                         },
                                         "parameters": [{"name": "intensity", "definitionParameter": {"large": "payload"}}],
+                                    }
+                                ],
+                                "parameters": [
+                                    {
+                                        "name": "intensity",
+                                        "type": "scalar",
+                                        "homeValue": 0,
+                                        "valueIsPercentage": True,
+                                        "twoBytes": False,
+                                        "isBroken": False,
                                     }
                                 ],
                             }
@@ -2543,6 +2578,20 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["details"]["summary"]["read_transport"], "tcp_fallback")
         self.assertIn("large response", result["details"]["summary"]["read_transport_meaning"])
         self.assertEqual(result["details"]["groups"][0]["instrument_names"], ["1"])
+        self.assertEqual(result["details"]["groups"][0]["parameter_names"], ["intensity"])
+        instrument = result["details"]["instruments"][0]
+        self.assertEqual(instrument["definition"]["default_parameter_name"], "intensity")
+        self.assertEqual(instrument["definition"]["version"], 2)
+        parameter = result["details"]["parameters"][0]
+        self.assertEqual(parameter["owner_name"], "1")
+        self.assertEqual(parameter["unique_name"], "1.intensity")
+        self.assertEqual(parameter["type"], "scalar")
+        self.assertEqual(parameter["home_value"], 0)
+        self.assertEqual(parameter["home_value_dmx"], 0)
+        self.assertTrue(parameter["value_is_percentage"])
+        self.assertFalse(parameter["two_bytes"])
+        self.assertFalse(parameter["broken"])
+        self.assertEqual(result["details"]["parameters"][1]["scope"], "group")
         self.assertEqual(result["details"]["instrument_index"]["rows"][0][0], "1")
         self.assertEqual(len(result["details"]["instrument_index"]["rows"]), 1)
         self.assertEqual(result["details"]["definition_counts"], {"Generic Dimmer": 1})

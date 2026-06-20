@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import hmac
 import json
 import math
 import os
+import secrets
 import time
 from typing import Any
 
@@ -79,6 +82,12 @@ CASEFOLD_COMPARISON_KEYS = {
     "text/format/alignment",
 }
 LIGHT_COMMAND_PROPERTY = "lightCommandText"
+LIGHT_BEHAVIOR_PROPERTIES = frozenset({"alwaysCollate", "subcontroller"})
+PHASE4_LIGHT_OPERATION_KIND = "phase4_light_command_text_write"
+PHASE4_LIGHT_TOKEN_VERSION = 1
+PHASE5_LIGHT_OPERATION_KIND = "phase5_light_behavior_flag_write"
+PHASE5_LIGHT_TOKEN_VERSION = 1
+_LIGHT_WRITE_TOKEN_SECRET = secrets.token_bytes(32)
 
 
 def _write_workspace_resolution_error(
@@ -340,15 +349,36 @@ class QLabWriteMixin:
         if len(updates) > MAX_BATCH_UPDATES:
             raise UnsafeWriteOperationError(f"updates can include at most {MAX_BATCH_UPDATES} cue updates")
         effective_dry_run = resolve_dry_run(self, dry_run)
+        phase4_light_call = any(_raw_update_requests_light_command(raw_update) for raw_update in updates)
+        phase5_light_call = any(_raw_update_requests_light_behavior(raw_update) for raw_update in updates)
         items = [_normalize_batch_update_item_for_batch(raw_update) for raw_update in updates]
         for item in items:
             _bind_confirm_tokens(workspace, item)
         if not effective_dry_run:
+            phase4_structure_error = _phase4_light_call_structure_error(items) if phase4_light_call else None
+            phase5_structure_error = _phase5_light_call_structure_error(items) if phase5_light_call else None
             gate_results = []
             gate_ok = True
             for item in items:
                 errors = dict(item.get("errors") or {})
-                if not item.get("errors"):
+                if not errors and phase4_structure_error:
+                    errors[LIGHT_COMMAND_PROPERTY] = phase4_structure_error
+                elif not errors and phase5_structure_error:
+                    errors["light_behavior"] = phase5_structure_error
+                elif not errors and phase4_light_call:
+                    if len(item["confirm_gates"]) != 1:
+                        errors[LIGHT_COMMAND_PROPERTY] = (
+                            "lightCommandText is gated or dry-run only without exactly one reviewed "
+                            "Phase 4 confirm_token."
+                        )
+                elif not errors and phase5_light_call:
+                    property_name = item["operations"][0]["property"]
+                    if len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Phase 5 confirm_token."
+                        )
+                elif not errors:
                     errors.update(real_write_permission_errors(item["profile"], item["operations"], item["confirm_gates"]))
                 if errors:
                     gate_ok = False
@@ -387,6 +417,11 @@ class QLabWriteMixin:
 
         if effective_dry_run:
             results = []
+            phase5_candidate_shape = (
+                phase5_light_call
+                and not phase4_light_call
+                and _phase5_light_call_structure_error(items) is None
+            )
             light_patch: dict[str, Any] | None = None
             light_patch_error: dict[str, str] | None = None
             light_patch_loaded = False
@@ -405,8 +440,19 @@ class QLabWriteMixin:
                     warnings.extend(
                         _annotate_light_command_operation(
                             item,
+                            workspace_id=workspace,
+                            before=before,
                             light_patch=light_patch,
                             patch_error=light_patch_error,
+                        )
+                    )
+                if not errors and _light_behavior_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_light_behavior_operation(
+                            item,
+                            workspace_id=workspace,
+                            before=before,
+                            candidate_shape=phase5_candidate_shape,
                         )
                     )
                 cue_id = _resolved_cue_id(before)
@@ -499,6 +545,10 @@ class QLabWriteMixin:
                 errors.update(_validate_profile_for_before(item["profile"], before))
             if not item.get("errors"):
                 errors.update(_validate_contextual_real_write(self, workspace, item, before))
+            if not errors and phase4_light_call:
+                errors.update(_validate_phase4_light_real_write(self, workspace, item, before))
+            elif not errors and phase5_light_call:
+                errors.update(_validate_phase5_light_real_write(workspace, item, before))
             if errors:
                 preflight_ok = False
             preflight_results.append(
@@ -713,6 +763,79 @@ def _bind_confirm_tokens(workspace_id: str, item: dict[str, Any]) -> None:
         operation["confirm_token"] = f"confirm:{operation['property']}:{digest[:16]}"
 
 
+def _phase4_light_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 4 lightCommandText real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") != "light_basic":
+        return "Phase 4 lightCommandText real writes require profile='light_basic'."
+    if len(operations) != 1:
+        return "Phase 4 lightCommandText real writes require exactly one property or operation."
+    operation = operations[0]
+    if operation.get("property") != LIGHT_COMMAND_PROPERTY or operation.get("path") != LIGHT_COMMAND_PROPERTY:
+        return "Phase 4 real writes allow only lightCommandText."
+    if operation.get("mode") != "saved":
+        return "Phase 4 lightCommandText real writes require saved mode."
+    return None
+
+
+def _raw_update_requests_light_command(raw_update: Any) -> bool:
+    if hasattr(raw_update, "model_dump"):
+        raw_update = raw_update.model_dump()
+    if not isinstance(raw_update, dict):
+        return False
+    properties = raw_update.get("properties")
+    if isinstance(properties, dict) and LIGHT_COMMAND_PROPERTY in properties:
+        return True
+    operations = raw_update.get("operations")
+    return isinstance(operations, list) and any(
+        isinstance(operation, dict)
+        and (
+            operation.get("property") == LIGHT_COMMAND_PROPERTY
+            or operation.get("path") == LIGHT_COMMAND_PROPERTY
+        )
+        for operation in operations
+    )
+
+
+def _phase5_light_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 5 Light behavior real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") != "light_basic":
+        return "Phase 5 Light behavior real writes require profile='light_basic'."
+    if len(operations) != 1:
+        return "Phase 5 Light behavior real writes require exactly one property or operation."
+    operation = operations[0]
+    property_name = operation.get("property")
+    if property_name not in LIGHT_BEHAVIOR_PROPERTIES or operation.get("path") != property_name:
+        return "Phase 5 real writes allow only alwaysCollate or subcontroller."
+    if operation.get("mode") != "saved":
+        return "Phase 5 Light behavior real writes require saved mode."
+    return None
+
+
+def _raw_update_requests_light_behavior(raw_update: Any) -> bool:
+    if hasattr(raw_update, "model_dump"):
+        raw_update = raw_update.model_dump()
+    if not isinstance(raw_update, dict):
+        return False
+    properties = raw_update.get("properties")
+    if isinstance(properties, dict) and LIGHT_BEHAVIOR_PROPERTIES.intersection(properties):
+        return True
+    operations = raw_update.get("operations")
+    return isinstance(operations, list) and any(
+        isinstance(operation, dict)
+        and (
+            operation.get("property") in LIGHT_BEHAVIOR_PROPERTIES
+            or operation.get("path") in LIGHT_BEHAVIOR_PROPERTIES
+        )
+        for operation in operations
+    )
+
+
 def _normalize_batch_update_item_for_batch(raw_update: Any) -> dict[str, Any]:
     if hasattr(raw_update, "model_dump"):
         raw_update = raw_update.model_dump()
@@ -884,6 +1007,79 @@ def _light_command_operation(item: dict[str, Any]) -> dict[str, Any] | None:
     )
 
 
+def _light_behavior_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in LIGHT_BEHAVIOR_PROPERTIES
+        ),
+        None,
+    )
+
+
+def _annotate_light_behavior_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operations = [
+        operation
+        for operation in item.get("operations", [])
+        if operation.get("property") in LIGHT_BEHAVIOR_PROPERTIES
+    ]
+    if not operations:
+        return []
+    cue_id = _resolved_cue_id(before)
+    candidates: list[bool] = []
+    for operation in operations:
+        property_name = operation["property"]
+        baseline = before.get(property_name) if isinstance(before, dict) else None
+        requested = operation["args"][0] if operation.get("args") else None
+        candidate = (
+            candidate_shape
+            and before is not None
+            and before.get("type") == "Light"
+            and isinstance(baseline, bool)
+            and isinstance(requested, bool)
+            and cue_id is not None
+        )
+        candidates.append(candidate)
+        operation.update(
+            {
+                "risk_tier": "high",
+                "real_write_enabled": False,
+                "real_write_possible": candidate,
+                "requires_confirm_token": candidate,
+                "phase5_light_behavior_candidate": candidate,
+                "planned_only_reason": (
+                    "light_behavior_requires_confirm_token"
+                    if candidate
+                    else "light_behavior_requires_single_property"
+                ),
+            }
+        )
+        if candidate:
+            operation["confirm_token"] = _phase5_light_confirm_token(
+                workspace_id=workspace_id,
+                cue_ref=item["cue_ref"],
+                cue_id=cue_id,
+                item=item,
+                operation=operation,
+                baseline=baseline,
+                requested=requested,
+            )
+        else:
+            operation.pop("confirm_token", None)
+    return (
+        []
+        if any(candidates)
+        else ["Light behavior update is not confirmable outside a single-cue, single-property dry-run."]
+    )
+
+
 def _try_read_safe_light_patch(
     reader: Any,
     workspace_id: str,
@@ -912,6 +1108,8 @@ def _try_read_safe_light_patch(
 def _annotate_light_command_operation(
     item: dict[str, Any],
     *,
+    workspace_id: str,
+    before: dict[str, Any] | None,
     light_patch: dict[str, Any] | None,
     patch_error: dict[str, str] | None,
 ) -> list[str]:
@@ -939,25 +1137,55 @@ def _annotate_light_command_operation(
             )
 
     overall_status = analysis["overall_status"]
-    real_write_possible = overall_status in {"valid", "warning"}
+    requested = str(operation["args"][0])
+    baseline = before.get(LIGHT_COMMAND_PROPERTY) if isinstance(before, dict) else None
+    cue_id = _resolved_cue_id(before)
+    empty_command = not requested.strip()
+    candidate = (
+        overall_status == "valid"
+        and not empty_command
+        and isinstance(baseline, str)
+        and cue_id is not None
+    )
+    planned_only_reason = {
+        "warning": "light_command_analysis_warning",
+        "invalid": "light_command_analysis_failed",
+        "unsupported": "unsupported_light_command_syntax",
+        "unavailable": "light_command_analysis_unavailable",
+    }.get(overall_status, "light_command_requires_valid_analysis_and_confirm_token")
+    if overall_status == "valid" and empty_command:
+        planned_only_reason = "empty_light_command_text_not_writeable"
+    elif overall_status == "valid" and (not isinstance(baseline, str) or cue_id is None):
+        planned_only_reason = "light_command_baseline_unavailable"
     operation.update(
         {
             "risk_tier": "high",
             "real_write_enabled": False,
-            "real_write_possible": real_write_possible,
-            "requires_confirm_token": True,
-            "planned_only_reason": {
-                "invalid": "light_command_analysis_failed",
-                "unsupported": "unsupported_light_command_syntax",
-                "unavailable": "light_command_analysis_unavailable",
-            }.get(overall_status, "light_command_real_write_not_enabled"),
+            "real_write_possible": candidate,
+            "requires_confirm_token": candidate,
+            "phase4_real_write_candidate": candidate,
+            "planned_only_reason": planned_only_reason,
             "light_command_analysis": analysis,
         }
     )
-    if not real_write_possible:
+    if candidate:
+        operation["confirm_token"] = _phase4_light_confirm_token(
+            workspace_id=workspace_id,
+            cue_ref=item["cue_ref"],
+            cue_id=cue_id,
+            item=item,
+            operation=operation,
+            baseline=baseline,
+            requested=requested,
+        )
+    else:
         operation.pop("confirm_token", None)
-    if overall_status == "valid":
+    if candidate:
         return []
+    if overall_status == "valid" and empty_command:
+        return ["Empty lightCommandText is valid to analyze but is not confirmable for Phase 4 real write."]
+    if overall_status == "valid":
+        return ["Light cue baseline is unavailable; Phase 4 real write is not possible."]
     return [
         {
             "warning": "LCL analysis returned warnings; inspect results before future confirmation.",
@@ -966,6 +1194,248 @@ def _annotate_light_command_operation(
             "unavailable": "LCL analysis is unavailable; real write is not possible.",
         }[overall_status]
     ]
+
+
+def _phase4_light_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    baseline: str,
+    requested: str,
+) -> dict[str, Any]:
+    return {
+        "version": PHASE4_LIGHT_TOKEN_VERSION,
+        "operation_kind": PHASE4_LIGHT_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline_sha256": _text_sha256(baseline),
+        "requested_sha256": _text_sha256(requested),
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "analysis_status": "valid",
+    }
+
+
+def _phase4_light_confirm_token(**payload_args: Any) -> str:
+    payload = _phase4_light_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:{LIGHT_COMMAND_PROPERTY}:v{PHASE4_LIGHT_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _decode_phase4_light_confirm_token(token: str) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    expected_prefix = ["confirm", LIGHT_COMMAND_PROPERTY, f"v{PHASE4_LIGHT_TOKEN_VERSION}"]
+    if len(parts) != 5 or parts[:3] != expected_prefix:
+        return None, "Phase 4 lightCommandText confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(
+        _LIGHT_WRITE_TOKEN_SECRET,
+        encoded.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 4 lightCommandText confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 4 lightCommandText confirm_token payload is invalid."
+    if not isinstance(payload, dict):
+        return None, "Phase 4 lightCommandText confirm_token payload is invalid."
+    return payload, None
+
+
+def _text_sha256(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _validate_phase4_light_real_write(
+    reader: Any,
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _light_command_operation(item)
+    if operation is None or not isinstance(before, dict):
+        return {LIGHT_COMMAND_PROPERTY: "Phase 4 lightCommandText preflight is incomplete."}
+    if before.get("type") != "Light":
+        return {LIGHT_COMMAND_PROPERTY: "Phase 4 lightCommandText real writes require cue type exactly Light."}
+    baseline = before.get(LIGHT_COMMAND_PROPERTY)
+    requested = operation["args"][0] if operation.get("args") else None
+    cue_id = _resolved_cue_id(before)
+    if not isinstance(baseline, str) or not isinstance(requested, str) or cue_id is None:
+        return {LIGHT_COMMAND_PROPERTY: "Fresh Light cue baseline or requested command text is unavailable."}
+    if not requested.strip():
+        return {LIGHT_COMMAND_PROPERTY: "Empty lightCommandText is not writeable in Phase 4."}
+
+    light_patch, patch_error = _try_read_safe_light_patch(reader, workspace_id)
+    if light_patch is None:
+        return {
+            LIGHT_COMMAND_PROPERTY: (patch_error or {}).get(
+                "message", "Light Patch safe model could not be read."
+            )
+        }
+    try:
+        analysis = _summarize_light_command_analysis(analyze_light_command_text(requested, light_patch))
+    except Exception:
+        return {LIGHT_COMMAND_PROPERTY: "Internal LCL analyzer failed during Phase 4 preflight."}
+    if analysis["overall_status"] != "valid":
+        return {
+            LIGHT_COMMAND_PROPERTY: (
+                "Phase 4 lightCommandText real write requires fresh analysis status valid; "
+                f"received {analysis['overall_status']}."
+            )
+        }
+
+    token = item["confirm_gates"][0]
+    payload, token_error = _decode_phase4_light_confirm_token(token)
+    if token_error or payload is None:
+        return {LIGHT_COMMAND_PROPERTY: token_error or "Phase 4 lightCommandText confirm_token is invalid."}
+    expected = _phase4_light_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    for key, value in expected.items():
+        if key == "baseline_sha256":
+            continue
+        if payload.get(key) != value:
+            return {
+                LIGHT_COMMAND_PROPERTY: (
+                    "Phase 4 lightCommandText confirm_token does not match this workspace, cue, value, or risk context."
+                )
+            }
+    if payload.get("baseline_sha256") != expected["baseline_sha256"]:
+        return {
+            LIGHT_COMMAND_PROPERTY: (
+                "stale_light_command_baseline: current lightCommandText no longer matches the reviewed dry-run baseline."
+            )
+        }
+    return {}
+
+
+def _phase5_light_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    baseline: bool,
+    requested: bool,
+) -> dict[str, Any]:
+    return {
+        "version": PHASE5_LIGHT_TOKEN_VERSION,
+        "operation_kind": PHASE5_LIGHT_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": baseline,
+        "requested": requested,
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+    }
+
+
+def _phase5_light_confirm_token(**payload_args: Any) -> str:
+    payload = _phase5_light_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:lightBehavior:v{PHASE5_LIGHT_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _decode_phase5_light_confirm_token(token: str) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    expected_prefix = ["confirm", "lightBehavior", f"v{PHASE5_LIGHT_TOKEN_VERSION}"]
+    if len(parts) != 5 or parts[:3] != expected_prefix:
+        return None, "Phase 5 Light behavior confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(
+        _LIGHT_WRITE_TOKEN_SECRET,
+        encoded.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 5 Light behavior confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 5 Light behavior confirm_token payload is invalid."
+    if not isinstance(payload, dict):
+        return None, "Phase 5 Light behavior confirm_token payload is invalid."
+    return payload, None
+
+
+def _validate_phase5_light_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _light_behavior_operation(item)
+    property_name = operation.get("property") if operation else "light_behavior"
+    if operation is None or not isinstance(before, dict):
+        return {property_name: "Phase 5 Light behavior preflight is incomplete."}
+    if before.get("type") != "Light":
+        return {property_name: "Phase 5 Light behavior real writes require cue type exactly Light."}
+    baseline = before.get(property_name)
+    requested = operation["args"][0] if operation.get("args") else None
+    cue_id = _resolved_cue_id(before)
+    if not isinstance(baseline, bool) or not isinstance(requested, bool) or cue_id is None:
+        return {property_name: "Fresh Light cue baseline or requested boolean is unavailable."}
+
+    token = item["confirm_gates"][0]
+    payload, token_error = _decode_phase5_light_confirm_token(token)
+    if token_error or payload is None:
+        return {property_name: token_error or "Phase 5 Light behavior confirm_token is invalid."}
+    expected = _phase5_light_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    for key, value in expected.items():
+        if key == "baseline":
+            continue
+        if payload.get(key) != value:
+            return {
+                property_name: (
+                    "Phase 5 Light behavior confirm_token does not match this workspace, cue, property, "
+                    "value, or risk context."
+                )
+            }
+    if payload.get("baseline") is not expected["baseline"]:
+        return {
+            property_name: (
+                f"stale_light_behavior_baseline: current {property_name} no longer matches "
+                "the reviewed dry-run baseline."
+            )
+        }
+    return {}
 
 
 def _summarize_light_command_analysis(helper_result: dict[str, Any]) -> dict[str, Any]:
@@ -1196,6 +1666,8 @@ def _planned_update_operations(
         for key in (
             "real_write_possible",
             "requires_confirm_token",
+            "phase4_real_write_candidate",
+            "phase5_light_behavior_candidate",
             "light_command_analysis",
         ):
             if key in update_operation:

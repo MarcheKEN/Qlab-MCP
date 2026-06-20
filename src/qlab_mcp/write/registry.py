@@ -918,9 +918,9 @@ TEXT_CATALOG_PROPERTIES = (
 )
 
 LIGHT_CATALOG_PROPERTIES = (
-    _planned_prop("lightCommandText", "string", reason="light_command_real_write_not_enabled"),
-    _planned_prop("alwaysCollate", "boolean", reason="light_collation_can_change_cue_output"),
-    _planned_prop("subcontroller", "boolean", reason="light_dashboard_behavior_needs_validation"),
+    _planned_prop("lightCommandText", "string", reason="light_command_requires_valid_analysis_and_confirm_token"),
+    _planned_prop("alwaysCollate", "boolean", reason="light_behavior_requires_confirm_token"),
+    _planned_prop("subcontroller", "boolean", reason="light_behavior_requires_confirm_token"),
     _op("collateAndStart", (), path="collateAndStart", risk_tier="high", planned_only_reason="light_commands_can_affect_visual_output"),
     _op(
         "setLight",
@@ -1149,7 +1149,7 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
         True,
         "Text profile; only simple text formatting is real-write enabled.",
     ),
-    "light_basic": UpdateProfileSpec("light_basic", ("Light",), (*COMMON_PROPERTIES, *LIGHT_CATALOG_PROPERTIES), "high", True, "Light profile; light commands remain dry-run only."),
+    "light_basic": UpdateProfileSpec("light_basic", ("Light",), (*COMMON_PROPERTIES, *LIGHT_CATALOG_PROPERTIES), "high", True, "Light profile; lightCommandText and saved behavior flags use specialized confirmation gates."),
     "fade_basic": UpdateProfileSpec("fade_basic", ("Fade",), (*COMMON_PROPERTIES, *FADE_CATALOG_PROPERTIES), "high", True, "Fade profile; fade targets remain dry-run only."),
     "network_basic": UpdateProfileSpec("network_basic", ("Network",), (*COMMON_PROPERTIES, *NETWORK_CATALOG_PROPERTIES), "high", True, "Network profile; network messages remain dry-run only."),
     "midi_basic": UpdateProfileSpec("midi_basic", ("MIDI",), (*COMMON_PROPERTIES, *MIDI_CATALOG_PROPERTIES), "high", True, "MIDI profile; MIDI messages remain dry-run only."),
@@ -1453,8 +1453,26 @@ def real_write_permission_errors(
         prop = str(operation["property"])
         if profile == "light_basic" and prop == "lightCommandText":
             errors[prop] = (
-                "lightCommandText is gated or dry-run only; real write remains disabled "
-                "in PLAN LUCES Phase 3."
+                "lightCommandText is gated or dry-run only outside the specialized "
+                "single-cue Phase 4 qlab_update_cues flow."
+            )
+            continue
+        if profile == "light_basic" and prop in {
+            "collateAndStart",
+            "setLight",
+            "replaceLightCommand",
+            "removeLightCommandsMatching",
+            "safeSort",
+            "safeSortCommands",
+            "prune",
+            "pruneCommands",
+        }:
+            errors[prop] = f"{prop} is gated or dry-run only in PLAN LUCES Phase 5."
+            continue
+        if profile == "light_basic" and prop in {"alwaysCollate", "subcontroller"}:
+            errors[prop] = (
+                f"{prop} is gated or dry-run only outside the specialized single-cue Phase 5 "
+                "qlab_update_cues flow."
             )
             continue
         if operation["real_write_enabled"]:

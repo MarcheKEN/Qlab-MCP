@@ -121,6 +121,8 @@ class BatchFakeWriteClient:
         ignore_set_property: tuple[str, str] | None = None,
         missing_refs: set[str] | None = None,
         show_mode_data: Any = False,
+        connect_data: str = "ok:view|edit",
+        workspace_id: str = "ws-1",
         light_patch: dict[str, Any] | None = None,
         light_patch_error: bool = False,
     ):
@@ -139,6 +141,8 @@ class BatchFakeWriteClient:
         self.after_read_counts: dict[str, int] = {}
         self.missing_refs = missing_refs or set()
         self.show_mode_data = show_mode_data
+        self.connect_data = connect_data
+        self.workspace_id = workspace_id
         self.light_patch = light_patch or {"instruments": [], "groups": []}
         self.light_patch_error = light_patch_error
         self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
@@ -152,16 +156,16 @@ class BatchFakeWriteClient:
         reply_timeout: float | None = None,
     ) -> Any:
         if address == "/workspaces" and not self.config.enable_write:
-            return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
+            return SimpleNamespace(data=[{"uniqueID": self.workspace_id, "displayName": "demo.qlab5"}], status="ok")
         self.requests.append((address, args, workspace_id))
         self.reply_timeouts.append(reply_timeout)
         if address == "/workspaces":
-            return SimpleNamespace(data=[{"uniqueID": "ws-1", "displayName": "demo.qlab5"}], status="ok")
-        if address == "/workspace/ws-1/connect":
-            return SimpleNamespace(data="ok:view|edit", status="ok")
-        if address == "/workspace/ws-1/showMode":
+            return SimpleNamespace(data=[{"uniqueID": self.workspace_id, "displayName": "demo.qlab5"}], status="ok")
+        if address == f"/workspace/{self.workspace_id}/connect":
+            return SimpleNamespace(data=self.connect_data, status="ok")
+        if address == f"/workspace/{self.workspace_id}/showMode":
             return SimpleNamespace(data=self.show_mode_data, status="ok")
-        if address == "/workspace/ws-1/settings/light/patch":
+        if address == f"/workspace/{self.workspace_id}/settings/light/patch":
             if self.light_patch_error:
                 raise QLabReplyError("error", "Light Patch unavailable", address)
             return SimpleNamespace(data=self.light_patch, status="ok")
@@ -196,8 +200,8 @@ class BatchFakeWriteClient:
         return SimpleNamespace(data=None, status="ok")
 
     def _cue_id_and_property(self, address: str) -> tuple[str | None, str | None]:
-        cue_id_prefix = "/workspace/ws-1/cue_id/"
-        cue_number_prefix = "/workspace/ws-1/cue/"
+        cue_id_prefix = f"/workspace/{self.workspace_id}/cue_id/"
+        cue_number_prefix = f"/workspace/{self.workspace_id}/cue/"
         if address.startswith(cue_id_prefix):
             rest = address.removeprefix(cue_id_prefix)
             cue_id, _, prop = rest.partition("/")
@@ -4356,6 +4360,12 @@ def test_update_cues_light_basic_dry_run_plans_documented_light_cue_messages() -
     assert analysis["affected_parameters"] == ["intensity"]
     assert setters["lightCommandText"]["real_write_possible"] is True
     assert setters["lightCommandText"]["requires_confirm_token"] is True
+    assert setters["lightCommandText"]["phase4_real_write_candidate"] is True
+    assert setters["lightCommandText"]["real_write_enabled"] is False
+    assert setters["lightCommandText"]["planned_only_reason"] == (
+        "light_command_requires_valid_analysis_and_confirm_token"
+    )
+    assert setters["lightCommandText"]["confirm_token"].startswith("confirm:lightCommandText:v1:")
     assert result["results"][0]["diff"]["lightCommandText"] == {
         "before": "Front = 20",
         "requested": "Front = 50",
@@ -4408,8 +4418,10 @@ def test_update_cues_light_analysis_policies_share_one_patch_read() -> None:
     ]
     assert setters[0]["light_command_analysis"]["affected_instruments"] == ["Red Fixture"]
     assert setters[0]["light_command_analysis"]["skipped_member_count"] == 1
-    assert setters[0]["real_write_possible"] is True
-    assert "confirm_token" in setters[0]
+    assert setters[0]["real_write_possible"] is False
+    assert setters[0]["phase4_real_write_candidate"] is False
+    assert setters[0]["planned_only_reason"] == "light_command_analysis_warning"
+    assert "confirm_token" not in setters[0]
     assert setters[1]["real_write_possible"] is False
     assert setters[1]["planned_only_reason"] == "light_command_analysis_failed"
     assert "confirm_token" not in setters[1]
@@ -4441,6 +4453,7 @@ def test_update_cues_light_analysis_unavailable_keeps_dry_run_planned() -> None:
     assert setter["light_command_analysis"]["availability"] == "unavailable"
     assert setter["light_command_analysis"]["error"]["code"] == "light_patch_read_failed"
     assert setter["real_write_possible"] is False
+    assert setter["phase4_real_write_candidate"] is False
     assert setter["planned_only_reason"] == "light_command_analysis_unavailable"
     assert "confirm_token" not in setter
     assert result["results"][0]["errors"] is None
@@ -4486,7 +4499,7 @@ def test_update_cues_light_non_command_updates_do_not_read_patch() -> None:
     assert "/workspace/ws-1/settings/light/patch" not in [request[0] for request in client.requests]
 
 
-def test_update_cues_light_command_real_write_stays_blocked_with_token() -> None:
+def test_update_cues_light_command_real_write_with_token_sets_once_and_verifies() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -4505,13 +4518,729 @@ def test_update_cues_light_command_real_write_stays_blocked_with_token() -> None
         dry_run=False,
     )
 
-    assert result["ok"] is False
-    assert result["status"] == "preflight_failed"
-    assert result["results"][0]["errors"]["lightCommandText"] == (
-        "lightCommandText is gated or dry-run only; real write remains disabled "
-        "in PLAN LUCES Phase 3."
+    assert result["ok"] is True
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["lightCommandText"] == "Front = 50"
+    assert result["results"][0]["executed_operations"] == [
+        {
+            "operation": "set_property",
+            "property": "lightCommandText",
+            "address": f"/workspace/ws-1/cue_id/{cue_id}/lightCommandText",
+            "args": ["Front = 50"],
+            "mode": "saved",
+            "capability_gate": "light_output",
+            "status": "ok",
+        }
+    ]
+    assert [address for address, _, _ in client.requests].count(
+        f"/workspace/ws-1/cue_id/{cue_id}/lightCommandText"
+    ) == 1
+
+
+def test_update_cues_light_command_rollback_uses_new_dry_run_token() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Light", "lightCommandText": "Front = 20"}},
+        light_patch=normalized_light_patch_fixture(),
     )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    forward = {"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Front = 50"}}
+    forward_plan = reader.update_cues("ws-1", [forward], dry_run=True)
+    forward_token = planned_setters(forward_plan["results"][0])["lightCommandText"]["confirm_token"]
+    assert reader.update_cues(
+        "ws-1", [{**forward, "confirm_gates": [forward_token]}], dry_run=False
+    )["status"] == "updated"
+
+    rollback = {"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Front = 20"}}
+    rollback_plan = reader.update_cues("ws-1", [rollback], dry_run=True)
+    rollback_token = planned_setters(rollback_plan["results"][0])["lightCommandText"]["confirm_token"]
+    assert rollback_token != forward_token
+    result = reader.update_cues(
+        "ws-1", [{**rollback, "confirm_gates": [rollback_token]}], dry_run=False
+    )
+
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["lightCommandText"] == "Front = 20"
+    assert client.cues[cue_id]["lightCommandText"] == "Front = 20"
+
+
+def test_update_cues_empty_light_command_is_valid_but_not_confirmable() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Light", "lightCommandText": "Front = 20"}},
+        light_patch=normalized_light_patch_fixture(),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": ""}}],
+        dry_run=True,
+    )
+
+    setter = planned_setters(result["results"][0])["lightCommandText"]
+    assert setter["light_command_analysis"]["overall_status"] == "valid"
+    assert setter["real_write_possible"] is False
+    assert setter["requires_confirm_token"] is False
+    assert setter["phase4_real_write_candidate"] is False
+    assert setter["planned_only_reason"] == "empty_light_command_text_not_writeable"
+    assert "confirm_token" not in setter
+
+
+def _phase4_fixture(
+    *,
+    cue_type: str = "Light",
+    connect_data: str = "ok:view|edit",
+    show_mode_data: Any = False,
+    ignore_readback: bool = False,
+) -> tuple[BatchFakeWriteClient, QLabReader, str, dict[str, Any], str]:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": cue_type, "lightCommandText": "Front = 20"}},
+        light_patch=normalized_light_patch_fixture(),
+        connect_data=connect_data,
+        show_mode_data=show_mode_data,
+        ignore_set_property=(cue_id, "lightCommandText") if ignore_readback else None,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "light_basic",
+        "properties": {"lightCommandText": "Front = 50"},
+    }
+    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["lightCommandText"]["confirm_token"]
+    client.requests.clear()
+    return client, reader, cue_id, update, token
+
+
+def _light_setter_requests(client: BatchFakeWriteClient) -> list[tuple[str, tuple[Any, ...], str | None]]:
+    return [request for request in client.requests if request[0].endswith("/lightCommandText")]
+
+
+def test_phase4_token_payload_binds_version_kind_and_write_context() -> None:
+    _, _, cue_id, _, token = _phase4_fixture()
+
+    payload, error = write_operations._decode_phase4_light_confirm_token(token)
+
+    assert error is None
+    assert payload == {
+        "analysis_status": "valid",
+        "baseline_sha256": write_operations._text_sha256("Front = 20"),
+        "capability_gate": "light_output",
+        "cue_id": cue_id,
+        "cue_ref": cue_id,
+        "mode": "saved",
+        "operation_kind": "phase4_light_command_text_write",
+        "path": "lightCommandText",
+        "profile": "light_basic",
+        "property": "lightCommandText",
+        "requested_sha256": write_operations._text_sha256("Front = 50"),
+        "risk_tier": "high",
+        "version": 1,
+        "workspace_id": "ws-1",
+    }
+
+
+@pytest.mark.parametrize(
+    "token_mutator",
+    [
+        lambda token: "not-a-token",
+        lambda token: token[:-1] + ("0" if token[-1] != "0" else "1"),
+        lambda token: token.replace(":v1:", ":v2:", 1),
+    ],
+)
+def test_phase4_malformed_tampered_or_wrong_version_token_blocks_before_setter(token_mutator: Any) -> None:
+    client, reader, _, update, token = _phase4_fixture()
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token_mutator(token)]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert _light_setter_requests(client) == []
+
+
+def test_phase4_token_cannot_authorize_another_requested_value_or_cue_ref() -> None:
+    client, reader, cue_id, update, token = _phase4_fixture()
+
+    wrong_value = reader.update_cues(
+        "ws-1",
+        [{**update, "properties": {"lightCommandText": "Front = 60"}, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    client.requests.clear()
+    client.cue_numbers["1"] = cue_id
+    wrong_ref = reader.update_cues(
+        "ws-1",
+        [{**update, "cue_ref": "1", "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert wrong_value["status"] == "preflight_failed"
+    assert wrong_ref["status"] == "preflight_failed"
+    assert _light_setter_requests(client) == []
+
+
+def test_phase4_token_cannot_authorize_another_workspace() -> None:
+    _, _, cue_id, update, token = _phase4_fixture()
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Light", "lightCommandText": "Front = 20"}},
+        workspace_id="ws-2",
+        light_patch=normalized_light_patch_fixture(),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-2",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "does not match" in result["results"][0]["errors"]["lightCommandText"]
+    assert _light_setter_requests(client) == []
+
+
+def test_phase4_missing_workspace_blocks_before_setter() -> None:
+    client, reader, _, update, token = _phase4_fixture()
+
+    result = reader.update_cues(
+        "missing-ws",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "write_readiness" in result["errors"]
+    assert result["results"][0]["executed_operations"] == []
+    assert _light_setter_requests(client) == []
+
+
+@pytest.mark.parametrize("command_text", ["Back.red = 50", "Missing = 50", "1 - 3 = 50", ""])
+def test_phase4_nonconfirmable_analysis_has_no_real_write_path(command_text: str) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Light", "lightCommandText": "Front = 20"}},
+        light_patch=normalized_light_patch_fixture(),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "light_basic",
+        "properties": {"lightCommandText": command_text},
+    }
+    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    setter = planned_setters(plan["results"][0])["lightCommandText"]
+    client.requests.clear()
+
+    result = reader.update_cues("ws-1", [update], dry_run=False)
+
+    assert setter["real_write_possible"] is False
+    assert "confirm_token" not in setter
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
     assert client.requests == []
+
+
+def test_phase4_unavailable_analysis_and_multiple_tokens_block_before_setter() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Light", "lightCommandText": "Front = 20"}},
+        light_patch=normalized_light_patch_fixture(),
+        light_patch_error=True,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "light_basic",
+        "properties": {"lightCommandText": "Front = 50"},
+    }
+    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    setter = planned_setters(plan["results"][0])["lightCommandText"]
+    client.requests.clear()
+
+    unavailable = reader.update_cues("ws-1", [update], dry_run=False)
+    multiple = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": ["one", "two"]}],
+        dry_run=False,
+    )
+
+    assert setter["light_command_analysis"]["overall_status"] == "unavailable"
+    assert "confirm_token" not in setter
+    assert unavailable["status"] == "preflight_failed"
+    assert multiple["status"] == "preflight_failed"
+    assert _light_setter_requests(client) == []
+
+
+def test_phase4_stale_baseline_blocks_before_setter() -> None:
+    client, reader, cue_id, update, token = _phase4_fixture()
+    client.cues[cue_id]["lightCommandText"] = "Front = 30"
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "stale_light_command_baseline" in result["results"][0]["errors"]["lightCommandText"]
+    assert result["results"][0]["executed_operations"] == []
+    assert _light_setter_requests(client) == []
+
+
+def test_phase4_readback_mismatch_returns_verification_failure() -> None:
+    client, reader, _, update, token = _phase4_fixture(ignore_readback=True)
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "verification_failed"
+    assert len(_light_setter_requests(client)) == 1
+    assert result["results"][0]["after"]["lightCommandText"] == "Front = 20"
+    assert result["results"][0]["diff"]["lightCommandText"]["requested"] == "Front = 50"
+
+
+def test_phase4_batch_or_extra_property_blocks_whole_call_before_osc() -> None:
+    client, reader, cue_id, update, token = _phase4_fixture()
+    second_id = "22222222-2222-4222-8222-222222222222"
+    client.cues[second_id] = {
+        "uniqueID": second_id,
+        "type": "Light",
+        "lightCommandText": "Front = 20",
+    }
+
+    batch = reader.update_cues(
+        "ws-1",
+        [
+            {**update, "confirm_gates": [token]},
+            {**update, "cue_ref": second_id, "confirm_gates": [token]},
+        ],
+        dry_run=False,
+    )
+    mixed = reader.update_cues(
+        "ws-1",
+        [
+            {
+                **update,
+                "properties": {"lightCommandText": "Front = 50", "alwaysCollate": True},
+                "confirm_gates": [token],
+            }
+        ],
+        dry_run=False,
+    )
+
+    assert batch["status"] == "preflight_failed"
+    assert mixed["status"] == "preflight_failed"
+    assert all(item["executed_operations"] == [] for item in batch["results"])
+    assert mixed["results"][0]["executed_operations"] == []
+    assert client.requests == []
+
+
+@pytest.mark.parametrize(
+    ("connect_data", "show_mode_data"),
+    [("ok:view", False), ("ok:view|edit", True)],
+)
+def test_phase4_edit_scope_and_show_mode_block_before_setter(
+    connect_data: str,
+    show_mode_data: Any,
+) -> None:
+    client, reader, _, update, token = _phase4_fixture(
+        connect_data=connect_data,
+        show_mode_data=show_mode_data,
+    )
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert _light_setter_requests(client) == []
+
+
+def test_phase4_non_light_missing_cue_and_patch_failure_block_before_setter() -> None:
+    client, reader, cue_id, update, token = _phase4_fixture()
+    client.cues[cue_id]["type"] = "Memo"
+    non_light = reader.update_cues(
+        "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
+    )
+    client.cues[cue_id]["type"] = "Light"
+    client.missing_refs.add(cue_id)
+    missing = reader.update_cues(
+        "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
+    )
+    client.missing_refs.clear()
+    client.light_patch_error = True
+    patch_failure = reader.update_cues(
+        "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
+    )
+
+    assert [non_light["status"], missing["status"], patch_failure["status"]] == [
+        "preflight_failed",
+        "preflight_failed",
+        "preflight_failed",
+    ]
+    assert _light_setter_requests(client) == []
+
+
+def test_phase4_success_requests_no_dashboard_playback_or_unqualified_osc() -> None:
+    client, reader, _, update, token = _phase4_fixture()
+
+    result = reader.update_cues(
+        "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
+    )
+
+    addresses = [address for address, _, _ in client.requests]
+    assert result["status"] == "updated"
+    assert all(address == "/workspaces" or address.startswith("/workspace/ws-1/") for address in addresses)
+    assert not any(
+        forbidden in address.casefold()
+        for address in addresses
+        for forbidden in ("dashboard", "/go", "/start", "/stop", "panic", "audition", "preview")
+    )
+
+
+def _phase5_fixture(
+    property_name: str = "alwaysCollate",
+    *,
+    baseline: bool = False,
+    requested: bool = True,
+    cue_type: str = "Light",
+    connect_data: str = "ok:view|edit",
+    show_mode_data: Any = False,
+    ignore_readback: bool = False,
+) -> tuple[BatchFakeWriteClient, QLabReader, str, dict[str, Any], str]:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Light", property_name: baseline}},
+        connect_data=connect_data,
+        show_mode_data=show_mode_data,
+        ignore_set_property=(cue_id, property_name) if ignore_readback else None,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "light_basic",
+        "properties": {property_name: requested},
+    }
+    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    token = planned_setters(plan["results"][0])[property_name]["confirm_token"]
+    client.cues[cue_id]["type"] = cue_type
+    client.requests.clear()
+    return client, reader, cue_id, update, token
+
+
+@pytest.mark.parametrize(
+    ("property_name", "baseline", "requested"),
+    [
+        ("alwaysCollate", False, True),
+        ("alwaysCollate", True, False),
+        ("subcontroller", False, True),
+        ("subcontroller", True, False),
+    ],
+)
+def test_phase5_dry_run_candidate_and_real_write_verify_boolean(
+    property_name: str,
+    baseline: bool,
+    requested: bool,
+) -> None:
+    client, reader, cue_id, update, token = _phase5_fixture(
+        property_name,
+        baseline=baseline,
+        requested=requested,
+    )
+    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    setter = planned_setters(plan["results"][0])[property_name]
+    token = setter["confirm_token"]
+    client.requests.clear()
+
+    assert setter["real_write_possible"] is True
+    assert setter["requires_confirm_token"] is True
+    assert setter["phase5_light_behavior_candidate"] is True
+    assert setter["real_write_enabled"] is False
+    assert setter["planned_only_reason"] == "light_behavior_requires_confirm_token"
+    assert token.startswith("confirm:lightBehavior:v1:")
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    address = f"/workspace/ws-1/cue_id/{cue_id}/{property_name}"
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"][property_name] is requested
+    assert [request[0] for request in client.requests].count(address) == 1
+
+
+def test_phase5_token_payload_binds_kind_property_and_context() -> None:
+    _, _, cue_id, _, token = _phase5_fixture()
+
+    payload, error = write_operations._decode_phase5_light_confirm_token(token)
+
+    assert error is None
+    assert payload == {
+        "baseline": False,
+        "capability_gate": "light_output",
+        "cue_id": cue_id,
+        "cue_ref": cue_id,
+        "mode": "saved",
+        "operation_kind": "phase5_light_behavior_flag_write",
+        "path": "alwaysCollate",
+        "profile": "light_basic",
+        "property": "alwaysCollate",
+        "requested": True,
+        "risk_tier": "high",
+        "version": 1,
+        "workspace_id": "ws-1",
+    }
+
+
+def test_phase5_rollback_requires_new_dry_run_token() -> None:
+    client, reader, cue_id, forward, token = _phase5_fixture()
+    assert reader.update_cues(
+        "ws-1", [{**forward, "confirm_gates": [token]}], dry_run=False
+    )["status"] == "updated"
+
+    rollback = {
+        "cue_ref": cue_id,
+        "profile": "light_basic",
+        "properties": {"alwaysCollate": False},
+    }
+    plan = reader.update_cues("ws-1", [rollback], dry_run=True)
+    rollback_token = planned_setters(plan["results"][0])["alwaysCollate"]["confirm_token"]
+    result = reader.update_cues(
+        "ws-1", [{**rollback, "confirm_gates": [rollback_token]}], dry_run=False
+    )
+
+    assert rollback_token != token
+    assert result["status"] == "updated"
+    assert client.cues[cue_id]["alwaysCollate"] is False
+
+
+@pytest.mark.parametrize(
+    "token_mutator",
+    [
+        lambda token: "not-a-token",
+        lambda token: token[:-1] + ("0" if token[-1] != "0" else "1"),
+        lambda token: token.replace(":v1:", ":v2:", 1),
+    ],
+)
+def test_phase5_invalid_token_blocks_before_setter(token_mutator: Any) -> None:
+    client, reader, _, update, token = _phase5_fixture()
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token_mutator(token)]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert not any(address.endswith("/alwaysCollate") for address, _, _ in client.requests)
+
+
+def test_phase5_token_cannot_authorize_other_property_value_workspace_or_cue_ref() -> None:
+    client, reader, cue_id, update, token = _phase5_fixture()
+    wrong_value = reader.update_cues(
+        "ws-1",
+        [{**update, "properties": {"alwaysCollate": False}, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    client.requests.clear()
+    wrong_property = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "light_basic",
+                "properties": {"subcontroller": True},
+                "confirm_gates": [token],
+            }
+        ],
+        dry_run=False,
+    )
+    client.requests.clear()
+    client.cue_numbers["1"] = cue_id
+    wrong_ref = reader.update_cues(
+        "ws-1", [{**update, "cue_ref": "1", "confirm_gates": [token]}], dry_run=False
+    )
+    client.requests.clear()
+    other_client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Light", "alwaysCollate": False}},
+        workspace_id="ws-2",
+    )
+    other_reader = QLabReader(other_client)  # type: ignore[arg-type]
+    wrong_workspace = other_reader.update_cues(
+        "ws-2", [{**update, "confirm_gates": [token]}], dry_run=False
+    )
+
+    assert {wrong_value["status"], wrong_property["status"], wrong_ref["status"], wrong_workspace["status"]} == {
+        "preflight_failed"
+    }
+    assert not any(
+        address.endswith(("/alwaysCollate", "/subcontroller"))
+        for address, _, _ in client.requests + other_client.requests
+    )
+
+
+def test_phase5_stale_baseline_and_readback_mismatch_are_detected() -> None:
+    client, reader, cue_id, update, token = _phase5_fixture()
+    client.cues[cue_id]["alwaysCollate"] = True
+    stale = reader.update_cues(
+        "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
+    )
+    assert stale["status"] == "preflight_failed"
+    assert "stale_light_behavior_baseline" in stale["results"][0]["errors"]["alwaysCollate"]
+    assert not any(address.endswith("/alwaysCollate") for address, _, _ in client.requests)
+
+    mismatch_client, mismatch_reader, _, mismatch_update, mismatch_token = _phase5_fixture(
+        ignore_readback=True
+    )
+    mismatch = mismatch_reader.update_cues(
+        "ws-1",
+        [{**mismatch_update, "confirm_gates": [mismatch_token]}],
+        dry_run=False,
+    )
+    assert mismatch["status"] == "verification_failed"
+    assert sum(address.endswith("/alwaysCollate") for address, _, _ in mismatch_client.requests) == 1
+
+
+def test_phase5_batch_mixed_properties_and_live_mode_block_whole_call() -> None:
+    client, reader, cue_id, update, token = _phase5_fixture()
+    second_id = "22222222-2222-4222-8222-222222222222"
+    client.cues[second_id] = {"uniqueID": second_id, "type": "Light", "alwaysCollate": False}
+    cases = [
+        [
+            {**update, "confirm_gates": [token]},
+            {**update, "cue_ref": second_id, "confirm_gates": [token]},
+        ],
+        [
+            {
+                **update,
+                "properties": {"alwaysCollate": True, "subcontroller": True},
+                "confirm_gates": [token],
+            }
+        ],
+        [
+            {
+                **update,
+                "properties": {"alwaysCollate": True, "lightCommandText": "Front = 50"},
+                "confirm_gates": [token],
+            }
+        ],
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "light_basic",
+                "operations": [
+                    {"property": "alwaysCollate", "args": {"value": True}, "mode": "live"}
+                ],
+                "confirm_gates": [token],
+            }
+        ],
+    ]
+
+    for updates in cases:
+        result = reader.update_cues("ws-1", updates, dry_run=False)
+        assert result["status"] == "preflight_failed"
+        assert all(item["executed_operations"] == [] for item in result["results"])
+    assert client.requests == []
+
+
+def test_phase5_non_strict_dry_run_has_no_confirmable_token() -> None:
+    client, reader, cue_id, _, _ = _phase5_fixture()
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "light_basic",
+                "properties": {"alwaysCollate": True, "subcontroller": True},
+            }
+        ],
+        dry_run=True,
+    )
+
+    setters = planned_setters(result["results"][0])
+    for setter in setters.values():
+        assert setter["phase5_light_behavior_candidate"] is False
+        assert setter["real_write_possible"] is False
+        assert setter["requires_confirm_token"] is False
+        assert setter["planned_only_reason"] == "light_behavior_requires_single_property"
+        assert "confirm_token" not in setter
+    assert not any("settings/light/patch" in address for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize(
+    ("cue_type", "connect_data", "show_mode_data"),
+    [
+        ("Memo", "ok:view|edit", False),
+        ("Light", "ok:view", False),
+        ("Light", "ok:view|edit", True),
+    ],
+)
+def test_phase5_non_light_edit_scope_and_show_mode_block_before_setter(
+    cue_type: str,
+    connect_data: str,
+    show_mode_data: Any,
+) -> None:
+    client, reader, _, update, token = _phase5_fixture(
+        cue_type=cue_type,
+        connect_data=connect_data,
+        show_mode_data=show_mode_data,
+    )
+    result = reader.update_cues(
+        "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert not any(address.endswith("/alwaysCollate") for address, _, _ in client.requests)
+
+
+def test_phase5_missing_cue_and_safe_addresses_only() -> None:
+    client, reader, cue_id, update, token = _phase5_fixture()
+    client.missing_refs.add(cue_id)
+    missing = reader.update_cues(
+        "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
+    )
+    assert missing["status"] == "preflight_failed"
+    assert not any(address.endswith("/alwaysCollate") for address, _, _ in client.requests)
+
+    client.missing_refs.clear()
+    success = reader.update_cues(
+        "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
+    )
+    addresses = [address for address, _, _ in client.requests]
+    assert success["status"] == "updated"
+    assert all(address == "/workspaces" or address.startswith("/workspace/ws-1/") for address in addresses)
+    assert not any(
+        forbidden in address.casefold()
+        for address in addresses
+        for forbidden in ("dashboard", "/go", "/start", "/stop", "panic", "audition", "preview", "settings/light/patch")
+    )
 
 
 def test_update_cues_light_basic_invalid_values_and_profile_mismatch_have_no_plan() -> None:

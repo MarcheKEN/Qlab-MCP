@@ -121,6 +121,9 @@ VIDEO_PHASE3_APPEARANCE_TYPES = {
     "camera_basic": "Camera",
     "text_basic": "Text",
 }
+TEXT_PHASE3E_PROPERTIES = frozenset(
+    {"text", "text/format/fontSize", "text/format/alignment"}
+)
 VIDEO_PHASE2_HEALTH_READ_KEYS = (
     "number",
     "name",
@@ -143,6 +146,8 @@ PHASE3_VIDEO_SCALAR_OPERATION_KIND = "video_phase3c_scalar_write"
 PHASE3_VIDEO_SCALAR_TOKEN_VERSION = 1
 PHASE3_VIDEO_APPEARANCE_OPERATION_KIND = "video_phase3d_appearance_write"
 PHASE3_VIDEO_APPEARANCE_TOKEN_VERSION = 1
+PHASE3E_TEXT_BASIC_OPERATION_KIND = "video_phase3e_text_basic_write"
+PHASE3E_TEXT_BASIC_TOKEN_VERSION = 1
 _LIGHT_WRITE_TOKEN_SECRET = secrets.token_bytes(32)
 
 
@@ -422,6 +427,9 @@ class QLabWriteMixin:
         phase3_video_appearance_call = any(
             _phase3_video_appearance_operation(item) is not None for item in items
         )
+        phase3e_text_basic_call = any(
+            _phase3e_text_basic_operation(item) is not None for item in items
+        )
         for item in items:
             _strip_video_phase2_confirm_tokens(item)
             if item.get("profile") in VIDEO_PHASE2_PROFILES and item.get("operations"):
@@ -515,6 +523,11 @@ class QLabWriteMixin:
                 if phase3_video_appearance_call
                 else None
             )
+            phase3e_text_structure_error = (
+                _phase3e_text_basic_call_structure_error(items)
+                if phase3e_text_basic_call
+                else None
+            )
             gate_results = []
             gate_ok = True
             for item in items:
@@ -570,6 +583,15 @@ class QLabWriteMixin:
                         errors[property_name] = (
                             f"{property_name} is gated or dry-run only without exactly one reviewed "
                             "Phase 3D confirm_token."
+                        )
+                elif not errors and phase3e_text_basic_call:
+                    property_name = item["operations"][0]["property"]
+                    if phase3e_text_structure_error:
+                        errors[property_name] = phase3e_text_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Phase 3E confirm_token."
                         )
                 elif not errors:
                     errors.update(_video_phase2_real_write_errors(item))
@@ -647,6 +669,16 @@ class QLabWriteMixin:
                 and not phase3_video_scalar_call
                 and _phase3_video_appearance_call_structure_error(items) is None
             )
+            phase3e_text_candidate_shape = (
+                phase3e_text_basic_call
+                and not phase4_light_call
+                and not phase5_light_call
+                and not phase3_video_opacity_call
+                and not phase3_video_translation_call
+                and not phase3_video_scalar_call
+                and not phase3_video_appearance_call
+                and _phase3e_text_basic_call_structure_error(items) is None
+            )
             light_patch: dict[str, Any] | None = None
             light_patch_error: dict[str, str] | None = None
             light_patch_loaded = False
@@ -663,6 +695,7 @@ class QLabWriteMixin:
                     errors.update(_phase3_video_translation_dry_run_errors(item, before))
                     errors.update(_phase3_video_scalar_dry_run_errors(item, before))
                     errors.update(_phase3_video_appearance_dry_run_errors(item, before))
+                    errors.update(_phase3e_text_basic_dry_run_errors(item, before))
                 if not errors and _light_command_operation(item) is not None:
                     if not light_patch_loaded:
                         light_patch, light_patch_error = _try_read_safe_light_patch(self, workspace)
@@ -719,6 +752,15 @@ class QLabWriteMixin:
                             workspace_id=workspace,
                             before=before,
                             candidate_shape=phase3_appearance_candidate_shape,
+                        )
+                    )
+                if not errors and _phase3e_text_basic_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_phase3e_text_basic_operation(
+                            item,
+                            workspace_id=workspace,
+                            before=before,
+                            candidate_shape=phase3e_text_candidate_shape,
                         )
                     )
                 cue_id = _resolved_cue_id(before)
@@ -832,12 +874,18 @@ class QLabWriteMixin:
                 errors.update(_validate_phase3_video_appearance_real_write(workspace, item, before))
                 if not errors:
                     _mark_phase3_video_appearance_real_operation(item)
+            elif not errors and phase3e_text_basic_call:
+                errors.update(_validate_phase3e_text_basic_real_write(workspace, item, before))
+                if not errors:
+                    _mark_phase3e_text_basic_real_operation(item)
             if errors:
                 preflight_ok = False
                 if phase3_video_scalar_call:
                     _label_phase3_video_scalar_rejection(item)
                 if phase3_video_appearance_call:
                     _label_phase3_video_appearance_rejection(item)
+                if phase3e_text_basic_call:
+                    _label_phase3e_text_basic_rejection(item)
             preflight_results.append(
                 _batch_item_result(
                     workspace,
@@ -954,6 +1002,7 @@ class QLabWriteMixin:
                         or _phase3_video_translation_operation(item) is not None
                         or _phase3_video_scalar_operation(item) is not None
                         or _phase3_video_appearance_operation(item) is not None
+                        or _phase3e_text_basic_operation(item) is not None
                     )
                     else "One or more setters did not reply, but fresh after-read confirmed requested values."
                 )
@@ -971,6 +1020,7 @@ class QLabWriteMixin:
                 or _phase3_video_translation_operation(item) is not None
                 or _phase3_video_scalar_operation(item) is not None
                 or _phase3_video_appearance_operation(item) is not None
+                or _phase3e_text_basic_operation(item) is not None
             ):
                 status = "updated"
             elif setter_timeouts:
@@ -990,6 +1040,7 @@ class QLabWriteMixin:
             _refresh_phase3_video_translation_real_result(result, item)
             _refresh_phase3_video_scalar_real_result(result, item)
             _refresh_phase3_video_appearance_real_result(result, item)
+            _refresh_phase3e_text_basic_real_result(result, item)
             if _update_debug_enabled(self):
                 result["debug"] = {
                     "cue_ref": item["cue_ref"],
@@ -2186,6 +2237,276 @@ def _validate_phase3_video_appearance_real_write(
     return {}
 
 
+def _phase3e_text_basic_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") != "text_basic":
+        return None
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in TEXT_PHASE3E_PROPERTIES
+        ),
+        None,
+    )
+
+
+def _phase3e_text_basic_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 3E Text Basics real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") != "text_basic":
+        return "Phase 3E Text Basics real writes require profile='text_basic'."
+    if len(operations) != 1:
+        return "Phase 3E Text Basics real writes require exactly one property."
+    operation = operations[0]
+    if (
+        operation.get("property") not in TEXT_PHASE3E_PROPERTIES
+        or operation.get("path") != operation.get("property")
+    ):
+        return "Phase 3E real writes allow only text, text/format/fontSize, or text/format/alignment."
+    if operation.get("mode") != "saved":
+        return "Phase 3E Text Basics real writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Phase 3E Text Basics real writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _text_basic_value_valid(property_name: str, value: Any) -> bool:
+    if property_name == "text":
+        return isinstance(value, str)
+    if property_name == "text/format/alignment":
+        return isinstance(value, str) and value.strip().casefold() in {
+            "left",
+            "center",
+            "right",
+            "justify",
+        }
+    if property_name == "text/format/fontSize":
+        return _is_plain_finite_number(value) and 0 < float(value) <= 1000
+    return False
+
+
+def _text_basic_canonical_value(property_name: str, value: Any) -> Any:
+    if property_name == "text/format/fontSize":
+        return float(value)
+    if property_name == "text/format/alignment":
+        return value.strip().casefold()
+    return value
+
+
+def _text_basic_sha256(property_name: str, value: Any) -> str:
+    canonical = _text_basic_canonical_value(property_name, value)
+    return hashlib.sha256(
+        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _phase3e_text_basic_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    baseline: Any,
+    requested: Any,
+) -> dict[str, Any]:
+    property_name = operation["property"]
+    return {
+        "version": PHASE3E_TEXT_BASIC_TOKEN_VERSION,
+        "operation_kind": PHASE3E_TEXT_BASIC_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "cue_type": "Text",
+        "profile": item["profile"],
+        "property": property_name,
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": _text_basic_canonical_value(property_name, baseline),
+        "baseline_sha256": _text_basic_sha256(property_name, baseline),
+        "requested": _text_basic_canonical_value(property_name, requested),
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "mcp_secret_version": 1,
+    }
+
+
+def _phase3e_text_basic_confirm_token(**payload_args: Any) -> str:
+    payload = _phase3e_text_basic_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:textBasic:v{PHASE3E_TEXT_BASIC_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _decode_phase3e_text_basic_confirm_token(
+    token: str,
+) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    expected_prefix = ["confirm", "textBasic", f"v{PHASE3E_TEXT_BASIC_TOKEN_VERSION}"]
+    if len(parts) != 5 or parts[:3] != expected_prefix:
+        return None, "Phase 3E Text Basics confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(
+        _LIGHT_WRITE_TOKEN_SECRET,
+        encoded.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 3E Text Basics confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 3E Text Basics confirm_token payload is invalid."
+    if not isinstance(payload, dict):
+        return None, "Phase 3E Text Basics confirm_token payload is invalid."
+    return payload, None
+
+
+def _phase3e_text_basic_dry_run_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase3e_text_basic_operation(item)
+    if operation is None or not isinstance(before, dict) or before.get("type") != "Text":
+        return {}
+    property_name = operation["property"]
+    baseline = before.get(property_name)
+    requested = operation["args"][0] if operation.get("args") else None
+    if not _text_basic_value_valid(property_name, baseline):
+        return {property_name: f"Phase 3E Text Basics requires readable {property_name} baseline."}
+    if not _text_basic_value_valid(property_name, requested):
+        return {property_name: f"Phase 3E Text Basics requested {property_name} value is invalid."}
+    return {}
+
+
+def _annotate_phase3e_text_basic_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operation = _phase3e_text_basic_operation(item)
+    if operation is None:
+        return []
+    property_name = operation["property"]
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name) if isinstance(before, dict) else None
+    requested = operation["args"][0] if operation.get("args") else None
+    candidate = (
+        candidate_shape
+        and isinstance(before, dict)
+        and before.get("type") == "Text"
+        and cue_id == item.get("cue_ref")
+        and _text_basic_value_valid(property_name, baseline)
+        and _text_basic_value_valid(property_name, requested)
+    )
+    if not candidate:
+        operation.pop("confirm_token", None)
+        return []
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase3e_text_basic_candidate": True,
+            "planned_only_reason": "text_basic_requires_confirm_token",
+            "future_gate_requirements": [
+                "phase3e_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation["confirm_token"] = _phase3e_text_basic_confirm_token(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    return []
+
+
+def _validate_phase3e_text_basic_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase3e_text_basic_operation(item)
+    property_name = operation.get("property") if operation else "text_basic"
+    if operation is None or not isinstance(before, dict):
+        return {property_name: "Phase 3E Text Basics preflight is incomplete."}
+    if item.get("profile") != "text_basic" or before.get("type") != "Text":
+        return {property_name: "Phase 3E Text Basics real writes require a Text cue and text_basic profile."}
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return {property_name: "Phase 3E Text Basics real writes require a healthy cue without warnings."}
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return {property_name: "Phase 3E Text Basics real writes require an inactive cue."}
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name)
+    requested = operation["args"][0] if operation.get("args") else None
+    if cue_id != item.get("cue_ref"):
+        return {property_name: "Phase 3E fresh read uniqueID does not exactly match requested cue UUID."}
+    if not _text_basic_value_valid(property_name, baseline):
+        return {property_name: f"Phase 3E Text Basics requires readable {property_name} baseline."}
+    if not _text_basic_value_valid(property_name, requested):
+        return {property_name: f"Phase 3E Text Basics requested {property_name} value is invalid."}
+    token = item["confirm_gates"][0]
+    payload, token_error = _decode_phase3e_text_basic_confirm_token(token)
+    if token_error or payload is None:
+        return {property_name: token_error or "Phase 3E Text Basics confirm_token is invalid."}
+    expected = _phase3e_text_basic_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    for key, value in expected.items():
+        if key in {"baseline", "baseline_sha256"}:
+            continue
+        if payload.get(key) != value:
+            return {
+                property_name: (
+                    "Phase 3E Text Basics confirm_token does not match this workspace, cue, property, "
+                    "value, or risk context."
+                )
+            }
+    baseline_matches = (
+        math.isclose(
+            float(payload.get("baseline", math.nan)),
+            float(expected["baseline"]),
+            abs_tol=UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
+            rel_tol=UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
+        )
+        if property_name == "text/format/fontSize"
+        else payload.get("baseline") == expected["baseline"]
+    )
+    if payload.get("baseline_sha256") != expected["baseline_sha256"] or not baseline_matches:
+        return {
+            property_name: (
+                f"stale_text_basic_baseline: current {property_name} no longer matches "
+                "the reviewed dry-run baseline."
+            )
+        }
+    return {}
+
+
 def _phase4_light_call_structure_error(items: list[dict[str, Any]]) -> str | None:
     if len(items) != 1:
         return "Phase 4 lightCommandText real writes require exactly one cue update."
@@ -3132,6 +3453,72 @@ def _refresh_phase3_video_appearance_real_result(
         plan["safety"] = safety
 
 
+def _mark_phase3e_text_basic_real_operation(item: dict[str, Any]) -> None:
+    operation = _phase3e_text_basic_operation(item)
+    if operation is None:
+        return
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": True,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase3e_text_basic_candidate": True,
+            "future_gate_requirements": [
+                "phase3e_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation.pop("planned_only_reason", None)
+
+
+def _label_phase3e_text_basic_rejection(item: dict[str, Any]) -> None:
+    operation = _phase3e_text_basic_operation(item)
+    if operation is not None:
+        operation["planned_only_reason"] = "text_basic_requires_confirm_token"
+
+
+def _refresh_phase3e_text_basic_real_result(
+    result: dict[str, Any],
+    item: dict[str, Any],
+) -> None:
+    text_operation = _phase3e_text_basic_operation(item)
+    if text_operation is None or not result.get("executed_operations"):
+        return
+    property_name = text_operation["property"]
+    for operation in result.get("operations") or []:
+        if operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    for operation in result.get("planned_operations") or []:
+        if operation.get("operation") == "set_property" and operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    plan = result.get("updateq_plan")
+    if isinstance(plan, dict):
+        plan["status"] = result.get("status")
+        plan["intent"] = f"Executed saved {property_name} change on Text cue."
+        plan["real_write_enabled"] = True
+        plan["real_write_possible"] = True
+        plan["requires_confirm_token"] = True
+        plan.pop("why_not_written", None)
+        plan["after"] = (result.get("after") or {}).get(property_name)
+        plan["verification"] = {"readback_matched": result.get("errors") is None}
+        safety = dict(plan.get("safety") or {})
+        safety.update({"no_executed_operations": False, "will_modify_qlab": True})
+        plan["safety"] = safety
+
+
 def _summarize_light_command_analysis(helper_result: dict[str, Any]) -> dict[str, Any]:
     results = helper_result.get("results") if isinstance(helper_result.get("results"), list) else []
     status_counts = {status: 0 for status in ("valid", "warning", "invalid", "unsupported")}
@@ -3502,6 +3889,7 @@ def _planned_update_operations(
             "phase3b_video_translation_candidate",
             "phase3c_video_scalar_candidate",
             "phase3d_video_appearance_candidate",
+            "phase3e_text_basic_candidate",
             "phase4_real_write_candidate",
             "phase5_light_behavior_candidate",
             "light_command_analysis",

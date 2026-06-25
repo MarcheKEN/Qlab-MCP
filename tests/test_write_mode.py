@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 import time
 from types import SimpleNamespace
@@ -333,6 +334,11 @@ VIDEO_PHASE3C_SCALAR_PROPERTIES = {
     "cropRight",
 }
 VIDEO_PHASE3D_APPEARANCE_PROPERTIES = {"blendMode", "preserveAspectRatio"}
+PHASE3E_TEXT_BASIC_PROPERTIES = {
+    "text",
+    "text/format/alignment",
+    "text/format/fontSize",
+}
 VIDEO_PHASE2_REQUESTED_VALUES = {
     "anchor/x": 12.5,
     "anchor/y": -4.5,
@@ -427,6 +433,7 @@ def _valid_value_for_validator(validator: str) -> Any:
         "target_id": "target-id",
         "target_mode": 1,
         "text_alignment": "center",
+        "text_font_size": 24,
         "text_line_style": "single",
         "timecode_framerate": 1,
         "timecode_part": 1,
@@ -490,6 +497,7 @@ def _invalid_value_for_validator(validator: str) -> Any:
         "target_id": "",
         "target_mode": 2,
         "text_alignment": "middle",
+        "text_font_size": 0,
         "text_line_style": "triple",
         "timecode_framerate": 8,
         "timecode_part": 100,
@@ -995,6 +1003,12 @@ def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_os
         cue_values[prop_name] = "Multiply"
     elif prop_name == "preserveAspectRatio":
         cue_values[prop_name] = True
+    elif profile == "text_basic" and prop_name in PHASE3E_TEXT_BASIC_PROPERTIES:
+        cue_values[prop_name] = {
+            "text": "Old text",
+            "text/format/alignment": "left",
+            "text/format/fontSize": 48,
+        }[prop_name]
     dry_client = FakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
         existing_cue_id=cue_id,
@@ -3441,7 +3455,7 @@ def test_update_cue_text_basic_dry_run_allows_small_text_profile() -> None:
         assert result["executed_operations"] == []
 
 
-def test_update_cue_text_basic_real_write_is_blocked_before_osc() -> None:
+def test_update_cue_text_font_name_real_write_is_blocked_before_osc() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = FakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass", cache_ttl=10),
@@ -3455,7 +3469,7 @@ def test_update_cue_text_basic_real_write_is_blocked_before_osc() -> None:
             "text/format/fontName": "Helvetica",
             "text/format/fontSize": 48,
         },
-        timeout_set_property="text/format/fontSize",
+        timeout_set_property="text/format/fontName",
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
@@ -3463,7 +3477,7 @@ def test_update_cue_text_basic_real_write_is_blocked_before_osc() -> None:
         reader.update_cue(
             "ws-1",
             cue_id,
-            {"text/format/alignment": "right", "text/format/fontSize": 60},
+            {"text/format/fontName": "Courier New"},
             dry_run=False,
             profile="text_basic",
         )
@@ -3801,10 +3815,7 @@ def test_video_phase2_dry_run_rejects_explicitly_blocked_families_before_osc(
             ("text_basic", "Text", property_name)
             for property_name in (
                 "fixedWidth",
-                "text",
-                "text/format/alignment",
                 "text/format/fontName",
-                "text/format/fontSize",
             )
         ],
     ],
@@ -3870,7 +3881,7 @@ def test_video_phase2_scalar_matrix_plans_normalized_diff_without_token(
     ("profile", "cue_type", "property_name", "before_value", "requested_value"),
     [
         ("video_basic", "Video", "clockType", "audio", "video"),
-        ("text_basic", "Text", "text", "Old title", "New title"),
+        ("text_basic", "Text", "fixedWidth", 500, 640),
     ],
 )
 def test_video_phase2_success_includes_updateq_plan(
@@ -3922,10 +3933,6 @@ def test_video_phase2_success_includes_updateq_plan(
         "no_executed_operations": True,
         "will_modify_qlab": False,
     }
-    if property_name == "text":
-        assert plan["format_inheritance_warning"] is True
-        assert "first existing character" in plan["warning"]
-        assert "verify_first_character_inherited_format" in plan["future_gate_requirements"]
     assert result["executed_operations"] == []
     assert_no_confirm_token(result)
 
@@ -5354,6 +5361,326 @@ def test_phase3d_skipped_candidates_remain_unregistered(property_name: str) -> N
         )
 
 
+PHASE3E_TEXT_BASIC_CASES = [
+    ("text", "Old text", "New\ntext"),
+    ("text/format/fontSize", 48, 56),
+    ("text/format/alignment", "left", "center"),
+]
+
+
+def _phase3e_text_basic_fixture(
+    *,
+    property_name: str = "text",
+    baseline: Any = "Old text",
+    requested: Any = "New text",
+    timeout: bool = False,
+    timeout_without_apply: bool = False,
+) -> tuple[BatchFakeWriteClient, QLabReader, str, dict[str, Any], str]:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Text", property_name: baseline}},
+        timeout_set_property=(cue_id, property_name) if timeout else None,
+        timeout_without_apply=timeout_without_apply,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "text_basic",
+        "properties": {property_name: requested},
+    }
+    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    token = planned_setters(plan["results"][0])[property_name]["confirm_token"]
+    client.requests.clear()
+    return client, reader, cue_id, update, token
+
+
+@pytest.mark.parametrize(
+    ("property_name", "baseline", "requested"),
+    PHASE3E_TEXT_BASIC_CASES,
+)
+def test_phase3e_text_basic_dry_run_emits_bound_token(
+    property_name: str,
+    baseline: Any,
+    requested: Any,
+) -> None:
+    client, reader, cue_id, update, _ = _phase3e_text_basic_fixture(
+        property_name=property_name,
+        baseline=baseline,
+        requested=requested,
+    )
+
+    result = reader.update_cues("ws-1", [update], dry_run=True)
+    item = result["results"][0]
+    setter = planned_setters(item)[property_name]
+    payload, error = write_operations._decode_phase3e_text_basic_confirm_token(
+        setter["confirm_token"]
+    )
+
+    assert error is None
+    assert setter["confirm_token"].startswith("confirm:textBasic:v1:")
+    assert setter["phase3e_text_basic_candidate"] is True
+    assert setter["real_write_enabled"] is False
+    assert setter["real_write_possible"] is True
+    assert setter["requires_confirm_token"] is True
+    assert setter["address"] == f"/workspace/ws-1/cue_id/{cue_id}/{property_name}"
+    assert item["executed_operations"] == []
+    assert payload["operation_kind"] == "video_phase3e_text_basic_write"
+    assert payload["cue_type"] == "Text"
+    assert payload["profile"] == "text_basic"
+    assert payload["property"] == property_name
+    assert payload["requested"] == (
+        float(requested) if property_name == "text/format/fontSize" else requested
+    )
+    assert not any(address.endswith(f"/{property_name}") for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize(
+    ("property_name", "baseline", "requested"),
+    PHASE3E_TEXT_BASIC_CASES,
+)
+def test_phase3e_text_basic_real_write_sets_once_and_verifies(
+    property_name: str,
+    baseline: Any,
+    requested: Any,
+) -> None:
+    client, reader, cue_id, update, token = _phase3e_text_basic_fixture(
+        property_name=property_name,
+        baseline=baseline,
+        requested=requested,
+    )
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    item = result["results"][0]
+    setter = planned_setters(item)[property_name]
+    address = f"/workspace/ws-1/cue_id/{cue_id}/{property_name}"
+    assert result["status"] == "updated"
+    assert item["after"][property_name] == requested
+    assert setter["real_write_enabled"] is True
+    assert setter["real_write_possible"] is True
+    assert setter["requires_confirm_token"] is True
+    assert "planned_only_reason" not in setter
+    assert item["updateq_plan"]["status"] == "updated"
+    assert item["updateq_plan"]["safety"]["will_modify_qlab"] is True
+    assert [request[0] for request in client.requests].count(address) == 1
+    assert not any("/live" in request[0] for request in client.requests)
+
+
+def test_phase3e_text_basic_token_binding_and_structure_rejections() -> None:
+    client, reader, cue_id, update, token = _phase3e_text_basic_fixture()
+    client.cue_numbers["v1"] = cue_id
+    other_id = "22222222-2222-4222-8222-222222222222"
+    client.cues[other_id] = {"type": "Text", "text": "Old text"}
+    cases = [
+        [{**update, "confirm_gates": []}],
+        [{**update, "confirm_gates": ["confirm:textBasic:v1:fake"]}],
+        [{**update, "properties": {"text/format/alignment": "center"}, "confirm_gates": [token]}],
+        [{**update, "cue_ref": other_id, "confirm_gates": [token]}],
+        [{**update, "cue_ref": "v1", "confirm_gates": [token]}],
+        [{**update, "properties": {"text": "New text", "text/format/fontSize": 56}, "confirm_gates": [token]}],
+        [{**update, "confirm_gates": [token]}, {**update, "confirm_gates": [token]}],
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "text_basic",
+                "operations": [{"property": "text", "args": {"value": "New text"}, "mode": "live"}],
+                "confirm_gates": [token],
+            }
+        ],
+    ]
+    for case in cases:
+        result = reader.update_cues("ws-1", case, dry_run=False)
+        assert result["status"] == "preflight_failed"
+        assert all(item["executed_operations"] == [] for item in result["results"])
+    assert not any(address.endswith("/text") for address, _, _ in client.requests)
+
+
+def test_phase3e_text_basic_rejects_wrong_profile_type_and_stale_baseline() -> None:
+    client, reader, cue_id, update, token = _phase3e_text_basic_fixture()
+    wrong_profile = reader.update_cues(
+        "ws-1",
+        [{**update, "profile": "video_basic", "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    client.cues[cue_id]["type"] = "Video"
+    wrong_type = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    client.cues[cue_id].update({"type": "Text", "text": "Changed baseline"})
+    stale = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert wrong_profile["status"] == "preflight_failed"
+    assert wrong_type["status"] == "preflight_failed"
+    assert stale["status"] == "preflight_failed"
+    assert "stale_text_basic_baseline" in stale["results"][0]["errors"]["text"]
+    assert all(
+        item["executed_operations"] == []
+        for result in (wrong_profile, wrong_type, stale)
+        for item in result["results"]
+    )
+
+
+@pytest.mark.parametrize(
+    "cue_state",
+    [
+        {"isBroken": True},
+        {"isWarning": True},
+        {"isRunning": True},
+        {"isPaused": True},
+        {"isAuditioning": True},
+    ],
+)
+def test_phase3e_text_basic_rejects_unhealthy_or_active_cue(
+    cue_state: dict[str, Any],
+) -> None:
+    client, reader, cue_id, update, token = _phase3e_text_basic_fixture()
+    client.cues[cue_id].update(cue_state)
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert not any(address.endswith("/text") for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize(
+    ("property_name", "value"),
+    [
+        ("text", {"rich": "object"}),
+        ("text/format/fontSize", 0),
+        ("text/format/fontSize", 1001),
+        ("text/format/fontSize", math.nan),
+        ("text/format/fontSize", math.inf),
+        ("text/format/alignment", "middle"),
+    ],
+)
+def test_phase3e_text_basic_rejects_invalid_values(
+    property_name: str,
+    value: Any,
+) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    reader = QLabReader(FakeWriteClient(QLabConfig(enable_write=False, passcode=None)))  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "text_basic", "properties": {property_name: value}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+
+
+@pytest.mark.parametrize(
+    ("property_name", "value"),
+    [
+        ("text/format", {"fontSize": 56}),
+        ("text/format/fontName", "Helvetica"),
+        ("text/format/color", {"red": 1, "green": 1, "blue": 1, "alpha": 1}),
+        ("text/format/shadowBlurRadius", 2),
+    ],
+)
+def test_phase3e_rich_text_properties_remain_blocked(
+    property_name: str,
+    value: Any,
+) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Text", "text": "Old text"}},
+    )
+
+    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "text_basic", "properties": {property_name: value}}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["planned_operations"] == []
+    assert result["results"][0]["executed_operations"] == []
+
+
+def test_phase3e_text_basic_timeout_and_rollback_contract() -> None:
+    client, reader, _, update, forward_token = _phase3e_text_basic_fixture(timeout=True)
+    forward = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [forward_token]}],
+        dry_run=False,
+    )
+    rollback_update = {**update, "properties": {"text": "Old text"}}
+    old_token = reader.update_cues(
+        "ws-1",
+        [{**rollback_update, "confirm_gates": [forward_token]}],
+        dry_run=False,
+    )
+    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_token = planned_setters(rollback_plan["results"][0])["text"]["confirm_token"]
+    rollback = reader.update_cues(
+        "ws-1",
+        [{**rollback_update, "confirm_gates": [rollback_token]}],
+        dry_run=False,
+    )
+
+    assert forward["status"] == "updated"
+    assert "setter_timeout_but_readback_matched" in forward["results"][0]["warnings"]
+    assert old_token["status"] == "preflight_failed"
+    assert rollback["status"] == "updated"
+    assert rollback["results"][0]["after"]["text"] == "Old text"
+
+
+def test_phase3e_text_basic_timeout_mismatch_is_uncertain_no_retry() -> None:
+    client, reader, _, update, token = _phase3e_text_basic_fixture(
+        timeout=True,
+        timeout_without_apply=True,
+    )
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "partial_failed"
+    assert len([address for address, _, _ in client.requests if address.endswith("/text")]) == 1
+
+
+@pytest.mark.parametrize("profile,cue_type", [("video_basic", "Video"), ("camera_basic", "Camera")])
+def test_phase3e_text_properties_not_enabled_for_video_or_camera(
+    profile: str,
+    cue_type: str,
+) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": cue_type}},
+    )
+
+    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": profile, "properties": {"text": "Blocked"}}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+
+
 def test_video_phase2_wrong_cue_type_failure_has_no_token() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = FakeWriteClient(
@@ -5807,7 +6134,11 @@ def test_update_cue_operations_support_video_text_and_midi_dry_run_shapes() -> N
     text_client = FakeWriteClient(
         QLabConfig(enable_write=False, passcode=None),
         existing_cue_id=cue_id,
-        cue_values={"uniqueID": cue_id, "type": "Text"},
+        cue_values={
+            "uniqueID": cue_id,
+            "type": "Text",
+            "text/format/alignment": "left",
+        },
     )
     text = QLabReader(text_client)  # type: ignore[arg-type]
     text_result = text.update_cue(

@@ -41,6 +41,7 @@ Documents that still guide current implementation work.
 - `current/workorders/003_plan_phase3b_translation.md`
 - `current/workorders/004_implement_phase3c_visual_scalars.md`
 - `current/workorders/005_implement_phase3d_visual_appearance.md`
+- `current/workorders/006_implement_phase3e_text_basics.md`
 - `current/video_phase3a_opacity_real_write_plan.md`
 - `current/video_phase2c_gate_test_vectors.md`
 - `current/qlab_update_cues_runtime_checklist.md`

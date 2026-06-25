@@ -917,7 +917,7 @@ TEXT_SAFE_PROPERTIES = (
     _planned_prop("fixedWidth", "non_negative_number", reason="video_phase2_dry_run_only"),
     _planned_prop("text/format/alignment", "text_alignment", reason="video_phase2_dry_run_only"),
     _planned_prop("text/format/fontName", "non_empty_string", reason="video_phase2_dry_run_only"),
-    _planned_prop("text/format/fontSize", "positive_number", reason="video_phase2_dry_run_only"),
+    _planned_prop("text/format/fontSize", "text_font_size", reason="video_phase2_dry_run_only"),
 )
 
 CAMERA_CATALOG_PROPERTIES = (
@@ -1173,7 +1173,7 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
         (*COMMON_PROPERTIES, *TEXT_SAFE_PROPERTIES, *VIDEO_PHASE2_VISUAL_PROPERTIES, *TEXT_CATALOG_PROPERTIES),
         "medium",
         True,
-        "Text opacity, translation, and visual scalars use specialized confirmation gates; text and formatting properties stay dry-run only.",
+        "Text visual properties and basic text content, font size, and alignment use specialized confirmation gates; rich formatting stays dry-run only.",
     ),
     "light_basic": UpdateProfileSpec("light_basic", ("Light",), (*COMMON_PROPERTIES, *LIGHT_CATALOG_PROPERTIES), "high", True, "Light profile; lightCommandText and saved behavior flags use specialized confirmation gates."),
     "fade_basic": UpdateProfileSpec("fade_basic", ("Fade",), (*COMMON_PROPERTIES, *FADE_CATALOG_PROPERTIES), "high", True, "Fade profile; fade targets remain dry-run only."),
@@ -1743,6 +1743,11 @@ def _validate_value(validator: str, value: Any) -> Any:
         number = _number(value, "value must be a positive number")
         if number <= 0:
             raise UnsafeWriteOperationError("value must be a positive number")
+        return number
+    if validator == "text_font_size":
+        number = _number(value, "value must be a finite number greater than 0 and at most 1000")
+        if not math.isfinite(float(number)) or number <= 0 or number > 1000:
+            raise UnsafeWriteOperationError("value must be a finite number greater than 0 and at most 1000")
         return number
     if validator == "int":
         return _int(value, "value must be an integer")

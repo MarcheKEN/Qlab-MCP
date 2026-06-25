@@ -6,7 +6,7 @@ from qlab_mcp.cues.coverage import extract_readable_cue_osc_inventory, read_allo
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DICTIONARY_PATH = PROJECT_ROOT / "references" / "qlab" / "qlab_osc_dictionary.md"
+DICTIONARY_PATH = PROJECT_ROOT / "docs" / "references" / "qlab_osc_dictionary.md"
 
 
 def test_read_allowlist_coverage_snapshot_matches_qlab_dictionary() -> None:

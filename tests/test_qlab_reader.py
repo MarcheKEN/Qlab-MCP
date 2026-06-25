@@ -2190,7 +2190,7 @@ class QLabReaderTests(unittest.TestCase):
     def test_workspace_settings_safe_reads_selected_sections_and_redacts_destinations(self) -> None:
         responses = {
             "/workspace/ws-1/settings/video/inputPatchList": [
-                {"name": "Camera 1", "uniqueID": "input-1", "deviceName": "ATEM"}
+                {"name": "Camera 1", "uniqueID": "input-1", "deviceName": "ATEM", "source": "HDMI"}
             ],
             "/workspace/ws-1/settings/video/routes": [
                 {
@@ -2231,6 +2231,9 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(set(result["sections"]), {"video", "network"})
         self.assertEqual(result["summary"]["video_route_count"], 1)
         self.assertEqual(result["summary"]["video_stage_count"], 1)
+        self.assertEqual(result["sections"]["video"]["input_patches"][0]["uniqueID"], "input-1")
+        self.assertTrue(result["sections"]["video"]["input_patches"][0]["device_present"])
+        self.assertTrue(result["sections"]["video"]["input_patches"][0]["source_present"])
         self.assertEqual(result["summary"]["network_patch_count"], 1)
         self.assertTrue(result["sections"]["video"]["routes"][0]["destination_present"])
         self.assertFalse(result["sections"]["video"]["routes"][0]["connected"])
@@ -4093,6 +4096,9 @@ class QLabReaderTests(unittest.TestCase):
                 "stage/regions": [{"id": "large"}],
                 "stageName": "Main",
                 "stage/size": [1920, 1080],
+                "cueSize": [1280, 720],
+                "cueSize/width": 1280,
+                "cueSize/height": 720,
                 "anchor/x": 0.5,
                 "anchor/y": 0.5,
                 "translation/x": 10,
@@ -4117,6 +4123,8 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["properties"]["cropTop"], 10)
         self.assertEqual(result["properties"]["translation/x"], 10)
         self.assertEqual(result["properties"]["scale/y"], 0.9)
+        self.assertEqual(result["properties"]["cueSize/width"], 1280)
+        self.assertEqual(result["sections"]["type_specific"]["cueSize/height"], 720)
         self.assertEqual(result["sections"]["identity"]["type"], "Video")
         self.assertNotIn("notes", result["properties"])
         self.assertNotIn("fileTarget", result["properties"])
@@ -4663,6 +4671,329 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["properties"]["text/format/shadowOffset/width"], 2)
         self.assertEqual(result["properties"]["text/outputSize/height"], 120)
         self.assertEqual(result["properties"]["cueSize"], [320, 120])
+
+    def test_inspector_safe_text_includes_scalar_output_and_cue_sizes(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "type": "Text",
+                "cueSize": [640, 360],
+                "cueSize/width": 640,
+                "cueSize/height": 360,
+                "text/outputSize": [320, 120],
+                "text/outputSize/width": 320,
+                "text/outputSize/height": 120,
+                "stage/regions": [{"uniqueID": "heavy-region"}],
+            }
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+            result = reader.get_cue_details("ws-1", "10", "inspector_safe")
+
+        assert result["properties"]["cueSize/width"] == 640
+        assert result["properties"]["text/outputSize/height"] == 120
+        assert result["sections"]["type_specific"]["text/outputSize/width"] == 320
+        assert "stage/regions" not in result["properties"]
+
+    def test_inspector_safe_video_summary_links_stage_routes_devices_and_fx(self) -> None:
+        route_a = {
+            "name": "Output A",
+            "uniqueID": "route-a",
+            "connected": True,
+            "destinationInfo": {"name": "Projector", "destinationType": "Display"},
+        }
+        route_b = {
+            "name": "Output B",
+            "uniqueID": "route-b",
+            "connected": False,
+            "destinationInfo": {"name": "NDI", "destinationType": "NDI"},
+        }
+        regions = [
+            {
+                "name": "A",
+                "uniqueID": "region-a",
+                "boundsOnStage": {"x": 0, "y": 0, "width": 960, "height": 1080},
+                "meshWidth": 2,
+                "meshHeight": 2,
+                "warpType": 3,
+                "autoEdgeBlends": True,
+                "edgeBlendPower": 2,
+                "controlPoints": [{"x": 0, "y": 0}],
+                "shadowControlPoints": [{"x": 1, "y": 1}],
+                "meshSubregions": [{"raw": "mesh"}],
+                "route": route_a,
+            },
+            {"name": "B", "uniqueID": "region-b", "route": route_b},
+        ]
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "number": "10",
+                "name": "Projection",
+                "type": "Video",
+                "isBroken": False,
+                "isWarning": False,
+                "hasFileTargets": True,
+                "stageName": "Main",
+                "stageID": "stage-1",
+                "stageNumber": 1,
+                "stage/size": {"width": 1920, "height": 1080},
+                "opacity": 0.8,
+                "translation": {"x": 10, "y": 20},
+                "scale": {"x": 1.5, "y": 1.5},
+                "videoEffects": [{"name": "Blur", "inputRadius": 5}],
+                "stage": {"regions": [{"controlPoints": [1, 2, 3, 4]}]},
+                "stage/regions": [{"controlPoints": [1, 2, 3, 4]}],
+            },
+            "/workspace/ws-1/settings/video/inputPatchList": [],
+            "/workspace/ws-1/settings/video/routes": [route_a, route_b],
+            "/workspace/ws-1/settings/video/stages": [
+                {"name": "Main", "uniqueID": "stage-1", "width": 1920, "height": 1080, "regions": regions}
+            ],
+            "/workspace/ws-1/settings/video/stageID/stage-1/regions": regions,
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+            result = reader.get_cue_details("ws-1", "10", "inspector_safe")
+
+        summary = result["sections"]["video_summary"]
+        self.assertEqual(summary["cue"]["uniqueID"], "cue-id")
+        self.assertEqual(summary["stage"]["region_count"], 2)
+        self.assertTrue(summary["stage"]["multi_output"])
+        self.assertEqual(
+            summary["stage"]["regions"][0],
+            {
+                "name": "A",
+                "uniqueID": "region-a",
+                "index": 0,
+                "route": {
+                    "name": "Output A",
+                    "uniqueID": "route-a",
+                    "connected": True,
+                    "destination_present": True,
+                    "device": {"name": "Projector", "type": "Display", "present": True},
+                },
+            },
+        )
+        serialized_regions = json.dumps(summary["stage"]["regions"])
+        for forbidden in (
+            "bounds",
+            "boundsOnStage",
+            "meshWidth",
+            "meshHeight",
+            "warpType",
+            "edgeBlend",
+            "controlPoint",
+            "meshSubregion",
+            "destinationInfo",
+        ):
+            self.assertNotIn(forbidden, serialized_regions)
+        self.assertEqual(summary["video_fx"]["effect_count"], 1)
+        self.assertEqual(summary["video_fx"]["effects"][0]["name"], "Blur")
+        self.assertIn({"code": "disconnected_route"}, summary["problems"])
+        self.assertNotIn("stage", result["properties"])
+        self.assertNotIn("stage/regions", result["properties"])
+        self.assertEqual(server.received.count("/workspace/ws-1/settings/video/stages"), 1)
+
+    def test_technical_and_exhaustive_preserve_raw_video_regions(self) -> None:
+        raw_region = {
+            "name": "A",
+            "uniqueID": "region-a",
+            "boundsOnStage": {"x": 0, "y": 0, "width": 1920, "height": 1080},
+            "meshWidth": 2,
+            "meshHeight": 2,
+            "warpType": 3,
+            "controlPoints": [{"x": 0, "y": 0}],
+            "route": {
+                "name": "Output A",
+                "uniqueID": "route-a",
+                "destinationInfo": {"name": "Projector", "destinationType": "Display"},
+            },
+        }
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "type": "Video",
+                "stage": {"uniqueID": "stage-1", "regions": [raw_region]},
+                "stage/regions": [raw_region],
+            }
+        }
+        for profile in ("technical", "exhaustive"):
+            with self.subTest(profile=profile):
+                with FakeQlabOscServer(responses) as server:
+                    reader = QLabReader(client_for(server))
+                    result = reader.get_cue_details("ws-1", "10", profile)
+
+                region = result["properties"]["stage/regions"][0]
+                self.assertEqual(region["warpType"], 3)
+                self.assertEqual(region["controlPoints"], [{"x": 0, "y": 0}])
+                self.assertEqual(region["route"]["destinationInfo"]["name"], "Projector")
+
+    def test_inspector_safe_camera_input_matching_and_deprecated_fallback(self) -> None:
+        patches = [
+            {"name": "Descriptive Camera", "uniqueID": "patch-1"},
+            {"name": "Disconnected Camera", "uniqueID": "patch-2", "source_present": False},
+        ]
+        cases = [
+            ({"videoInputPatchID": "patch-1", "videoInputPatchNumber": 2}, "valid", "id"),
+            ({"videoInputPatchID": "", "videoInputPatchNumber": 1}, "valid", "number"),
+            ({"videoInputPatchID": "missing", "videoInputPatchNumber": 1}, "invalid_reference", "id"),
+            ({"videoInputPatchID": "", "videoInputPatchNumber": 99}, "invalid_reference", "number"),
+            ({"cameraPatch": 1}, "deprecated_reference", "cameraPatch"),
+            ({"videoInputPatchID": "patch-2"}, "disconnected", "id"),
+        ]
+        for index, (patch_values, status, method) in enumerate(cases, start=1):
+            with self.subTest(status=status, method=method):
+                cue_path = f"/workspace/ws-1/cue/{index}/valuesForKeys"
+                responses = {
+                    cue_path: {
+                        "uniqueID": f"camera-{index}",
+                        "number": str(index),
+                        "type": "Camera",
+                        "isBroken": False,
+                        "isWarning": False,
+                        "stageID": "stage-1",
+                        **patch_values,
+                    },
+                    "/workspace/ws-1/settings/video/inputPatchList": patches,
+                    "/workspace/ws-1/settings/video/routes": [],
+                    "/workspace/ws-1/settings/video/stages": [],
+                }
+                with FakeQlabOscServer(responses) as server:
+                    reader = QLabReader(client_for(server))
+                    result = reader.get_cue_details("ws-1", str(index), "inspector_safe")
+
+                camera = result["sections"]["video_summary"]["camera_input"]
+                self.assertEqual(camera["status"], status)
+                self.assertEqual(camera["match_method"], method)
+
+    def test_inspector_safe_video_settings_failure_is_auxiliary(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "camera-id",
+                "number": "10",
+                "type": "Camera",
+                "isBroken": False,
+                "isWarning": False,
+                "videoInputPatchID": "patch-1",
+                "stageID": "stage-1",
+            }
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+            result = reader.get_cue_details("ws-1", "10", "inspector_safe")
+
+        summary = result["sections"]["video_summary"]
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(summary["topology_status"], "unavailable")
+        self.assertEqual(summary["camera_input"]["status"], "unknown")
+        self.assertFalse(summary["camera_input"]["validation_available"])
+        self.assertEqual(summary["camera_input"]["reason"], "input_patch_list_unavailable")
+
+    def test_inspector_safe_non_video_batch_does_not_read_video_settings(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/1/valuesForKeys": {"uniqueID": "audio-1", "type": "Audio", "name": "Audio"},
+            "/workspace/ws-1/cue/2/valuesForKeys": {"uniqueID": "memo-2", "type": "Memo", "name": "Memo"},
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+            result = reader.get_cue_details("ws-1", ["1", "2"], "inspector_safe")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(all("video_summary" not in item["sections"] for item in result["results"]))
+        self.assertFalse(any("/settings/video/" in address for address in server.received))
+
+    def test_inspector_safe_visual_batch_reads_video_settings_once(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/1/valuesForKeys": {"uniqueID": "video-1", "type": "Video"},
+            "/workspace/ws-1/cue/2/valuesForKeys": {"uniqueID": "text-2", "type": "Text"},
+            "/workspace/ws-1/settings/video/inputPatchList": [],
+            "/workspace/ws-1/settings/video/routes": [],
+            "/workspace/ws-1/settings/video/stages": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+            result = reader.get_cue_details("ws-1", ["1", "2"], "inspector_safe")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(all("video_summary" in item["sections"] for item in result["results"]))
+        self.assertEqual(server.received.count("/workspace/ws-1/settings/video/inputPatchList"), 1)
+        self.assertEqual(server.received.count("/workspace/ws-1/settings/video/routes"), 1)
+        self.assertEqual(server.received.count("/workspace/ws-1/settings/video/stages"), 1)
+
+    def test_text_and_camera_without_file_targets_do_not_report_file_problem(self) -> None:
+        for cue_type in ("Text", "Camera"):
+            with self.subTest(cue_type=cue_type):
+                responses = {
+                    "/workspace/ws-1/cue/10/valuesForKeys": {
+                        "uniqueID": "cue-id",
+                        "type": cue_type,
+                        "isBroken": False,
+                        "isWarning": False,
+                        "hasFileTargets": False,
+                        "stageID": "stage-1",
+                    },
+                    "/workspace/ws-1/settings/video/inputPatchList": [],
+                    "/workspace/ws-1/settings/video/routes": [],
+                    "/workspace/ws-1/settings/video/stages": [],
+                }
+                with FakeQlabOscServer(responses) as server:
+                    reader = QLabReader(client_for(server))
+                    result = reader.get_cue_details("ws-1", "10", "inspector_safe")
+
+                codes = {problem["code"] for problem in result["sections"]["video_summary"]["problems"]}
+                self.assertFalse(any(code.startswith("video_file_target_") for code in codes))
+
+    def test_video_without_file_target_reports_problem(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "video-id",
+                "type": "Video",
+                "isBroken": True,
+                "isWarning": False,
+                "hasFileTargets": False,
+                "stageID": "stage-1",
+            },
+            "/workspace/ws-1/settings/video/inputPatchList": [],
+            "/workspace/ws-1/settings/video/routes": [],
+            "/workspace/ws-1/settings/video/stages": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+            result = reader.get_cue_details("ws-1", "10", "inspector_safe")
+
+        codes = {problem["code"] for problem in result["sections"]["video_summary"]["problems"]}
+        self.assertIn("visual_cue_broken", codes)
+        self.assertIn("video_file_target_missing", codes)
+
+    def test_video_stage_reusing_one_route_is_not_multi_output(self) -> None:
+        route = {
+            "name": "Output A",
+            "uniqueID": "route-a",
+            "connected": True,
+            "destinationInfo": {"name": "Projector", "destinationType": "Display"},
+        }
+        regions = [
+            {"name": "A", "uniqueID": "region-a", "route": route},
+            {"name": "B", "uniqueID": "region-b", "route": route},
+        ]
+        responses = {
+            "/workspace/ws-1/settings/video/inputPatchList": [],
+            "/workspace/ws-1/settings/video/routes": [route],
+            "/workspace/ws-1/settings/video/stages": [
+                {"name": "Main", "uniqueID": "stage-1", "width": 1920, "height": 1080, "regions": regions}
+            ],
+            "/workspace/ws-1/settings/video/stageID/stage-1/regions": regions,
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+            result = reader.get_workspace_settings("ws-1", sections=["video"], profile="safe")
+
+        stage = result["sections"]["video"]["stages"][0]
+        self.assertEqual(stage["region_count"], 2)
+        self.assertFalse(stage["multi_output"])
+        self.assertFalse(any(problem["code"] == "multi_output_stage" for problem in result["sections"]["video"]["problems"]))
 
     def test_exhaustive_audio_details_include_playback_maps_and_patch_fields(self) -> None:
         responses = {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass, replace
 from string import Formatter
 from typing import Any
@@ -774,26 +775,25 @@ VIDEO_CATALOG_PROPERTIES = (
     _planned_prop("fillStage", "boolean", reason="video_framing_changes_need_visual_validation"),
     _planned_prop("fillStyle", "video_fill_style", reason="video_framing_changes_need_visual_validation"),
     _planned_prop("holdLastFrame", "boolean", reason="video_playback_visual_state_needs_validation"),
-    _planned_prop("preserveAspectRatio", "boolean", reason="video_framing_changes_need_visual_validation"),
+    _planned_prop("preserveAspectRatio", "boolean", reason="video_appearance_requires_confirm_token"),
     _planned_prop("smooth", "boolean", reason="video_rendering_changes_need_visual_validation"),
     _op("anchor", (("x", "number"), ("y", "number")), modes=("saved", "live"), planned_only_reason="geometry_changes_need_visual_validation"),
-    _prop("anchor/x", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("anchor/y", "number", risk_tier="medium", real_write_enabled=True),
+    _planned_prop("anchor/x", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("anchor/y", "number", reason="video_phase2_dry_run_only"),
     _op("translation", (("x", "number"), ("y", "number")), modes=("saved", "live"), planned_only_reason="geometry_changes_need_visual_validation"),
-    _prop("translation/x", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("translation/y", "number", risk_tier="medium", real_write_enabled=True),
+    _planned_prop("translation/x", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("translation/y", "number", reason="video_phase2_dry_run_only"),
     _op("scale", (("x", "number"), ("y", "number")), modes=("saved", "live"), planned_only_reason="geometry_changes_need_visual_validation"),
-    _prop("scale/x", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("scale/y", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("rotation", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("opacity", "opacity", risk_tier="medium", real_write_enabled=True),
+    _planned_prop("scale/x", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("scale/y", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("opacity", "opacity", reason="video_phase2_dry_run_only"),
     _op("crop", (("top", "number"), ("bottom", "number"), ("left", "number"), ("right", "number")), modes=("saved", "live"), planned_only_reason="geometry_changes_need_visual_validation"),
-    _prop("cropTop", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("cropBottom", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("cropLeft", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("cropRight", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("blendMode", "video_blend_mode", risk_tier="medium", real_write_enabled=True),
-    _prop("clockType", "video_clock_type", risk_tier="medium", real_write_enabled=True),
+    _planned_prop("cropTop", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("cropBottom", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("cropLeft", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("cropRight", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("blendMode", "video_blend_mode", reason="video_appearance_requires_confirm_token"),
+    _planned_prop("clockType", "video_clock_type", reason="video_phase2_dry_run_only"),
     _op("origin", (("x", "number"), ("y", "number")), modes=("saved", "live"), planned_only_reason="geometry_changes_need_visual_validation"),
     _planned_prop("origin/x", "number", modes=("saved", "live"), reason="geometry_changes_need_visual_validation"),
     _planned_prop("origin/y", "number", modes=("saved", "live"), reason="geometry_changes_need_visual_validation"),
@@ -886,12 +886,38 @@ VIDEO_CATALOG_PROPERTIES = (
     ),
 )
 
+VIDEO_PHASE2_VISUAL_PROPERTY_NAMES = frozenset(
+    {
+        "anchor/x",
+        "anchor/y",
+        "blendMode",
+        "clockType",
+        "cropBottom",
+        "cropLeft",
+        "cropRight",
+        "cropTop",
+        "opacity",
+        "preserveAspectRatio",
+        "scale/x",
+        "scale/y",
+        "translation/x",
+        "translation/y",
+    }
+)
+VIDEO_PHASE2_TEXT_PROPERTY_NAMES = frozenset(
+    {"fixedWidth", "text", "text/format/alignment", "text/format/fontName", "text/format/fontSize"}
+)
+VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES = VIDEO_PHASE2_VISUAL_PROPERTY_NAMES | VIDEO_PHASE2_TEXT_PROPERTY_NAMES
+VIDEO_PHASE2_VISUAL_PROPERTIES = tuple(
+    prop for prop in VIDEO_CATALOG_PROPERTIES if prop.name in VIDEO_PHASE2_VISUAL_PROPERTY_NAMES
+)
+
 TEXT_SAFE_PROPERTIES = (
-    _prop("text", "string", real_write_enabled=True),
-    _prop("fixedWidth", "non_negative_number", real_write_enabled=True),
-    _prop("text/format/alignment", "text_alignment", real_write_enabled=True),
-    _prop("text/format/fontName", "non_empty_string", real_write_enabled=True),
-    _prop("text/format/fontSize", "positive_number", real_write_enabled=True),
+    _planned_prop("text", "string", reason="video_phase2_text_format_inheritance_risk"),
+    _planned_prop("fixedWidth", "non_negative_number", reason="video_phase2_dry_run_only"),
+    _planned_prop("text/format/alignment", "text_alignment", reason="video_phase2_dry_run_only"),
+    _planned_prop("text/format/fontName", "non_empty_string", reason="video_phase2_dry_run_only"),
+    _planned_prop("text/format/fontSize", "positive_number", reason="video_phase2_dry_run_only"),
 )
 
 CAMERA_CATALOG_PROPERTIES = (
@@ -1139,15 +1165,15 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
         "Audio profile; only transport metadata is real-write enabled.",
     ),
     "mic_basic": UpdateProfileSpec("mic_basic", ("Mic",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES), "medium", True, "Mic profile with safe channel metadata writes."),
-    "video_basic": UpdateProfileSpec("video_basic", ("Video",), (*COMMON_PROPERTIES, *VIDEO_CATALOG_PROPERTIES), "medium", True, "Video profile with one-argument geometry writes."),
-    "camera_basic": UpdateProfileSpec("camera_basic", ("Camera",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES, *VIDEO_CATALOG_PROPERTIES, *CAMERA_CATALOG_PROPERTIES), "medium", True, "Camera profile with safe channel and geometry writes."),
+    "video_basic": UpdateProfileSpec("video_basic", ("Video",), (*COMMON_PROPERTIES, *VIDEO_CATALOG_PROPERTIES), "medium", True, "Video opacity, translation, and visual scalars use specialized confirmation gates; remaining visual properties stay dry-run only."),
+    "camera_basic": UpdateProfileSpec("camera_basic", ("Camera",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES, *VIDEO_CATALOG_PROPERTIES, *CAMERA_CATALOG_PROPERTIES), "medium", True, "Camera opacity, translation, and visual scalars use specialized confirmation gates; remaining visual properties stay dry-run only."),
     TEXT_BASIC_UPDATE_PROFILE: UpdateProfileSpec(
         TEXT_BASIC_UPDATE_PROFILE,
         ("Text",),
-        (*COMMON_PROPERTIES, *TEXT_SAFE_PROPERTIES, *TEXT_CATALOG_PROPERTIES),
+        (*COMMON_PROPERTIES, *TEXT_SAFE_PROPERTIES, *VIDEO_PHASE2_VISUAL_PROPERTIES, *TEXT_CATALOG_PROPERTIES),
         "medium",
         True,
-        "Text profile; only simple text formatting is real-write enabled.",
+        "Text opacity, translation, and visual scalars use specialized confirmation gates; text and formatting properties stay dry-run only.",
     ),
     "light_basic": UpdateProfileSpec("light_basic", ("Light",), (*COMMON_PROPERTIES, *LIGHT_CATALOG_PROPERTIES), "high", True, "Light profile; lightCommandText and saved behavior flags use specialized confirmation gates."),
     "fade_basic": UpdateProfileSpec("fade_basic", ("Fade",), (*COMMON_PROPERTIES, *FADE_CATALOG_PROPERTIES), "high", True, "Fade profile; fade targets remain dry-run only."),
@@ -1575,6 +1601,9 @@ def _normalize_one_operation(
 ) -> dict[str, Any]:
     spec = _property_spec(profile, property_name)
     normalized_mode = _validate_mode(spec, mode)
+    video_phase2_profiles = {"video_basic", "camera_basic", "text_basic"}
+    if normalized_mode == "live" and profile in video_phase2_profiles:
+        raise UnsafeWriteOperationError("Video-family editing blocks live mode; use saved mode for dry-run planning")
     normalized_args = _normalize_args(spec, raw_args, source=source)
     path = _render_path(spec, normalized_args)
     if normalized_mode == "live":
@@ -1595,7 +1624,23 @@ def _normalize_one_operation(
         "readback": spec.readback,
         "contextual_requirements": list(spec.contextual_requirements),
     }
-    if not spec.real_write_enabled:
+    if profile in video_phase2_profiles and spec.name in VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES:
+        operation.update(
+            {
+                "real_write_possible": False,
+                "requires_confirm_token": False,
+                "future_gate_requirements": [
+                    "future_versioned_confirm_token",
+                    "single_cue_single_property",
+                    "saved_mode",
+                    "fresh_baseline",
+                    "exact_readback",
+                    "manual_rollback_plan",
+                    *(["verify_first_character_inherited_format"] if spec.name == "text" else []),
+                ],
+            }
+        )
+    elif not spec.real_write_enabled:
         operation["confirm_token"] = _confirm_token(profile, spec.name, path, normalized_mode, osc_args)
     return operation
 
@@ -1723,7 +1768,7 @@ def _validate_value(validator: str, value: Any) -> Any:
         return number
     if validator == "opacity":
         number = _number(value, "opacity must be a number from 0 to 1")
-        if number < 0 or number > 1:
+        if not math.isfinite(float(number)) or number < 0 or number > 1:
             raise UnsafeWriteOperationError("opacity must be a number from 0 to 1")
         return number
     if validator == "video_layer":

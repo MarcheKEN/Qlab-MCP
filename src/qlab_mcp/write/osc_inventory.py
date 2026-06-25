@@ -102,6 +102,12 @@ def extract_cue_osc_inventory(dictionary_text: str) -> list[dict[str, Any]]:
                 route_group.append(_route_only(lines[group_index]))
                 group_index += 1
             access_row = _access_row(lines, group_index, end)
+            metadata = _access_metadata(access_row)
+            block_end = _next_route_index(lines, group_index, end, "/cue/{cue_number}")
+            deprecated = _block_contains(lines, group_index, block_end, "deprecated")
+            increment_decrement = metadata["increment_decrement"] or _block_contains(
+                lines, group_index, block_end, "increment/decrement"
+            )
             writable = "read/write" in access_row
             action = any(_is_mutating_action(_suffix(route)) for route in route_group)
             if writable or action:
@@ -118,12 +124,63 @@ def extract_cue_osc_inventory(dictionary_text: str) -> list[dict[str, Any]]:
                             "normalized_property": normalize_registry_key(suffix),
                             "args": _arg_names(lines[line_index]),
                             "access": access_row,
+                            "read": metadata["read"],
+                            "write": metadata["write"],
+                            "increment_decrement": increment_decrement,
+                            "deprecated": deprecated,
                             "kind": "action" if action and not writable else "property",
                             "line": line_index + 1,
                             "live": any(candidate.endswith("/live") for candidate in route_group),
                         }
                     )
             line_index = group_index
+    return entries
+
+
+def extract_workspace_video_osc_inventory(dictionary_text: str) -> list[dict[str, Any]]:
+    """Return Workspace Settings → Video routes with normalized access metadata."""
+    lines = dictionary_text.splitlines()
+    entries: list[dict[str, Any]] = []
+    index = 0
+    prefix = "/settings/video/"
+    while index < len(lines):
+        if not lines[index].startswith(prefix):
+            index += 1
+            continue
+        routes: list[str] = []
+        route_index = index
+        while route_index < len(lines) and lines[route_index].startswith(prefix):
+            routes.append(_route_only(lines[route_index]))
+            route_index += 1
+        access_row = _access_row(lines, route_index, len(lines))
+        metadata = _access_metadata(access_row)
+        block_end = _next_route_index(lines, route_index, len(lines), prefix)
+        deprecated = _block_contains(lines, route_index, block_end, "deprecated")
+        increment_decrement = metadata["increment_decrement"] or _block_contains(
+            lines, route_index, block_end, "increment/decrement"
+        )
+        for route in routes:
+            property_name = route.removeprefix(prefix)
+            action = property_name in {"undo", "redo"} or property_name.endswith("/resetControlPoints")
+            entries.append(
+                {
+                    "section": "Workspace Video",
+                    "route": route,
+                    "property": property_name,
+                    "args": _arg_names(lines[index]),
+                    "access": access_row,
+                    "read": metadata["read"],
+                    "write": metadata["write"] or action,
+                    "live": route.endswith("/live"),
+                    "increment_decrement": increment_decrement,
+                    "deprecated": deprecated,
+                    "kind": "action" if action else "property",
+                    "line": index + 1,
+                    "mcp_status": "read_only" if metadata["read"] and not (metadata["write"] or action) else "blocked",
+                    "risk": "low" if metadata["read"] and not (metadata["write"] or action) else "high",
+                }
+            )
+        index = route_index
     return entries
 
 
@@ -187,6 +244,27 @@ def _access_row(lines: list[str], start: int, end: int) -> str:
         if index < end:
             return lines[index].strip()
     return ""
+
+
+def _access_metadata(access_row: str) -> dict[str, bool]:
+    columns = access_row.split("\t")
+    return {
+        "read": any(column.strip().startswith("read") for column in columns[:3]),
+        "write": len(columns) > 1 and "write" in columns[1],
+        "increment_decrement": len(columns) > 4 and bool(columns[4].strip()),
+    }
+
+
+def _next_route_index(lines: list[str], start: int, end: int, prefix: str) -> int:
+    index = start
+    while index < end and not lines[index].startswith(prefix):
+        index += 1
+    return index
+
+
+def _block_contains(lines: list[str], start: int, end: int, needle: str) -> bool:
+    normalized = needle.casefold()
+    return any(normalized in line.casefold() for line in lines[start:end])
 
 
 def _arg_names(line: str) -> list[str]:

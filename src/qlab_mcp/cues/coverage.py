@@ -39,7 +39,7 @@ RUNTIME_READ_PREFIXES = (
 
 
 def default_qlab_dictionary_path() -> Path:
-    return Path(__file__).resolve().parents[3] / "references" / "qlab" / "qlab_osc_dictionary.md"
+    return Path(__file__).resolve().parents[3] / "docs" / "references" / "qlab_osc_dictionary.md"
 
 
 def extract_readable_cue_osc_inventory(dictionary_text: str) -> list[dict[str, Any]]:

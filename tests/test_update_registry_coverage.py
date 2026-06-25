@@ -2,12 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from qlab_mcp.write.osc_inventory import coverage_summary, extract_cue_osc_inventory, registry_coverage
+from qlab_mcp.write.osc_inventory import (
+    coverage_summary,
+    extract_cue_osc_inventory,
+    extract_workspace_video_osc_inventory,
+    registry_coverage,
+)
 from qlab_mcp.write.registry import profile_catalog
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DICTIONARY_PATH = PROJECT_ROOT / "references" / "qlab" / "qlab_osc_dictionary.md"
+DICTIONARY_PATH = PROJECT_ROOT / "docs" / "references" / "qlab_osc_dictionary.md"
 
 
 def test_update_registry_has_specs_for_all_mutating_cue_osc_routes() -> None:
@@ -21,9 +26,9 @@ def test_update_registry_has_specs_for_all_mutating_cue_osc_routes() -> None:
         "Group/List/Cart": {"real_write": 7, "planned_only": 6},
         "Audio": {"gated": 65, "real_write": 6},
         "Mic": {"gated": 4, "real_write": 3},
-        "Video": {"gated": 66, "real_write": 13},
+        "Video": {"gated": 79},
         "Camera": {"gated": 4, "real_write": 2},
-        "Text": {"real_write": 5, "gated": 14},
+        "Text": {"gated": 19},
         "Light": {"gated": 11},
         "Fade": {"gated": 25},
         "Network": {"gated": 20},
@@ -39,7 +44,7 @@ def test_update_registry_has_specs_for_all_mutating_cue_osc_routes() -> None:
 def test_updateq_coverage_snapshot_doc_matches_summary() -> None:
     inventory = extract_cue_osc_inventory(DICTIONARY_PATH.read_text())
     summary = coverage_summary(registry_coverage(inventory, profile_catalog()))
-    snapshot = (PROJECT_ROOT / "docs" / "updateq_osc_coverage_snapshot.md").read_text()
+    snapshot = (PROJECT_ROOT / "docs" / "current" / "updateq_osc_coverage_snapshot.md").read_text()
 
     for section, counts in summary.items():
         expected_row = (
@@ -69,3 +74,36 @@ def test_update_registry_marks_script_source_as_not_editable_by_osc() -> None:
     assert not any(entry["property"] == "scriptSource" for entry in inventory)
     assert catalog["script_basic"]["properties"]["scriptSource"]["planned_only_reason"] == "not_editable_by_osc"
     assert catalog["script_basic"]["properties"]["compileSource"]["capability_gate"] == "script_compile"
+
+
+def test_video_phase1_inventory_tracks_live_increment_and_deprecation() -> None:
+    inventory = extract_cue_osc_inventory(DICTIONARY_PATH.read_text())
+    by_property = {(entry["section"], entry["property"]): entry for entry in inventory}
+
+    assert by_property[("Video", "opacity")]["live"] is True
+    assert by_property[("Video", "opacity")]["read"] is True
+    assert by_property[("Video", "opacity")]["write"] is True
+    assert by_property[("Text", "text/format/fontSize")]["increment_decrement"] is True
+    assert by_property[("Camera", "cameraPatch")]["deprecated"] is True
+
+
+def test_workspace_video_inventory_is_explicitly_read_only_or_blocked() -> None:
+    inventory = extract_workspace_video_osc_inventory(DICTIONARY_PATH.read_text())
+    by_property = {entry["property"]: entry for entry in inventory}
+
+    assert len(inventory) == 118
+    assert by_property["inputPatchList"]["mcp_status"] == "read_only"
+    assert by_property["routes"]["mcp_status"] == "read_only"
+    assert by_property["stage/{current_name}/name"]["mcp_status"] == "blocked"
+    assert by_property["undo"]["kind"] == "action"
+    assert by_property["undo"]["mcp_status"] == "blocked"
+
+
+def test_video_phase1_matrix_documents_required_columns_and_blocked_families() -> None:
+    matrix = (PROJECT_ROOT / "docs" / "references" / "video_phase1_osc_matrix.md").read_text()
+
+    assert "| Area | Property | OSC path | Read | Write | Live | +/- | Deprecated | MCP status | Risk |" in matrix
+    assert "`/cue/{cue_number}/cameraPatch`" in matrix
+    assert "`/settings/video/undo`, `/redo`" in matrix
+    assert "scalar rotation" in matrix
+    assert "blocked; removed from Video/Camera registry" in matrix

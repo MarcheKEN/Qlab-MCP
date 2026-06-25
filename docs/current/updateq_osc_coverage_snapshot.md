@@ -1,6 +1,6 @@
 # UpdateQ OSC Coverage Snapshot
 
-Source of truth: `references/qlab/qlab_osc_dictionary.md`.
+Source of truth: `docs/references/qlab_osc_dictionary.md`.
 
 Generated view: `extract_cue_osc_inventory(...)` + `registry_coverage(...)` against
 `profile_catalog()`.
@@ -13,9 +13,9 @@ Generated view: `extract_cue_osc_inventory(...)` + `registry_coverage(...)` agai
 | Group/List/Cart | 7 | 0 | 6 | 0 |
 | Audio | 6 | 65 | 0 | 0 |
 | Mic | 3 | 4 | 0 | 0 |
-| Video | 13 | 66 | 0 | 0 |
+| Video | 0 | 79 | 0 | 0 |
 | Camera | 2 | 4 | 0 | 0 |
-| Text | 5 | 14 | 0 | 0 |
+| Text | 0 | 19 | 0 | 0 |
 | Light | 0 | 11 | 0 | 0 |
 | Fade | 0 | 25 | 0 | 0 |
 | Network | 0 | 20 | 0 | 0 |
@@ -36,6 +36,8 @@ Generated view: `extract_cue_osc_inventory(...)` + `registry_coverage(...)` agai
 - `cueTargetName` remains blocked for real writes; callers must use `cueTargetID` or `cueTargetNumber`.
 - `Mic.channelOffset` is gated by `patch_routing` until input patch bounds validation exists.
 - Dangerous output families remain gated: audio output, patch routing, video visual/effects, text rich format, fade targets, light output, network output, MIDI output, script compile.
+- Video Phase 1 keeps every Video/Text visual setter dry-run only; generic confirm tokens cannot authorize real writes.
+- Video Phase 1 rejects fileTarget, videoInputPatchName/Number/ID, and every Video FX mutation before dry-run planning or any OSC read/write.
 
 ## Gate Map
 
@@ -66,7 +68,7 @@ from qlab_mcp.write.osc_inventory import extract_cue_osc_inventory, registry_cov
 from qlab_mcp.write.registry import profile_catalog
 
 root = Path.cwd()
-dictionary = root / "references" / "qlab" / "qlab_osc_dictionary.md"
+dictionary = root / "docs" / "references" / "qlab_osc_dictionary.md"
 coverage = registry_coverage(extract_cue_osc_inventory(dictionary.read_text()), profile_catalog())
 print(coverage_summary(coverage))
 print([entry for entry in coverage if entry["registry_status"] == "missing"])

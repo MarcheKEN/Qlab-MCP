@@ -11,6 +11,7 @@ import os
 import secrets
 import time
 from typing import Any
+from uuid import UUID
 
 from ..errors import OscTimeoutError, UnsafeWriteOperationError
 from ..osc.addressing import (
@@ -24,6 +25,7 @@ from ..runtime.read_cache import shared_read_cache
 from ..settings.light_commands import analyze_light_command_text
 from .allowlist import (
     COMMON_UPDATE_PROFILE,
+    VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES,
     ensure_real_write_allowed,
     normalize_update_request,
     read_keys_for_operations,
@@ -83,10 +85,64 @@ CASEFOLD_COMPARISON_KEYS = {
 }
 LIGHT_COMMAND_PROPERTY = "lightCommandText"
 LIGHT_BEHAVIOR_PROPERTIES = frozenset({"alwaysCollate", "subcontroller"})
+VIDEO_PHASE2_PROFILES = frozenset({"video_basic", "camera_basic", "text_basic"})
+VIDEO_PHASE3_OPACITY_PROPERTY = "opacity"
+VIDEO_PHASE3_OPACITY_TYPES = {
+    "video_basic": "Video",
+    "camera_basic": "Camera",
+    "text_basic": "Text",
+}
+VIDEO_PHASE3_TRANSLATION_PROPERTIES = frozenset({"translation/x", "translation/y"})
+VIDEO_PHASE3_TRANSLATION_TYPES = {
+    "video_basic": "Video",
+    "camera_basic": "Camera",
+    "text_basic": "Text",
+}
+VIDEO_PHASE3_SCALAR_PROPERTIES = frozenset(
+    {
+        "scale/x",
+        "scale/y",
+        "anchor/x",
+        "anchor/y",
+        "cropTop",
+        "cropBottom",
+        "cropLeft",
+        "cropRight",
+    }
+)
+VIDEO_PHASE3_SCALAR_TYPES = {
+    "video_basic": "Video",
+    "camera_basic": "Camera",
+    "text_basic": "Text",
+}
+VIDEO_PHASE3_APPEARANCE_PROPERTIES = frozenset({"blendMode", "preserveAspectRatio"})
+VIDEO_PHASE3_APPEARANCE_TYPES = {
+    "video_basic": "Video",
+    "camera_basic": "Camera",
+    "text_basic": "Text",
+}
+VIDEO_PHASE2_HEALTH_READ_KEYS = (
+    "number",
+    "name",
+    "armed",
+    "isBroken",
+    "isWarning",
+    "isRunning",
+    "isPaused",
+    "isAuditioning",
+)
 PHASE4_LIGHT_OPERATION_KIND = "phase4_light_command_text_write"
 PHASE4_LIGHT_TOKEN_VERSION = 1
 PHASE5_LIGHT_OPERATION_KIND = "phase5_light_behavior_flag_write"
 PHASE5_LIGHT_TOKEN_VERSION = 1
+PHASE3_VIDEO_OPACITY_OPERATION_KIND = "video_phase3_opacity_write"
+PHASE3_VIDEO_OPACITY_TOKEN_VERSION = 1
+PHASE3_VIDEO_TRANSLATION_OPERATION_KIND = "video_phase3b_translation_write"
+PHASE3_VIDEO_TRANSLATION_TOKEN_VERSION = 1
+PHASE3_VIDEO_SCALAR_OPERATION_KIND = "video_phase3c_scalar_write"
+PHASE3_VIDEO_SCALAR_TOKEN_VERSION = 1
+PHASE3_VIDEO_APPEARANCE_OPERATION_KIND = "video_phase3d_appearance_write"
+PHASE3_VIDEO_APPEARANCE_TOKEN_VERSION = 1
 _LIGHT_WRITE_TOKEN_SECRET = secrets.token_bytes(32)
 
 
@@ -314,7 +370,7 @@ class QLabWriteMixin:
             status = "cue_not_found"
         if status == "updated_with_confirmed_timeouts":
             status = "updated"
-        return {
+        result = {
             "ok": batch["ok"],
             "status": status,
             "workspace_id": batch["workspace_id"],
@@ -332,8 +388,12 @@ class QLabWriteMixin:
             "verification": {"properties": item["after"]} if item.get("after") else None,
             "errors": item["errors"],
             "warnings": item["warnings"],
+            "notices": item.get("notices", []),
             "message": batch["message"],
         }
+        if item.get("updateq_plan") is not None:
+            result["updateq_plan"] = item["updateq_plan"]
+        return result
 
     def update_cues(
         self,
@@ -352,11 +412,109 @@ class QLabWriteMixin:
         phase4_light_call = any(_raw_update_requests_light_command(raw_update) for raw_update in updates)
         phase5_light_call = any(_raw_update_requests_light_behavior(raw_update) for raw_update in updates)
         items = [_normalize_batch_update_item_for_batch(raw_update) for raw_update in updates]
+        phase3_video_opacity_call = any(_phase3_video_opacity_operation(item) is not None for item in items)
+        phase3_video_translation_call = any(
+            _phase3_video_translation_operation(item) is not None for item in items
+        )
+        phase3_video_scalar_call = any(
+            _phase3_video_scalar_operation(item) is not None for item in items
+        )
+        phase3_video_appearance_call = any(
+            _phase3_video_appearance_operation(item) is not None for item in items
+        )
+        for item in items:
+            _strip_video_phase2_confirm_tokens(item)
+            if item.get("profile") in VIDEO_PHASE2_PROFILES and item.get("operations"):
+                item["read_keys"] = list(dict.fromkeys([*item["read_keys"], *VIDEO_PHASE2_HEALTH_READ_KEYS]))
+        video_phase2_dry_run_errors = (
+            [_video_phase2_dry_run_blocked_errors(item) for item in items]
+            if effective_dry_run
+            else []
+        )
+        if any(video_phase2_dry_run_errors):
+            results = []
+            for item, blocked_errors in zip(items, video_phase2_dry_run_errors, strict=True):
+                errors = dict(item.get("errors") or {})
+                errors.update(blocked_errors)
+                if not errors:
+                    errors["video_phase2"] = (
+                        "Batch rejected because another Video-family operation is blocked even for dry-run."
+                    )
+                results.append(
+                    _batch_item_result(
+                        workspace,
+                        item,
+                        cue_id=None,
+                        status="dry_run_preflight_failed",
+                        before=None,
+                        after=None,
+                        errors=errors,
+                        warnings=["Dry run rejected before any OSC request was sent to QLab."],
+                    )
+                )
+            return _batch_update_result(
+                workspace,
+                dry_run=True,
+                results=results,
+                status="preflight_failed",
+                requested_count=len(items),
+                errors={
+                    "preflight": (
+                        "Video-family dry-run policy blocks this property; no OSC requests were sent."
+                    )
+                },
+            )
         for item in items:
             _bind_confirm_tokens(workspace, item)
+        video_phase2_dry_run_structure_error = (
+            _video_phase2_dry_run_structure_error(items) if effective_dry_run else None
+        )
+        if video_phase2_dry_run_structure_error:
+            results = [
+                _batch_item_result(
+                    workspace,
+                    item,
+                    cue_id=None,
+                    status="dry_run_preflight_failed",
+                    before=None,
+                    after=None,
+                    errors={
+                        **(item.get("errors") or {}),
+                        "video_phase2": video_phase2_dry_run_structure_error,
+                    },
+                    warnings=["Dry run only: no mutating OSC commands were sent to QLab."],
+                )
+                for item in items
+            ]
+            return _batch_update_result(
+                workspace,
+                dry_run=True,
+                results=results,
+                status="preflight_failed",
+                requested_count=len(items),
+                errors={"preflight": video_phase2_dry_run_structure_error},
+            )
         if not effective_dry_run:
             phase4_structure_error = _phase4_light_call_structure_error(items) if phase4_light_call else None
             phase5_structure_error = _phase5_light_call_structure_error(items) if phase5_light_call else None
+            phase3_structure_error = (
+                _phase3_video_opacity_call_structure_error(items) if phase3_video_opacity_call else None
+            )
+            phase3_translation_structure_error = (
+                _phase3_video_translation_call_structure_error(items)
+                if phase3_video_translation_call
+                else None
+            )
+            phase3_scalar_structure_error = (
+                _phase3_video_scalar_call_structure_error(items)
+                if phase3_video_scalar_call
+                else None
+            )
+            phase3_appearance_structure_error = (
+                _phase3_video_appearance_call_structure_error(items)
+                if phase3_video_appearance_call
+                else None
+            )
             gate_results = []
             gate_ok = True
             for item in items:
@@ -378,8 +536,45 @@ class QLabWriteMixin:
                             f"{property_name} is gated or dry-run only without exactly one reviewed "
                             "Phase 5 confirm_token."
                         )
+                elif not errors and phase3_video_opacity_call:
+                    if phase3_structure_error:
+                        errors[VIDEO_PHASE3_OPACITY_PROPERTY] = phase3_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[VIDEO_PHASE3_OPACITY_PROPERTY] = (
+                            "opacity is gated or dry-run only without exactly one reviewed "
+                            "Phase 3A confirm_token."
+                        )
+                elif not errors and phase3_video_translation_call:
+                    property_name = item["operations"][0]["property"]
+                    if phase3_translation_structure_error:
+                        errors[property_name] = phase3_translation_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Phase 3B confirm_token."
+                        )
+                elif not errors and phase3_video_scalar_call:
+                    property_name = item["operations"][0]["property"]
+                    if phase3_scalar_structure_error:
+                        errors[property_name] = phase3_scalar_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Phase 3C confirm_token."
+                        )
+                elif not errors and phase3_video_appearance_call:
+                    property_name = item["operations"][0]["property"]
+                    if phase3_appearance_structure_error:
+                        errors[property_name] = phase3_appearance_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Phase 3D confirm_token."
+                        )
                 elif not errors:
-                    errors.update(real_write_permission_errors(item["profile"], item["operations"], item["confirm_gates"]))
+                    errors.update(_video_phase2_real_write_errors(item))
+                    if not errors:
+                        errors.update(real_write_permission_errors(item["profile"], item["operations"], item["confirm_gates"]))
                 if errors:
                     gate_ok = False
                 gate_results.append(
@@ -422,6 +617,36 @@ class QLabWriteMixin:
                 and not phase4_light_call
                 and _phase5_light_call_structure_error(items) is None
             )
+            phase3_candidate_shape = (
+                phase3_video_opacity_call
+                and not phase4_light_call
+                and not phase5_light_call
+                and _phase3_video_opacity_call_structure_error(items) is None
+            )
+            phase3_translation_candidate_shape = (
+                phase3_video_translation_call
+                and not phase4_light_call
+                and not phase5_light_call
+                and not phase3_video_opacity_call
+                and _phase3_video_translation_call_structure_error(items) is None
+            )
+            phase3_scalar_candidate_shape = (
+                phase3_video_scalar_call
+                and not phase4_light_call
+                and not phase5_light_call
+                and not phase3_video_opacity_call
+                and not phase3_video_translation_call
+                and _phase3_video_scalar_call_structure_error(items) is None
+            )
+            phase3_appearance_candidate_shape = (
+                phase3_video_appearance_call
+                and not phase4_light_call
+                and not phase5_light_call
+                and not phase3_video_opacity_call
+                and not phase3_video_translation_call
+                and not phase3_video_scalar_call
+                and _phase3_video_appearance_call_structure_error(items) is None
+            )
             light_patch: dict[str, Any] | None = None
             light_patch_error: dict[str, str] | None = None
             light_patch_loaded = False
@@ -433,6 +658,11 @@ class QLabWriteMixin:
                     before, read_errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
                     errors.update(read_errors)
                     errors.update(_validate_profile_for_before(item["profile"], before))
+                    errors.update(_video_phase2_dry_run_identity_errors(item, before))
+                    errors.update(_video_phase2_dry_run_health_errors(item, before))
+                    errors.update(_phase3_video_translation_dry_run_errors(item, before))
+                    errors.update(_phase3_video_scalar_dry_run_errors(item, before))
+                    errors.update(_phase3_video_appearance_dry_run_errors(item, before))
                 if not errors and _light_command_operation(item) is not None:
                     if not light_patch_loaded:
                         light_patch, light_patch_error = _try_read_safe_light_patch(self, workspace)
@@ -455,6 +685,42 @@ class QLabWriteMixin:
                             candidate_shape=phase5_candidate_shape,
                         )
                     )
+                if not errors and _phase3_video_opacity_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_phase3_video_opacity_operation(
+                            item,
+                            workspace_id=workspace,
+                            before=before,
+                            candidate_shape=phase3_candidate_shape,
+                        )
+                    )
+                if not errors and _phase3_video_translation_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_phase3_video_translation_operation(
+                            item,
+                            workspace_id=workspace,
+                            before=before,
+                            candidate_shape=phase3_translation_candidate_shape,
+                        )
+                    )
+                if not errors and _phase3_video_scalar_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_phase3_video_scalar_operation(
+                            item,
+                            workspace_id=workspace,
+                            before=before,
+                            candidate_shape=phase3_scalar_candidate_shape,
+                        )
+                    )
+                if not errors and _phase3_video_appearance_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_phase3_video_appearance_operation(
+                            item,
+                            workspace_id=workspace,
+                            before=before,
+                            candidate_shape=phase3_appearance_candidate_shape,
+                        )
+                    )
                 cue_id = _resolved_cue_id(before)
                 results.append(
                     _batch_item_result(
@@ -466,6 +732,7 @@ class QLabWriteMixin:
                         after=None,
                         errors=errors or None,
                         warnings=warnings,
+                        notices=_video_phase2_dry_run_notices(item, before),
                     )
                 )
             failed_count = sum(1 for result in results if result["errors"])
@@ -549,8 +816,28 @@ class QLabWriteMixin:
                 errors.update(_validate_phase4_light_real_write(self, workspace, item, before))
             elif not errors and phase5_light_call:
                 errors.update(_validate_phase5_light_real_write(workspace, item, before))
+            elif not errors and phase3_video_opacity_call:
+                errors.update(_validate_phase3_video_opacity_real_write(workspace, item, before))
+                if not errors:
+                    _mark_phase3_video_opacity_real_operation(item)
+            elif not errors and phase3_video_translation_call:
+                errors.update(_validate_phase3_video_translation_real_write(workspace, item, before))
+                if not errors:
+                    _mark_phase3_video_translation_real_operation(item)
+            elif not errors and phase3_video_scalar_call:
+                errors.update(_validate_phase3_video_scalar_real_write(workspace, item, before))
+                if not errors:
+                    _mark_phase3_video_scalar_real_operation(item)
+            elif not errors and phase3_video_appearance_call:
+                errors.update(_validate_phase3_video_appearance_real_write(workspace, item, before))
+                if not errors:
+                    _mark_phase3_video_appearance_real_operation(item)
             if errors:
                 preflight_ok = False
+                if phase3_video_scalar_call:
+                    _label_phase3_video_scalar_rejection(item)
+                if phase3_video_appearance_call:
+                    _label_phase3_video_appearance_rejection(item)
             preflight_results.append(
                 _batch_item_result(
                     workspace,
@@ -660,7 +947,16 @@ class QLabWriteMixin:
             inconclusive = bool(unverifiable_operations)
             if setter_timeouts and confirmed_by_after:
                 timeout_confirmed_count += 1
-                warnings.append("One or more setters did not reply, but fresh after-read confirmed requested values.")
+                warnings.append(
+                    "setter_timeout_but_readback_matched"
+                    if (
+                        _phase3_video_opacity_operation(item) is not None
+                        or _phase3_video_translation_operation(item) is not None
+                        or _phase3_video_scalar_operation(item) is not None
+                        or _phase3_video_appearance_operation(item) is not None
+                    )
+                    else "One or more setters did not reply, but fresh after-read confirmed requested values."
+                )
             failed = bool(setter_errors) or bool(unconfirmed_timeouts)
             verification_failed = (bool(after_errors) or bool(value_mismatch)) and not failed
             if failed:
@@ -670,6 +966,13 @@ class QLabWriteMixin:
                 errors["verification"] = "No deterministic readback values were available for this real write."
             elif verification_failed:
                 status = "verification_failed"
+            elif setter_timeouts and (
+                _phase3_video_opacity_operation(item) is not None
+                or _phase3_video_translation_operation(item) is not None
+                or _phase3_video_scalar_operation(item) is not None
+                or _phase3_video_appearance_operation(item) is not None
+            ):
+                status = "updated"
             elif setter_timeouts:
                 status = "updated_with_confirmed_timeouts"
             else:
@@ -683,6 +986,10 @@ class QLabWriteMixin:
                     "warnings": warnings,
                 }
             )
+            _refresh_phase3_video_opacity_real_result(result, item)
+            _refresh_phase3_video_translation_real_result(result, item)
+            _refresh_phase3_video_scalar_real_result(result, item)
+            _refresh_phase3_video_appearance_real_result(result, item)
             if _update_debug_enabled(self):
                 result["debug"] = {
                     "cue_ref": item["cue_ref"],
@@ -761,6 +1068,1122 @@ def _bind_confirm_tokens(workspace_id: str, item: dict[str, Any]) -> None:
         }
         digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
         operation["confirm_token"] = f"confirm:{operation['property']}:{digest[:16]}"
+
+
+def _strip_video_phase2_confirm_tokens(item: dict[str, Any]) -> None:
+    if item.get("profile") not in VIDEO_PHASE2_PROFILES:
+        return
+
+    def strip(value: Any) -> None:
+        if isinstance(value, dict):
+            value.pop("confirm_token", None)
+            for nested in value.values():
+                strip(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                strip(nested)
+
+    strip(item)
+
+
+def _video_phase2_real_write_errors(item: dict[str, Any]) -> dict[str, str]:
+    if item.get("profile") not in VIDEO_PHASE2_PROFILES:
+        return {}
+    return {
+        str(operation["property"]): (
+            f"{operation['property']} is gated or dry-run only under the current Video write policy; "
+            "no confirm_token can authorize a real write."
+        )
+        for operation in item.get("operations") or []
+        if not operation.get("real_write_enabled")
+    }
+
+
+def _video_phase2_dry_run_blocked_errors(item: dict[str, Any]) -> dict[str, str]:
+    if item.get("profile") not in VIDEO_PHASE2_PROFILES:
+        return {}
+    errors: dict[str, str] = {}
+    property_names = set(item.get("requested_property_names") or ())
+    operations = {
+        str(operation.get("property", "")): operation for operation in item.get("operations") or []
+    }
+    property_names.update(operations)
+    for property_name in property_names:
+        operation = operations.get(property_name)
+        common_real_write = bool(operation and operation.get("real_write_enabled"))
+        if property_name and property_name not in VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES and not common_real_write:
+            errors[property_name] = _video_phase2_blocked_property_message(property_name)
+    return errors
+
+
+def _video_phase2_blocked_property_message(property_name: str) -> str:
+    if property_name in {"anchor", "crop", "scale", "translation"}:
+        family = "aggregate geometry"
+    elif property_name == "fileTarget":
+        family = "file target"
+    elif property_name == "cameraPatch" or property_name.startswith("videoInputPatch"):
+        family = "camera input patch"
+    elif property_name.startswith("videoEffect"):
+        family = "Video FX mutation"
+    elif property_name in {"rotation", "quaternion", "resetRotation"} or property_name.startswith("rotate/"):
+        family = "rotation"
+    elif property_name.startswith("stage"):
+        family = "stage, region, route, or warping"
+    elif property_name.startswith("text/format"):
+        family = "rich text formatting"
+    else:
+        family = "property outside the scalar allowlist"
+    return (
+        f"{property_name} is blocked even for dry-run by Video-family policy ({family}); "
+        "no OSC request was sent."
+    )
+
+
+def _video_phase2_dry_run_identity_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    if item.get("profile") not in VIDEO_PHASE2_PROFILES or not before:
+        return {}
+    returned_id = before.get("uniqueID")
+    if returned_id != item.get("cue_ref"):
+        return {"cue_ref": "Video-family fresh read uniqueID does not exactly match requested cue UUID."}
+    return {}
+
+
+def _video_phase2_dry_run_health_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    if item.get("profile") not in VIDEO_PHASE2_PROFILES or not item.get("operations") or not before:
+        return {}
+    errors: dict[str, str] = {}
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        errors["health"] = "Video-family dry-runs require a healthy cue without warnings."
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        errors["active"] = "Video-family dry-runs require an inactive cue."
+    return errors
+
+
+def _video_phase2_dry_run_notices(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> list[str]:
+    if item.get("profile") in VIDEO_PHASE2_PROFILES and before and before.get("armed") is False:
+        return ["cue_disarmed"]
+    return []
+
+
+def _is_exact_cue_uuid(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        return str(UUID(value)).casefold() == value.casefold()
+    except (ValueError, AttributeError):
+        return False
+
+
+def _video_phase2_dry_run_structure_error(items: list[dict[str, Any]]) -> str | None:
+    phase2_items = [
+        item
+        for item in items
+        if item.get("profile") in VIDEO_PHASE2_PROFILES
+        and any(
+            operation.get("property") in VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES
+            for operation in item.get("operations") or []
+        )
+    ]
+    if not phase2_items:
+        return None
+    if len(items) != 1 or len(phase2_items[0].get("operations") or []) != 1:
+        return "Video-family dry-runs require exactly one cue and one property."
+    item = phase2_items[0]
+    operation = item["operations"][0]
+    if operation.get("property") not in VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES:
+        return "Video-family dry-runs allow only one supported scalar property."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Video-family dry-runs require exact cue UUID as cue_ref; cue numbers are rejected."
+    if item.get("confirm_gates"):
+        return "Video-family dry-runs require empty confirm_gates unless a specialized real-write gate applies."
+    if operation.get("mode") != "saved":
+        return "Video-family dry-runs require saved mode."
+    return None
+
+
+def _phase3_video_opacity_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") == VIDEO_PHASE3_OPACITY_PROPERTY
+        ),
+        None,
+    )
+
+
+def _phase3_video_opacity_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 3A opacity real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") not in VIDEO_PHASE3_OPACITY_TYPES:
+        return "Phase 3A opacity real writes require video_basic, camera_basic, or text_basic profile."
+    if len(operations) != 1:
+        return "Phase 3A opacity real writes require exactly one property."
+    operation = operations[0]
+    if operation.get("property") != VIDEO_PHASE3_OPACITY_PROPERTY or operation.get("path") != VIDEO_PHASE3_OPACITY_PROPERTY:
+        return "Phase 3A real writes allow only opacity."
+    if operation.get("mode") != "saved":
+        return "Phase 3A opacity real writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Phase 3A opacity real writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _is_plain_finite_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value))
+
+
+def _video_opacity_sha256(value: int | float) -> str:
+    return hashlib.sha256(
+        json.dumps(float(value), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _phase3_video_opacity_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    baseline: int | float,
+    requested: int | float,
+) -> dict[str, Any]:
+    return {
+        "version": PHASE3_VIDEO_OPACITY_TOKEN_VERSION,
+        "operation_kind": PHASE3_VIDEO_OPACITY_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "cue_type": VIDEO_PHASE3_OPACITY_TYPES[item["profile"]],
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": float(baseline),
+        "baseline_sha256": _video_opacity_sha256(baseline),
+        "requested": float(requested),
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "mcp_secret_version": 1,
+    }
+
+
+def _phase3_video_opacity_confirm_token(**payload_args: Any) -> str:
+    payload = _phase3_video_opacity_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:videoOpacity:v{PHASE3_VIDEO_OPACITY_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _decode_phase3_video_opacity_confirm_token(token: str) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    expected_prefix = ["confirm", "videoOpacity", f"v{PHASE3_VIDEO_OPACITY_TOKEN_VERSION}"]
+    if len(parts) != 5 or parts[:3] != expected_prefix:
+        return None, "Phase 3A opacity confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(
+        _LIGHT_WRITE_TOKEN_SECRET,
+        encoded.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 3A opacity confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 3A opacity confirm_token payload is invalid."
+    if not isinstance(payload, dict):
+        return None, "Phase 3A opacity confirm_token payload is invalid."
+    return payload, None
+
+
+def _annotate_phase3_video_opacity_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operation = _phase3_video_opacity_operation(item)
+    if operation is None:
+        return []
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(VIDEO_PHASE3_OPACITY_PROPERTY) if isinstance(before, dict) else None
+    requested = operation["args"][0] if operation.get("args") else None
+    candidate = (
+        candidate_shape
+        and isinstance(before, dict)
+        and before.get("type") == VIDEO_PHASE3_OPACITY_TYPES.get(item.get("profile"))
+        and cue_id == item.get("cue_ref")
+        and _is_plain_finite_number(baseline)
+        and _is_plain_finite_number(requested)
+    )
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": candidate,
+            "requires_confirm_token": candidate,
+            "phase3_video_opacity_candidate": candidate,
+            "planned_only_reason": (
+                "video_opacity_requires_confirm_token"
+                if candidate
+                else "video_opacity_requires_single_healthy_uuid_cue"
+            ),
+            "future_gate_requirements": [
+                "phase3a_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    if candidate:
+        operation["confirm_token"] = _phase3_video_opacity_confirm_token(
+            workspace_id=workspace_id,
+            cue_ref=item["cue_ref"],
+            cue_id=cue_id,
+            item=item,
+            operation=operation,
+            baseline=baseline,
+            requested=requested,
+        )
+    else:
+        operation.pop("confirm_token", None)
+    return [] if candidate else ["Opacity update is not confirmable outside Phase 3A gate."]
+
+
+def _validate_phase3_video_opacity_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase3_video_opacity_operation(item)
+    if operation is None or not isinstance(before, dict):
+        return {VIDEO_PHASE3_OPACITY_PROPERTY: "Phase 3A opacity preflight is incomplete."}
+    if before.get("type") != VIDEO_PHASE3_OPACITY_TYPES.get(item.get("profile")):
+        return {VIDEO_PHASE3_OPACITY_PROPERTY: "Phase 3A opacity real writes require matching Video, Camera, or Text cue type."}
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return {VIDEO_PHASE3_OPACITY_PROPERTY: "Phase 3A opacity real writes require a healthy cue without warnings."}
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return {VIDEO_PHASE3_OPACITY_PROPERTY: "Phase 3A opacity real writes require an inactive cue."}
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(VIDEO_PHASE3_OPACITY_PROPERTY)
+    requested = operation["args"][0] if operation.get("args") else None
+    if cue_id != item.get("cue_ref"):
+        return {VIDEO_PHASE3_OPACITY_PROPERTY: "Phase 3A fresh read uniqueID does not exactly match requested cue UUID."}
+    if not _is_plain_finite_number(baseline) or not _is_plain_finite_number(requested):
+        return {VIDEO_PHASE3_OPACITY_PROPERTY: "Phase 3A opacity requires finite numeric baseline and requested value."}
+    token = item["confirm_gates"][0]
+    payload, token_error = _decode_phase3_video_opacity_confirm_token(token)
+    if token_error or payload is None:
+        return {VIDEO_PHASE3_OPACITY_PROPERTY: token_error or "Phase 3A opacity confirm_token is invalid."}
+    expected = _phase3_video_opacity_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    for key, value in expected.items():
+        if key in {"baseline", "baseline_sha256"}:
+            continue
+        if payload.get(key) != value:
+            return {
+                VIDEO_PHASE3_OPACITY_PROPERTY: (
+                    "Phase 3A opacity confirm_token does not match this workspace, cue, property, "
+                    "value, or risk context."
+                )
+            }
+    if payload.get("baseline_sha256") != expected["baseline_sha256"] or not math.isclose(
+        float(payload.get("baseline", math.nan)),
+        float(expected["baseline"]),
+        abs_tol=UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
+        rel_tol=UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
+    ):
+        return {
+            VIDEO_PHASE3_OPACITY_PROPERTY: (
+                "stale_video_opacity_baseline: current opacity no longer matches the reviewed dry-run baseline."
+            )
+        }
+    return {}
+
+
+def _phase3_video_translation_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in VIDEO_PHASE3_TRANSLATION_PROPERTIES
+        ),
+        None,
+    )
+
+
+def _phase3_video_translation_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 3B translation real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") not in VIDEO_PHASE3_TRANSLATION_TYPES:
+        return "Phase 3B translation real writes require video_basic, camera_basic, or text_basic profile."
+    if len(operations) != 1:
+        return "Phase 3B translation real writes require exactly one property."
+    operation = operations[0]
+    if (
+        operation.get("property") not in VIDEO_PHASE3_TRANSLATION_PROPERTIES
+        or operation.get("path") != operation.get("property")
+    ):
+        return "Phase 3B real writes allow only translation/x or translation/y."
+    if operation.get("mode") != "saved":
+        return "Phase 3B translation real writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Phase 3B translation real writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _video_translation_sha256(value: int | float) -> str:
+    return hashlib.sha256(
+        json.dumps(float(value), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _phase3_video_translation_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    baseline: int | float,
+    requested: int | float,
+) -> dict[str, Any]:
+    return {
+        "version": PHASE3_VIDEO_TRANSLATION_TOKEN_VERSION,
+        "operation_kind": PHASE3_VIDEO_TRANSLATION_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "cue_type": VIDEO_PHASE3_TRANSLATION_TYPES[item["profile"]],
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": float(baseline),
+        "baseline_sha256": _video_translation_sha256(baseline),
+        "requested": float(requested),
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "mcp_secret_version": 1,
+    }
+
+
+def _phase3_video_translation_confirm_token(**payload_args: Any) -> str:
+    payload = _phase3_video_translation_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:videoTranslation:v{PHASE3_VIDEO_TRANSLATION_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _decode_phase3_video_translation_confirm_token(
+    token: str,
+) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    expected_prefix = [
+        "confirm",
+        "videoTranslation",
+        f"v{PHASE3_VIDEO_TRANSLATION_TOKEN_VERSION}",
+    ]
+    if len(parts) != 5 or parts[:3] != expected_prefix:
+        return None, "Phase 3B translation confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(
+        _LIGHT_WRITE_TOKEN_SECRET,
+        encoded.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 3B translation confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 3B translation confirm_token payload is invalid."
+    if not isinstance(payload, dict):
+        return None, "Phase 3B translation confirm_token payload is invalid."
+    return payload, None
+
+
+def _phase3_video_translation_dry_run_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase3_video_translation_operation(item)
+    if (
+        operation is None
+        or item.get("profile") not in VIDEO_PHASE3_TRANSLATION_TYPES
+        or not isinstance(before, dict)
+        or before.get("type") != VIDEO_PHASE3_TRANSLATION_TYPES.get(item.get("profile"))
+    ):
+        return {}
+    property_name = operation["property"]
+    baseline = before.get(property_name)
+    requested = operation["args"][0] if operation.get("args") else None
+    if not _is_plain_finite_number(baseline) or not _is_plain_finite_number(requested):
+        return {
+            property_name: (
+                "Phase 3B translation requires finite numeric baseline and requested value."
+            )
+        }
+    return {}
+
+
+def _annotate_phase3_video_translation_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operation = _phase3_video_translation_operation(item)
+    if operation is None or item.get("profile") not in VIDEO_PHASE3_TRANSLATION_TYPES:
+        return []
+    property_name = operation["property"]
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name) if isinstance(before, dict) else None
+    requested = operation["args"][0] if operation.get("args") else None
+    candidate = (
+        candidate_shape
+        and isinstance(before, dict)
+        and before.get("type") == VIDEO_PHASE3_TRANSLATION_TYPES.get(item.get("profile"))
+        and cue_id == item.get("cue_ref")
+        and _is_plain_finite_number(baseline)
+        and _is_plain_finite_number(requested)
+    )
+    if not candidate:
+        operation.pop("confirm_token", None)
+        return []
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase3b_video_translation_candidate": True,
+            "planned_only_reason": "video_translation_requires_confirm_token",
+            "future_gate_requirements": [
+                "phase3b_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation["confirm_token"] = _phase3_video_translation_confirm_token(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    return []
+
+
+def _validate_phase3_video_translation_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase3_video_translation_operation(item)
+    property_name = operation.get("property") if operation else "translation"
+    if operation is None or not isinstance(before, dict):
+        return {property_name: "Phase 3B translation preflight is incomplete."}
+    if before.get("type") != VIDEO_PHASE3_TRANSLATION_TYPES.get(item.get("profile")):
+        return {
+            property_name: (
+                "Phase 3B translation real writes require matching Video, Camera, or Text cue type/profile."
+            )
+        }
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return {property_name: "Phase 3B translation real writes require a healthy cue without warnings."}
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return {property_name: "Phase 3B translation real writes require an inactive cue."}
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name)
+    requested = operation["args"][0] if operation.get("args") else None
+    if cue_id != item.get("cue_ref"):
+        return {property_name: "Phase 3B fresh read uniqueID does not exactly match requested cue UUID."}
+    if not _is_plain_finite_number(baseline) or not _is_plain_finite_number(requested):
+        return {property_name: "Phase 3B translation requires finite numeric baseline and requested value."}
+    token = item["confirm_gates"][0]
+    payload, token_error = _decode_phase3_video_translation_confirm_token(token)
+    if token_error or payload is None:
+        return {property_name: token_error or "Phase 3B translation confirm_token is invalid."}
+    expected = _phase3_video_translation_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    for key, value in expected.items():
+        if key in {"baseline", "baseline_sha256"}:
+            continue
+        if payload.get(key) != value:
+            return {
+                property_name: (
+                    "Phase 3B translation confirm_token does not match this workspace, cue, property, "
+                    "value, or risk context."
+                )
+            }
+    if payload.get("baseline_sha256") != expected["baseline_sha256"] or not math.isclose(
+        float(payload.get("baseline", math.nan)),
+        float(expected["baseline"]),
+        abs_tol=UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
+        rel_tol=UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
+    ):
+        return {
+            property_name: (
+                f"stale_video_translation_baseline: current {property_name} no longer matches "
+                "the reviewed dry-run baseline."
+            )
+        }
+    return {}
+
+
+def _phase3_video_scalar_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in VIDEO_PHASE3_SCALAR_PROPERTIES
+        ),
+        None,
+    )
+
+
+def _phase3_video_scalar_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 3C scalar real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") not in VIDEO_PHASE3_SCALAR_TYPES:
+        return "Phase 3C scalar real writes require video_basic, camera_basic, or text_basic profile."
+    if len(operations) != 1:
+        return "Phase 3C scalar real writes require exactly one property."
+    operation = operations[0]
+    if (
+        operation.get("property") not in VIDEO_PHASE3_SCALAR_PROPERTIES
+        or operation.get("path") != operation.get("property")
+    ):
+        return "Phase 3C real writes allow only scale, anchor, or crop scalar properties."
+    if operation.get("mode") != "saved":
+        return "Phase 3C scalar real writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Phase 3C scalar real writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _video_scalar_sha256(value: int | float) -> str:
+    return hashlib.sha256(
+        json.dumps(float(value), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _phase3_video_scalar_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    baseline: int | float,
+    requested: int | float,
+) -> dict[str, Any]:
+    return {
+        "version": PHASE3_VIDEO_SCALAR_TOKEN_VERSION,
+        "operation_kind": PHASE3_VIDEO_SCALAR_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "cue_type": VIDEO_PHASE3_SCALAR_TYPES[item["profile"]],
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": float(baseline),
+        "baseline_sha256": _video_scalar_sha256(baseline),
+        "requested": float(requested),
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "mcp_secret_version": 1,
+    }
+
+
+def _phase3_video_scalar_confirm_token(**payload_args: Any) -> str:
+    payload = _phase3_video_scalar_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:videoScalar:v{PHASE3_VIDEO_SCALAR_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _decode_phase3_video_scalar_confirm_token(
+    token: str,
+) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    expected_prefix = [
+        "confirm",
+        "videoScalar",
+        f"v{PHASE3_VIDEO_SCALAR_TOKEN_VERSION}",
+    ]
+    if len(parts) != 5 or parts[:3] != expected_prefix:
+        return None, "Phase 3C scalar confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(
+        _LIGHT_WRITE_TOKEN_SECRET,
+        encoded.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 3C scalar confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 3C scalar confirm_token payload is invalid."
+    if not isinstance(payload, dict):
+        return None, "Phase 3C scalar confirm_token payload is invalid."
+    return payload, None
+
+
+def _phase3_video_scalar_dry_run_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase3_video_scalar_operation(item)
+    if (
+        operation is None
+        or item.get("profile") not in VIDEO_PHASE3_SCALAR_TYPES
+        or not isinstance(before, dict)
+        or before.get("type") != VIDEO_PHASE3_SCALAR_TYPES.get(item.get("profile"))
+    ):
+        return {}
+    property_name = operation["property"]
+    baseline = before.get(property_name)
+    requested = operation["args"][0] if operation.get("args") else None
+    if not _is_plain_finite_number(baseline) or not _is_plain_finite_number(requested):
+        return {
+            property_name: "Phase 3C scalar requires finite numeric baseline and requested value."
+        }
+    return {}
+
+
+def _annotate_phase3_video_scalar_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operation = _phase3_video_scalar_operation(item)
+    if operation is None or item.get("profile") not in VIDEO_PHASE3_SCALAR_TYPES:
+        return []
+    property_name = operation["property"]
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name) if isinstance(before, dict) else None
+    requested = operation["args"][0] if operation.get("args") else None
+    candidate = (
+        candidate_shape
+        and isinstance(before, dict)
+        and before.get("type") == VIDEO_PHASE3_SCALAR_TYPES.get(item.get("profile"))
+        and cue_id == item.get("cue_ref")
+        and _is_plain_finite_number(baseline)
+        and _is_plain_finite_number(requested)
+    )
+    if not candidate:
+        operation.pop("confirm_token", None)
+        return []
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase3c_video_scalar_candidate": True,
+            "planned_only_reason": "video_scalar_requires_confirm_token",
+            "future_gate_requirements": [
+                "phase3c_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation["confirm_token"] = _phase3_video_scalar_confirm_token(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    return []
+
+
+def _validate_phase3_video_scalar_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase3_video_scalar_operation(item)
+    property_name = operation.get("property") if operation else "video_scalar"
+    if operation is None or not isinstance(before, dict):
+        return {property_name: "Phase 3C scalar preflight is incomplete."}
+    if before.get("type") != VIDEO_PHASE3_SCALAR_TYPES.get(item.get("profile")):
+        return {
+            property_name: (
+                "Phase 3C scalar real writes require matching Video, Camera, or Text cue type/profile."
+            )
+        }
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return {property_name: "Phase 3C scalar real writes require a healthy cue without warnings."}
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return {property_name: "Phase 3C scalar real writes require an inactive cue."}
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name)
+    requested = operation["args"][0] if operation.get("args") else None
+    if cue_id != item.get("cue_ref"):
+        return {property_name: "Phase 3C fresh read uniqueID does not exactly match requested cue UUID."}
+    if not _is_plain_finite_number(baseline) or not _is_plain_finite_number(requested):
+        return {property_name: "Phase 3C scalar requires finite numeric baseline and requested value."}
+    token = item["confirm_gates"][0]
+    payload, token_error = _decode_phase3_video_scalar_confirm_token(token)
+    if token_error or payload is None:
+        return {property_name: token_error or "Phase 3C scalar confirm_token is invalid."}
+    expected = _phase3_video_scalar_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    for key, value in expected.items():
+        if key in {"baseline", "baseline_sha256"}:
+            continue
+        if payload.get(key) != value:
+            return {
+                property_name: (
+                    "Phase 3C scalar confirm_token does not match this workspace, cue, property, "
+                    "value, or risk context."
+                )
+            }
+    if payload.get("baseline_sha256") != expected["baseline_sha256"] or not math.isclose(
+        float(payload.get("baseline", math.nan)),
+        float(expected["baseline"]),
+        abs_tol=UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
+        rel_tol=UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
+    ):
+        return {
+            property_name: (
+                f"stale_video_scalar_baseline: current {property_name} no longer matches "
+                "the reviewed dry-run baseline."
+            )
+        }
+    return {}
+
+
+def _phase3_video_appearance_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in VIDEO_PHASE3_APPEARANCE_PROPERTIES
+        ),
+        None,
+    )
+
+
+def _phase3_video_appearance_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 3D appearance real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") not in VIDEO_PHASE3_APPEARANCE_TYPES:
+        return "Phase 3D appearance real writes require video_basic, camera_basic, or text_basic profile."
+    if len(operations) != 1:
+        return "Phase 3D appearance real writes require exactly one property."
+    operation = operations[0]
+    if (
+        operation.get("property") not in VIDEO_PHASE3_APPEARANCE_PROPERTIES
+        or operation.get("path") != operation.get("property")
+    ):
+        return "Phase 3D real writes allow only blendMode or preserveAspectRatio."
+    if operation.get("mode") != "saved":
+        return "Phase 3D appearance real writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Phase 3D appearance real writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _video_appearance_value_valid(property_name: str, value: Any) -> bool:
+    if property_name == "preserveAspectRatio":
+        return isinstance(value, bool)
+    if property_name == "blendMode":
+        return isinstance(value, str) and bool(value)
+    return False
+
+
+def _video_appearance_sha256(value: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _phase3_video_appearance_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    baseline: Any,
+    requested: Any,
+) -> dict[str, Any]:
+    return {
+        "version": PHASE3_VIDEO_APPEARANCE_TOKEN_VERSION,
+        "operation_kind": PHASE3_VIDEO_APPEARANCE_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "cue_type": VIDEO_PHASE3_APPEARANCE_TYPES[item["profile"]],
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": baseline,
+        "baseline_sha256": _video_appearance_sha256(baseline),
+        "requested": requested,
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "mcp_secret_version": 1,
+    }
+
+
+def _phase3_video_appearance_confirm_token(**payload_args: Any) -> str:
+    payload = _phase3_video_appearance_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:videoAppearance:v{PHASE3_VIDEO_APPEARANCE_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _decode_phase3_video_appearance_confirm_token(
+    token: str,
+) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    expected_prefix = [
+        "confirm",
+        "videoAppearance",
+        f"v{PHASE3_VIDEO_APPEARANCE_TOKEN_VERSION}",
+    ]
+    if len(parts) != 5 or parts[:3] != expected_prefix:
+        return None, "Phase 3D appearance confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(
+        _LIGHT_WRITE_TOKEN_SECRET,
+        encoded.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 3D appearance confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 3D appearance confirm_token payload is invalid."
+    if not isinstance(payload, dict):
+        return None, "Phase 3D appearance confirm_token payload is invalid."
+    return payload, None
+
+
+def _phase3_video_appearance_dry_run_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase3_video_appearance_operation(item)
+    if (
+        operation is None
+        or item.get("profile") not in VIDEO_PHASE3_APPEARANCE_TYPES
+        or not isinstance(before, dict)
+        or before.get("type") != VIDEO_PHASE3_APPEARANCE_TYPES.get(item.get("profile"))
+    ):
+        return {}
+    property_name = operation["property"]
+    baseline = before.get(property_name)
+    requested = operation["args"][0] if operation.get("args") else None
+    if not _video_appearance_value_valid(property_name, baseline):
+        return {property_name: f"Phase 3D appearance requires readable {property_name} baseline."}
+    if not _video_appearance_value_valid(property_name, requested):
+        return {property_name: f"Phase 3D appearance requested {property_name} value is invalid."}
+    return {}
+
+
+def _annotate_phase3_video_appearance_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operation = _phase3_video_appearance_operation(item)
+    if operation is None or item.get("profile") not in VIDEO_PHASE3_APPEARANCE_TYPES:
+        return []
+    property_name = operation["property"]
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name) if isinstance(before, dict) else None
+    requested = operation["args"][0] if operation.get("args") else None
+    candidate = (
+        candidate_shape
+        and isinstance(before, dict)
+        and before.get("type") == VIDEO_PHASE3_APPEARANCE_TYPES.get(item.get("profile"))
+        and cue_id == item.get("cue_ref")
+        and _video_appearance_value_valid(property_name, baseline)
+        and _video_appearance_value_valid(property_name, requested)
+    )
+    if not candidate:
+        operation.pop("confirm_token", None)
+        return []
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase3d_video_appearance_candidate": True,
+            "planned_only_reason": "video_appearance_requires_confirm_token",
+            "future_gate_requirements": [
+                "phase3d_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation["confirm_token"] = _phase3_video_appearance_confirm_token(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    return []
+
+
+def _validate_phase3_video_appearance_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase3_video_appearance_operation(item)
+    property_name = operation.get("property") if operation else "video_appearance"
+    if operation is None or not isinstance(before, dict):
+        return {property_name: "Phase 3D appearance preflight is incomplete."}
+    if before.get("type") != VIDEO_PHASE3_APPEARANCE_TYPES.get(item.get("profile")):
+        return {
+            property_name: (
+                "Phase 3D appearance real writes require matching Video, Camera, or Text cue type/profile."
+            )
+        }
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return {property_name: "Phase 3D appearance real writes require a healthy cue without warnings."}
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return {property_name: "Phase 3D appearance real writes require an inactive cue."}
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name)
+    requested = operation["args"][0] if operation.get("args") else None
+    if cue_id != item.get("cue_ref"):
+        return {property_name: "Phase 3D fresh read uniqueID does not exactly match requested cue UUID."}
+    if not _video_appearance_value_valid(property_name, baseline):
+        return {property_name: f"Phase 3D appearance requires readable {property_name} baseline."}
+    if not _video_appearance_value_valid(property_name, requested):
+        return {property_name: f"Phase 3D appearance requested {property_name} value is invalid."}
+    token = item["confirm_gates"][0]
+    payload, token_error = _decode_phase3_video_appearance_confirm_token(token)
+    if token_error or payload is None:
+        return {property_name: token_error or "Phase 3D appearance confirm_token is invalid."}
+    expected = _phase3_video_appearance_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    for key, value in expected.items():
+        if key in {"baseline", "baseline_sha256"}:
+            continue
+        if payload.get(key) != value:
+            return {
+                property_name: (
+                    "Phase 3D appearance confirm_token does not match this workspace, cue, property, "
+                    "value, or risk context."
+                )
+            }
+    if (
+        payload.get("baseline_sha256") != expected["baseline_sha256"]
+        or payload.get("baseline") != expected["baseline"]
+    ):
+        return {
+            property_name: (
+                f"stale_video_appearance_baseline: current {property_name} no longer matches "
+                "the reviewed dry-run baseline."
+            )
+        }
+    return {}
 
 
 def _phase4_light_call_structure_error(items: list[dict[str, Any]]) -> str | None:
@@ -859,6 +2282,7 @@ def _normalize_batch_update_item_for_batch(raw_update: Any) -> dict[str, Any]:
 
     properties: dict[str, Any] = {}
     operations: list[dict[str, Any]] = []
+    requested_property_names = _raw_update_property_names(raw_update)
     confirm_gates, gate_error = _normalize_confirm_gates(raw_update.get("confirm_gates"))
     if gate_error:
         errors["confirm_gates"] = gate_error
@@ -877,6 +2301,7 @@ def _normalize_batch_update_item_for_batch(raw_update: Any) -> dict[str, Any]:
         "profile": profile,
         "properties": properties,
         "operations": operations,
+        "requested_property_names": requested_property_names,
         "confirm_gates": confirm_gates,
         "read_keys": read_keys_for_operations(operations),
         "errors": errors or None,
@@ -889,10 +2314,28 @@ def _invalid_batch_update_item(cue_ref: str, profile: str, errors: dict[str, str
         "profile": profile,
         "properties": {},
         "operations": [],
+        "requested_property_names": [],
         "confirm_gates": [],
         "read_keys": read_keys_for_operations([]),
         "errors": errors,
     }
+
+
+def _raw_update_property_names(raw_update: dict[str, Any]) -> list[str]:
+    names: list[str] = []
+    properties = raw_update.get("properties")
+    if isinstance(properties, dict):
+        names.extend(str(name).strip() for name in properties if isinstance(name, str) and name.strip())
+    operations = raw_update.get("operations")
+    if isinstance(operations, list):
+        names.extend(
+            str(operation["property"]).strip()
+            for operation in operations
+            if isinstance(operation, dict)
+            and isinstance(operation.get("property"), str)
+            and str(operation["property"]).strip()
+        )
+    return list(dict.fromkeys(names))
 
 
 def _normalize_confirm_gates(raw_gates: Any) -> tuple[list[str], str | None]:
@@ -1438,6 +2881,257 @@ def _validate_phase5_light_real_write(
     return {}
 
 
+def _mark_phase3_video_opacity_real_operation(item: dict[str, Any]) -> None:
+    operation = _phase3_video_opacity_operation(item)
+    if operation is None:
+        return
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": True,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase3_video_opacity_candidate": True,
+            "future_gate_requirements": [
+                "phase3a_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation.pop("planned_only_reason", None)
+
+
+def _refresh_phase3_video_opacity_real_result(result: dict[str, Any], item: dict[str, Any]) -> None:
+    if _phase3_video_opacity_operation(item) is None or not result.get("executed_operations"):
+        return
+    for operation in result.get("operations") or []:
+        if operation.get("property") == VIDEO_PHASE3_OPACITY_PROPERTY:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    for operation in result.get("planned_operations") or []:
+        if operation.get("operation") == "set_property" and operation.get("property") == VIDEO_PHASE3_OPACITY_PROPERTY:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    plan = result.get("updateq_plan")
+    if isinstance(plan, dict):
+        cue_type = (result.get("before") or {}).get("type") or "visual"
+        plan["status"] = result.get("status")
+        plan["intent"] = f"Executed saved opacity change on {cue_type} cue."
+        plan["real_write_enabled"] = True
+        plan["real_write_possible"] = True
+        plan["requires_confirm_token"] = True
+        plan.pop("why_not_written", None)
+        plan["after"] = (result.get("after") or {}).get(VIDEO_PHASE3_OPACITY_PROPERTY)
+        plan["verification"] = {"readback_matched": result.get("errors") is None}
+        safety = dict(plan.get("safety") or {})
+        safety.update({"no_executed_operations": False, "will_modify_qlab": True})
+        plan["safety"] = safety
+
+
+def _mark_phase3_video_translation_real_operation(item: dict[str, Any]) -> None:
+    operation = _phase3_video_translation_operation(item)
+    if operation is None:
+        return
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": True,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase3b_video_translation_candidate": True,
+            "future_gate_requirements": [
+                "phase3b_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation.pop("planned_only_reason", None)
+
+
+def _refresh_phase3_video_translation_real_result(
+    result: dict[str, Any],
+    item: dict[str, Any],
+) -> None:
+    translation_operation = _phase3_video_translation_operation(item)
+    if translation_operation is None or not result.get("executed_operations"):
+        return
+    property_name = translation_operation["property"]
+    for operation in result.get("operations") or []:
+        if operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    for operation in result.get("planned_operations") or []:
+        if operation.get("operation") == "set_property" and operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    plan = result.get("updateq_plan")
+    if isinstance(plan, dict):
+        cue_type = (result.get("before") or {}).get("type") or "visual"
+        plan["status"] = result.get("status")
+        plan["intent"] = f"Executed saved {property_name} change on {cue_type} cue."
+        plan["real_write_enabled"] = True
+        plan["real_write_possible"] = True
+        plan["requires_confirm_token"] = True
+        plan.pop("why_not_written", None)
+        plan["after"] = (result.get("after") or {}).get(property_name)
+        plan["verification"] = {"readback_matched": result.get("errors") is None}
+        safety = dict(plan.get("safety") or {})
+        safety.update({"no_executed_operations": False, "will_modify_qlab": True})
+        plan["safety"] = safety
+
+
+def _mark_phase3_video_scalar_real_operation(item: dict[str, Any]) -> None:
+    operation = _phase3_video_scalar_operation(item)
+    if operation is None:
+        return
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": True,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase3c_video_scalar_candidate": True,
+            "future_gate_requirements": [
+                "phase3c_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation.pop("planned_only_reason", None)
+
+
+def _label_phase3_video_scalar_rejection(item: dict[str, Any]) -> None:
+    operation = _phase3_video_scalar_operation(item)
+    if operation is not None:
+        operation["planned_only_reason"] = "video_scalar_requires_confirm_token"
+
+
+def _refresh_phase3_video_scalar_real_result(
+    result: dict[str, Any],
+    item: dict[str, Any],
+) -> None:
+    scalar_operation = _phase3_video_scalar_operation(item)
+    if scalar_operation is None or not result.get("executed_operations"):
+        return
+    property_name = scalar_operation["property"]
+    for operation in result.get("operations") or []:
+        if operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    for operation in result.get("planned_operations") or []:
+        if operation.get("operation") == "set_property" and operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    plan = result.get("updateq_plan")
+    if isinstance(plan, dict):
+        cue_type = (result.get("before") or {}).get("type") or "visual"
+        plan["status"] = result.get("status")
+        plan["intent"] = f"Executed saved {property_name} change on {cue_type} cue."
+        plan["real_write_enabled"] = True
+        plan["real_write_possible"] = True
+        plan["requires_confirm_token"] = True
+        plan.pop("why_not_written", None)
+        plan["after"] = (result.get("after") or {}).get(property_name)
+        plan["verification"] = {"readback_matched": result.get("errors") is None}
+        safety = dict(plan.get("safety") or {})
+        safety.update({"no_executed_operations": False, "will_modify_qlab": True})
+        plan["safety"] = safety
+
+
+def _mark_phase3_video_appearance_real_operation(item: dict[str, Any]) -> None:
+    operation = _phase3_video_appearance_operation(item)
+    if operation is None:
+        return
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": True,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase3d_video_appearance_candidate": True,
+            "future_gate_requirements": [
+                "phase3d_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation.pop("planned_only_reason", None)
+
+
+def _label_phase3_video_appearance_rejection(item: dict[str, Any]) -> None:
+    operation = _phase3_video_appearance_operation(item)
+    if operation is not None:
+        operation["planned_only_reason"] = "video_appearance_requires_confirm_token"
+
+
+def _refresh_phase3_video_appearance_real_result(
+    result: dict[str, Any],
+    item: dict[str, Any],
+) -> None:
+    appearance_operation = _phase3_video_appearance_operation(item)
+    if appearance_operation is None or not result.get("executed_operations"):
+        return
+    property_name = appearance_operation["property"]
+    for operation in result.get("operations") or []:
+        if operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    for operation in result.get("planned_operations") or []:
+        if operation.get("operation") == "set_property" and operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    plan = result.get("updateq_plan")
+    if isinstance(plan, dict):
+        cue_type = (result.get("before") or {}).get("type") or "visual"
+        plan["status"] = result.get("status")
+        plan["intent"] = f"Executed saved {property_name} change on {cue_type} cue."
+        plan["real_write_enabled"] = True
+        plan["real_write_possible"] = True
+        plan["requires_confirm_token"] = True
+        plan.pop("why_not_written", None)
+        plan["after"] = (result.get("after") or {}).get(property_name)
+        plan["verification"] = {"readback_matched": result.get("errors") is None}
+        safety = dict(plan.get("safety") or {})
+        safety.update({"no_executed_operations": False, "will_modify_qlab": True})
+        plan["safety"] = safety
+
+
 def _summarize_light_command_analysis(helper_result: dict[str, Any]) -> dict[str, Any]:
     results = helper_result.get("results") if isinstance(helper_result.get("results"), list) else []
     status_counts = {status: 0 for status in ("valid", "warning", "invalid", "unsupported")}
@@ -1504,7 +3198,10 @@ def _batch_item_result(
     after: dict[str, Any] | None,
     errors: dict[str, str] | None,
     warnings: list[str],
+    notices: list[str] | None = None,
 ) -> dict[str, Any]:
+    item_notices = list(notices or [])
+    diff = _diff_properties(before, item["properties"], after)
     planned_operations = []
     if not errors:
         planned_operations = _planned_update_operations(
@@ -1513,7 +3210,7 @@ def _batch_item_result(
             item["operations"],
             resolved_cue_id=cue_id,
         )
-    return {
+    result = {
         "cue_ref": item["cue_ref"],
         "cue_id": cue_id,
         "profile": item["profile"],
@@ -1523,12 +3220,146 @@ def _batch_item_result(
         "confirm_gates": item["confirm_gates"],
         "before": before,
         "after": after,
-        "diff": _diff_properties(before, item["properties"], after),
+        "diff": diff,
         "planned_operations": planned_operations,
         "executed_operations": [],
         "errors": errors,
         "warnings": warnings,
+        "notices": item_notices,
     }
+    updateq_plan = _video_phase2_updateq_plan(item, before, diff, errors, item_notices)
+    if updateq_plan is not None:
+        result["updateq_plan"] = updateq_plan
+    return result
+
+
+def _video_phase2_updateq_plan(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+    diff: dict[str, dict[str, Any]],
+    errors: dict[str, str] | None,
+    notices: list[str],
+) -> dict[str, Any] | None:
+    property_names = list(dict.fromkeys(item.get("requested_property_names") or ()))
+    operations = {str(operation.get("property", "")): operation for operation in item.get("operations") or []}
+    if item.get("profile") not in VIDEO_PHASE2_PROFILES or not any(
+        _is_video_phase2_property(name, operations.get(name)) for name in property_names
+    ):
+        return None
+
+    property_name = property_names[0] if len(property_names) == 1 else None
+    cue_values = before or {}
+    cue = {
+        "uniqueID": cue_values.get("uniqueID")
+        or (item.get("cue_ref") if _is_exact_cue_uuid(item.get("cue_ref")) else None),
+        "number": cue_values.get("number"),
+        "name": cue_values.get("name"),
+        "type": cue_values.get("type"),
+    }
+    safety = {
+        "no_live": True,
+        "no_playback": True,
+        "no_workspace_video_write": True,
+        "no_executed_operations": True,
+        "will_modify_qlab": False,
+    }
+    notice_explanations = {}
+    if "cue_disarmed" in notices:
+        notice_explanations["cue_disarmed"] = (
+            "Cue is disarmed; this affects playback readiness, not saved-property planning."
+        )
+
+    if errors:
+        reason = errors.get(property_name) if property_name else None
+        reason = reason or next(iter(errors.values()))
+        return {
+            "status": "rejected",
+            "intent": f"Reject {property_name or 'requested'} Video-family change.",
+            "cue": cue,
+            "property": property_name,
+            "profile": item["profile"],
+            "reason": reason,
+            "planned_mutation": False,
+            "real_write_enabled": False,
+            "real_write_possible": False,
+            "requires_confirm_token": False,
+            "notices": notices,
+            "notice_explanations": notice_explanations,
+            "suggestion": _video_phase2_updateq_suggestion(property_name, reason),
+            "safety": safety,
+        }
+
+    if property_name not in VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES:
+        return None
+    operation = operations[property_name]
+    property_diff = diff.get(property_name, {})
+    plan = {
+        "status": "planned",
+        "intent": f"Preview saved {property_name} change on {cue.get('type') or 'visual'} cue.",
+        "cue": cue,
+        "property": property_name,
+        "profile": item["profile"],
+        "mode": "saved",
+        "before": property_diff.get("before"),
+        "requested": property_diff.get("requested"),
+        "diff": property_diff,
+        "risk_tier": operation["risk_tier"],
+        "real_write_enabled": bool(operation.get("real_write_enabled")),
+        "real_write_possible": bool(operation.get("real_write_possible")),
+        "requires_confirm_token": bool(operation.get("requires_confirm_token")),
+        "why_not_written": operation.get("planned_only_reason"),
+        "future_gate_requirements": list(operation.get("future_gate_requirements") or []),
+        "notices": notices,
+        "notice_explanations": notice_explanations,
+        "safety": safety,
+    }
+    if property_name == "text":
+        plan.update(
+            {
+                "format_inheritance_warning": True,
+                "warning": "Changing text inherits formatting from the first existing character.",
+            }
+        )
+    return plan
+
+
+def _is_video_phase2_property(property_name: str, operation: dict[str, Any] | None) -> bool:
+    if property_name in VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES:
+        return True
+    if operation and not operation.get("real_write_enabled"):
+        return True
+    return (
+        property_name in {"anchor", "crop", "fileTarget", "quaternion", "resetRotation", "rotation", "scale", "translation"}
+        or property_name == "cameraPatch"
+        or property_name.startswith(("rotate/", "stage", "text/format", "videoEffect", "videoInputPatch"))
+    )
+
+
+def _video_phase2_updateq_suggestion(property_name: str | None, reason: str) -> str | None:
+    name = property_name or ""
+    if "live" in reason.casefold():
+        return "Retry the same scalar property as a saved-mode dry-run."
+    scalar_geometry = {
+        "anchor": "anchor/x and anchor/y",
+        "translation": "translation/x and translation/y",
+        "scale": "scale/x and scale/y",
+        "crop": "cropTop, cropBottom, cropLeft, and cropRight",
+    }
+    if name in scalar_geometry:
+        return f"Plan {scalar_geometry[name]} separately as saved-mode dry-runs."
+    if name in {"quaternion", "resetRotation", "rotation"} or name.startswith("rotate/"):
+        return "Rotation editing is deferred to a dedicated rotation phase."
+    if name == "fileTarget":
+        return "Media target editing is outside current Video write scope."
+    if name.startswith("videoEffect"):
+        return "Video FX mutations are deferred to a later Video FX phase."
+    if name == "cameraPatch" or name.startswith("videoInputPatch"):
+        return "Camera patch editing is blocked; inspect the input patch read-only instead."
+    if name.startswith("stage"):
+        return "Stage editing is blocked; inspect stage topology read-only instead."
+    if name.startswith("text/format"):
+        return "Rich text editing is blocked; use one allowed scalar text property when applicable."
+    return None
 
 
 def _batch_update_result(
@@ -1666,6 +3497,11 @@ def _planned_update_operations(
         for key in (
             "real_write_possible",
             "requires_confirm_token",
+            "future_gate_requirements",
+            "phase3_video_opacity_candidate",
+            "phase3b_video_translation_candidate",
+            "phase3c_video_scalar_candidate",
+            "phase3d_video_appearance_candidate",
             "phase4_real_write_candidate",
             "phase5_light_behavior_candidate",
             "light_command_analysis",

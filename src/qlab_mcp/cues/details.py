@@ -12,6 +12,7 @@ from ..write.registry import editable_update_capabilities
 from .profiles import (
     _auto_type_specific_keys,
     _build_auto_sections,
+    _build_video_summary,
     _derive_profile_fields,
     _empty_auto_sections,
     _is_active_cue_ref,
@@ -126,6 +127,33 @@ def _normalize_cue_detail_result(result: dict[str, Any]) -> dict[str, Any]:
 
 
 class CueDetailsMixin:
+    def _attach_video_summaries(
+        self,
+        workspace_id: str,
+        results: list[dict[str, Any]],
+        profile: str,
+    ) -> None:
+        if profile.strip().lower() != "inspector_safe":
+            return
+        visual_results = [
+            result for result in results
+            if str(result.get("cue_type") or "").strip().casefold() in {"video", "text", "camera"}
+        ]
+        if not visual_results:
+            return
+        settings_errors: dict[str, str] = {}
+        try:
+            video_settings = self._workspace_settings_video(workspace_id, "safe", [], settings_errors)
+        except Exception as exc:
+            settings_errors["video.settings"] = sanitize_exception_message(exc)
+            video_settings = None
+        for result in visual_results:
+            summary = _build_video_summary(result.get("properties", {}), video_settings, settings_errors)
+            if summary is None:
+                continue
+            sections = result.setdefault("sections", {})
+            sections["video_summary"] = summary
+
     def _read_cue_values_with_fallback(
         self,
         workspace_id: str,
@@ -332,7 +360,9 @@ class CueDetailsMixin:
                 "warnings": ["Requested workspace could not be resolved."],
             }
         if isinstance(cue_ref, str):
-            return _normalize_cue_detail_result(self._get_single_cue_details(resolved_workspace_id, cue_ref, profile))
+            result = _normalize_cue_detail_result(self._get_single_cue_details(resolved_workspace_id, cue_ref, profile))
+            self._attach_video_summaries(resolved_workspace_id, [result], profile)
+            return result
         if not isinstance(cue_ref, list):
             raise ValueError("cue_ref must be a string or a list of strings")
         if not cue_ref:
@@ -376,6 +406,7 @@ class CueDetailsMixin:
                 failed_count += 1
 
         succeeded_count = len(cue_ref) - failed_count
+        self._attach_video_summaries(resolved_workspace_id, results, profile)
         if failed_count:
             warnings.append("One or more cue detail reads failed; inspect errors for per-cue failures.")
         batch_result = {

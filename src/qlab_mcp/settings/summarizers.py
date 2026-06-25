@@ -170,6 +170,22 @@ def _summarize_audio_map_detail(item: Any) -> dict[str, Any]:
     }
 
 
+def _summarize_video_device(item: Any) -> dict[str, Any]:
+    if not isinstance(item, dict):
+        return {"present": False}
+    summary: dict[str, Any] = {"present": bool(item)}
+    name = _first_present(item, ("name", "deviceName", "displayName"))
+    device_type = _first_present(item, ("destinationType", "deviceType", "type"))
+    if name is not None:
+        summary["name"] = name
+    if device_type is not None:
+        summary["type"] = device_type
+    connected = item.get("connected")
+    if connected is not None:
+        summary["connected"] = connected
+    return summary
+
+
 def _summarize_video_route(item: Any) -> dict[str, Any]:
     summary = _basic_item_summary(item)
     if isinstance(item, dict):
@@ -189,16 +205,26 @@ def _summarize_video_route(item: Any) -> dict[str, Any]:
             destination_type = destination_info.get("destinationType")
             if destination_type is not None:
                 summary["destination_type"] = destination_type
+            summary["device"] = _summarize_video_device(destination_info)
         summary["destination_present"] = _contains_any_key(item, {"destinationinfo", "device", "deviceid", "devicename"})
         summary["guides_present"] = _contains_any_key(item, {"enableguides", "guides"})
     return summary
 
 
-def _summarize_video_input_patch(item: Any) -> dict[str, Any]:
+def _summarize_video_input_patch(item: Any, number: int | None = None) -> dict[str, Any]:
     summary = _basic_item_summary(item)
+    if number is not None:
+        summary["number"] = number
     if isinstance(item, dict):
-        summary["device_present"] = _contains_any_key(item, SAFE_DEVICE_REDACT_KEYS)
-        summary["source_present"] = _contains_any_key(item, {"source", "input", "camera", "capturedevice"})
+        device_known = "device_present" in item or _contains_any_key(item, SAFE_DEVICE_REDACT_KEYS)
+        source_known = "source_present" in item or _contains_any_key(item, {"source", "input", "camera", "capturedevice"})
+        summary["device_present"] = bool(item.get("device_present")) if "device_present" in item else device_known
+        summary["source_present"] = bool(item.get("source_present")) if "source_present" in item else source_known
+        summary["device_presence_known"] = device_known
+        summary["source_presence_known"] = source_known
+        for key in ("connected", "available"):
+            if key in item:
+                summary[key] = item[key]
     return summary
 
 
@@ -213,21 +239,29 @@ def _summarize_video_stage(item: Any, regions: Any | None = None) -> dict[str, A
         embedded_region_count = _count_nested(item, ("regions",))
         if embedded_region_count is not None:
             summary["region_count"] = embedded_region_count
-        route = None
-        item_regions = item.get("regions")
-        if isinstance(item_regions, list) and item_regions and isinstance(item_regions[0], dict):
-            route = item_regions[0].get("route")
-        if isinstance(route, dict):
-            route_summary = _summarize_video_route(route)
-            if route_summary:
-                summary["route"] = route_summary
-    if regions is not None:
-        summary["region_count"] = len(_collection_items(regions))
+    region_items = _collection_items(regions if regions is not None else item.get("regions") if isinstance(item, dict) else None)
+    region_summaries = [_summarize_video_region(region, index) for index, region in enumerate(region_items)]
+    summary["region_count"] = len(region_summaries)
+    summary["regions"] = region_summaries
+    route_keys: set[tuple[str, str]] = set()
+    for region in region_summaries:
+        route = region.get("route")
+        if not isinstance(route, dict):
+            continue
+        route_id = route.get("uniqueID")
+        route_name = route.get("name")
+        device = route.get("device") if isinstance(route.get("device"), dict) else {}
+        key = (str(route_id or route_name or ""), str(device.get("name") or device.get("type") or ""))
+        if any(key):
+            route_keys.add(key)
+    summary["multi_output"] = len(route_keys) > 1
     return summary
 
 
-def _summarize_video_region(item: Any) -> dict[str, Any]:
+def _summarize_video_region(item: Any, index: int | None = None) -> dict[str, Any]:
     summary = _basic_item_summary(item)
+    if index is not None:
+        summary["index"] = index
     if not isinstance(item, dict):
         return summary
     for key in (
@@ -260,7 +294,10 @@ def _summarize_video_region(item: Any) -> dict[str, Any]:
 
 
 def _summarize_video_stage_detail(stage: Any, regions: Any | None) -> dict[str, Any]:
-    region_summaries = [_summarize_video_region(region) for region in _collection_items(regions)]
+    region_summaries = [
+        _summarize_video_region(region, index)
+        for index, region in enumerate(_collection_items(regions))
+    ]
     return {
         "stage": _summarize_video_stage(stage, regions),
         "regions": region_summaries,
@@ -271,6 +308,28 @@ def _summarize_video_stage_detail(stage: Any, regions: Any | None) -> dict[str, 
             "regions[].route.destinationInfo",
         ],
     }
+
+
+def _video_settings_problems(stages: list[dict[str, Any]], routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    problems: list[dict[str, Any]] = []
+    for route in routes:
+        if route.get("connected") is False:
+            problems.append({"code": "disconnected_route", "route": _basic_item_summary(route)})
+        device = route.get("device") if isinstance(route.get("device"), dict) else {}
+        if device.get("connected") is False:
+            problems.append({"code": "disconnected_device", "route": _basic_item_summary(route)})
+        if route.get("destination_present") is False:
+            problems.append({"code": "route_without_device", "route": _basic_item_summary(route)})
+    for stage in stages:
+        routed_regions = [
+            region for region in stage.get("regions", [])
+            if isinstance(region, dict) and isinstance(region.get("route"), dict) and region["route"]
+        ]
+        if not routed_regions:
+            problems.append({"code": "stage_without_routes", "stage": _basic_item_summary(stage)})
+        if stage.get("multi_output") is True:
+            problems.append({"code": "multi_output_stage", "stage": _basic_item_summary(stage)})
+    return problems
 
 
 def _summarize_network_patch(item: Any) -> dict[str, Any]:

@@ -399,7 +399,8 @@ Structured update operations inside each item use this shape:
 
 References:
 
-- [QLab update cues runtime checklist](docs/qlab_update_cues_runtime_checklist.md)
-- [Update cue OSC coverage snapshot](docs/updateq_osc_coverage_snapshot.md)
-- [QLab OSC dictionary](references/qlab/qlab_osc_dictionary.md)
-- [QLab OSC queries](references/qlab/osc_queries.md)
+- [QLab update cues runtime checklist](docs/current/qlab_update_cues_runtime_checklist.md)
+- [Update cue OSC coverage snapshot](docs/current/updateq_osc_coverage_snapshot.md)
+- [QLab OSC dictionary](docs/references/qlab_osc_dictionary.md)
+- [QLab OSC queries](docs/references/osc_queries.md)
+- [Video Phase 1 OSC matrix](docs/references/video_phase1_osc_matrix.md)

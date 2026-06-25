@@ -446,6 +446,11 @@ INSPECTOR_SAFE_PROFILE = tuple(
             *tuple(sorted(TARGET_PROPERTIES - SENSITIVE_CUE_PROPERTIES)),
             *tuple(sorted(GROUP_PROPERTIES)),
             *tuple(sorted(TYPE_SPECIFIC_PROPERTIES - SENSITIVE_CUE_PROPERTIES - HEAVY_CUE_PROPERTIES)),
+            "cueSize",
+            "cueSize/width",
+            "cueSize/height",
+            "text/outputSize/width",
+            "text/outputSize/height",
         )
     )
 )

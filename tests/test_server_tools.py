@@ -125,7 +125,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         },
         "tags": ["batch-update", "cue-update", "gated-write", "qlab", "write-mode"],
         "input_schema_hash": "d5202803e7b8b5bf7a07bc3693b27b3c86715258957fa8283284656cd6b280f6",
-        "output_schema_hash": "748245a9a4bccbd1764f91827536bed33e0e29b735eff3b6034d35bfcfbcd808",
+        "output_schema_hash": "853257a5192b69f070e159611c4aa2151bc998d905a789cca4b93eaea37b7e61",
     },
 }
 EXPECTED_DESCRIPTION_PHRASES = {
@@ -271,6 +271,7 @@ def test_update_cues_fastmcp_schema_keeps_batch_contract() -> None:
         "message",
     ]
     assert "updated_with_confirmed_timeouts" in update_output["properties"]["status"]["enum"]
+    assert "updateq_plan" in update_output["properties"]["results"]["items"]["properties"]
 
 
 def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -> None:

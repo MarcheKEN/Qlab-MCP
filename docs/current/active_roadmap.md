@@ -1,6 +1,6 @@
 # Active Roadmap
 
-Status: 2026-06-25
+Status: 2026-06-28
 
 ## Closed
 
@@ -19,6 +19,9 @@ Status: 2026-06-25
   and `Text`: `blendMode` and `preserveAspectRatio`.
 - Video Phase 3E — saved Text Basics real writes for `Text` cues:
   `text`, `text/format/fontSize`, and `text/format/alignment`.
+- Video Phase 4C — saved Video FX scalar real write for `Video` cues only:
+  exact cue UUID only, `videoEffectIndex/0/parameter/inputRadius`, finite
+  numeric scalar, saved mode only.
 
 Phase 3A runtime validation confirmed token-gated single-property writes, fresh
 readback, new-token rollback, and restored baselines for all three cue types.
@@ -51,18 +54,38 @@ as `status="updated"` with warning `setter_timeout_but_readback_matched`, and
 no mutating retry occurred. No GO, playback, audition, `/live`, raw OSC, save,
 or unrelated mutation was used.
 
-## Next
+Phase 4C was independently runtime validated on `v11 dorado.png`
+(`680CB8B6-CA66-4D15-AC15-0A92FC3E89FE`) in `mcp_prueba.qlab5`
+(`95F0A03D-140E-4673-974A-E76748EBB023`) with QLab 5.5.10. The only supported
+real write is `Video` `videoEffectIndex/0/parameter/inputRadius` in saved mode,
+using an exact cue UUID and a finite numeric scalar. Baseline `10` changed to
+`11`, fresh readback matched, then rollback used a fresh token and restored
+`10`. Rejection probes blocked fake token, stale/used token, wrong value, wrong
+index, wrong parameter, cue number, Camera cue, Text cue, `/live`, batch,
+multi-property, name-based effect targeting, enabled/disabled, string/color/
+structured value, and broken cue before mutation with `executed_operations=[]`.
+QLab setter timeout with matching fresh readback was accepted as confirmed
+success with warning `setter_timeout_but_readback_matched`; no mutating retry
+occurred. Stale/used-token rejection was observed as a no-op baseline rejection,
+not an explicit consumed-token diagnostic.
 
-Video Phase 3F — Text Style. Optional future candidate only:
+## In local validation
 
-- `fontName`
-- text color
-- background color
-- shadow
-- underline and strikethrough
+Video Phase 3F — Text Style:
 
-Do not implement unless the OSC dictionary and exact deterministic readback are
-clear for each property.
+- blocked after QLab 5.5.10 runtime validation did not return reliable fresh
+  baselines/readback for `shadowBlurRadius`, `shadowOffset/width`,
+  `shadowOffset/height`, `underlineStyle`, or `strikethroughStyle`
+- no `confirm:textStyle:v1:` tokens emitted
+- no Text Style setters enabled
+
+Video Phase 4A/4B — Video FX read model and dry-run planner:
+
+- lightweight safe effect/parameter summaries
+- dry-run only for enabled state and existing scalar parameters by name/index;
+  QLab 5.5.10 flat `videoEffects` payload keys are treated as parameter-like
+  fields when addressed by index
+- no token and no Video FX real write
 
 See:
 
@@ -71,15 +94,27 @@ See:
 - `workorders/004_implement_phase3c_visual_scalars.md`
 - `workorders/005_implement_phase3d_visual_appearance.md`
 - `workorders/006_implement_phase3e_text_basics.md`
+- `workorders/007_text_style_and_video_fx_read_plan.md`
+- `workorders/008_video_fx_real_write_candidate.md`
 
 ## Safety boundary
 
-Phase 3E is runtime validated and closed. Keep blocked:
+Phase 3E and Phase 4C are runtime validated and closed. Phase 3F remains
+blocked because runtime readback was unavailable; Phase 4A/4B remain
+read/dry-run only except for the closed Phase 4C candidate. Keep blocked:
 
 - playback, GO, Dashboard, raw OSC, and `/live`
 - Workspace Video writes
 - stage, region, route, warping, and control-point writes
-- Video FX, `fileTarget`, camera/video-input patch, rotation, and shutter writes
-- rich text format, font name, text/background/shadow colors, text
-  decorations, `doOpacity`, and clock-type real writes
+- all Video FX real writes except the Phase 4C closed `Video` exact-UUID,
+  saved-mode, finite-numeric `videoEffectIndex/0/parameter/inputRadius`
+  candidate; FX add/insert/delete/move, enabled/disabled, name-targeted writes,
+  Camera/Text FX, aggregate parameter planning, color/structured/string/enum
+  parameters, and `/live`
+- future Video FX candidates are limited to more scalar `Video` parameters,
+  Camera/Text FX after separate proof, and enabled/disabled after stable
+  readback; color and structured parameters remain blocked
+- `fileTarget`, camera/video-input patch, rotation, and shutter writes
+- rich text format, font name, text/background/shadow colors, aggregate shadow
+  offset, `doOpacity`, and clock-type real writes
 - batch and multi-property Video-family real writes

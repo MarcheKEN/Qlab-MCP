@@ -3173,6 +3173,31 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(server.received[0], "/workspace/ws-1/cueLists/shallow")
         self.assertNotIn("/workspace/ws-1/cueLists/uniqueIDs", server.received)
 
+    def test_query_cues_chunks_large_profile_reads_under_qlab_limit(self) -> None:
+        cue_id = "22222222-2222-4222-8222-222222222222"
+        responses = {
+            "/workspace/ws-1/cueLists/uniqueIDs": [
+                {"uniqueID": "list-id", "cues": [{"uniqueID": cue_id, "cues": []}]}
+            ],
+            f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys": {
+                "uniqueID": cue_id,
+                "number": "1",
+                "name": "Projection",
+                "displayName": "1 Projection",
+                "type": "Video",
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            result = QLabReader(client_for(server)).query_cues(
+                "ws-1",
+                "type",
+                "Video",
+                profile="inspector_safe",
+            )
+
+        self.assertEqual(result["matched_count"], 1)
+        self.assertGreater(server.received.count(f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys"), 1)
+
     def test_query_cues_supports_5000_scan_limit_before_expensive_reads(self) -> None:
         cue_ids = [f"{index:032d}-aaaa-bbbb-cccc-{index:012d}" for index in range(5001)]
         cues = [{"uniqueID": cue_id, "type": "Audio"} for cue_id in cue_ids]
@@ -4615,7 +4640,14 @@ class QLabReaderTests(unittest.TestCase):
                 "preserveAspectRatio": True,
                 "quaternion": [0, 0, 0, 1],
                 "smooth": True,
-                "videoEffects": [{"name": "blur"}],
+                "videoEffects": [
+                    {
+                        "name": "blur",
+                        "enabled": True,
+                        "parameters": {"inputRadius": 5, "inputVector": [0, 1]},
+                        "internalMetadata": {"raw": True},
+                    }
+                ],
             },
         }
         with FakeQlabOscServer(responses) as server:
@@ -4629,6 +4661,10 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["properties"]["anchor"], [0.5, 0.5])
         self.assertEqual(result["properties"]["cueSize/width"], 640)
         self.assertEqual(result["properties"]["layer"], 5)
+        self.assertEqual(
+            result["properties"]["videoEffects"][0]["internalMetadata"],
+            {"raw": True},
+        )
         self.assertIn("large, sensitive", result["warnings"][0])
         self.assertEqual(result["read_coverage"]["status"], "available")
         self.assertGreater(result["read_coverage"]["status_counts"]["live_omitted"], 0)
@@ -4741,7 +4777,21 @@ class QLabReaderTests(unittest.TestCase):
                 "opacity": 0.8,
                 "translation": {"x": 10, "y": 20},
                 "scale": {"x": 1.5, "y": 1.5},
-                "videoEffects": [{"name": "Blur", "inputRadius": 5}],
+                "videoEffects": [
+                    {
+                        "name": "Blur",
+                        "enabled": True,
+                        "type": "CIFilter",
+                        "parameters": {
+                            "inputRadius": 5,
+                            "mode": "soft",
+                            "enabledFlag": True,
+                            "tint": [1, 0.5, 0, 1],
+                            "vector": [1, 2],
+                        },
+                        "internalMetadata": {"heavy": True},
+                    }
+                ],
                 "stage": {"regions": [{"controlPoints": [1, 2, 3, 4]}]},
                 "stage/regions": [{"controlPoints": [1, 2, 3, 4]}],
             },
@@ -4760,6 +4810,71 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(summary["cue"]["uniqueID"], "cue-id")
         self.assertEqual(summary["stage"]["region_count"], 2)
         self.assertTrue(summary["stage"]["multi_output"])
+        self.assertEqual(
+            summary["video_fx"]["effects"][0]["parameters"],
+            [
+                {
+                    "dry_run_candidate": True,
+                    "kind": "boolean",
+                    "key": "enabledFlag",
+                    "readback_stable": True,
+                    "risk": "high",
+                    "scalar": True,
+                    "value": True,
+                    "value_type": "bool",
+                    "writable_path_documented": True,
+                },
+                {
+                    "key": "inputRadius",
+                    "value": 5,
+                    "value_type": "int",
+                    "kind": "number",
+                    "scalar": True,
+                    "readback_stable": True,
+                    "writable_path_documented": True,
+                    "dry_run_candidate": True,
+                    "risk": "high",
+                },
+                {
+                    "key": "mode",
+                    "value": "soft",
+                    "value_type": "str",
+                    "kind": "enum_or_string",
+                    "scalar": True,
+                    "readback_stable": True,
+                    "writable_path_documented": True,
+                    "dry_run_candidate": True,
+                    "risk": "high",
+                },
+                {
+                    "dry_run_candidate": False,
+                    "kind": "color",
+                    "key": "tint",
+                    "readback_stable": False,
+                    "risk": "high",
+                    "scalar": False,
+                    "value_type": "list",
+                    "writable_path_documented": True,
+                },
+                {
+                    "dry_run_candidate": False,
+                    "kind": "structured",
+                    "key": "vector",
+                    "readback_stable": False,
+                    "risk": "high",
+                    "scalar": False,
+                    "value_type": "list",
+                    "writable_path_documented": True,
+                },
+            ],
+        )
+        self.assertTrue(summary["video_fx"]["effects"][0]["enabled"])
+        self.assertEqual(summary["video_fx"]["effects"][0]["type"], "CIFilter")
+        self.assertEqual(
+            summary["video_fx"]["effects"][0]["addressing"],
+            {"by_index": "videoEffectIndex/0", "by_name": "videoEffect/Blur"},
+        )
+        self.assertNotIn("internalMetadata", summary["video_fx"]["effects"][0])
         self.assertEqual(
             summary["stage"]["regions"][0],
             {
@@ -4794,6 +4909,69 @@ class QLabReaderTests(unittest.TestCase):
         self.assertNotIn("stage", result["properties"])
         self.assertNotIn("stage/regions", result["properties"])
         self.assertEqual(server.received.count("/workspace/ws-1/settings/video/stages"), 1)
+
+    def test_inspector_safe_video_fx_missing_info_degrades_to_empty_summary(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "number": "10",
+                "name": "No FX",
+                "type": "Video",
+                "isBroken": False,
+                "isWarning": False,
+            },
+            "/workspace/ws-1/settings/video/inputPatchList": [],
+            "/workspace/ws-1/settings/video/routes": [],
+            "/workspace/ws-1/settings/video/stages": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            result = QLabReader(client_for(server)).get_cue_details(
+                "ws-1",
+                "10",
+                "inspector_safe",
+            )
+
+        assert result["sections"]["video_summary"]["video_fx"] == {
+            "hasVideoEffects": False,
+            "effect_count": 0,
+            "effects": [],
+            "raw_effect_keys": [],
+        }
+
+    def test_inspector_safe_video_fx_flat_payload_summarizes_parameter_like_keys(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "number": "10",
+                "name": "Flat FX",
+                "type": "Video",
+                "isBroken": False,
+                "isWarning": False,
+                "videoEffects": [{"Choose_Effect": 0, "inputIntensity": 2.5, "inputRadius": 10}],
+            },
+            "/workspace/ws-1/settings/video/inputPatchList": [],
+            "/workspace/ws-1/settings/video/routes": [],
+            "/workspace/ws-1/settings/video/stages": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            result = QLabReader(client_for(server)).get_cue_details(
+                "ws-1",
+                "10",
+                "inspector_safe",
+            )
+
+        effect = result["sections"]["video_summary"]["video_fx"]["effects"][0]
+        assert effect["identity_available"] is False
+        assert effect["type_available"] is False
+        assert effect["enabled_available"] is False
+        assert effect["parameters_source"] == "flat_payload"
+        assert effect["addressing"] == {"by_index": "videoEffectIndex/0"}
+        assert [item["key"] for item in effect["parameters"]] == [
+            "Choose_Effect",
+            "inputIntensity",
+            "inputRadius",
+        ]
+        assert all(item["dry_run_candidate"] is True for item in effect["parameters"])
 
     def test_technical_and_exhaustive_preserve_raw_video_regions(self) -> None:
         raw_region = {

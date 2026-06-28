@@ -36,8 +36,24 @@ Generated view: `extract_cue_osc_inventory(...)` + `registry_coverage(...)` agai
 - `cueTargetName` remains blocked for real writes; callers must use `cueTargetID` or `cueTargetNumber`.
 - `Mic.channelOffset` is gated by `patch_routing` until input patch bounds validation exists.
 - Dangerous output families remain gated: audio output, patch routing, video visual/effects, text rich format, fade targets, light output, network output, MIDI output, script compile.
-- Video Phase 1 keeps every Video/Text visual setter dry-run only; generic confirm tokens cannot authorize real writes.
-- Video Phase 1 rejects fileTarget, videoInputPatchName/Number/ID, and every Video FX mutation before dry-run planning or any OSC read/write.
+- Video Phases 3A–3E expose only their documented token-gated scalar/Text
+  setters. Phase 3F Text Style candidates are blocked because QLab 5.5.10 did
+  not return reliable fresh baselines/readback; no `confirm:textStyle:v1:` token
+  is emitted. Phase 4C exposes one runtime-validated Video FX scalar exception:
+  `Video`, exact cue UUID, saved mode, `videoEffectIndex/0/parameter/inputRadius`,
+  finite numeric scalar only.
+- `fileTarget`, videoInputPatchName/Number/ID, Workspace Video, and all Video FX
+  real writes remain blocked except that Phase 4C exception.
+- Video FX dry-run planning is limited to enabled state and existing scalar
+  parameters by exact name/index. QLab 5.5.10 flat effect payload keys are
+  treated as parameter-like fields for index dry-runs. Only the closed Phase 4C
+  `inputRadius` candidate emits `confirm:videoFxScalar:v1:` and may execute a
+  single saved setter; other FX plans emit no token and execute no setter.
+- Phase 4C runtime validation used QLab 5.5.10, changed `inputRadius` `10 -> 11`,
+  rolled back `11 -> 10` with a fresh token, and accepted QLab setter timeout
+  only because fresh readback matched with `setter_timeout_but_readback_matched`.
+  The stale/used-token probe rejected before mutation via no-op baseline rather
+  than an explicit consumed-token diagnostic.
 
 ## Gate Map
 

@@ -92,11 +92,26 @@ class FakeWriteClient:
             property_name = self._property_name_from_address(address, known_ids)
             if property_name == self.fail_set_property:
                 raise QLabReplyError("error", f"Failed setting {property_name}", address)
-            self.cue_values[property_name] = args[0] if args else None
+            self._set_property(property_name, args[0] if args else None)
             if property_name == self.timeout_set_property:
                 raise OscTimeoutError(f"Timed out waiting for QLab reply to {address}")
             return SimpleNamespace(data=None, status="ok")
         raise AssertionError(f"Unexpected fake write request: {address}")
+
+    def _set_property(self, property_name: str, value: Any) -> None:
+        if property_name == "videoEffectIndex/0/parameter/inputRadius":
+            effects = self.cue_values.setdefault("videoEffects", [])
+            while len(effects) <= 0:
+                effects.append({})
+            effect = effects[0]
+            if isinstance(effect, dict):
+                parameters = effect.get("parameters")
+                if isinstance(parameters, dict) and "inputRadius" in parameters:
+                    parameters["inputRadius"] = value
+                else:
+                    effect["inputRadius"] = value
+                return
+        self.cue_values[property_name] = value
 
     @staticmethod
     def _property_name_from_address(address: str, known_ids: set[str]) -> str:
@@ -181,7 +196,7 @@ class BatchFakeWriteClient:
             if self.timeout_apply_after_reads is not None:
                 for (pending_cue_id, pending_prop), pending_value in list(self.pending_timeout_applies.items()):
                     if pending_cue_id == cue_id and self.after_read_counts[cue_id] >= self.timeout_apply_after_reads:
-                        self.cues[pending_cue_id][pending_prop] = pending_value
+                        self._set_property(pending_cue_id, pending_prop, pending_value)
                         del self.pending_timeout_applies[(pending_cue_id, pending_prop)]
             return SimpleNamespace(data=dict(self.cues[cue_id]), status="ok")
         if self.fail_set_property == (cue_id, prop):
@@ -192,14 +207,29 @@ class BatchFakeWriteClient:
                 time.sleep(reply_timeout)
             if not timeout_without_apply:
                 if self.timeout_apply_after_reads is None:
-                    self.cues[cue_id][prop] = args[0] if args else None
+                    self._set_property(cue_id, prop, args[0] if args else None)
                 else:
                     self.pending_timeout_applies[(cue_id, prop)] = args[0] if args else None
             raise OscTimeoutError(f"Timed out waiting for QLab reply to {address}")
         if self.ignore_set_property == (cue_id, prop):
             return SimpleNamespace(data=None, status="ok")
-        self.cues[cue_id][prop] = args[0] if args else None
+        self._set_property(cue_id, prop, args[0] if args else None)
         return SimpleNamespace(data=None, status="ok")
+
+    def _set_property(self, cue_id: str, prop: str, value: Any) -> None:
+        if prop == "videoEffectIndex/0/parameter/inputRadius":
+            effects = self.cues[cue_id].setdefault("videoEffects", [])
+            while len(effects) <= 0:
+                effects.append({})
+            effect = effects[0]
+            if isinstance(effect, dict):
+                parameters = effect.get("parameters")
+                if isinstance(parameters, dict) and "inputRadius" in parameters:
+                    parameters["inputRadius"] = value
+                else:
+                    effect["inputRadius"] = value
+                return
+        self.cues[cue_id][prop] = value
 
     def _cue_id_and_property(self, address: str) -> tuple[str | None, str | None]:
         cue_id_prefix = f"/workspace/{self.workspace_id}/cue_id/"
@@ -320,6 +350,11 @@ VIDEO_PHASE2_ALLOWED_PROPERTIES = {
     "text/format/alignment",
     "text/format/fontName",
     "text/format/fontSize",
+    "text/format/shadowBlurRadius",
+    "text/format/shadowOffset/width",
+    "text/format/shadowOffset/height",
+    "text/format/underlineStyle",
+    "text/format/strikethroughStyle",
     "translation/x",
     "translation/y",
 }
@@ -338,6 +373,19 @@ PHASE3E_TEXT_BASIC_PROPERTIES = {
     "text",
     "text/format/alignment",
     "text/format/fontSize",
+}
+PHASE3F_TEXT_STYLE_VALUES = {
+    "text/format/shadowBlurRadius": 2,
+    "text/format/shadowOffset/width": 1,
+    "text/format/shadowOffset/height": -1,
+    "text/format/underlineStyle": "none",
+    "text/format/strikethroughStyle": "single",
+}
+VIDEO_PHASE4_FX_DRY_RUN_PROPERTIES = {
+    "videoEffect/enabled",
+    "videoEffectIndex/enabled",
+    "videoEffect/parameter",
+    "videoEffectIndex/parameter",
 }
 VIDEO_PHASE2_REQUESTED_VALUES = {
     "anchor/x": 12.5,
@@ -1009,6 +1057,8 @@ def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_os
             "text/format/alignment": "left",
             "text/format/fontSize": 48,
         }[prop_name]
+    elif profile == "text_basic" and prop_name in PHASE3F_TEXT_STYLE_VALUES:
+        cue_values[prop_name] = PHASE3F_TEXT_STYLE_VALUES[prop_name]
     dry_client = FakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
         existing_cue_id=cue_id,
@@ -1038,10 +1088,15 @@ def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_os
         video_phase2_blocked = (
             profile in {"video_basic", "camera_basic", "text_basic"}
             and prop_name not in VIDEO_PHASE2_ALLOWED_PROPERTIES
+            and prop_name not in VIDEO_PHASE4_FX_DRY_RUN_PROPERTIES
         )
         if video_phase2_blocked:
             assert "blocked even for dry-run by Video-family policy" in dry_result["errors"][prop_name]
             assert dry_client.requests == []
+        elif prop_name in VIDEO_PHASE4_FX_DRY_RUN_PROPERTIES:
+            assert prop_name in dry_result["errors"]
+        elif profile == "text_basic" and prop_name in PHASE3F_TEXT_STYLE_VALUES:
+            assert "baseline/readback is unavailable" in dry_result["errors"][prop_name]
         else:
             assert "read_before" in dry_result["errors"], (profile, prop_name, dry_result)
 
@@ -1051,8 +1106,8 @@ def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_os
         cue_values=cue_values,
     )
     real_reader = QLabReader(real_client)  # type: ignore[arg-type]
-    with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
-        real_reader.update_cue(
+    if profile == "text_basic" and prop_name in PHASE3F_TEXT_STYLE_VALUES:
+        real_result = real_reader.update_cue(
             "ws-1",
             cue_id,
             update.get("properties"),
@@ -1060,7 +1115,21 @@ def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_os
             profile=profile,
             operations=update.get("operations"),
         )
-    assert real_client.requests == []
+        assert real_result["status"] == "preflight_failed"
+        assert real_result["executed_operations"] == []
+        assert_no_confirm_token(real_result)
+        assert not any(address.endswith(f"/{prop_name}") for address, _, _ in real_client.requests)
+    else:
+        with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
+            real_reader.update_cue(
+                "ws-1",
+                cue_id,
+                update.get("properties"),
+                dry_run=False,
+                profile=profile,
+                operations=update.get("operations"),
+            )
+        assert real_client.requests == []
 
 
 @pytest.mark.parametrize(
@@ -3780,11 +3849,15 @@ def test_video_phase2_dry_run_rejects_explicitly_blocked_families_before_osc(
 
     assert result["ok"] is False
     assert result["status"] == "dry_run_preflight_failed"
-    assert "blocked even for dry-run by Video-family policy" in result["errors"][property_name]
     assert result["planned_operations"] == []
     assert result["executed_operations"] == []
     assert_no_confirm_token(result)
-    assert client.requests == []
+    if property_name in VIDEO_PHASE4_FX_DRY_RUN_PROPERTIES:
+        assert "effect" in result["errors"][property_name].casefold()
+        assert any(address.endswith("/valuesForKeys") for address, _, _ in client.requests)
+    else:
+        assert "blocked even for dry-run by Video-family policy" in result["errors"][property_name]
+        assert client.requests == []
 
 
 @pytest.mark.parametrize(
@@ -3806,6 +3879,7 @@ def test_video_phase2_dry_run_rejects_explicitly_blocked_families_before_osc(
                 "text/format/alignment",
                 "text/format/fontName",
                 "text/format/fontSize",
+                *PHASE3F_TEXT_STYLE_VALUES,
             }
             and property_name not in {"translation/x", "translation/y"}
             and property_name not in VIDEO_PHASE3C_SCALAR_PROPERTIES
@@ -5592,7 +5666,7 @@ def test_phase3e_text_basic_rejects_invalid_values(
         ("text/format", {"fontSize": 56}),
         ("text/format/fontName", "Helvetica"),
         ("text/format/color", {"red": 1, "green": 1, "blue": 1, "alpha": 1}),
-        ("text/format/shadowBlurRadius", 2),
+        ("text/format/shadowColor", {"red": 0, "green": 0, "blue": 0, "alpha": 1}),
     ],
 )
 def test_phase3e_rich_text_properties_remain_blocked(
@@ -5658,6 +5732,732 @@ def test_phase3e_text_basic_timeout_mismatch_is_uncertain_no_retry() -> None:
 
     assert result["status"] == "partial_failed"
     assert len([address for address, _, _ in client.requests if address.endswith("/text")]) == 1
+
+
+@pytest.mark.parametrize(
+    ("property_name", "baseline", "requested"),
+    [
+        ("text/format/shadowBlurRadius", 2, 4),
+        ("text/format/shadowOffset/width", 1, 3),
+        ("text/format/shadowOffset/height", -1, 2),
+        ("text/format/underlineStyle", "none", "single"),
+        ("text/format/strikethroughStyle", "single", "double"),
+    ],
+)
+def test_phase3f_text_style_dry_run_token_real_write_and_readback(
+    property_name: str,
+    baseline: Any,
+    requested: Any,
+) -> None:
+    """Phase 3F stays blocked until QLab returns reliable fresh readback."""
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Text", property_name: baseline}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "text_basic",
+        "properties": {property_name: requested},
+    }
+
+    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    client.requests.clear()
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        dry_run=False,
+    )
+
+    assert plan["status"] == "preflight_failed"
+    assert plan["results"][0]["planned_operations"] == []
+    assert "baseline/readback is unavailable" in plan["results"][0]["errors"][property_name]
+    assert plan["results"][0]["executed_operations"] == []
+    assert_no_confirm_token(plan)
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert_no_confirm_token(result)
+    assert not any(address.endswith(f"/{property_name}") for address, _, _ in client.requests)
+
+
+def test_phase3f_text_style_rejects_fake_stale_batch_and_non_text() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    other_id = "22222222-2222-4222-8222-222222222222"
+    property_name = "text/format/underlineStyle"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            cue_id: {"type": "Text", property_name: "none"},
+            other_id: {"type": "Video", property_name: "none"},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "text_basic",
+        "properties": {property_name: "single"},
+    }
+    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    assert plan["status"] == "preflight_failed"
+    assert_no_confirm_token(plan)
+    client.cues[cue_id][property_name] = "double"
+
+    cases = [
+        [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}, {**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        [
+            {
+                **update,
+                "cue_ref": other_id,
+                "profile": "video_basic",
+                "confirm_gates": ["confirm:textStyle:v1:fake"],
+            }
+        ],
+    ]
+    for case in cases:
+        result = reader.update_cues("ws-1", case, dry_run=False)
+        assert result["status"] == "preflight_failed"
+        assert all(item["executed_operations"] == [] for item in result["results"])
+        assert_no_confirm_token(result)
+
+
+def _phase3f_text_style_fixture() -> tuple[BatchFakeWriteClient, QLabReader, str, dict[str, Any]]:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    property_name = "text/format/underlineStyle"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            cue_id: {
+                "type": "Text",
+                property_name: "none",
+                "text/format/strikethroughStyle": "none",
+            }
+        },
+        cue_numbers={"v1": cue_id},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "text_basic",
+        "properties": {property_name: "single"},
+    }
+    client.requests.clear()
+    return client, reader, cue_id, update
+
+
+def test_phase3f_text_style_token_binding_and_structure_rejections() -> None:
+    client, reader, cue_id, update = _phase3f_text_style_fixture()
+    other_id = "22222222-2222-4222-8222-222222222222"
+    client.cues[other_id] = {
+        "uniqueID": other_id,
+        "type": "Text",
+        "text/format/underlineStyle": "none",
+    }
+    cases = [
+        [{**update, "confirm_gates": []}],
+        [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        [{**update, "properties": {"text/format/underlineStyle": "double"}, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        [
+            {
+                **update,
+                "properties": {"text/format/strikethroughStyle": "single"},
+                "confirm_gates": ["confirm:textStyle:v1:fake"],
+            }
+        ],
+        [{**update, "cue_ref": other_id, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        [{**update, "cue_ref": "v1", "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        [
+            {
+                **update,
+                "properties": {
+                    "text/format/underlineStyle": "single",
+                    "text/format/strikethroughStyle": "single",
+                },
+                "confirm_gates": ["confirm:textStyle:v1:fake"],
+            }
+        ],
+        [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}, {**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "text_basic",
+                "operations": [
+                    {
+                        "property": "text/format/underlineStyle",
+                        "args": {"value": "single"},
+                        "mode": "live",
+                    }
+                ],
+                "confirm_gates": ["confirm:textStyle:v1:fake"],
+            }
+        ],
+        [{**update, "profile": "video_basic", "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+    ]
+    for case in cases:
+        result = reader.update_cues("ws-1", case, dry_run=False)
+        assert result["status"] == "preflight_failed"
+        assert all(item["executed_operations"] == [] for item in result["results"])
+        assert_no_confirm_token(result)
+    assert not any(address.endswith("/text/format/underlineStyle") for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize("cue_type", ["Video", "Camera"])
+def test_phase3f_text_style_rejects_video_and_camera_cues(cue_type: str) -> None:
+    client, reader, cue_id, update = _phase3f_text_style_fixture()
+    client.cues[cue_id]["type"] = cue_type
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert_no_confirm_token(result)
+    assert not any(address.endswith("/text/format/underlineStyle") for address, _, _ in client.requests)
+
+
+def test_phase3f_text_style_token_is_bound_to_workspace() -> None:
+    _, _, cue_id, update = _phase3f_text_style_fixture()
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Text", "text/format/underlineStyle": "none"}},
+        workspace_id="ws-2",
+    )
+
+    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+        "ws-2",
+        [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert_no_confirm_token(result)
+    assert not any(address.endswith("/text/format/underlineStyle") for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize(
+    "cue_state",
+    [
+        {"isBroken": True},
+        {"isWarning": True},
+        {"isRunning": True},
+        {"isPaused": True},
+        {"isAuditioning": True},
+    ],
+)
+def test_phase3f_text_style_rejects_unhealthy_or_active_cue(
+    cue_state: dict[str, Any],
+) -> None:
+    client, reader, cue_id, update = _phase3f_text_style_fixture()
+    client.cues[cue_id].update(cue_state)
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert_no_confirm_token(result)
+    assert not any(address.endswith("/text/format/underlineStyle") for address, _, _ in client.requests)
+
+
+def test_phase3f_text_style_rollback_requires_fresh_token() -> None:
+    client, reader, _, update = _phase3f_text_style_fixture()
+    forward = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        dry_run=False,
+    )
+    rollback_update = {
+        **update,
+        "properties": {"text/format/underlineStyle": "none"},
+    }
+    old_token = reader.update_cues(
+        "ws-1",
+        [{**rollback_update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        dry_run=False,
+    )
+    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback = reader.update_cues(
+        "ws-1",
+        [{**rollback_update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
+        dry_run=False,
+    )
+
+    assert forward["status"] == "preflight_failed"
+    assert old_token["status"] == "preflight_failed"
+    assert rollback_plan["status"] == "preflight_failed"
+    assert rollback["status"] == "preflight_failed"
+    assert_no_confirm_token(rollback_plan)
+    assert_no_confirm_token(rollback)
+    assert not any(address.endswith("/text/format/underlineStyle") for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize(
+    ("property_name", "value"),
+    [
+        ("text/format/shadowBlurRadius", -1),
+        ("text/format/shadowBlurRadius", math.nan),
+        ("text/format/shadowOffset/width", math.inf),
+        ("text/format/underlineStyle", "thick"),
+        ("text/format/strikethroughStyle", ""),
+    ],
+)
+def test_phase3f_text_style_rejects_invalid_values(
+    property_name: str,
+    value: Any,
+) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    result = QLabReader(  # type: ignore[arg-type]
+        FakeWriteClient(QLabConfig(enable_write=False, passcode=None))
+    ).update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "text_basic", "properties": {property_name: value}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+
+
+@pytest.mark.parametrize(
+    ("operation", "expected_before", "expected_requested"),
+    [
+        (
+            {
+                "property": "videoEffect/enabled",
+                "args": {"name": "ColorControls", "value": False},
+            },
+            True,
+            False,
+        ),
+        (
+            {
+                "property": "videoEffectIndex/parameter",
+                "args": {"index": 0, "parameterKey": "inputBrightness", "setting": 0.75},
+            },
+            0.5,
+            0.75,
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("profile", "cue_type"),
+    [
+        ("video_basic", "Video"),
+        ("camera_basic", "Camera"),
+        ("text_basic", "Text"),
+    ],
+)
+def test_video_fx_phase4b_dry_run_plans_only_known_scalar_change(
+    operation: dict[str, Any],
+    expected_before: Any,
+    expected_requested: Any,
+    profile: str,
+    cue_type: str,
+) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=False, passcode=None),
+        existing_cue_id=cue_id,
+        cue_values={
+            "uniqueID": cue_id,
+            "type": cue_type,
+            "videoEffects": [
+                {
+                    "name": "ColorControls",
+                    "enabled": True,
+                    "parameters": {"inputBrightness": 0.5, "mode": "normal"},
+                }
+            ],
+        },
+    )
+    result = QLabReader(client).update_cue(  # type: ignore[arg-type]
+        "ws-1",
+        cue_id,
+        dry_run=True,
+        profile=profile,
+        operations=[operation],
+    )
+
+    item_plan = result["updateq_plan"]
+    setter = planned_setters(result)[operation["property"]]
+    assert result["ok"] is True
+    assert result["executed_operations"] == []
+    assert_no_confirm_token(result)
+    assert setter["real_write_possible"] is False
+    assert setter["requires_confirm_token"] is False
+    assert setter["planned_only"] is True
+    assert setter["video_fx_plan"]["before"] == expected_before
+    assert setter["video_fx_plan"]["requested"] == expected_requested
+    assert setter["video_fx_plan"]["planned_only"] is True
+    assert setter["video_fx_plan"]["expected_setter_address"] == (
+        f"/workspace/ws-1/cue_id/{cue_id}/{setter['video_fx_plan']['path']}"
+    )
+    assert setter["video_fx_plan"]["expected_readback_address"] == (
+        setter["video_fx_plan"]["expected_setter_address"]
+    )
+    assert item_plan["video_fx"]["will_modify_qlab"] is False
+    assert not any("/videoEffect" in address and not address.endswith("/valuesForKeys") for address, _, _ in client.requests)
+
+
+def test_video_fx_phase4b_rejects_unknown_or_non_scalar_parameter() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=False, passcode=None),
+        existing_cue_id=cue_id,
+        cue_values={
+            "uniqueID": cue_id,
+            "type": "Video",
+            "videoEffects": [
+                {
+                    "name": "ColorControls",
+                    "parameters": {
+                        "inputVector": [0, 1],
+                        "inputColor": [1, 0, 0, 1],
+                    },
+                }
+            ],
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    for parameter_key in ("missing", "inputVector", "inputColor"):
+        result = reader.update_cue(
+            "ws-1",
+            cue_id,
+            dry_run=True,
+            profile="video_basic",
+            operations=[
+                {
+                    "property": "videoEffect/parameter",
+                    "args": {
+                        "name": "ColorControls",
+                        "parameterKey": parameter_key,
+                        "setting": 0.5,
+                    },
+                }
+            ],
+        )
+        assert result["status"] == "dry_run_preflight_failed"
+        assert result["planned_operations"] == []
+        assert result["executed_operations"] == []
+        assert_no_confirm_token(result)
+
+
+def test_video_fx_phase4c_dry_run_emits_token_for_flat_input_radius_by_index() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=False, passcode=None),
+        existing_cue_id=cue_id,
+        cue_values={
+            "uniqueID": cue_id,
+            "type": "Video",
+            "videoEffects": [{"Choose_Effect": 0, "inputIntensity": 2.5, "inputRadius": 10}],
+        },
+    )
+    result = QLabReader(client).update_cue(  # type: ignore[arg-type]
+        "ws-1",
+        cue_id,
+        dry_run=True,
+        profile="video_basic",
+        operations=[
+            {
+                "property": "videoEffectIndex/parameter",
+                "args": {"index": 0, "parameterKey": "inputRadius", "setting": 12},
+            }
+        ],
+    )
+
+    setter = planned_setters(result)["videoEffectIndex/parameter"]
+    payload, error = write_operations._decode_phase4c_video_fx_scalar_confirm_token(setter["confirm_token"])
+    assert result["ok"] is True
+    assert result["executed_operations"] == []
+    assert setter["video_fx_plan"]["before"] == 10
+    assert setter["video_fx_plan"]["requested"] == 12
+    assert setter["video_fx_plan"]["parameters_source"] == "flat_payload"
+    assert setter["real_write_possible"] is True
+    assert setter["requires_confirm_token"] is True
+    assert setter["planned_only_reason"] == "video_fx_scalar_requires_confirm_token"
+    assert setter["confirm_token"].startswith("confirm:videoFxScalar:v1:")
+    assert error is None
+    assert payload["operation_kind"] == "video_phase4c_fx_scalar_write"
+    assert payload["cue_type"] == "Video"
+    assert payload["effect_index"] == 0
+    assert payload["parameter_key"] == "inputRadius"
+    assert payload["baseline"] == 10.0
+    assert payload["requested"] == 12.0
+    assert result["updateq_plan"]["real_write_possible"] is True
+    assert result["updateq_plan"]["requires_confirm_token"] is True
+    assert not any("/videoEffect" in address and not address.endswith("/valuesForKeys") for address, _, _ in client.requests)
+
+
+def test_video_fx_phase4c_real_write_updates_single_flat_input_radius() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            cue_id: {
+                "type": "Video",
+                "videoEffects": [{"Choose_Effect": 0, "inputIntensity": 2.5, "inputRadius": 10}],
+            }
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "video_basic",
+        "operations": [
+            {
+                "property": "videoEffectIndex/parameter",
+                "args": {"index": 0, "parameterKey": "inputRadius", "setting": 12},
+            }
+        ],
+    }
+    token = planned_setters(reader.update_cues("ws-1", [update], dry_run=True)["results"][0])[
+        "videoEffectIndex/parameter"
+    ]["confirm_token"]
+
+    result = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    item = result["results"][0]
+
+    assert result["status"] == "updated"
+    assert item["status"] == "updated"
+    assert item["errors"] is None
+    assert item["after"]["videoEffects"][0]["inputRadius"] == 12
+    assert item["executed_operations"] == [
+        {
+            "operation": "set_property",
+            "property": "videoEffectIndex/parameter",
+            "address": f"/workspace/ws-1/cue_id/{cue_id}/videoEffectIndex/0/parameter/inputRadius",
+            "args": [12],
+            "mode": "saved",
+            "capability_gate": "video_effects",
+            "status": "ok",
+        }
+    ]
+    assert item["updateq_plan"]["real_write_enabled"] is True
+    assert item["updateq_plan"]["safety"]["will_modify_qlab"] is True
+    assert not any("/live" in address for address, _, _ in client.requests)
+
+
+def test_video_fx_phase4c_accepts_setter_timeout_when_readback_matches() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    prop = "videoEffectIndex/0/parameter/inputRadius"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            cue_id: {
+                "type": "Video",
+                "videoEffects": [{"Choose_Effect": 0, "inputIntensity": 2.5, "inputRadius": 10}],
+            }
+        },
+        timeout_set_property=(cue_id, prop),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "video_basic",
+        "operations": [
+            {
+                "property": "videoEffectIndex/parameter",
+                "args": {"index": 0, "parameterKey": "inputRadius", "setting": 12},
+            }
+        ],
+    }
+    token = planned_setters(reader.update_cues("ws-1", [update], dry_run=True)["results"][0])[
+        "videoEffectIndex/parameter"
+    ]["confirm_token"]
+
+    result = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    item = result["results"][0]
+
+    assert result["status"] == "updated"
+    assert item["status"] == "updated"
+    assert item["errors"] is None
+    assert item["after"]["videoEffects"][0]["inputRadius"] == 12
+    assert "setter_timeout_but_readback_matched" in item["warnings"]
+    assert result["timeout_confirmed_count"] == 1
+
+
+def test_video_fx_phase4c_rejects_stale_token_and_wrong_requested_value() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    update = {
+        "cue_ref": cue_id,
+        "profile": "video_basic",
+        "operations": [
+            {
+                "property": "videoEffectIndex/parameter",
+                "args": {"index": 0, "parameterKey": "inputRadius", "setting": 12},
+            }
+        ],
+    }
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            cue_id: {
+                "type": "Video",
+                "videoEffects": [{"Choose_Effect": 0, "inputIntensity": 2.5, "inputRadius": 10}],
+            }
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    token = planned_setters(reader.update_cues("ws-1", [update], dry_run=True)["results"][0])[
+        "videoEffectIndex/parameter"
+    ]["confirm_token"]
+
+    client.cues[cue_id]["videoEffects"][0]["inputRadius"] = 11
+    stale = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    client.cues[cue_id]["videoEffects"][0]["inputRadius"] = 10
+    wrong_value = {
+        **update,
+        "operations": [
+            {
+                "property": "videoEffectIndex/parameter",
+                "args": {"index": 0, "parameterKey": "inputRadius", "setting": 13},
+            }
+        ],
+        "confirm_gates": [token],
+    }
+    wrong = reader.update_cues("ws-1", [wrong_value], dry_run=False)
+
+    assert stale["status"] == "preflight_failed"
+    assert "stale_video_fx_scalar_baseline" in stale["results"][0]["errors"]["videoEffectIndex/parameter"]
+    assert wrong["status"] == "preflight_failed"
+    assert "confirm_token does not match" in wrong["results"][0]["errors"]["videoEffectIndex/parameter"]
+    assert not any(
+        address.endswith("/videoEffectIndex/0/parameter/inputRadius") and args
+        for address, args, _ in client.requests
+    )
+
+
+def test_video_fx_phase4b_rejects_type_mismatch_and_ambiguous_name() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=False, passcode=None),
+        existing_cue_id=cue_id,
+        cue_values={
+            "uniqueID": cue_id,
+            "type": "Video",
+            "videoEffects": [
+                {"name": "Blur", "parameters": {"inputRadius": 5}},
+                {"name": "Blur", "parameters": {"inputRadius": 10}},
+            ],
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    ambiguous = reader.update_cue(
+        "ws-1",
+        cue_id,
+        dry_run=True,
+        profile="video_basic",
+        operations=[
+            {
+                "property": "videoEffect/parameter",
+                "args": {"name": "Blur", "parameterKey": "inputRadius", "setting": 6},
+            }
+        ],
+    )
+    mismatch = reader.update_cue(
+        "ws-1",
+        cue_id,
+        dry_run=True,
+        profile="video_basic",
+        operations=[
+            {
+                "property": "videoEffectIndex/parameter",
+                "args": {"index": 0, "parameterKey": "inputRadius", "setting": "six"},
+            }
+        ],
+    )
+
+    assert "ambiguous" in ambiguous["errors"]["videoEffect/parameter"]
+    assert "type mismatch" in mismatch["errors"]["videoEffectIndex/parameter"]
+    assert ambiguous["executed_operations"] == []
+    assert mismatch["executed_operations"] == []
+    assert_no_confirm_token(ambiguous)
+    assert_no_confirm_token(mismatch)
+
+
+def test_video_fx_phase4b_real_live_batch_and_multi_property_stay_blocked() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    cue = {
+        "type": "Video",
+        "videoEffects": [
+            {
+                "name": "ColorControls",
+                "enabled": True,
+                "parameters": {"inputBrightness": 0.5},
+            }
+        ],
+    }
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: cue},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    enabled = {
+        "property": "videoEffect/enabled",
+        "args": {"name": "ColorControls", "value": False},
+    }
+    parameter = {
+        "property": "videoEffect/parameter",
+        "args": {
+            "name": "ColorControls",
+            "parameterKey": "inputBrightness",
+            "setting": 0.75,
+        },
+    }
+    cases = [
+        (
+            False,
+            [{"cue_ref": cue_id, "profile": "video_basic", "operations": [enabled]}],
+        ),
+        (
+            True,
+            [
+                {
+                    "cue_ref": cue_id,
+                    "profile": "video_basic",
+                    "operations": [{**enabled, "mode": "live"}],
+                }
+            ],
+        ),
+        (
+            False,
+            [
+                {"cue_ref": cue_id, "profile": "video_basic", "operations": [enabled]},
+                {"cue_ref": cue_id, "profile": "video_basic", "operations": [enabled]},
+            ],
+        ),
+        (
+            False,
+            [
+                {
+                    "cue_ref": cue_id,
+                    "profile": "video_basic",
+                    "operations": [enabled, parameter],
+                }
+            ],
+        ),
+    ]
+
+    for dry_run, updates in cases:
+        result = reader.update_cues("ws-1", updates, dry_run=dry_run)
+        assert result["status"] == "preflight_failed"
+        assert all(item["executed_operations"] == [] for item in result["results"])
+        assert_no_confirm_token(result)
+    assert not any(
+        "/videoEffect" in address and not address.endswith("/valuesForKeys")
+        for address, _, _ in client.requests
+    )
 
 
 @pytest.mark.parametrize("profile,cue_type", [("video_basic", "Video"), ("camera_basic", "Camera")])

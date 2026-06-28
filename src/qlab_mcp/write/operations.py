@@ -82,6 +82,8 @@ CASEFOLD_COMPARISON_KEYS = {
     "clockType",
     "colorName",
     "text/format/alignment",
+    "text/format/strikethroughStyle",
+    "text/format/underlineStyle",
 }
 LIGHT_COMMAND_PROPERTY = "lightCommandText"
 LIGHT_BEHAVIOR_PROPERTIES = frozenset({"alwaysCollate", "subcontroller"})
@@ -124,6 +126,26 @@ VIDEO_PHASE3_APPEARANCE_TYPES = {
 TEXT_PHASE3E_PROPERTIES = frozenset(
     {"text", "text/format/fontSize", "text/format/alignment"}
 )
+TEXT_PHASE3F_PROPERTIES = frozenset(
+    {
+        "text/format/shadowBlurRadius",
+        "text/format/shadowOffset/width",
+        "text/format/shadowOffset/height",
+        "text/format/underlineStyle",
+        "text/format/strikethroughStyle",
+    }
+)
+VIDEO_PHASE4_FX_DRY_RUN_PROPERTIES = frozenset(
+    {
+        "videoEffect/enabled",
+        "videoEffectIndex/enabled",
+        "videoEffect/parameter",
+        "videoEffectIndex/parameter",
+    }
+)
+VIDEO_PHASE4C_FX_SCALAR_PROPERTY = "videoEffectIndex/parameter"
+VIDEO_PHASE4C_FX_ALLOWED_PARAMETER = "inputRadius"
+VIDEO_PHASE4C_FX_ALLOWED_INDEX = 0
 VIDEO_PHASE2_HEALTH_READ_KEYS = (
     "number",
     "name",
@@ -148,6 +170,10 @@ PHASE3_VIDEO_APPEARANCE_OPERATION_KIND = "video_phase3d_appearance_write"
 PHASE3_VIDEO_APPEARANCE_TOKEN_VERSION = 1
 PHASE3E_TEXT_BASIC_OPERATION_KIND = "video_phase3e_text_basic_write"
 PHASE3E_TEXT_BASIC_TOKEN_VERSION = 1
+PHASE3F_TEXT_STYLE_OPERATION_KIND = "video_phase3f_text_style_write"
+PHASE3F_TEXT_STYLE_TOKEN_VERSION = 1
+PHASE4C_VIDEO_FX_SCALAR_OPERATION_KIND = "video_phase4c_fx_scalar_write"
+PHASE4C_VIDEO_FX_SCALAR_TOKEN_VERSION = 1
 _LIGHT_WRITE_TOKEN_SECRET = secrets.token_bytes(32)
 
 
@@ -430,6 +456,12 @@ class QLabWriteMixin:
         phase3e_text_basic_call = any(
             _phase3e_text_basic_operation(item) is not None for item in items
         )
+        phase3f_text_style_call = any(
+            _phase3f_text_style_operation(item) is not None for item in items
+        )
+        phase4c_video_fx_scalar_call = any(
+            _phase4c_video_fx_scalar_operation(item) is not None for item in items
+        )
         for item in items:
             _strip_video_phase2_confirm_tokens(item)
             if item.get("profile") in VIDEO_PHASE2_PROFILES and item.get("operations"):
@@ -477,7 +509,11 @@ class QLabWriteMixin:
         video_phase2_dry_run_structure_error = (
             _video_phase2_dry_run_structure_error(items) if effective_dry_run else None
         )
-        if video_phase2_dry_run_structure_error:
+        video_fx_dry_run_structure_error = (
+            _video_fx_dry_run_structure_error(items) if effective_dry_run else None
+        )
+        if video_phase2_dry_run_structure_error or video_fx_dry_run_structure_error:
+            structure_error = video_phase2_dry_run_structure_error or video_fx_dry_run_structure_error
             results = [
                 _batch_item_result(
                     workspace,
@@ -488,7 +524,7 @@ class QLabWriteMixin:
                     after=None,
                     errors={
                         **(item.get("errors") or {}),
-                        "video_phase2": video_phase2_dry_run_structure_error,
+                        "video_phase2": structure_error,
                     },
                     warnings=["Dry run only: no mutating OSC commands were sent to QLab."],
                 )
@@ -500,7 +536,7 @@ class QLabWriteMixin:
                 results=results,
                 status="preflight_failed",
                 requested_count=len(items),
-                errors={"preflight": video_phase2_dry_run_structure_error},
+                errors={"preflight": structure_error},
             )
         if not effective_dry_run:
             phase4_structure_error = _phase4_light_call_structure_error(items) if phase4_light_call else None
@@ -526,6 +562,16 @@ class QLabWriteMixin:
             phase3e_text_structure_error = (
                 _phase3e_text_basic_call_structure_error(items)
                 if phase3e_text_basic_call
+                else None
+            )
+            phase3f_text_structure_error = (
+                _phase3f_text_style_call_structure_error(items)
+                if phase3f_text_style_call
+                else None
+            )
+            phase4c_video_fx_structure_error = (
+                _phase4c_video_fx_scalar_call_structure_error(items)
+                if phase4c_video_fx_scalar_call
                 else None
             )
             gate_results = []
@@ -592,6 +638,24 @@ class QLabWriteMixin:
                         errors[property_name] = (
                             f"{property_name} is gated or dry-run only without exactly one reviewed "
                             "Phase 3E confirm_token."
+                        )
+                elif not errors and phase3f_text_style_call:
+                    property_name = item["operations"][0]["property"]
+                    if phase3f_text_structure_error:
+                        errors[property_name] = phase3f_text_structure_error
+                    else:
+                        errors[property_name] = (
+                            f"{property_name} real write is blocked: QLab 5.5.10 did not provide "
+                            "reliable fresh readback for Phase 3F Text Style validation."
+                        )
+                elif not errors and phase4c_video_fx_scalar_call:
+                    property_name = item["operations"][0]["property"]
+                    if phase4c_video_fx_structure_error:
+                        errors[property_name] = phase4c_video_fx_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Phase 4C confirm_token."
                         )
                 elif not errors:
                     errors.update(_video_phase2_real_write_errors(item))
@@ -679,6 +743,29 @@ class QLabWriteMixin:
                 and not phase3_video_appearance_call
                 and _phase3e_text_basic_call_structure_error(items) is None
             )
+            phase3f_text_candidate_shape = (
+                phase3f_text_style_call
+                and not phase4_light_call
+                and not phase5_light_call
+                and not phase3_video_opacity_call
+                and not phase3_video_translation_call
+                and not phase3_video_scalar_call
+                and not phase3_video_appearance_call
+                and not phase3e_text_basic_call
+                and _phase3f_text_style_call_structure_error(items) is None
+            )
+            phase4c_video_fx_candidate_shape = (
+                phase4c_video_fx_scalar_call
+                and not phase4_light_call
+                and not phase5_light_call
+                and not phase3_video_opacity_call
+                and not phase3_video_translation_call
+                and not phase3_video_scalar_call
+                and not phase3_video_appearance_call
+                and not phase3e_text_basic_call
+                and not phase3f_text_style_call
+                and _phase4c_video_fx_scalar_call_structure_error(items) is None
+            )
             light_patch: dict[str, Any] | None = None
             light_patch_error: dict[str, str] | None = None
             light_patch_loaded = False
@@ -696,6 +783,8 @@ class QLabWriteMixin:
                     errors.update(_phase3_video_scalar_dry_run_errors(item, before))
                     errors.update(_phase3_video_appearance_dry_run_errors(item, before))
                     errors.update(_phase3e_text_basic_dry_run_errors(item, before))
+                    errors.update(_phase3f_text_style_dry_run_errors(item, before))
+                    errors.update(_video_fx_dry_run_errors(item, before))
                 if not errors and _light_command_operation(item) is not None:
                     if not light_patch_loaded:
                         light_patch, light_patch_error = _try_read_safe_light_patch(self, workspace)
@@ -763,6 +852,26 @@ class QLabWriteMixin:
                             candidate_shape=phase3e_text_candidate_shape,
                         )
                     )
+                if not errors and _phase3f_text_style_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_phase3f_text_style_operation(
+                            item,
+                            workspace_id=workspace,
+                            before=before,
+                            candidate_shape=phase3f_text_candidate_shape,
+                        )
+                    )
+                if not errors and _phase4c_video_fx_scalar_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_phase4c_video_fx_scalar_operation(
+                            item,
+                            workspace_id=workspace,
+                            before=before,
+                            candidate_shape=phase4c_video_fx_candidate_shape,
+                        )
+                    )
+                elif not errors and _video_fx_dry_run_operation(item) is not None:
+                    _annotate_video_fx_dry_run_operation(item, workspace, before)
                 cue_id = _resolved_cue_id(before)
                 results.append(
                     _batch_item_result(
@@ -878,6 +987,14 @@ class QLabWriteMixin:
                 errors.update(_validate_phase3e_text_basic_real_write(workspace, item, before))
                 if not errors:
                     _mark_phase3e_text_basic_real_operation(item)
+            elif not errors and phase3f_text_style_call:
+                errors.update(_validate_phase3f_text_style_real_write(workspace, item, before))
+                if not errors:
+                    _mark_phase3f_text_style_real_operation(item)
+            elif not errors and phase4c_video_fx_scalar_call:
+                errors.update(_validate_phase4c_video_fx_scalar_real_write(workspace, item, before))
+                if not errors:
+                    _mark_phase4c_video_fx_scalar_real_operation(item)
             if errors:
                 preflight_ok = False
                 if phase3_video_scalar_call:
@@ -886,6 +1003,10 @@ class QLabWriteMixin:
                     _label_phase3_video_appearance_rejection(item)
                 if phase3e_text_basic_call:
                     _label_phase3e_text_basic_rejection(item)
+                if phase3f_text_style_call:
+                    _label_phase3f_text_style_rejection(item)
+                if phase4c_video_fx_scalar_call:
+                    _label_phase4c_video_fx_scalar_rejection(item)
             preflight_results.append(
                 _batch_item_result(
                     workspace,
@@ -1003,6 +1124,8 @@ class QLabWriteMixin:
                         or _phase3_video_scalar_operation(item) is not None
                         or _phase3_video_appearance_operation(item) is not None
                         or _phase3e_text_basic_operation(item) is not None
+                        or _phase3f_text_style_operation(item) is not None
+                        or _phase4c_video_fx_scalar_operation(item) is not None
                     )
                     else "One or more setters did not reply, but fresh after-read confirmed requested values."
                 )
@@ -1021,6 +1144,8 @@ class QLabWriteMixin:
                 or _phase3_video_scalar_operation(item) is not None
                 or _phase3_video_appearance_operation(item) is not None
                 or _phase3e_text_basic_operation(item) is not None
+                or _phase3f_text_style_operation(item) is not None
+                or _phase4c_video_fx_scalar_operation(item) is not None
             ):
                 status = "updated"
             elif setter_timeouts:
@@ -1041,6 +1166,8 @@ class QLabWriteMixin:
             _refresh_phase3_video_scalar_real_result(result, item)
             _refresh_phase3_video_appearance_real_result(result, item)
             _refresh_phase3e_text_basic_real_result(result, item)
+            _refresh_phase3f_text_style_real_result(result, item)
+            _refresh_phase4c_video_fx_scalar_real_result(result, item)
             if _update_debug_enabled(self):
                 result["debug"] = {
                     "cue_ref": item["cue_ref"],
@@ -1162,7 +1289,13 @@ def _video_phase2_dry_run_blocked_errors(item: dict[str, Any]) -> dict[str, str]
     for property_name in property_names:
         operation = operations.get(property_name)
         common_real_write = bool(operation and operation.get("real_write_enabled"))
-        if property_name and property_name not in VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES and not common_real_write:
+        video_fx_dry_run = property_name in VIDEO_PHASE4_FX_DRY_RUN_PROPERTIES
+        if (
+            property_name
+            and property_name not in VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES
+            and not video_fx_dry_run
+            and not common_real_write
+        ):
             errors[property_name] = _video_phase2_blocked_property_message(property_name)
     return errors
 
@@ -1259,6 +1392,577 @@ def _video_phase2_dry_run_structure_error(items: list[dict[str, Any]]) -> str | 
     if operation.get("mode") != "saved":
         return "Video-family dry-runs require saved mode."
     return None
+
+
+def _video_fx_dry_run_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") not in VIDEO_PHASE2_PROFILES:
+        return None
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in VIDEO_PHASE4_FX_DRY_RUN_PROPERTIES
+        ),
+        None,
+    )
+
+
+def _video_fx_dry_run_structure_error(items: list[dict[str, Any]]) -> str | None:
+    fx_items = [item for item in items if _video_fx_dry_run_operation(item) is not None]
+    if not fx_items:
+        return None
+    if len(items) != 1 or len(fx_items[0].get("operations") or []) != 1:
+        return "Video FX dry-runs require exactly one cue and one operation."
+    item = fx_items[0]
+    operation = item["operations"][0]
+    if operation.get("mode") != "saved":
+        return "Video FX dry-runs require saved mode; /live remains blocked."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Video FX dry-runs require exact cue UUID as cue_ref; cue numbers are rejected."
+    if item.get("confirm_gates"):
+        return "Video FX dry-runs do not accept confirm_gates or emit confirm tokens."
+    return None
+
+
+def _video_fx_effect(
+    effects: Any,
+    operation: dict[str, Any],
+) -> tuple[dict[str, Any] | None, str | None]:
+    if not isinstance(effects, list):
+        return None, "Video FX inventory is unavailable."
+    values = operation.get("arg_values") or {}
+    if operation["property"].startswith("videoEffectIndex/"):
+        index = values.get("index")
+        if not isinstance(index, int) or index < 0 or index >= len(effects):
+            return None, "Video FX index does not resolve in the fresh effect inventory."
+        effect = effects[index]
+    else:
+        requested_name = values.get("name")
+        matches = [
+            candidate
+            for candidate in effects
+            if isinstance(candidate, dict)
+            and requested_name
+            in {
+                candidate.get("name"),
+                candidate.get("effectName"),
+                candidate.get("displayName"),
+                candidate.get("oscName"),
+            }
+        ]
+        if len(matches) > 1:
+            return None, "Video FX name is ambiguous; use the zero-based index operation."
+        effect = matches[0] if matches else None
+    if not isinstance(effect, dict):
+        return None, "Video FX effect does not resolve to readable structured data."
+    return effect, None
+
+
+def _video_fx_scalar_kind(value: Any) -> str | None:
+    if isinstance(value, bool):
+        return "boolean"
+    if _is_plain_finite_number(value):
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    return None
+
+
+_VIDEO_FX_NON_PARAMETER_KEYS = frozenset(
+    {
+        "name",
+        "effectName",
+        "displayName",
+        "oscName",
+        "type",
+        "effectType",
+        "category",
+        "enabled",
+        "isEnabled",
+        "parameters",
+    }
+)
+
+
+def _video_fx_parameters(effect: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    parameters = effect.get("parameters")
+    if isinstance(parameters, dict):
+        return parameters, "parameters"
+    return {
+        str(key): value
+        for key, value in effect.items()
+        if str(key) not in _VIDEO_FX_NON_PARAMETER_KEYS
+    }, "flat_payload"
+
+
+def _video_fx_dry_run_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _video_fx_dry_run_operation(item)
+    if operation is None or not isinstance(before, dict):
+        return {}
+    property_name = operation["property"]
+    effect, error = _video_fx_effect(before.get("videoEffects"), operation)
+    if error or effect is None:
+        return {property_name: error or "Video FX effect inventory is unavailable."}
+    values = operation.get("arg_values") or {}
+    if property_name.endswith("/enabled"):
+        current = effect.get("enabled", effect.get("isEnabled"))
+        if not isinstance(current, bool):
+            return {property_name: "Video FX enabled baseline is not available as a boolean."}
+        return {}
+    parameter_key = values.get("parameterKey")
+    parameters, _ = _video_fx_parameters(effect)
+    if not isinstance(parameters, dict) or parameter_key not in parameters:
+        return {property_name: "Video FX parameter is absent from the fresh readable parameter inventory."}
+    current = parameters[parameter_key]
+    requested = values.get("setting")
+    current_kind = _video_fx_scalar_kind(current)
+    requested_kind = _video_fx_scalar_kind(requested)
+    if current_kind is None or requested_kind is None:
+        return {
+            property_name: (
+                "Video FX parameter dry-run supports only existing finite numeric, boolean, or string values."
+            )
+        }
+    if current_kind != requested_kind:
+        return {
+            property_name: (
+                f"Video FX parameter type mismatch: fresh value is {current_kind}, "
+                f"requested value is {requested_kind}."
+            )
+        }
+    return {}
+
+
+def _annotate_video_fx_dry_run_operation(
+    item: dict[str, Any],
+    workspace_id: str,
+    before: dict[str, Any] | None,
+) -> None:
+    operation = _video_fx_dry_run_operation(item)
+    if operation is None or not isinstance(before, dict):
+        return
+    effect, _ = _video_fx_effect(before.get("videoEffects"), operation)
+    if effect is None:
+        return
+    values = operation.get("arg_values") or {}
+    property_name = operation["property"]
+    parameter_key = values.get("parameterKey")
+    parameters, parameter_source = _video_fx_parameters(effect)
+    current = (
+        effect.get("enabled", effect.get("isEnabled"))
+        if property_name.endswith("/enabled")
+        else parameters.get(parameter_key)
+    )
+    requested = values.get("value") if property_name.endswith("/enabled") else values.get("setting")
+    cue_id = _resolved_cue_id(before)
+    address = (
+        _cue_id_address(workspace_id, cue_id, operation["path"])
+        if cue_id
+        else operation["path"]
+    )
+    operation.update(
+        {
+            "real_write_enabled": False,
+            "real_write_possible": False,
+            "requires_confirm_token": False,
+            "planned_only": True,
+            "planned_only_reason": "video_fx_phase4b_dry_run_only",
+            "video_fx_plan": {
+                "status": "planned",
+                "planned_only": True,
+                "cue_id": cue_id,
+                "cue_type": before.get("type"),
+                "effect": {
+                    "index": values.get("index"),
+                    "name": values.get("name")
+                    or effect.get("name")
+                    or effect.get("effectName")
+                    or effect.get("displayName")
+                    or effect.get("oscName"),
+                },
+                "property": property_name,
+                "path": operation.get("path"),
+                "expected_setter_address": address,
+                "expected_readback_address": address,
+                "parameter": parameter_key,
+                "parameters_source": parameter_source if parameter_key is not None else None,
+                "before": current,
+                "requested": requested,
+                "inventory_readback_key": "videoEffects",
+                "risk_tier": "high",
+                "planned_only_reason": "video_fx_phase4b_dry_run_only",
+                "will_modify_qlab": False,
+            },
+        }
+    )
+    operation.pop("confirm_token", None)
+
+
+def _phase4c_video_fx_scalar_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    operation = _video_fx_dry_run_operation(item)
+    if operation is None:
+        return None
+    values = operation.get("arg_values") or {}
+    if (
+        item.get("profile") == "video_basic"
+        and operation.get("property") == VIDEO_PHASE4C_FX_SCALAR_PROPERTY
+        and operation.get("path") == "videoEffectIndex/0/parameter/inputRadius"
+        and operation.get("mode") == "saved"
+        and values.get("index") == VIDEO_PHASE4C_FX_ALLOWED_INDEX
+        and values.get("parameterKey") == VIDEO_PHASE4C_FX_ALLOWED_PARAMETER
+    ):
+        return operation
+    return None
+
+
+def _phase4c_video_fx_scalar_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 4C Video FX scalar real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") != "video_basic":
+        return "Phase 4C Video FX scalar real writes require video_basic profile."
+    if len(operations) != 1:
+        return "Phase 4C Video FX scalar real writes require exactly one property."
+    operation = operations[0]
+    if operation.get("property") != VIDEO_PHASE4C_FX_SCALAR_PROPERTY:
+        return "Phase 4C real writes allow only videoEffectIndex/parameter."
+    if operation.get("mode") != "saved":
+        return "Phase 4C Video FX scalar real writes require saved mode; /live remains blocked."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Phase 4C Video FX scalar real writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    values = operation.get("arg_values") or {}
+    if values.get("index") != VIDEO_PHASE4C_FX_ALLOWED_INDEX:
+        return "Phase 4C Video FX scalar real writes allow only effect index 0."
+    if values.get("parameterKey") != VIDEO_PHASE4C_FX_ALLOWED_PARAMETER:
+        return "Phase 4C Video FX scalar real writes allow only inputRadius."
+    if not _is_plain_finite_number(values.get("setting")):
+        return "Phase 4C Video FX scalar real writes require a finite numeric setting."
+    return None
+
+
+def _video_fx_effect_payload_sha256(effect: dict[str, Any]) -> str:
+    return hashlib.sha256(
+        json.dumps(effect, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+
+
+def _phase4c_video_fx_scalar_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    effect: dict[str, Any],
+    baseline: int | float,
+    requested: int | float,
+) -> dict[str, Any]:
+    values = operation.get("arg_values") or {}
+    return {
+        "version": PHASE4C_VIDEO_FX_SCALAR_TOKEN_VERSION,
+        "operation_kind": PHASE4C_VIDEO_FX_SCALAR_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "cue_type": "Video",
+        "profile": item["profile"],
+        "property": operation["property"],
+        "effect_index": values.get("index"),
+        "parameter_key": values.get("parameterKey"),
+        "path": operation["path"],
+        "osc_setter_path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": float(baseline),
+        "baseline_sha256": _video_opacity_sha256(baseline),
+        "requested": float(requested),
+        "raw_effect_payload_sha256": _video_fx_effect_payload_sha256(effect),
+        "risk_tier": "high",
+        "capability_gate": operation.get("capability_gate"),
+        "mcp_secret_version": 1,
+    }
+
+
+def _phase4c_video_fx_scalar_confirm_token(**payload_args: Any) -> str:
+    payload = _phase4c_video_fx_scalar_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:videoFxScalar:v{PHASE4C_VIDEO_FX_SCALAR_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _decode_phase4c_video_fx_scalar_confirm_token(token: str) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    expected_prefix = ["confirm", "videoFxScalar", f"v{PHASE4C_VIDEO_FX_SCALAR_TOKEN_VERSION}"]
+    if len(parts) != 5 or parts[:3] != expected_prefix:
+        return None, "Phase 4C Video FX scalar confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(
+        _LIGHT_WRITE_TOKEN_SECRET,
+        encoded.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 4C Video FX scalar confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 4C Video FX scalar confirm_token payload is invalid."
+    if not isinstance(payload, dict):
+        return None, "Phase 4C Video FX scalar confirm_token payload is invalid."
+    return payload, None
+
+
+def _phase4c_video_fx_scalar_candidate_values(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> tuple[dict[str, Any] | None, int | float | None, int | float | None, str | None]:
+    operation = _phase4c_video_fx_scalar_operation(item)
+    if operation is None or not isinstance(before, dict):
+        return None, None, None, "Phase 4C Video FX scalar preflight is incomplete."
+    effect, error = _video_fx_effect(before.get("videoEffects"), operation)
+    if error or effect is None:
+        return None, None, None, error or "Video FX effect inventory is unavailable."
+    parameters, source = _video_fx_parameters(effect)
+    if source != "flat_payload":
+        return None, None, None, "Phase 4C requires the QLab 5.5.10 flat Video FX payload shape."
+    baseline = parameters.get(VIDEO_PHASE4C_FX_ALLOWED_PARAMETER)
+    requested = (operation.get("arg_values") or {}).get("setting")
+    if not _is_plain_finite_number(baseline) or not _is_plain_finite_number(requested):
+        return None, None, None, "Phase 4C requires finite numeric baseline and requested value."
+    if math.isclose(
+        float(baseline),
+        float(requested),
+        rel_tol=UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
+        abs_tol=UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
+    ):
+        return None, None, None, "Phase 4C Video FX scalar no-op writes are blocked; requested value matches baseline."
+    return effect, baseline, requested, None
+
+
+def _annotate_phase4c_video_fx_scalar_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operation = _phase4c_video_fx_scalar_operation(item)
+    if operation is None:
+        return []
+    cue_id = _resolved_cue_id(before)
+    effect, baseline, requested, error = _phase4c_video_fx_scalar_candidate_values(item, before)
+    candidate = (
+        candidate_shape
+        and isinstance(before, dict)
+        and before.get("type") == "Video"
+        and cue_id == item.get("cue_ref")
+        and effect is not None
+        and baseline is not None
+        and requested is not None
+        and error is None
+    )
+    if not candidate:
+        operation.pop("confirm_token", None)
+        return [error or "Phase 4C Video FX scalar is not confirmable outside the ultra-limited gate."]
+    _annotate_video_fx_dry_run_operation(item, workspace_id, before)
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase4c_video_fx_scalar_candidate": True,
+            "planned_only_reason": "video_fx_scalar_requires_confirm_token",
+            "future_gate_requirements": [
+                "phase4c_video_fx_scalar_confirm_token",
+                "single_video_cue_single_parameter",
+                "uuid_cue_ref",
+                "effect_index_0",
+                "inputRadius_only",
+                "saved_mode",
+                "fresh_flat_payload_baseline",
+                "raw_effect_payload_hash",
+                "new_token_for_rollback",
+            ],
+        }
+    )
+    operation["video_fx_plan"]["real_write_possible"] = True
+    operation["video_fx_plan"]["requires_confirm_token"] = True
+    operation["video_fx_plan"]["planned_only_reason"] = "video_fx_scalar_requires_confirm_token"
+    operation["confirm_token"] = _phase4c_video_fx_scalar_confirm_token(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        effect=effect,
+        baseline=baseline,
+        requested=requested,
+    )
+    return []
+
+
+def _validate_phase4c_video_fx_scalar_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    property_name = VIDEO_PHASE4C_FX_SCALAR_PROPERTY
+    operation = _phase4c_video_fx_scalar_operation(item)
+    if operation is None or not isinstance(before, dict):
+        return {property_name: "Phase 4C Video FX scalar preflight is incomplete."}
+    if before.get("type") != "Video":
+        return {property_name: "Phase 4C Video FX scalar real writes require cue type Video."}
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return {property_name: "Phase 4C Video FX scalar real writes require a healthy cue without warnings."}
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return {property_name: "Phase 4C Video FX scalar real writes require an inactive cue."}
+    cue_id = _resolved_cue_id(before)
+    if cue_id != item.get("cue_ref"):
+        return {property_name: "Phase 4C fresh read uniqueID does not exactly match requested cue UUID."}
+    effect, baseline, requested, error = _phase4c_video_fx_scalar_candidate_values(item, before)
+    if error or effect is None or baseline is None or requested is None:
+        return {property_name: error or "Phase 4C Video FX scalar baseline is unavailable."}
+    token = item["confirm_gates"][0]
+    payload, token_error = _decode_phase4c_video_fx_scalar_confirm_token(token)
+    if token_error or payload is None:
+        return {property_name: token_error or "Phase 4C Video FX scalar confirm_token is invalid."}
+    expected = _phase4c_video_fx_scalar_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        effect=effect,
+        baseline=baseline,
+        requested=requested,
+    )
+    for key, value in expected.items():
+        if key in {"baseline", "baseline_sha256", "raw_effect_payload_sha256"}:
+            continue
+        if payload.get(key) != value:
+            return {
+                property_name: (
+                    "Phase 4C Video FX scalar confirm_token does not match this workspace, cue, "
+                    "effect index, parameter, value, or risk context."
+                )
+            }
+    if (
+        payload.get("baseline_sha256") != expected["baseline_sha256"]
+        or payload.get("raw_effect_payload_sha256") != expected["raw_effect_payload_sha256"]
+        or not math.isclose(
+            float(payload.get("baseline", math.nan)),
+            float(expected["baseline"]),
+            abs_tol=UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
+            rel_tol=UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
+        )
+    ):
+        return {
+            property_name: (
+                "stale_video_fx_scalar_baseline: current Video FX payload no longer matches "
+                "the reviewed dry-run baseline."
+            )
+        }
+    return {}
+
+
+def _mark_phase4c_video_fx_scalar_real_operation(item: dict[str, Any]) -> None:
+    operation = _phase4c_video_fx_scalar_operation(item)
+    if operation is None:
+        return
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": True,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase4c_video_fx_scalar_candidate": True,
+        }
+    )
+    operation.pop("planned_only_reason", None)
+
+
+def _label_phase4c_video_fx_scalar_rejection(item: dict[str, Any]) -> None:
+    operation = _phase4c_video_fx_scalar_operation(item)
+    if operation is not None:
+        operation["planned_only_reason"] = "video_fx_scalar_requires_confirm_token"
+
+
+def _refresh_phase4c_video_fx_scalar_real_result(
+    result: dict[str, Any],
+    item: dict[str, Any],
+) -> None:
+    fx_operation = _phase4c_video_fx_scalar_operation(item)
+    if fx_operation is None or not result.get("executed_operations"):
+        return
+    property_name = fx_operation["property"]
+    for operation in result.get("operations") or []:
+        if operation.get("property") == property_name:
+            operation.update(
+                real_write_enabled=True,
+                real_write_possible=True,
+                requires_confirm_token=True,
+            )
+            operation.pop("planned_only_reason", None)
+    for operation in result.get("planned_operations") or []:
+        if operation.get("operation") == "set_property" and operation.get("property") == property_name:
+            operation.update(
+                real_write_enabled=True,
+                real_write_possible=True,
+                requires_confirm_token=True,
+            )
+            operation.pop("planned_only_reason", None)
+    plan = result.get("updateq_plan")
+    if not isinstance(plan, dict):
+        cue_values = result.get("before") or {}
+        plan = {
+            "status": result.get("status"),
+            "intent": "Executed saved videoEffectIndex/0/parameter/inputRadius change on Video cue.",
+            "cue": {
+                "uniqueID": result.get("cue_id"),
+                "number": cue_values.get("number"),
+                "name": cue_values.get("name"),
+                "type": cue_values.get("type"),
+            },
+            "property": property_name,
+            "profile": item["profile"],
+            "mode": "saved",
+            "risk_tier": "high",
+        }
+        result["updateq_plan"] = plan
+    plan.update(
+        status=result.get("status"),
+        intent="Executed saved videoEffectIndex/0/parameter/inputRadius change on Video cue.",
+        real_write_enabled=True,
+        real_write_possible=True,
+        requires_confirm_token=True,
+        planned_only=False,
+        after=_phase4c_video_fx_after_value(result.get("after")),
+        verification={"readback_matched": result.get("errors") is None},
+    )
+    plan.pop("why_not_written", None)
+    safety = dict(plan.get("safety") or {})
+    safety.update({"no_executed_operations": False, "will_modify_qlab": True})
+    plan["safety"] = safety
+
+
+def _phase4c_video_fx_after_value(after: Any) -> Any:
+    if not isinstance(after, dict):
+        return None
+    effects = after.get("videoEffects")
+    if not isinstance(effects, list) or len(effects) <= VIDEO_PHASE4C_FX_ALLOWED_INDEX:
+        return None
+    effect = effects[VIDEO_PHASE4C_FX_ALLOWED_INDEX]
+    if not isinstance(effect, dict):
+        return None
+    parameters, _ = _video_fx_parameters(effect)
+    return parameters.get(VIDEO_PHASE4C_FX_ALLOWED_PARAMETER)
 
 
 def _phase3_video_opacity_operation(item: dict[str, Any]) -> dict[str, Any] | None:
@@ -2507,6 +3211,290 @@ def _validate_phase3e_text_basic_real_write(
     return {}
 
 
+def _phase3f_text_style_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") != "text_basic":
+        return None
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in TEXT_PHASE3F_PROPERTIES
+        ),
+        None,
+    )
+
+
+def _phase3f_text_style_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 3F Text Style real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") != "text_basic":
+        return "Phase 3F Text Style real writes require profile='text_basic'."
+    if len(operations) != 1:
+        return "Phase 3F Text Style real writes require exactly one property."
+    operation = operations[0]
+    if (
+        operation.get("property") not in TEXT_PHASE3F_PROPERTIES
+        or operation.get("path") != operation.get("property")
+    ):
+        return "Phase 3F real writes allow only the approved scalar shadow and decoration properties."
+    if operation.get("mode") != "saved":
+        return "Phase 3F Text Style real writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Phase 3F Text Style real writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _text_style_value_valid(property_name: str, value: Any) -> bool:
+    if property_name == "text/format/shadowBlurRadius":
+        return _is_plain_finite_number(value) and float(value) >= 0
+    if property_name in {
+        "text/format/shadowOffset/width",
+        "text/format/shadowOffset/height",
+    }:
+        return _is_plain_finite_number(value)
+    if property_name in {
+        "text/format/underlineStyle",
+        "text/format/strikethroughStyle",
+    }:
+        return isinstance(value, str) and value.strip().casefold() in {"none", "single", "double"}
+    return False
+
+
+def _text_style_canonical_value(property_name: str, value: Any) -> Any:
+    if property_name in {
+        "text/format/shadowBlurRadius",
+        "text/format/shadowOffset/width",
+        "text/format/shadowOffset/height",
+    }:
+        return float(value)
+    return value.strip().casefold()
+
+
+def _text_style_sha256(property_name: str, value: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            _text_style_canonical_value(property_name, value),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _phase3f_text_style_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    baseline: Any,
+    requested: Any,
+) -> dict[str, Any]:
+    property_name = operation["property"]
+    return {
+        "version": PHASE3F_TEXT_STYLE_TOKEN_VERSION,
+        "operation_kind": PHASE3F_TEXT_STYLE_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "cue_type": "Text",
+        "profile": item["profile"],
+        "property": property_name,
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": _text_style_canonical_value(property_name, baseline),
+        "baseline_sha256": _text_style_sha256(property_name, baseline),
+        "requested": _text_style_canonical_value(property_name, requested),
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "mcp_secret_version": 1,
+    }
+
+
+def _phase3f_text_style_confirm_token(**payload_args: Any) -> str:
+    payload = _phase3f_text_style_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:textStyle:v{PHASE3F_TEXT_STYLE_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _decode_phase3f_text_style_confirm_token(
+    token: str,
+) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    expected_prefix = ["confirm", "textStyle", f"v{PHASE3F_TEXT_STYLE_TOKEN_VERSION}"]
+    if len(parts) != 5 or parts[:3] != expected_prefix:
+        return None, "Phase 3F Text Style confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(
+        _LIGHT_WRITE_TOKEN_SECRET,
+        encoded.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 3F Text Style confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 3F Text Style confirm_token payload is invalid."
+    return (payload, None) if isinstance(payload, dict) else (
+        None,
+        "Phase 3F Text Style confirm_token payload is invalid.",
+    )
+
+
+def _phase3f_text_style_dry_run_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase3f_text_style_operation(item)
+    if operation is None or not isinstance(before, dict) or before.get("type") != "Text":
+        return {}
+    property_name = operation["property"]
+    requested = operation["args"][0] if operation.get("args") else None
+    if not _text_style_value_valid(property_name, requested):
+        return {property_name: f"Phase 3F Text Style requested {property_name} value is invalid."}
+    return {
+        property_name: (
+            f"Phase 3F Text Style is blocked: reliable fresh {property_name} "
+            "baseline/readback is unavailable in QLab 5.5.10."
+        )
+    }
+
+
+def _annotate_phase3f_text_style_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operation = _phase3f_text_style_operation(item)
+    if operation is None:
+        return []
+    property_name = operation["property"]
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name) if isinstance(before, dict) else None
+    requested = operation["args"][0] if operation.get("args") else None
+    candidate = (
+        candidate_shape
+        and isinstance(before, dict)
+        and before.get("type") == "Text"
+        and cue_id == item.get("cue_ref")
+        and _text_style_value_valid(property_name, baseline)
+        and _text_style_value_valid(property_name, requested)
+    )
+    if not candidate:
+        operation.pop("confirm_token", None)
+        return []
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase3f_text_style_candidate": True,
+            "planned_only_reason": "text_style_requires_confirm_token",
+            "future_gate_requirements": [
+                "phase3f_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation["confirm_token"] = _phase3f_text_style_confirm_token(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    return []
+
+
+def _validate_phase3f_text_style_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase3f_text_style_operation(item)
+    property_name = operation.get("property") if operation else "text_style"
+    if operation is None or not isinstance(before, dict):
+        return {property_name: "Phase 3F Text Style preflight is incomplete."}
+    return {
+        property_name: (
+            f"Phase 3F Text Style real write is blocked: reliable fresh {property_name} "
+            "baseline/readback is unavailable in QLab 5.5.10."
+        )
+    }
+    if item.get("profile") != "text_basic" or before.get("type") != "Text":
+        return {property_name: "Phase 3F Text Style real writes require a Text cue and text_basic profile."}
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return {property_name: "Phase 3F Text Style real writes require a healthy cue without warnings."}
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return {property_name: "Phase 3F Text Style real writes require an inactive cue."}
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name)
+    requested = operation["args"][0] if operation.get("args") else None
+    if cue_id != item.get("cue_ref"):
+        return {property_name: "Phase 3F fresh read uniqueID does not exactly match requested cue UUID."}
+    if not _text_style_value_valid(property_name, baseline):
+        return {property_name: f"Phase 3F Text Style requires readable {property_name} baseline."}
+    if not _text_style_value_valid(property_name, requested):
+        return {property_name: f"Phase 3F Text Style requested {property_name} value is invalid."}
+    payload, token_error = _decode_phase3f_text_style_confirm_token(item["confirm_gates"][0])
+    if token_error or payload is None:
+        return {property_name: token_error or "Phase 3F Text Style confirm_token is invalid."}
+    expected = _phase3f_text_style_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    for key, value in expected.items():
+        if key in {"baseline", "baseline_sha256"}:
+            continue
+        if payload.get(key) != value:
+            return {
+                property_name: (
+                    "Phase 3F Text Style confirm_token does not match this workspace, cue, property, "
+                    "value, or risk context."
+                )
+            }
+    baseline_matches = (
+        math.isclose(
+            float(payload.get("baseline", math.nan)),
+            float(expected["baseline"]),
+            abs_tol=UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
+            rel_tol=UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
+        )
+        if _is_plain_finite_number(expected["baseline"])
+        else payload.get("baseline") == expected["baseline"]
+    )
+    if payload.get("baseline_sha256") != expected["baseline_sha256"] or not baseline_matches:
+        return {
+            property_name: (
+                f"stale_text_style_baseline: current {property_name} no longer matches "
+                "the reviewed dry-run baseline."
+            )
+        }
+    return {}
+
+
 def _phase4_light_call_structure_error(items: list[dict[str, Any]]) -> str | None:
     if len(items) != 1:
         return "Phase 4 lightCommandText real writes require exactly one cue update."
@@ -3519,6 +4507,78 @@ def _refresh_phase3e_text_basic_real_result(
         plan["safety"] = safety
 
 
+def _mark_phase3f_text_style_real_operation(item: dict[str, Any]) -> None:
+    operation = _phase3f_text_style_operation(item)
+    if operation is None:
+        return
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": True,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase3f_text_style_candidate": True,
+            "future_gate_requirements": [
+                "phase3f_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation.pop("planned_only_reason", None)
+
+
+def _label_phase3f_text_style_rejection(item: dict[str, Any]) -> None:
+    operation = _phase3f_text_style_operation(item)
+    if operation is not None:
+        operation["planned_only_reason"] = "text_style_requires_confirm_token"
+
+
+def _refresh_phase3f_text_style_real_result(
+    result: dict[str, Any],
+    item: dict[str, Any],
+) -> None:
+    style_operation = _phase3f_text_style_operation(item)
+    if style_operation is None or not result.get("executed_operations"):
+        return
+    property_name = style_operation["property"]
+    for operation in result.get("operations") or []:
+        if operation.get("property") == property_name:
+            operation.update(
+                real_write_enabled=True,
+                real_write_possible=True,
+                requires_confirm_token=True,
+            )
+            operation.pop("planned_only_reason", None)
+    for operation in result.get("planned_operations") or []:
+        if operation.get("operation") == "set_property" and operation.get("property") == property_name:
+            operation.update(
+                real_write_enabled=True,
+                real_write_possible=True,
+                requires_confirm_token=True,
+            )
+            operation.pop("planned_only_reason", None)
+    plan = result.get("updateq_plan")
+    if isinstance(plan, dict):
+        plan.update(
+            status=result.get("status"),
+            intent=f"Executed saved {property_name} change on Text cue.",
+            real_write_enabled=True,
+            real_write_possible=True,
+            requires_confirm_token=True,
+            after=(result.get("after") or {}).get(property_name),
+            verification={"readback_matched": result.get("errors") is None},
+        )
+        plan.pop("why_not_written", None)
+        safety = dict(plan.get("safety") or {})
+        safety.update({"no_executed_operations": False, "will_modify_qlab": True})
+        plan["safety"] = safety
+
+
 def _summarize_light_command_analysis(helper_result: dict[str, Any]) -> dict[str, Any]:
     results = helper_result.get("results") if isinstance(helper_result.get("results"), list) else []
     status_counts = {status: 0 for status in ("valid", "warning", "invalid", "unsupported")}
@@ -3673,6 +4733,36 @@ def _video_phase2_updateq_plan(
             "notices": notices,
             "notice_explanations": notice_explanations,
             "suggestion": _video_phase2_updateq_suggestion(property_name, reason),
+            "safety": safety,
+        }
+
+    fx_operation = _video_fx_dry_run_operation(item)
+    if fx_operation is not None:
+        fx_plan = fx_operation.get("video_fx_plan")
+        if not isinstance(fx_plan, dict):
+            return None
+        return {
+            "status": "planned",
+            "intent": "Preview one saved Video FX change without executing it.",
+            "cue": cue,
+            "property": fx_operation["property"],
+            "profile": item["profile"],
+            "mode": "saved",
+            "before": fx_plan.get("before"),
+            "requested": fx_plan.get("requested"),
+            "diff": {
+                "before": fx_plan.get("before"),
+                "requested": fx_plan.get("requested"),
+            },
+            "risk_tier": "high",
+            "real_write_enabled": bool(fx_operation.get("real_write_enabled")),
+            "real_write_possible": bool(fx_operation.get("real_write_possible")),
+            "requires_confirm_token": bool(fx_operation.get("requires_confirm_token")),
+            "planned_only": not bool(fx_operation.get("real_write_possible")),
+            "why_not_written": fx_operation.get("planned_only_reason"),
+            "video_fx": fx_plan,
+            "notices": notices,
+            "notice_explanations": notice_explanations,
             "safety": safety,
         }
 
@@ -3890,6 +4980,10 @@ def _planned_update_operations(
             "phase3c_video_scalar_candidate",
             "phase3d_video_appearance_candidate",
             "phase3e_text_basic_candidate",
+            "phase3f_text_style_candidate",
+            "phase4c_video_fx_scalar_candidate",
+            "video_fx_plan",
+            "planned_only",
             "phase4_real_write_candidate",
             "phase5_light_behavior_candidate",
             "light_command_analysis",
@@ -4042,6 +5136,15 @@ def _verification_requested_values(item: dict[str, Any]) -> dict[str, Any]:
     for operation in item["operations"]:
         read_key = operation.get("read_key")
         args = operation.get("args") or []
+        if _phase4c_video_fx_scalar_operation(item) is operation:
+            values = operation.get("arg_values") or {}
+            requested["videoEffects"] = {
+                "__video_fx_scalar__": True,
+                "index": values.get("index"),
+                "parameterKey": values.get("parameterKey"),
+                "setting": values.get("setting"),
+            }
+            continue
         if read_key and len(args) == 1:
             requested[str(read_key)] = args[0]
     return requested
@@ -4059,6 +5162,18 @@ def _verification_mismatch_message(values: Any, requested: dict[str, Any]) -> st
 
 
 def _property_values_match(key: str, actual: Any, requested: Any) -> bool:
+    if key == "videoEffects" and isinstance(requested, dict) and requested.get("__video_fx_scalar__") is True:
+        index = requested.get("index")
+        parameter_key = requested.get("parameterKey")
+        if not isinstance(actual, list) or not isinstance(index, int) or index < 0 or index >= len(actual):
+            return False
+        effect = actual[index]
+        if not isinstance(effect, dict) or not isinstance(parameter_key, str):
+            return False
+        parameters, _ = _video_fx_parameters(effect)
+        actual_value = parameters.get(parameter_key)
+        requested_value = requested.get("setting")
+        return _property_values_match(parameter_key, actual_value, requested_value)
     actual_value = _comparison_value(key, actual)
     requested_value = _comparison_value(key, requested)
     if _is_plain_number(actual_value) and _is_plain_number(requested_value):

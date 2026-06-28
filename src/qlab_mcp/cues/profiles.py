@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from ..osc.addressing import _clean_cue_ref
@@ -391,6 +392,35 @@ def _video_effects_summary(value: Any) -> dict[str, Any]:
             )
             if name is not None:
                 entry["name"] = name
+                entry["addressing"] = {
+                    "by_index": f"videoEffectIndex/{index}",
+                    "by_name": f"videoEffect/{name}",
+                }
+            else:
+                entry["identity_available"] = False
+                entry["addressing"] = {"by_index": f"videoEffectIndex/{index}"}
+            effect_type = next(
+                (effect.get(key) for key in ("type", "effectType", "category") if effect.get(key)),
+                None,
+            )
+            if effect_type is not None:
+                entry["type"] = effect_type
+            else:
+                entry["type_available"] = False
+            enabled = effect.get("enabled", effect.get("isEnabled"))
+            if isinstance(enabled, bool):
+                entry["enabled"] = enabled
+                entry["enabled_readback_stable"] = True
+                entry["enabled_write_documented"] = True
+            else:
+                entry["enabled_available"] = False
+            parameters, source = _video_effect_parameter_inventory(effect)
+            if parameters:
+                entry["parameters_source"] = source
+                entry["parameters"] = [
+                    _video_effect_parameter_summary(key, parameter_value)
+                    for key, parameter_value in sorted(parameters.items(), key=lambda item: str(item[0]))
+                ]
         elif isinstance(effect, str):
             entry["name"] = effect
         summarized.append(entry)
@@ -400,6 +430,71 @@ def _video_effects_summary(value: Any) -> dict[str, Any]:
         "effects": summarized,
         "raw_effect_keys": sorted(raw_keys),
     }
+
+
+_VIDEO_EFFECT_IDENTITY_KEYS = frozenset(
+    {
+        "name",
+        "effectName",
+        "displayName",
+        "oscName",
+        "type",
+        "effectType",
+        "category",
+        "enabled",
+        "isEnabled",
+        "parameters",
+    }
+)
+
+
+def _video_effect_parameter_inventory(effect: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    parameters = effect.get("parameters")
+    if isinstance(parameters, dict):
+        return parameters, "parameters"
+    return {
+        str(key): value
+        for key, value in effect.items()
+        if str(key) not in _VIDEO_EFFECT_IDENTITY_KEYS
+    }, "flat_payload"
+
+
+def _video_effect_parameter_summary(key: Any, value: Any) -> dict[str, Any]:
+    if isinstance(value, bool):
+        kind, stable = "boolean", True
+    elif isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value)):
+        kind, stable = "number", True
+    elif isinstance(value, str):
+        kind, stable = "enum_or_string", True
+    elif (
+        isinstance(value, list)
+        and len(value) == 4
+        and all(
+            isinstance(component, (int, float))
+            and not isinstance(component, bool)
+            and math.isfinite(float(component))
+            and 0 <= float(component) <= 1
+            for component in value
+        )
+    ):
+        kind, stable = "color", False
+    elif isinstance(value, (list, dict)):
+        kind, stable = "structured", False
+    else:
+        kind, stable = "unknown", False
+    summary = {
+        "key": str(key),
+        "value_type": type(value).__name__,
+        "kind": kind,
+        "scalar": stable,
+        "readback_stable": stable,
+        "writable_path_documented": True,
+        "dry_run_candidate": stable,
+        "risk": "high",
+    }
+    if stable:
+        summary["value"] = value
+    return summary
 
 
 def _lightweight_video_regions(value: Any) -> list[dict[str, Any]]:

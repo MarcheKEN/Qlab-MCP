@@ -856,6 +856,7 @@ VIDEO_CATALOG_PROPERTIES = (
         "videoEffect/parameter",
         (("name", "non_empty_string"), ("parameterKey", "non_empty_string"), ("setting", "json_value")),
         path="videoEffect/{name}/parameter/{parameterKey}",
+        read_key="videoEffects",
         modes=("saved", "live"),
         risk_tier="high",
         planned_only_reason="video_effect_parameters_need_profile_specific_validation",
@@ -864,6 +865,7 @@ VIDEO_CATALOG_PROPERTIES = (
         "videoEffectIndex/parameter",
         (("index", "non_negative_int"), ("parameterKey", "non_empty_string"), ("setting", "json_value")),
         path="videoEffectIndex/{index}/parameter/{parameterKey}",
+        read_key="videoEffects",
         modes=("saved", "live"),
         risk_tier="high",
         planned_only_reason="video_effect_parameters_need_profile_specific_validation",
@@ -905,7 +907,18 @@ VIDEO_PHASE2_VISUAL_PROPERTY_NAMES = frozenset(
     }
 )
 VIDEO_PHASE2_TEXT_PROPERTY_NAMES = frozenset(
-    {"fixedWidth", "text", "text/format/alignment", "text/format/fontName", "text/format/fontSize"}
+    {
+        "fixedWidth",
+        "text",
+        "text/format/alignment",
+        "text/format/fontName",
+        "text/format/fontSize",
+        "text/format/shadowBlurRadius",
+        "text/format/shadowOffset/width",
+        "text/format/shadowOffset/height",
+        "text/format/underlineStyle",
+        "text/format/strikethroughStyle",
+    }
 )
 VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES = VIDEO_PHASE2_VISUAL_PROPERTY_NAMES | VIDEO_PHASE2_TEXT_PROPERTY_NAMES
 VIDEO_PHASE2_VISUAL_PROPERTIES = tuple(

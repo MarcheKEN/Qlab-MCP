@@ -898,6 +898,8 @@ VIDEO_PHASE2_VISUAL_PROPERTY_NAMES = frozenset(
         "cropLeft",
         "cropRight",
         "cropTop",
+        "fillStage",
+        "fillStyle",
         "opacity",
         "preserveAspectRatio",
         "scale/x",

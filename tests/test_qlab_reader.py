@@ -4972,6 +4972,10 @@ class QLabReaderTests(unittest.TestCase):
             "inputRadius",
         ]
         assert all(item["dry_run_candidate"] is True for item in effect["parameters"])
+        params = {item["key"]: item for item in effect["parameters"]}
+        assert params["inputIntensity"]["kind"] == "number"
+        assert params["inputIntensity"]["scalar"] is True
+        assert params["inputIntensity"]["readback_stable"] is True
 
     def test_technical_and_exhaustive_preserve_raw_video_regions(self) -> None:
         raw_region = {

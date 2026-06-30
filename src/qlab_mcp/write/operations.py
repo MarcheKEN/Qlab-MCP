@@ -129,6 +129,12 @@ VIDEO_PHASE3_APPEARANCE_TYPES = {
     "camera_basic": "Camera",
     "text_basic": "Text",
 }
+VIDEO_PHASE7_GEOMETRY_PROPERTIES = frozenset({"fillStage", "fillStyle"})
+VIDEO_PHASE7_GEOMETRY_TYPES = {
+    "video_basic": "Video",
+    "camera_basic": "Camera",
+    "text_basic": "Text",
+}
 TEXT_PHASE3E_PROPERTIES = frozenset(
     {"text", "text/format/fontSize", "text/format/alignment"}
 )
@@ -151,6 +157,7 @@ VIDEO_PHASE4_FX_DRY_RUN_PROPERTIES = frozenset(
 )
 VIDEO_PHASE4C_FX_SCALAR_PROPERTY = "videoEffectIndex/parameter"
 VIDEO_PHASE4C_FX_ALLOWED_PARAMETER = "inputRadius"
+VIDEO_PHASE6_FX_ALLOWED_PARAMETER = "inputIntensity"
 VIDEO_PHASE4C_FX_ALLOWED_INDEX = 0
 VIDEO_PHASE2_HEALTH_READ_KEYS = (
     "number",
@@ -174,13 +181,34 @@ PHASE3_VIDEO_SCALAR_OPERATION_KIND = "video_phase3c_scalar_write"
 PHASE3_VIDEO_SCALAR_TOKEN_VERSION = 1
 PHASE3_VIDEO_APPEARANCE_OPERATION_KIND = "video_phase3d_appearance_write"
 PHASE3_VIDEO_APPEARANCE_TOKEN_VERSION = 1
+PHASE7_VIDEO_GEOMETRY_OPERATION_KIND = "video_phase7_geometry_write"
+PHASE7_VIDEO_GEOMETRY_TOKEN_VERSION = 1
 PHASE3E_TEXT_BASIC_OPERATION_KIND = "video_phase3e_text_basic_write"
 PHASE3E_TEXT_BASIC_TOKEN_VERSION = 1
 PHASE3F_TEXT_STYLE_OPERATION_KIND = "video_phase3f_text_style_write"
 PHASE3F_TEXT_STYLE_TOKEN_VERSION = 1
 PHASE4C_VIDEO_FX_SCALAR_OPERATION_KIND = "video_phase4c_fx_scalar_write"
 PHASE4C_VIDEO_FX_SCALAR_TOKEN_VERSION = 1
+PHASE6_VIDEO_FX_SCALAR_OPERATION_KIND = "video_phase6_fx_scalar_write"
+PHASE6_VIDEO_FX_SCALAR_TOKEN_VERSION = 2
 _LIGHT_WRITE_TOKEN_SECRET = secrets.token_bytes(32)
+
+VIDEO_FX_SCALAR_TOKEN_SPECS = {
+    VIDEO_PHASE4C_FX_ALLOWED_PARAMETER: {
+        "version": PHASE4C_VIDEO_FX_SCALAR_TOKEN_VERSION,
+        "operation_kind": PHASE4C_VIDEO_FX_SCALAR_OPERATION_KIND,
+        "phase": "Phase 4C",
+        "gate": "phase4c_video_fx_scalar_confirm_token",
+        "requirement": "inputRadius_only",
+    },
+    VIDEO_PHASE6_FX_ALLOWED_PARAMETER: {
+        "version": PHASE6_VIDEO_FX_SCALAR_TOKEN_VERSION,
+        "operation_kind": PHASE6_VIDEO_FX_SCALAR_OPERATION_KIND,
+        "phase": "Phase 6",
+        "gate": "phase6_video_fx_scalar_confirm_token",
+        "requirement": "inputIntensity_only",
+    },
+}
 
 
 def _write_workspace_resolution_error(
@@ -459,6 +487,9 @@ class QLabWriteMixin:
         phase3_video_appearance_call = any(
             _phase3_video_appearance_operation(item) is not None for item in items
         )
+        phase7_video_geometry_call = any(
+            _phase7_video_geometry_operation(item) is not None for item in items
+        )
         phase3e_text_basic_call = any(
             _phase3e_text_basic_operation(item) is not None for item in items
         )
@@ -565,6 +596,11 @@ class QLabWriteMixin:
                 if phase3_video_appearance_call
                 else None
             )
+            phase7_geometry_structure_error = (
+                _phase7_video_geometry_call_structure_error(items)
+                if phase7_video_geometry_call
+                else None
+            )
             phase3e_text_structure_error = (
                 _phase3e_text_basic_call_structure_error(items)
                 if phase3e_text_basic_call
@@ -635,6 +671,15 @@ class QLabWriteMixin:
                         errors[property_name] = (
                             f"{property_name} is gated or dry-run only without exactly one reviewed "
                             "Phase 3D confirm_token."
+                        )
+                elif not errors and phase7_video_geometry_call:
+                    property_name = item["operations"][0]["property"]
+                    if phase7_geometry_structure_error:
+                        errors[property_name] = phase7_geometry_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Phase 7 confirm_token."
                         )
                 elif not errors and phase3e_text_basic_call:
                     property_name = item["operations"][0]["property"]
@@ -747,7 +792,18 @@ class QLabWriteMixin:
                 and not phase3_video_translation_call
                 and not phase3_video_scalar_call
                 and not phase3_video_appearance_call
+                and not phase7_video_geometry_call
                 and _phase3e_text_basic_call_structure_error(items) is None
+            )
+            phase7_geometry_candidate_shape = (
+                phase7_video_geometry_call
+                and not phase4_light_call
+                and not phase5_light_call
+                and not phase3_video_opacity_call
+                and not phase3_video_translation_call
+                and not phase3_video_scalar_call
+                and not phase3_video_appearance_call
+                and _phase7_video_geometry_call_structure_error(items) is None
             )
             phase3f_text_candidate_shape = (
                 phase3f_text_style_call
@@ -757,6 +813,7 @@ class QLabWriteMixin:
                 and not phase3_video_translation_call
                 and not phase3_video_scalar_call
                 and not phase3_video_appearance_call
+                and not phase7_video_geometry_call
                 and not phase3e_text_basic_call
                 and _phase3f_text_style_call_structure_error(items) is None
             )
@@ -768,6 +825,7 @@ class QLabWriteMixin:
                 and not phase3_video_translation_call
                 and not phase3_video_scalar_call
                 and not phase3_video_appearance_call
+                and not phase7_video_geometry_call
                 and not phase3e_text_basic_call
                 and not phase3f_text_style_call
                 and _phase4c_video_fx_scalar_call_structure_error(items) is None
@@ -788,6 +846,7 @@ class QLabWriteMixin:
                     errors.update(_phase3_video_translation_dry_run_errors(item, before))
                     errors.update(_phase3_video_scalar_dry_run_errors(item, before))
                     errors.update(_phase3_video_appearance_dry_run_errors(item, before))
+                    errors.update(_phase7_video_geometry_dry_run_errors(item, before))
                     errors.update(_phase3e_text_basic_dry_run_errors(item, before))
                     errors.update(_phase3f_text_style_dry_run_errors(item, before))
                     errors.update(_video_fx_dry_run_errors(item, before))
@@ -847,6 +906,15 @@ class QLabWriteMixin:
                             workspace_id=workspace,
                             before=before,
                             candidate_shape=phase3_appearance_candidate_shape,
+                        )
+                    )
+                if not errors and _phase7_video_geometry_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_phase7_video_geometry_operation(
+                            item,
+                            workspace_id=workspace,
+                            before=before,
+                            candidate_shape=phase7_geometry_candidate_shape,
                         )
                     )
                 if not errors and _phase3e_text_basic_operation(item) is not None:
@@ -989,6 +1057,10 @@ class QLabWriteMixin:
                 errors.update(_validate_phase3_video_appearance_real_write(workspace, item, before))
                 if not errors:
                     _mark_phase3_video_appearance_real_operation(item)
+            elif not errors and phase7_video_geometry_call:
+                errors.update(_validate_phase7_video_geometry_real_write(workspace, item, before))
+                if not errors:
+                    _mark_phase7_video_geometry_real_operation(item)
             elif not errors and phase3e_text_basic_call:
                 errors.update(_validate_phase3e_text_basic_real_write(workspace, item, before))
                 if not errors:
@@ -1007,6 +1079,8 @@ class QLabWriteMixin:
                     _label_phase3_video_scalar_rejection(item)
                 if phase3_video_appearance_call:
                     _label_phase3_video_appearance_rejection(item)
+                if phase7_video_geometry_call:
+                    _label_phase7_video_geometry_rejection(item)
                 if phase3e_text_basic_call:
                     _label_phase3e_text_basic_rejection(item)
                 if phase3f_text_style_call:
@@ -1129,6 +1203,7 @@ class QLabWriteMixin:
                         or _phase3_video_translation_operation(item) is not None
                         or _phase3_video_scalar_operation(item) is not None
                         or _phase3_video_appearance_operation(item) is not None
+                        or _phase7_video_geometry_operation(item) is not None
                         or _phase3e_text_basic_operation(item) is not None
                         or _phase3f_text_style_operation(item) is not None
                         or _phase4c_video_fx_scalar_operation(item) is not None
@@ -1149,6 +1224,7 @@ class QLabWriteMixin:
                 or _phase3_video_translation_operation(item) is not None
                 or _phase3_video_scalar_operation(item) is not None
                 or _phase3_video_appearance_operation(item) is not None
+                or _phase7_video_geometry_operation(item) is not None
                 or _phase3e_text_basic_operation(item) is not None
                 or _phase3f_text_style_operation(item) is not None
                 or _phase4c_video_fx_scalar_operation(item) is not None
@@ -1171,6 +1247,7 @@ class QLabWriteMixin:
             _refresh_phase3_video_translation_real_result(result, item)
             _refresh_phase3_video_scalar_real_result(result, item)
             _refresh_phase3_video_appearance_real_result(result, item)
+            _refresh_phase7_video_geometry_real_result(result, item)
             _refresh_phase3e_text_basic_real_result(result, item)
             _refresh_phase3f_text_style_real_result(result, item)
             _refresh_phase4c_video_fx_scalar_real_result(result, item)
@@ -1612,16 +1689,25 @@ def _phase4c_video_fx_scalar_operation(item: dict[str, Any]) -> dict[str, Any] |
     if operation is None:
         return None
     values = operation.get("arg_values") or {}
+    parameter_key = values.get("parameterKey")
     if (
         item.get("profile") == "video_basic"
         and operation.get("property") == VIDEO_PHASE4C_FX_SCALAR_PROPERTY
-        and operation.get("path") == "videoEffectIndex/0/parameter/inputRadius"
+        and parameter_key in VIDEO_FX_SCALAR_TOKEN_SPECS
+        and operation.get("path") == f"videoEffectIndex/0/parameter/{parameter_key}"
         and operation.get("mode") == "saved"
         and values.get("index") == VIDEO_PHASE4C_FX_ALLOWED_INDEX
-        and values.get("parameterKey") == VIDEO_PHASE4C_FX_ALLOWED_PARAMETER
     ):
         return operation
     return None
+
+
+def _phase4c_video_fx_scalar_spec(item: dict[str, Any]) -> dict[str, Any] | None:
+    operation = _phase4c_video_fx_scalar_operation(item)
+    if operation is None:
+        return None
+    parameter_key = (operation.get("arg_values") or {}).get("parameterKey")
+    return VIDEO_FX_SCALAR_TOKEN_SPECS.get(parameter_key)
 
 
 def _phase4c_video_fx_scalar_call_structure_error(items: list[dict[str, Any]]) -> str | None:
@@ -1643,10 +1729,10 @@ def _phase4c_video_fx_scalar_call_structure_error(items: list[dict[str, Any]]) -
     values = operation.get("arg_values") or {}
     if values.get("index") != VIDEO_PHASE4C_FX_ALLOWED_INDEX:
         return "Phase 4C Video FX scalar real writes allow only effect index 0."
-    if values.get("parameterKey") != VIDEO_PHASE4C_FX_ALLOWED_PARAMETER:
-        return "Phase 4C Video FX scalar real writes allow only inputRadius."
+    if values.get("parameterKey") not in VIDEO_FX_SCALAR_TOKEN_SPECS:
+        return "Video FX scalar real writes allow only inputRadius or inputIntensity."
     if not _is_plain_finite_number(values.get("setting")):
-        return "Phase 4C Video FX scalar real writes require a finite numeric setting."
+        return "Video FX scalar real writes require a finite numeric setting."
     return None
 
 
@@ -1668,9 +1754,10 @@ def _phase4c_video_fx_scalar_token_payload(
     requested: int | float,
 ) -> dict[str, Any]:
     values = operation.get("arg_values") or {}
+    spec = VIDEO_FX_SCALAR_TOKEN_SPECS[values["parameterKey"]]
     return {
-        "version": PHASE4C_VIDEO_FX_SCALAR_TOKEN_VERSION,
-        "operation_kind": PHASE4C_VIDEO_FX_SCALAR_OPERATION_KIND,
+        "version": spec["version"],
+        "operation_kind": spec["operation_kind"],
         "workspace_id": workspace_id,
         "cue_ref": cue_ref,
         "cue_id": cue_id,
@@ -1698,14 +1785,14 @@ def _phase4c_video_fx_scalar_confirm_token(**payload_args: Any) -> str:
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).decode("ascii").rstrip("=")
     signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
-    return f"confirm:videoFxScalar:v{PHASE4C_VIDEO_FX_SCALAR_TOKEN_VERSION}:{encoded}:{signature}"
+    return f"confirm:videoFxScalar:v{payload['version']}:{encoded}:{signature}"
 
 
 def _decode_phase4c_video_fx_scalar_confirm_token(token: str) -> tuple[dict[str, Any] | None, str | None]:
     parts = token.split(":", 4)
-    expected_prefix = ["confirm", "videoFxScalar", f"v{PHASE4C_VIDEO_FX_SCALAR_TOKEN_VERSION}"]
-    if len(parts) != 5 or parts[:3] != expected_prefix:
-        return None, "Phase 4C Video FX scalar confirm_token is malformed or has an unsupported version."
+    supported_versions = {f"v{spec['version']}" for spec in VIDEO_FX_SCALAR_TOKEN_SPECS.values()}
+    if len(parts) != 5 or parts[0] != "confirm" or parts[1] != "videoFxScalar" or parts[2] not in supported_versions:
+        return None, "Video FX scalar confirm_token is malformed or has an unsupported version."
     encoded, signature = parts[3], parts[4]
     expected_signature = hmac.new(
         _LIGHT_WRITE_TOKEN_SECRET,
@@ -1713,14 +1800,14 @@ def _decode_phase4c_video_fx_scalar_confirm_token(token: str) -> tuple[dict[str,
         hashlib.sha256,
     ).hexdigest()
     if not hmac.compare_digest(signature, expected_signature):
-        return None, "Phase 4C Video FX scalar confirm_token signature is invalid."
+        return None, "Video FX scalar confirm_token signature is invalid."
     try:
         padding = "=" * (-len(encoded) % 4)
         payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
     except Exception:
-        return None, "Phase 4C Video FX scalar confirm_token payload is invalid."
+        return None, "Video FX scalar confirm_token payload is invalid."
     if not isinstance(payload, dict):
-        return None, "Phase 4C Video FX scalar confirm_token payload is invalid."
+        return None, "Video FX scalar confirm_token payload is invalid."
     return payload, None
 
 
@@ -1737,7 +1824,8 @@ def _phase4c_video_fx_scalar_candidate_values(
     parameters, source = _video_fx_parameters(effect)
     if source != "flat_payload":
         return None, None, None, "Phase 4C requires the QLab 5.5.10 flat Video FX payload shape."
-    baseline = parameters.get(VIDEO_PHASE4C_FX_ALLOWED_PARAMETER)
+    parameter_key = (operation.get("arg_values") or {}).get("parameterKey")
+    baseline = parameters.get(parameter_key)
     requested = (operation.get("arg_values") or {}).get("setting")
     if not _is_plain_finite_number(baseline) or not _is_plain_finite_number(requested):
         return None, None, None, "Phase 4C requires finite numeric baseline and requested value."
@@ -1759,6 +1847,7 @@ def _annotate_phase4c_video_fx_scalar_operation(
     candidate_shape: bool,
 ) -> list[str]:
     operation = _phase4c_video_fx_scalar_operation(item)
+    spec = _phase4c_video_fx_scalar_spec(item)
     if operation is None:
         return []
     cue_id = _resolved_cue_id(before)
@@ -1786,11 +1875,11 @@ def _annotate_phase4c_video_fx_scalar_operation(
             "phase4c_video_fx_scalar_candidate": True,
             "planned_only_reason": "video_fx_scalar_requires_confirm_token",
             "future_gate_requirements": [
-                "phase4c_video_fx_scalar_confirm_token",
+                spec["gate"] if spec else "video_fx_scalar_confirm_token",
                 "single_video_cue_single_parameter",
                 "uuid_cue_ref",
                 "effect_index_0",
-                "inputRadius_only",
+                spec["requirement"] if spec else "parameter_allowlist",
                 "saved_mode",
                 "fresh_flat_payload_baseline",
                 "raw_effect_payload_hash",
@@ -1929,7 +2018,7 @@ def _refresh_phase4c_video_fx_scalar_real_result(
         cue_values = result.get("before") or {}
         plan = {
             "status": result.get("status"),
-            "intent": "Executed saved videoEffectIndex/0/parameter/inputRadius change on Video cue.",
+            "intent": f"Executed saved {fx_operation['path']} change on Video cue.",
             "cue": {
                 "uniqueID": result.get("cue_id"),
                 "number": cue_values.get("number"),
@@ -1944,12 +2033,12 @@ def _refresh_phase4c_video_fx_scalar_real_result(
         result["updateq_plan"] = plan
     plan.update(
         status=result.get("status"),
-        intent="Executed saved videoEffectIndex/0/parameter/inputRadius change on Video cue.",
+        intent=f"Executed saved {fx_operation['path']} change on Video cue.",
         real_write_enabled=True,
         real_write_possible=True,
         requires_confirm_token=True,
         planned_only=False,
-        after=_phase4c_video_fx_after_value(result.get("after")),
+        after=_phase4c_video_fx_after_value(result.get("after"), item),
         verification={"readback_matched": result.get("errors") is None},
     )
     plan.pop("why_not_written", None)
@@ -1958,7 +2047,7 @@ def _refresh_phase4c_video_fx_scalar_real_result(
     plan["safety"] = safety
 
 
-def _phase4c_video_fx_after_value(after: Any) -> Any:
+def _phase4c_video_fx_after_value(after: Any, item: dict[str, Any]) -> Any:
     if not isinstance(after, dict):
         return None
     effects = after.get("videoEffects")
@@ -1968,7 +2057,10 @@ def _phase4c_video_fx_after_value(after: Any) -> Any:
     if not isinstance(effect, dict):
         return None
     parameters, _ = _video_fx_parameters(effect)
-    return parameters.get(VIDEO_PHASE4C_FX_ALLOWED_PARAMETER)
+    operation = _phase4c_video_fx_scalar_operation(item)
+    if operation is None:
+        return None
+    return parameters.get((operation.get("arg_values") or {}).get("parameterKey"))
 
 
 def _phase3_video_opacity_operation(item: dict[str, Any]) -> dict[str, Any] | None:
@@ -2941,6 +3033,260 @@ def _validate_phase3_video_appearance_real_write(
         return {
             property_name: (
                 f"stale_video_appearance_baseline: current {property_name} no longer matches "
+                "the reviewed dry-run baseline."
+            )
+        }
+    return {}
+
+
+def _phase7_video_geometry_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in VIDEO_PHASE7_GEOMETRY_PROPERTIES
+        ),
+        None,
+    )
+
+
+def _phase7_video_geometry_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 7 geometry real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") not in VIDEO_PHASE7_GEOMETRY_TYPES:
+        return "Phase 7 geometry real writes require video_basic, camera_basic, or text_basic profile."
+    if len(operations) != 1:
+        return "Phase 7 geometry real writes require exactly one property."
+    operation = operations[0]
+    if (
+        operation.get("property") not in VIDEO_PHASE7_GEOMETRY_PROPERTIES
+        or operation.get("path") != operation.get("property")
+    ):
+        return "Phase 7 real writes allow only fillStage or fillStyle."
+    if operation.get("mode") != "saved":
+        return "Phase 7 geometry real writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Phase 7 geometry real writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _video_geometry_value_valid(property_name: str, value: Any) -> bool:
+    if property_name == "fillStage":
+        return isinstance(value, bool)
+    if property_name == "fillStyle":
+        return isinstance(value, int) and not isinstance(value, bool) and value in {0, 1, 2}
+    return False
+
+
+def _video_geometry_sha256(value: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _phase7_video_geometry_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    baseline: Any,
+    requested: Any,
+) -> dict[str, Any]:
+    return {
+        "version": PHASE7_VIDEO_GEOMETRY_TOKEN_VERSION,
+        "operation_kind": PHASE7_VIDEO_GEOMETRY_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "cue_type": VIDEO_PHASE7_GEOMETRY_TYPES[item["profile"]],
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": baseline,
+        "baseline_sha256": _video_geometry_sha256(baseline),
+        "requested": requested,
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "mcp_secret_version": 1,
+    }
+
+
+def _phase7_video_geometry_confirm_token(**payload_args: Any) -> str:
+    payload = _phase7_video_geometry_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:videoGeometry:v{PHASE7_VIDEO_GEOMETRY_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _decode_phase7_video_geometry_confirm_token(
+    token: str,
+) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    expected_prefix = [
+        "confirm",
+        "videoGeometry",
+        f"v{PHASE7_VIDEO_GEOMETRY_TOKEN_VERSION}",
+    ]
+    if len(parts) != 5 or parts[:3] != expected_prefix:
+        return None, "Phase 7 geometry confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(
+        _LIGHT_WRITE_TOKEN_SECRET,
+        encoded.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 7 geometry confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 7 geometry confirm_token payload is invalid."
+    if not isinstance(payload, dict):
+        return None, "Phase 7 geometry confirm_token payload is invalid."
+    return payload, None
+
+
+def _phase7_video_geometry_dry_run_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase7_video_geometry_operation(item)
+    if (
+        operation is None
+        or item.get("profile") not in VIDEO_PHASE7_GEOMETRY_TYPES
+        or not isinstance(before, dict)
+        or before.get("type") != VIDEO_PHASE7_GEOMETRY_TYPES.get(item.get("profile"))
+    ):
+        return {}
+    property_name = operation["property"]
+    baseline = before.get(property_name)
+    requested = operation["args"][0] if operation.get("args") else None
+    if not _video_geometry_value_valid(property_name, baseline):
+        return {property_name: f"Phase 7 geometry requires readable {property_name} baseline."}
+    if not _video_geometry_value_valid(property_name, requested):
+        return {property_name: f"Phase 7 geometry requested {property_name} value is invalid."}
+    return {}
+
+
+def _annotate_phase7_video_geometry_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operation = _phase7_video_geometry_operation(item)
+    if operation is None or item.get("profile") not in VIDEO_PHASE7_GEOMETRY_TYPES:
+        return []
+    property_name = operation["property"]
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name) if isinstance(before, dict) else None
+    requested = operation["args"][0] if operation.get("args") else None
+    candidate = (
+        candidate_shape
+        and isinstance(before, dict)
+        and before.get("type") == VIDEO_PHASE7_GEOMETRY_TYPES.get(item.get("profile"))
+        and cue_id == item.get("cue_ref")
+        and _video_geometry_value_valid(property_name, baseline)
+        and _video_geometry_value_valid(property_name, requested)
+    )
+    if not candidate:
+        operation.pop("confirm_token", None)
+        return []
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase7_video_geometry_candidate": True,
+            "planned_only_reason": "video_geometry_requires_confirm_token",
+            "future_gate_requirements": [
+                "phase7_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation["confirm_token"] = _phase7_video_geometry_confirm_token(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    return []
+
+
+def _validate_phase7_video_geometry_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase7_video_geometry_operation(item)
+    property_name = operation.get("property") if operation else "video_geometry"
+    if operation is None or not isinstance(before, dict):
+        return {property_name: "Phase 7 geometry preflight is incomplete."}
+    if before.get("type") != VIDEO_PHASE7_GEOMETRY_TYPES.get(item.get("profile")):
+        return {
+            property_name: (
+                "Phase 7 geometry real writes require matching Video, Camera, or Text cue type/profile."
+            )
+        }
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return {property_name: "Phase 7 geometry real writes require a healthy cue without warnings."}
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return {property_name: "Phase 7 geometry real writes require an inactive cue."}
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name)
+    requested = operation["args"][0] if operation.get("args") else None
+    if cue_id != item.get("cue_ref"):
+        return {property_name: "Phase 7 fresh read uniqueID does not exactly match requested cue UUID."}
+    if not _video_geometry_value_valid(property_name, baseline):
+        return {property_name: f"Phase 7 geometry requires readable {property_name} baseline."}
+    if not _video_geometry_value_valid(property_name, requested):
+        return {property_name: f"Phase 7 geometry requested {property_name} value is invalid."}
+    token = item["confirm_gates"][0]
+    payload, token_error = _decode_phase7_video_geometry_confirm_token(token)
+    if token_error or payload is None:
+        return {property_name: token_error or "Phase 7 geometry confirm_token is invalid."}
+    expected = _phase7_video_geometry_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    for key, value in expected.items():
+        if key in {"baseline", "baseline_sha256"}:
+            continue
+        if payload.get(key) != value:
+            return {
+                property_name: (
+                    "Phase 7 geometry confirm_token does not match this workspace, cue, property, "
+                    "value, or risk context."
+                )
+            }
+    if payload.get("baseline_sha256") != expected["baseline_sha256"] or payload.get("baseline") != expected["baseline"]:
+        return {
+            property_name: (
+                f"stale_video_geometry_baseline: current {property_name} no longer matches "
                 "the reviewed dry-run baseline."
             )
         }
@@ -4447,6 +4793,73 @@ def _refresh_phase3_video_appearance_real_result(
         plan["safety"] = safety
 
 
+def _mark_phase7_video_geometry_real_operation(item: dict[str, Any]) -> None:
+    operation = _phase7_video_geometry_operation(item)
+    if operation is None:
+        return
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": True,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase7_video_geometry_candidate": True,
+            "future_gate_requirements": [
+                "phase7_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation.pop("planned_only_reason", None)
+
+
+def _label_phase7_video_geometry_rejection(item: dict[str, Any]) -> None:
+    operation = _phase7_video_geometry_operation(item)
+    if operation is not None:
+        operation["planned_only_reason"] = "video_geometry_requires_confirm_token"
+
+
+def _refresh_phase7_video_geometry_real_result(
+    result: dict[str, Any],
+    item: dict[str, Any],
+) -> None:
+    geometry_operation = _phase7_video_geometry_operation(item)
+    if geometry_operation is None or not result.get("executed_operations"):
+        return
+    property_name = geometry_operation["property"]
+    for operation in result.get("operations") or []:
+        if operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    for operation in result.get("planned_operations") or []:
+        if operation.get("operation") == "set_property" and operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    plan = result.get("updateq_plan")
+    if isinstance(plan, dict):
+        cue_type = (result.get("before") or {}).get("type") or "visual"
+        plan["status"] = result.get("status")
+        plan["intent"] = f"Executed saved {property_name} change on {cue_type} cue."
+        plan["real_write_enabled"] = True
+        plan["real_write_possible"] = True
+        plan["requires_confirm_token"] = True
+        plan.pop("why_not_written", None)
+        plan["after"] = (result.get("after") or {}).get(property_name)
+        plan["verification"] = {"readback_matched": result.get("errors") is None}
+        safety = dict(plan.get("safety") or {})
+        safety.update({"no_executed_operations": False, "will_modify_qlab": True})
+        plan["safety"] = safety
+
+
 def _mark_phase3e_text_basic_real_operation(item: dict[str, Any]) -> None:
     operation = _phase3e_text_basic_operation(item)
     if operation is None:
@@ -4992,6 +5405,7 @@ def _planned_update_operations(
             "planned_only",
             "phase4_real_write_candidate",
             "phase5_light_behavior_candidate",
+            "phase7_video_geometry_candidate",
             "light_command_analysis",
         ):
             if key in update_operation:

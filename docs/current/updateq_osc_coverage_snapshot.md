@@ -5,6 +5,13 @@ Source of truth: `docs/references/qlab_osc_dictionary.md`.
 Generated view: `extract_cue_osc_inventory(...)` + `registry_coverage(...)` against
 `profile_catalog()`.
 
+The summary table is registry baseline coverage for mutating OSC routes in the
+official dictionary. It does not count specialized runtime token exceptions
+implemented above the registry gate, such as the closed Phase 4C
+`Video` `videoEffectIndex/0/parameter/inputRadius` real write, Phase 6
+`inputIntensity`, and Phase 7 `fillStage`/`fillStyle`. Those exceptions are
+listed in Current Invariants.
+
 ## Summary
 
 | Section | Real write | Gated | Planned only | Missing |
@@ -43,17 +50,61 @@ Generated view: `extract_cue_osc_inventory(...)` + `registry_coverage(...)` agai
   `Video`, exact cue UUID, saved mode, `videoEffectIndex/0/parameter/inputRadius`,
   finite numeric scalar only.
 - `fileTarget`, videoInputPatchName/Number/ID, Workspace Video, and all Video FX
-  real writes remain blocked except that Phase 4C exception.
+  real writes remain blocked except the Phase 4C `inputRadius` exception and
+  the Phase 6 `inputIntensity` exception.
 - Video FX dry-run planning is limited to enabled state and existing scalar
   parameters by exact name/index. QLab 5.5.10 flat effect payload keys are
-  treated as parameter-like fields for index dry-runs. Only the closed Phase 4C
+  treated as parameter-like fields for index dry-runs. The closed Phase 4C
   `inputRadius` candidate emits `confirm:videoFxScalar:v1:` and may execute a
-  single saved setter; other FX plans emit no token and execute no setter.
+  single saved setter. The closed Phase 6 `inputIntensity` candidate emits
+  `confirm:videoFxScalar:v2:` and may execute one saved setter for `Video`
+  exact cue UUID, `video_basic`, `videoEffectIndex/0/parameter/inputIntensity`,
+  finite numeric scalar only. Other FX plans emit no token and execute no setter.
 - Phase 4C runtime validation used QLab 5.5.10, changed `inputRadius` `10 -> 11`,
   rolled back `11 -> 10` with a fresh token, and accepted QLab setter timeout
   only because fresh readback matched with `setter_timeout_but_readback_matched`.
   The stale/used-token probe rejected before mutation via no-op baseline rather
   than an explicit consumed-token diagnostic.
+- Phase 5 is docs/audit only. Phase 6 is runtime validated and closed for one
+  path above the registry gate: `Video` exact-UUID saved
+  `videoEffectIndex/0/parameter/inputIntensity` with
+  `confirm:videoFxScalar:v2:`.
+- Phase 6 runtime validation used `mcp_prueba.qlab5`
+  (`95F0A03D-140E-4673-974A-E76748EBB023`) and `v11 dorado.png`
+  (`680CB8B6-CA66-4D15-AC15-0A92FC3E89FE`). The happy path changed
+  `inputIntensity` from `2.6191787554229933` to `2.7191787554229934`; the setter
+  timeout was accepted only because fresh readback matched
+  `2.7191786766052246`. Rollback used a fresh token and restored
+  `2.6191787719726562` within QLab float precision. Workspace
+  running/paused/auditioning was `0/0/0`; pre-existing broken cues outside the
+  target were not blockers.
+- Phase 6 rejection sweep rejected fake v2 token, malformed v1-looking token,
+  valid v2 token with changed value, valid v2 token for `inputPower`, valid v2
+  token for `Choose_Effect`, cue ref `v11` instead of UUID, and a multi-property
+  call. All rejection probes had `executed_operations=[]`, and final readback
+  remained baseline exactly.
+- Phase 7 is runtime validated and closed above the registry gate. It emits
+  `confirm:videoGeometry:v1:` for `fillStage` and `fillStyle` on `Video`,
+  `Camera`, and `Text` cues only when dry-run sees a readable valid baseline.
+  Real write is saved-mode, exact-UUID, one cue, one property, fresh-token only,
+  with fresh readback and fresh-token rollback required.
+- Phase 7 runtime validation used `mcp_prueba.qlab5`
+  (`95F0A03D-140E-4673-974A-E76748EBB023`) with `Video` `Fill stage`
+  (`BF24AB14-43D2-43BD-BBE7-1BC87DDB5107`), `Camera` `Camare1`
+  (`EE632A41-FB3B-4CFA-BC27-00A4CEC54692`), and `Text` `Text1`
+  (`193FB551-7985-4381-9C2D-CF4218C03FB9`). All `fillStage`/`fillStyle` writes
+  and fresh-token rollbacks passed, final baselines were restored, and workspace
+  running/paused counts were `0/0`.
+- Phase 7 rejection probes blocked cue-number real write, `/live`,
+  multi-property real write, `rotation`, and `shutterTop` before mutation/OSC as
+  applicable. QLab setter timeout was accepted only when fresh readback matched
+  with `setter_timeout_but_readback_matched`; no mutating retry occurred.
+- `inputPower`, `Choose_Effect`, all other params, Camera/Text FX, name
+  targeting, enabled/disabled, add/delete/move/reorder, aggregate params,
+  color/structured/string/enum/list/dict values, `/live`, cue-number real
+  writes, batch/multi-property, Workspace Video, stages/routes/surfaces, patches,
+  `fileTarget`, rotation, quaternion, resetRotation, shutters,
+  warping/control points, and playback/show-control remain blocked.
 
 ## Gate Map
 

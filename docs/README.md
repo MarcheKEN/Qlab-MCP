@@ -44,6 +44,10 @@ Documents that still guide current implementation work.
 - `current/workorders/006_implement_phase3e_text_basics.md`
 - `current/workorders/007_text_style_and_video_fx_read_plan.md`
 - `current/workorders/008_video_fx_real_write_candidate.md`
+- `current/workorders/009_video_completion_matrix.md`
+- `current/workorders/010_video_docs_consistency_cleanup.md`
+- `current/workorders/011_video_fx_scalar_v2_candidate.md`
+- `current/workorders/012_geometry_completion_video_camera_text.md`
 - `current/video_phase3a_opacity_real_write_plan.md`
 - `current/video_phase2c_gate_test_vectors.md`
 - `current/qlab_update_cues_runtime_checklist.md`

@@ -101,7 +101,6 @@ finite number. All other Video FX real writes remain blocked.
 
 Covered by reader/write tests:
 
-- all five Text Style dry-runs emit `confirm:textStyle:v1:` tokens;
 - all five Text Style candidates reject without token or setter because
   baseline/readback is unavailable in QLab 5.5.10;
 - malformed/batch/wrong-type Text Style requests reject before mutation;

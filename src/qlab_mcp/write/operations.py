@@ -36,15 +36,21 @@ from .allowlist import (
     validate_write_properties,
 )
 from .safety import check_write_readiness, ensure_write_ready, resolve_dry_run
+from .timeouts import (
+    AFTER_READ_RETRY_DELAYS,
+    UPDATE_AFTER_READ_TIMEOUT_CAP_SECONDS,
+    UPDATE_MIN_REPLY_TIMEOUT_SECONDS,
+    UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS,
+    UPDATE_SETTER_REPLY_TIMEOUT_CAP_SECONDS,
+    UPDATE_SETTER_REPLY_TOTAL_BUDGET_SECONDS,
+    bounded_reply_timeout as _timeout_bounded_reply_timeout,
+    budget_remaining as _timeout_budget_remaining,
+    client_config_timeout as _timeout_client_config_timeout,
+    setter_reply_timeout as _timeout_setter_reply_timeout,
+)
 
 
 MAX_BATCH_UPDATES = 50
-AFTER_READ_RETRY_DELAYS = (0.2, 0.5, 1.0)
-UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS = 90.0
-UPDATE_SETTER_REPLY_TIMEOUT_CAP_SECONDS = 0.1
-UPDATE_SETTER_REPLY_TOTAL_BUDGET_SECONDS = 8.0
-UPDATE_AFTER_READ_TIMEOUT_CAP_SECONDS = 0.5
-UPDATE_MIN_REPLY_TIMEOUT_SECONDS = 0.001
 UPDATE_NUMERIC_MATCH_ABS_TOLERANCE = 1e-5
 UPDATE_NUMERIC_MATCH_REL_TOLERANCE = 1e-6
 UPDATE_STATUS_ACTIONS = {
@@ -5015,35 +5021,40 @@ def _resolved_cue_id(values: dict[str, Any] | None) -> str | None:
 
 
 def _client_config_timeout(reader: Any, fallback: float) -> float:
-    value = getattr(getattr(getattr(reader, "client", None), "config", None), "timeout", fallback)
-    try:
-        return max(UPDATE_MIN_REPLY_TIMEOUT_SECONDS, float(value))
-    except (TypeError, ValueError):
-        return fallback
+    return _timeout_client_config_timeout(
+        reader,
+        fallback,
+        min_reply_timeout_seconds=UPDATE_MIN_REPLY_TIMEOUT_SECONDS,
+    )
 
 
 def _budget_remaining(deadline: float | None) -> float:
-    if deadline is None:
-        return UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS
-    return deadline - time.monotonic()
+    return _timeout_budget_remaining(
+        deadline,
+        soft_budget_seconds=UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS,
+    )
 
 
 def _bounded_reply_timeout(reader: Any, cap: float, deadline: float | None = None) -> float:
-    timeout = min(_client_config_timeout(reader, cap), cap)
-    if deadline is not None:
-        remaining = _budget_remaining(deadline)
-        if remaining <= 0:
-            return UPDATE_MIN_REPLY_TIMEOUT_SECONDS
-        timeout = min(timeout, remaining)
-    return max(UPDATE_MIN_REPLY_TIMEOUT_SECONDS, timeout)
+    return _timeout_bounded_reply_timeout(
+        reader,
+        cap,
+        deadline,
+        min_reply_timeout_seconds=UPDATE_MIN_REPLY_TIMEOUT_SECONDS,
+        soft_budget_seconds=UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS,
+    )
 
 
 def _setter_reply_timeout(reader: Any, setter_count: int, deadline: float | None = None) -> float:
-    if setter_count <= 0:
-        return UPDATE_MIN_REPLY_TIMEOUT_SECONDS
-    per_setter_budget = UPDATE_SETTER_REPLY_TOTAL_BUDGET_SECONDS / setter_count
-    cap = min(UPDATE_SETTER_REPLY_TIMEOUT_CAP_SECONDS, per_setter_budget)
-    return _bounded_reply_timeout(reader, cap, deadline)
+    return _timeout_setter_reply_timeout(
+        reader,
+        setter_count,
+        deadline,
+        min_reply_timeout_seconds=UPDATE_MIN_REPLY_TIMEOUT_SECONDS,
+        soft_budget_seconds=UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS,
+        setter_reply_timeout_cap_seconds=UPDATE_SETTER_REPLY_TIMEOUT_CAP_SECONDS,
+        setter_reply_total_budget_seconds=UPDATE_SETTER_REPLY_TOTAL_BUDGET_SECONDS,
+    )
 
 
 def _try_read_update_values(

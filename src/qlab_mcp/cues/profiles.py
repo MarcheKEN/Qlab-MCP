@@ -64,6 +64,9 @@ AUTO_AUDIO_KEYS = (
     "audioOutputPatchID",
     "audioMap",
     "audioMap/size",
+    "sliceMarkers",
+    "lastSlicePlayCount",
+    "lastSliceInfiniteLoop",
 )
 AUTO_VIDEO_KEYS = (
     "stageName",
@@ -81,6 +84,18 @@ AUTO_VIDEO_KEYS = (
     "videoInputPatchName",
     "videoInputPatchNumber",
     "videoInputPatchID",
+    "audioTrackFormats",
+    "numChannelsIn",
+    "rate",
+    "startTime",
+    "endTime",
+    "playCount",
+    "infiniteLoop",
+    "preservePitch",
+    "holdLastFrame",
+    "sliceMarkers",
+    "lastSlicePlayCount",
+    "lastSliceInfiniteLoop",
 )
 AUTO_TEXT_KEYS = (
     *AUTO_VIDEO_KEYS,
@@ -240,6 +255,11 @@ def _is_positive_number(value: Any) -> bool:
 def _derive_profile_fields(profile: str, values: dict[str, Any]) -> dict[str, Any]:
     normalized = profile.strip().lower()
     derived = dict(values)
+    if "sliceMarkers" in derived:
+        if derived.get("sliceMarkers") is None:
+            derived["sliceMarkers"] = []
+        else:
+            derived["sliceMarkers"] = _normalize_slice_markers(derived.get("sliceMarkers"))
     if "hasFileTargets" in derived:
         derived["fileTargetPresent"] = bool(_coerce_qlab_bool(derived.get("hasFileTargets")))
     if "continueMode" in derived:
@@ -261,6 +281,34 @@ def _derive_profile_fields(profile: str, values: dict[str, Any]) -> dict[str, An
     if health_summary is not None:
         derived["health_summary"] = health_summary
     return derived
+
+
+def _normalize_slice_markers(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return [{"index": 0, "raw": value, "loopMode": "unknown", "malformed": True}]
+    markers: list[dict[str, Any]] = []
+    for index, marker in enumerate(value):
+        normalized: dict[str, Any] = {"index": index}
+        if isinstance(marker, dict):
+            normalized.update(marker)
+            normalized["index"] = index
+            play_count = marker.get("playCount")
+            if isinstance(play_count, int) and not isinstance(play_count, bool):
+                if play_count == -1:
+                    normalized["loopMode"] = "infinite"
+                    normalized["isInfinite"] = True
+                elif play_count > 0:
+                    normalized["loopMode"] = "finite"
+                    normalized["isInfinite"] = False
+                else:
+                    normalized["loopMode"] = "unknown"
+            else:
+                normalized["loopMode"] = "unknown"
+        else:
+            normalized["raw"] = marker
+            normalized["loopMode"] = "unknown"
+        markers.append(normalized)
+    return markers
 
 
 def _continue_mode_label(value: Any) -> str:

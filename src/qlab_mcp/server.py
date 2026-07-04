@@ -922,12 +922,12 @@ def qlab_create_cue(
 
 
 @mcp.tool(
-    title="Update QLab Cues",
-    tags={"qlab", "write-mode", "cue-update", "batch-update", "gated-write"},
+    title="Edit QLab Cues",
+    tags={"qlab", "write-mode", "cue-edit", "batch-edit", "gated-write"},
     annotations=GATED_CREATE_QLAB_TOOL,
     timeout=UPDATE_CUES_TIMEOUT,
 )
-def qlab_update_cues(
+def qlab_edit_cues(
     workspace_id: WorkspaceId,
     updates: Annotated[
         list[CueUpdateInput],
@@ -952,7 +952,7 @@ def qlab_update_cues(
         ),
     ] = None,
 ) -> UpdateCuesResult:
-    """Update one or more existing cues through the cue editing registry, or return a dry-run plan.
+    """Edit one or more existing cues through the cue editing registry, or return a dry-run plan.
 
     Real updates require QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
     Dry-run planning never sends mutating OSC.
@@ -961,13 +961,50 @@ def qlab_update_cues(
     """
     return _run_tool(
         lambda: UpdateCuesResult.model_validate(
-            _reader().update_cues(
+            _reader().edit_cues(
                 workspace_id=workspace_id,
                 updates=[update.model_dump() if hasattr(update, "model_dump") else update for update in updates],
                 dry_run=dry_run,
             )
         )
     )
+
+
+@mcp.tool(
+    title="Update QLab Cues (compatibility alias)",
+    tags={"qlab", "write-mode", "cue-update", "batch-update", "gated-write", "deprecated-alias"},
+    annotations=GATED_CREATE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_update_cues(
+    workspace_id: WorkspaceId,
+    updates: Annotated[
+        list[CueUpdateInput],
+        Field(
+            min_length=1,
+            max_length=50,
+            description=(
+                "Compatibility alias for qlab_edit_cues. Prefer qlab_edit_cues for new work. "
+                "Each item has cue_ref, profile, properties, operations, and optional confirm_gates "
+                "containing exact confirm_token values from reviewed dry-run planned_operations."
+            ),
+        ),
+    ],
+    dry_run: Annotated[
+        bool | None,
+        Field(
+            description=(
+                "When true, plan and diff the update but send no mutating commands. "
+                "When omitted, QLAB_WRITE_DRY_RUN_DEFAULT is used and defaults to true."
+            ),
+        ),
+    ] = None,
+) -> UpdateCuesResult:
+    """Compatibility alias for qlab_edit_cues.
+
+    Dry-run planning never sends mutating OSC. Prefer qlab_edit_cues for new work.
+    """
+    return qlab_edit_cues(workspace_id=workspace_id, updates=updates, dry_run=dry_run)
 
 
 def main() -> None:

@@ -5219,8 +5219,178 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["properties"]["audioMap/objects"], [{"name": "Object 1"}])
         self.assertEqual(result["properties"]["audioOutputPatch/routing"], [{"in": 1, "out": 1}])
         self.assertEqual(result["properties"]["levels"], [[0, 0]])
-        self.assertEqual(result["properties"]["sliceMarkers"], [{"time": 0}])
+        self.assertEqual(result["properties"]["sliceMarkers"], [{"index": 0, "time": 0, "loopMode": "unknown"}])
         self.assertEqual(result["properties"]["rate"], 1.25)
+
+    def test_auto_audio_details_include_empty_slice_markers(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "audio-id",
+                "type": "Audio",
+                "sliceMarkers": [],
+                "lastSlicePlayCount": 1,
+                "lastSliceInfiniteLoop": False,
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "auto")
+
+        self.assertEqual(result["properties"]["sliceMarkers"], [])
+        self.assertEqual(result["properties"]["lastSlicePlayCount"], 1)
+        self.assertFalse(result["properties"]["lastSliceInfiniteLoop"])
+
+    def test_auto_audio_details_normalize_missing_slice_markers_to_empty(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "audio-id",
+                "type": "Audio",
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "auto")
+
+        self.assertEqual(result["properties"]["sliceMarkers"], [])
+
+    def test_auto_video_details_include_normalized_slice_markers(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/20/valuesForKeys": {
+                "uniqueID": "video-id",
+                "type": "Video",
+                "sliceMarkers": [
+                    {"time": 12.5, "playCount": 1},
+                    {"time": 24.0, "playCount": -1},
+                ],
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "20", "auto")
+
+        self.assertEqual(
+            result["properties"]["sliceMarkers"],
+            [
+                {"index": 0, "time": 12.5, "playCount": 1, "loopMode": "finite", "isInfinite": False},
+                {"index": 1, "time": 24.0, "playCount": -1, "loopMode": "infinite", "isInfinite": True},
+            ],
+        )
+
+    def test_auto_video_details_include_empty_slice_markers(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/20/valuesForKeys": {
+                "uniqueID": "video-id",
+                "type": "Video",
+                "sliceMarkers": [],
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "20", "auto")
+
+        self.assertEqual(result["properties"]["sliceMarkers"], [])
+
+    def test_auto_video_details_normalize_missing_slice_markers_to_empty(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/20/valuesForKeys": {
+                "uniqueID": "video-id",
+                "type": "Video",
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "20", "auto")
+
+        self.assertEqual(result["properties"]["sliceMarkers"], [])
+
+    def test_auto_video_details_reads_slice_markers_direct_when_values_for_keys_omits_them(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/20/valuesForKeys": {
+                "uniqueID": "video-id",
+                "type": "Video",
+                "lastSlicePlayCount": 2,
+                "lastSliceInfiniteLoop": False,
+            },
+            "/workspace/ws-1/cue/20/sliceMarkers": [
+                {"time": 0.39638516306877136, "playCount": 2},
+                {"time": 1.784542202949524, "playCount": 4},
+            ],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "20", "auto")
+
+        self.assertEqual(
+            result["properties"]["sliceMarkers"],
+            [
+                {"index": 0, "time": 0.39638516306877136, "playCount": 2, "loopMode": "finite", "isInfinite": False},
+                {"index": 1, "time": 1.784542202949524, "playCount": 4, "loopMode": "finite", "isInfinite": False},
+            ],
+        )
+        self.assertEqual(result["properties"]["lastSlicePlayCount"], 2)
+        self.assertFalse(result["properties"]["lastSliceInfiniteLoop"])
+
+    def test_basic_safe_video_details_do_not_fake_unqueried_slice_markers(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/20/valuesForKeys": {
+                "uniqueID": "video-id",
+                "type": "Video",
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "20", "basic_safe")
+
+        self.assertNotIn("sliceMarkers", result["properties"])
+
+    def test_auto_slice_marker_malformed_readback_is_safe(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/20/valuesForKeys": {
+                "uniqueID": "video-id",
+                "type": "Video",
+                "sliceMarkers": [
+                    {"time": 1.0, "playCount": 0},
+                    "not-a-marker",
+                ],
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "20", "auto")
+
+        self.assertEqual(
+            result["properties"]["sliceMarkers"],
+            [
+                {"index": 0, "time": 1.0, "playCount": 0, "loopMode": "unknown"},
+                {"index": 1, "raw": "not-a-marker", "loopMode": "unknown"},
+            ],
+        )
+
+    def test_auto_slice_marker_malformed_non_list_is_not_empty(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/20/valuesForKeys": {
+                "uniqueID": "video-id",
+                "type": "Video",
+                "sliceMarkers": {"unexpected": True},
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "20", "auto")
+
+        self.assertEqual(
+            result["properties"]["sliceMarkers"],
+            [{"index": 0, "raw": {"unexpected": True}, "loopMode": "unknown", "malformed": True}],
+        )
 
     def test_exhaustive_light_details_include_documented_command_fields(self) -> None:
         responses = {

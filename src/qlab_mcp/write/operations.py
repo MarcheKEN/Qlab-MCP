@@ -13,7 +13,7 @@ import time
 from typing import Any
 from uuid import UUID
 
-from ..errors import OscTimeoutError, UnsafeWriteOperationError
+from ..errors import OscTimeoutError, QLabReplyError, UnsafeWriteOperationError
 from ..osc.addressing import (
     _clean_cue_ref,
     _clean_workspace_id,
@@ -23,6 +23,7 @@ from ..osc.addressing import (
 )
 from ..runtime.read_cache import shared_read_cache
 from ..settings.light_commands import analyze_light_command_text
+from ..settings.summarizers import _collection_items
 from .allowlist import (
     COMMON_UPDATE_PROFILE,
     VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES,
@@ -84,7 +85,6 @@ CONTINUE_MODE_VALUES = {
     "autofollow": 2,
 }
 CASEFOLD_COMPARISON_KEYS = {
-    "blendMode",
     "clockType",
     "colorName",
     "text/format/alignment",
@@ -129,12 +129,23 @@ VIDEO_PHASE3_APPEARANCE_TYPES = {
     "camera_basic": "Camera",
     "text_basic": "Text",
 }
-VIDEO_PHASE7_GEOMETRY_PROPERTIES = frozenset({"fillStage", "fillStyle"})
+VIDEO_PHASE7_GEOMETRY_PROPERTIES = frozenset({"fillStage", "fillStyle", "layer", "quaternion", "resetRotation", "smooth"})
 VIDEO_PHASE7_GEOMETRY_TYPES = {
     "video_basic": "Video",
     "camera_basic": "Camera",
     "text_basic": "Text",
 }
+VIDEO_PHASE8_IO_PROPERTIES_BY_PROFILE = {
+    "video_basic": frozenset({"stageID", "audioOutputPatchID"}),
+    "camera_basic": frozenset({"stageID", "audioOutputPatchID", "videoInputPatchID", "audioInputPatchID"}),
+    "text_basic": frozenset({"stageID"}),
+}
+VIDEO_PHASE8_IO_TYPES = {
+    "video_basic": "Video",
+    "camera_basic": "Camera",
+    "text_basic": "Text",
+}
+VIDEO_PHASE8_IO_PROPERTIES = frozenset().union(*VIDEO_PHASE8_IO_PROPERTIES_BY_PROFILE.values())
 TEXT_PHASE3E_PROPERTIES = frozenset(
     {"text", "text/format/fontSize", "text/format/alignment"}
 )
@@ -183,6 +194,40 @@ PHASE3_VIDEO_APPEARANCE_OPERATION_KIND = "video_phase3d_appearance_write"
 PHASE3_VIDEO_APPEARANCE_TOKEN_VERSION = 1
 PHASE7_VIDEO_GEOMETRY_OPERATION_KIND = "video_phase7_geometry_write"
 PHASE7_VIDEO_GEOMETRY_TOKEN_VERSION = 1
+PHASE7B_VIDEO_GEOMETRY_TOKEN_VERSION = 2
+PHASE7D_VIDEO_GEOMETRY_TOKEN_VERSION = 3
+PHASE7F_VIDEO_GEOMETRY_TOKEN_VERSION = 4
+PHASE7E_VIDEO_GEOMETRY_RESET_TOKEN_VERSION = 1
+PHASE8_VIDEO_IO_OPERATION_KIND = "video_phase8_io_write"
+PHASE8_VIDEO_IO_TOKEN_VERSION = 1
+VIDEO_PHASE8B_AUDIO_TIME_PROPERTIES = frozenset(
+    {
+        "startTime",
+        "endTime",
+        "playCount",
+        "infiniteLoop",
+        "rate",
+        "preservePitch",
+        "holdLastFrame",
+    }
+)
+VIDEO_PHASE8B_AUDIO_TIME_AUDIO_TRACK_PROPERTIES = VIDEO_PHASE8B_AUDIO_TIME_PROPERTIES - {"holdLastFrame"}
+VIDEO_PHASE8B_AUDIO_TIME_EVIDENCE_KEYS = ("audioTrackFormats", "numChannelsIn", "levels")
+PHASE8B_VIDEO_AUDIO_TIME_OPERATION_KIND = "video_phase8b_audio_time_write"
+PHASE8B_VIDEO_AUDIO_TIME_TOKEN_VERSION = 1
+VIDEO_PHASE8C_SLICE_MARKER_PROPERTIES = frozenset(
+    {
+        "sliceMarker/time",
+        "sliceMarker/playCount",
+        "addSliceMarker",
+        "deleteSliceMarker",
+        "deleteSliceMarkers",
+        "lastSlicePlayCount",
+    }
+)
+PHASE8C_VIDEO_SLICE_OPERATION_KIND = "video_phase8c_slice_marker_write"
+PHASE8C_VIDEO_SLICE_TOKEN_VERSION = 1
+SLICE_MARKER_MIN_SPACING_SECONDS = 0.05
 PHASE3E_TEXT_BASIC_OPERATION_KIND = "video_phase3e_text_basic_write"
 PHASE3E_TEXT_BASIC_TOKEN_VERSION = 1
 PHASE3F_TEXT_STYLE_OPERATION_KIND = "video_phase3f_text_style_write"
@@ -192,6 +237,7 @@ PHASE4C_VIDEO_FX_SCALAR_TOKEN_VERSION = 1
 PHASE6_VIDEO_FX_SCALAR_OPERATION_KIND = "video_phase6_fx_scalar_write"
 PHASE6_VIDEO_FX_SCALAR_TOKEN_VERSION = 2
 _LIGHT_WRITE_TOKEN_SECRET = secrets.token_bytes(32)
+_PHASE8_STAGEID_RECOVERY_BASELINES: dict[tuple[str, str, str], str] = {}
 
 VIDEO_FX_SCALAR_TOKEN_SPECS = {
     VIDEO_PHASE4C_FX_ALLOWED_PARAMETER: {
@@ -490,6 +536,15 @@ class QLabWriteMixin:
         phase7_video_geometry_call = any(
             _phase7_video_geometry_operation(item) is not None for item in items
         )
+        phase8_video_io_call = any(
+            _phase8_video_io_operation(item) is not None for item in items
+        )
+        phase8b_video_audio_time_call = any(
+            _phase8b_video_audio_time_operation(item) is not None for item in items
+        )
+        phase8c_video_slice_call = any(
+            _phase8c_video_slice_operation(item) is not None for item in items
+        )
         phase3e_text_basic_call = any(
             _phase3e_text_basic_operation(item) is not None for item in items
         )
@@ -503,6 +558,22 @@ class QLabWriteMixin:
             _strip_video_phase2_confirm_tokens(item)
             if item.get("profile") in VIDEO_PHASE2_PROFILES and item.get("operations"):
                 item["read_keys"] = list(dict.fromkeys([*item["read_keys"], *VIDEO_PHASE2_HEALTH_READ_KEYS]))
+            if _phase8b_video_audio_time_operation(item) is not None:
+                item["read_keys"] = list(dict.fromkeys([*item["read_keys"], *VIDEO_PHASE8B_AUDIO_TIME_EVIDENCE_KEYS]))
+            if _phase8c_video_slice_operation(item) is not None:
+                item["read_keys"] = list(
+                    dict.fromkeys(
+                        [
+                            *item["read_keys"],
+                            "sliceMarkers",
+                            "lastSlicePlayCount",
+                            "lastSliceInfiniteLoop",
+                            "startTime",
+                            "endTime",
+                            "duration",
+                        ]
+                    )
+                )
         video_phase2_dry_run_errors = (
             [_video_phase2_dry_run_blocked_errors(item) for item in items]
             if effective_dry_run
@@ -601,6 +672,21 @@ class QLabWriteMixin:
                 if phase7_video_geometry_call
                 else None
             )
+            phase8_io_structure_error = (
+                _phase8_video_io_call_structure_error(items)
+                if phase8_video_io_call
+                else None
+            )
+            phase8b_audio_time_structure_error = (
+                _phase8b_video_audio_time_call_structure_error(items)
+                if phase8b_video_audio_time_call
+                else None
+            )
+            phase8c_slice_structure_error = (
+                _phase8c_video_slice_call_structure_error(items)
+                if phase8c_video_slice_call
+                else None
+            )
             phase3e_text_structure_error = (
                 _phase3e_text_basic_call_structure_error(items)
                 if phase3e_text_basic_call
@@ -680,6 +766,33 @@ class QLabWriteMixin:
                         errors[property_name] = (
                             f"{property_name} is gated or dry-run only without exactly one reviewed "
                             "Phase 7 confirm_token."
+                        )
+                elif not errors and phase8_video_io_call:
+                    property_name = item["operations"][0]["property"]
+                    if phase8_io_structure_error:
+                        errors[property_name] = phase8_io_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Phase 8A confirm_token."
+                        )
+                elif not errors and phase8b_video_audio_time_call:
+                    property_name = item["operations"][0]["property"]
+                    if phase8b_audio_time_structure_error:
+                        errors[property_name] = phase8b_audio_time_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Phase 8B confirm_token."
+                        )
+                elif not errors and phase8c_video_slice_call:
+                    property_name = item["operations"][0]["property"]
+                    if phase8c_slice_structure_error:
+                        errors[property_name] = phase8c_slice_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Phase 8C confirm_token."
                         )
                 elif not errors and phase3e_text_basic_call:
                     property_name = item["operations"][0]["property"]
@@ -793,6 +906,9 @@ class QLabWriteMixin:
                 and not phase3_video_scalar_call
                 and not phase3_video_appearance_call
                 and not phase7_video_geometry_call
+                and not phase8_video_io_call
+                and not phase8b_video_audio_time_call
+                and not phase8c_video_slice_call
                 and _phase3e_text_basic_call_structure_error(items) is None
             )
             phase7_geometry_candidate_shape = (
@@ -803,7 +919,33 @@ class QLabWriteMixin:
                 and not phase3_video_translation_call
                 and not phase3_video_scalar_call
                 and not phase3_video_appearance_call
+                and not phase8c_video_slice_call
                 and _phase7_video_geometry_call_structure_error(items) is None
+            )
+            phase8_io_candidate_shape = (
+                phase8_video_io_call
+                and not phase4_light_call
+                and not phase5_light_call
+                and not phase3_video_opacity_call
+                and not phase3_video_translation_call
+                and not phase3_video_scalar_call
+                and not phase3_video_appearance_call
+                and not phase7_video_geometry_call
+                and not phase8c_video_slice_call
+                and _phase8_video_io_call_structure_error(items) is None
+            )
+            phase8b_audio_time_candidate_shape = (
+                phase8b_video_audio_time_call
+                and not phase4_light_call
+                and not phase5_light_call
+                and not phase3_video_opacity_call
+                and not phase3_video_translation_call
+                and not phase3_video_scalar_call
+                and not phase3_video_appearance_call
+                and not phase7_video_geometry_call
+                and not phase8_video_io_call
+                and not phase8c_video_slice_call
+                and _phase8b_video_audio_time_call_structure_error(items) is None
             )
             phase3f_text_candidate_shape = (
                 phase3f_text_style_call
@@ -814,6 +956,9 @@ class QLabWriteMixin:
                 and not phase3_video_scalar_call
                 and not phase3_video_appearance_call
                 and not phase7_video_geometry_call
+                and not phase8_video_io_call
+                and not phase8b_video_audio_time_call
+                and not phase8c_video_slice_call
                 and not phase3e_text_basic_call
                 and _phase3f_text_style_call_structure_error(items) is None
             )
@@ -826,9 +971,25 @@ class QLabWriteMixin:
                 and not phase3_video_scalar_call
                 and not phase3_video_appearance_call
                 and not phase7_video_geometry_call
+                and not phase8_video_io_call
+                and not phase8b_video_audio_time_call
+                and not phase8c_video_slice_call
                 and not phase3e_text_basic_call
                 and not phase3f_text_style_call
                 and _phase4c_video_fx_scalar_call_structure_error(items) is None
+            )
+            phase8c_slice_candidate_shape = (
+                phase8c_video_slice_call
+                and not phase4_light_call
+                and not phase5_light_call
+                and not phase3_video_opacity_call
+                and not phase3_video_translation_call
+                and not phase3_video_scalar_call
+                and not phase3_video_appearance_call
+                and not phase7_video_geometry_call
+                and not phase8_video_io_call
+                and not phase8b_video_audio_time_call
+                and _phase8c_video_slice_call_structure_error(items) is None
             )
             light_patch: dict[str, Any] | None = None
             light_patch_error: dict[str, str] | None = None
@@ -842,11 +1003,14 @@ class QLabWriteMixin:
                     errors.update(read_errors)
                     errors.update(_validate_profile_for_before(item["profile"], before))
                     errors.update(_video_phase2_dry_run_identity_errors(item, before))
-                    errors.update(_video_phase2_dry_run_health_errors(item, before))
+                    errors.update(_video_phase2_dry_run_health_errors(item, before, workspace_id=workspace))
                     errors.update(_phase3_video_translation_dry_run_errors(item, before))
                     errors.update(_phase3_video_scalar_dry_run_errors(item, before))
                     errors.update(_phase3_video_appearance_dry_run_errors(item, before))
                     errors.update(_phase7_video_geometry_dry_run_errors(item, before))
+                    errors.update(_phase8_video_io_dry_run_errors(item, before))
+                    errors.update(_phase8b_video_audio_time_dry_run_errors(item, before))
+                    errors.update(_phase8c_video_slice_dry_run_errors(item, before))
                     errors.update(_phase3e_text_basic_dry_run_errors(item, before))
                     errors.update(_phase3f_text_style_dry_run_errors(item, before))
                     errors.update(_video_fx_dry_run_errors(item, before))
@@ -915,6 +1079,34 @@ class QLabWriteMixin:
                             workspace_id=workspace,
                             before=before,
                             candidate_shape=phase7_geometry_candidate_shape,
+                        )
+                    )
+                if not errors and _phase8_video_io_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_phase8_video_io_operation(
+                            item,
+                            workspace_id=workspace,
+                            reader=self,
+                            before=before,
+                            candidate_shape=phase8_io_candidate_shape,
+                        )
+                    )
+                if not errors and _phase8b_video_audio_time_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_phase8b_video_audio_time_operation(
+                            item,
+                            workspace_id=workspace,
+                            before=before,
+                            candidate_shape=phase8b_audio_time_candidate_shape,
+                        )
+                    )
+                if not errors and _phase8c_video_slice_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_phase8c_video_slice_operation(
+                            item,
+                            workspace_id=workspace,
+                            before=before,
+                            candidate_shape=phase8c_slice_candidate_shape,
                         )
                     )
                 if not errors and _phase3e_text_basic_operation(item) is not None:
@@ -1061,6 +1253,18 @@ class QLabWriteMixin:
                 errors.update(_validate_phase7_video_geometry_real_write(workspace, item, before))
                 if not errors:
                     _mark_phase7_video_geometry_real_operation(item)
+            elif not errors and phase8_video_io_call:
+                errors.update(_validate_phase8_video_io_real_write(workspace, item, before))
+                if not errors:
+                    _mark_phase8_video_io_real_operation(item)
+            elif not errors and phase8b_video_audio_time_call:
+                errors.update(_validate_phase8b_video_audio_time_real_write(workspace, item, before))
+                if not errors:
+                    _mark_phase8b_video_audio_time_real_operation(item)
+            elif not errors and phase8c_video_slice_call:
+                errors.update(_validate_phase8c_video_slice_real_write(workspace, item, before))
+                if not errors:
+                    _mark_phase8c_video_slice_real_operation(item)
             elif not errors and phase3e_text_basic_call:
                 errors.update(_validate_phase3e_text_basic_real_write(workspace, item, before))
                 if not errors:
@@ -1081,6 +1285,12 @@ class QLabWriteMixin:
                     _label_phase3_video_appearance_rejection(item)
                 if phase7_video_geometry_call:
                     _label_phase7_video_geometry_rejection(item)
+                if phase8_video_io_call:
+                    _label_phase8_video_io_rejection(item)
+                if phase8b_video_audio_time_call:
+                    _label_phase8b_video_audio_time_rejection(item)
+                if phase8c_video_slice_call:
+                    _label_phase8c_video_slice_rejection(item)
                 if phase3e_text_basic_call:
                     _label_phase3e_text_basic_rejection(item)
                 if phase3f_text_style_call:
@@ -1117,6 +1327,7 @@ class QLabWriteMixin:
             executed_operations: list[dict[str, Any]] = []
             errors: dict[str, str] = {}
             setter_timeouts: dict[str, str] = {}
+            setter_reply_errors: dict[str, str] = {}
             for operation in item["operations"]:
                 key = operation["property"]
                 address = _cue_id_address(workspace, cue_id, operation["path"])
@@ -1139,12 +1350,20 @@ class QLabWriteMixin:
                     setter_timeouts[key] = str(exc)
                     status = "timeout_pending_verification"
                     error = str(exc)
+                except QLabReplyError as exc:
+                    if _is_readback_confirmable_gated_item(item):
+                        setter_reply_errors[key] = str(exc)
+                        status = "error_pending_verification"
+                        error = str(exc)
+                    else:
+                        errors[key] = str(exc)
+                        break
                 except Exception as exc:
                     errors[key] = str(exc)
                     break
                 executed_operations.append(
                     {
-                        "operation": "set_property",
+                        "operation": "action" if key == "resetRotation" else "set_property",
                         "property": key,
                         "address": address,
                         "args": operation["args"],
@@ -1157,6 +1376,7 @@ class QLabWriteMixin:
             item_result = dict(planned)
             item_result["executed_operations"] = executed_operations
             item_result["_setter_timeouts"] = setter_timeouts
+            item_result["_setter_reply_errors"] = setter_reply_errors
             item_result["_setter_errors"] = errors
             executed_items.append(item_result)
 
@@ -1181,17 +1401,55 @@ class QLabWriteMixin:
             )
             confirmed_by_after = _properties_match(after, requested_values)
             setter_timeouts = result.pop("_setter_timeouts")
+            setter_reply_errors = result.pop("_setter_reply_errors")
             setter_errors = result.pop("_setter_errors")
             unconfirmed_timeouts = {} if confirmed_by_after else setter_timeouts
+            unconfirmed_reply_errors = {} if confirmed_by_after else setter_reply_errors
             value_mismatch = {}
             if not confirmed_by_after and not setter_errors and not unconfirmed_timeouts and not after_errors:
                 value_mismatch["verification"] = _verification_mismatch_message(after, requested_values)
-            errors = {**setter_errors, **unconfirmed_timeouts, **after_errors, **value_mismatch}
+            errors = {**setter_errors, **unconfirmed_timeouts, **unconfirmed_reply_errors, **after_errors, **value_mismatch}
             warnings = list(result["warnings"])
+            phase8_io_operation = _phase8_video_io_operation(item)
+            if (
+                phase8_io_operation is not None
+                and phase8_io_operation.get("property") == "stageID"
+                and phase8_io_operation.get("args")
+            ):
+                stage_warning = _phase8_stage_warning_from_settings(self, workspace, phase8_io_operation["args"][0])
+                if stage_warning:
+                    warnings.append(stage_warning["message"])
+                    phase8_io_operation["warning_metadata"] = stage_warning
+            if (
+                phase8_io_operation is not None
+                and phase8_io_operation.get("property") == "stageID"
+                and isinstance(result.get("before"), dict)
+                and isinstance(after, dict)
+                and after.get("isBroken") is True
+            ):
+                warnings.append("stageid_write_result_is_broken")
+                recovery_key = _phase8_stageid_recovery_key(workspace, result.get("cue_id"), "stageID")
+                baseline_stage = result["before"].get("stageID")
+                if recovery_key is not None and isinstance(baseline_stage, str):
+                    _PHASE8_STAGEID_RECOVERY_BASELINES[recovery_key] = baseline_stage
+            elif (
+                phase8_io_operation is not None
+                and phase8_io_operation.get("property") == "stageID"
+                and isinstance(after, dict)
+                and after.get("isBroken") is not True
+            ):
+                recovery_key = _phase8_stageid_recovery_key(workspace, result.get("cue_id"), "stageID")
+                if recovery_key is not None:
+                    _PHASE8_STAGEID_RECOVERY_BASELINES.pop(recovery_key, None)
             unverifiable_operations = [
                 operation
                 for operation in item["operations"]
-                if not operation.get("read_key") or len(operation.get("args") or []) != 1
+                if not operation.get("read_key")
+                or (
+                    len(operation.get("args") or []) != 1
+                    and operation.get("property") not in {"quaternion", "resetRotation"}
+                    and operation.get("phase8c_expected_slice_markers") is None
+                )
             ]
             inconclusive = bool(unverifiable_operations)
             if setter_timeouts and confirmed_by_after:
@@ -1204,13 +1462,18 @@ class QLabWriteMixin:
                         or _phase3_video_scalar_operation(item) is not None
                         or _phase3_video_appearance_operation(item) is not None
                         or _phase7_video_geometry_operation(item) is not None
+                        or _phase8_video_io_operation(item) is not None
+                        or _phase8b_video_audio_time_operation(item) is not None
+                        or _phase8c_video_slice_operation(item) is not None
                         or _phase3e_text_basic_operation(item) is not None
                         or _phase3f_text_style_operation(item) is not None
                         or _phase4c_video_fx_scalar_operation(item) is not None
                     )
                     else "One or more setters did not reply, but fresh after-read confirmed requested values."
                 )
-            failed = bool(setter_errors) or bool(unconfirmed_timeouts)
+            if setter_reply_errors and confirmed_by_after:
+                warnings.append("setter_error_but_readback_matched")
+            failed = bool(setter_errors) or bool(unconfirmed_timeouts) or bool(unconfirmed_reply_errors)
             verification_failed = (bool(after_errors) or bool(value_mismatch)) and not failed
             if failed:
                 status = "partial_failed"
@@ -1219,18 +1482,21 @@ class QLabWriteMixin:
                 errors["verification"] = "No deterministic readback values were available for this real write."
             elif verification_failed:
                 status = "verification_failed"
-            elif setter_timeouts and (
+            elif (setter_timeouts or setter_reply_errors) and (
                 _phase3_video_opacity_operation(item) is not None
                 or _phase3_video_translation_operation(item) is not None
                 or _phase3_video_scalar_operation(item) is not None
                 or _phase3_video_appearance_operation(item) is not None
                 or _phase7_video_geometry_operation(item) is not None
+                or _phase8_video_io_operation(item) is not None
+                or _phase8b_video_audio_time_operation(item) is not None
+                or _phase8c_video_slice_operation(item) is not None
                 or _phase3e_text_basic_operation(item) is not None
                 or _phase3f_text_style_operation(item) is not None
                 or _phase4c_video_fx_scalar_operation(item) is not None
             ):
                 status = "updated"
-            elif setter_timeouts:
+            elif setter_timeouts or setter_reply_errors:
                 status = "updated_with_confirmed_timeouts"
             else:
                 status = "updated"
@@ -1248,6 +1514,9 @@ class QLabWriteMixin:
             _refresh_phase3_video_scalar_real_result(result, item)
             _refresh_phase3_video_appearance_real_result(result, item)
             _refresh_phase7_video_geometry_real_result(result, item)
+            _refresh_phase8_video_io_real_result(result, item)
+            _refresh_phase8b_video_audio_time_real_result(result, item)
+            _refresh_phase8c_video_slice_real_result(result, item)
             _refresh_phase3e_text_basic_real_result(result, item)
             _refresh_phase3f_text_style_real_result(result, item)
             _refresh_phase4c_video_fx_scalar_real_result(result, item)
@@ -1285,6 +1554,15 @@ class QLabWriteMixin:
             requested_count=len(updates),
             timeout_confirmed_count=timeout_confirmed_count,
         )
+
+    def edit_cues(
+        self,
+        workspace_id: str,
+        updates: list[dict[str, Any]],
+        dry_run: bool | None = None,
+    ) -> dict[str, Any]:
+        """Compatibility-forward alias; MCP exposes qlab_edit_cues and keeps qlab_update_cues."""
+        return self.update_cues(workspace_id, updates, dry_run=dry_run)
 
 
 def _normalize_placement(after_cue_id: str | None) -> dict[str, Any] | None:
@@ -1394,6 +1672,8 @@ def _video_phase2_blocked_property_message(property_name: str) -> str:
         family = "Video FX mutation"
     elif property_name in {"rotation", "quaternion", "resetRotation"} or property_name.startswith("rotate/"):
         family = "rotation"
+    elif property_name in VIDEO_PHASE8_IO_PROPERTIES:
+        family = "cue I/O selection"
     elif property_name.startswith("stage"):
         family = "stage, region, route, or warping"
     elif property_name.startswith("text/format"):
@@ -1421,12 +1701,17 @@ def _video_phase2_dry_run_identity_errors(
 def _video_phase2_dry_run_health_errors(
     item: dict[str, Any],
     before: dict[str, Any] | None,
+    *,
+    workspace_id: str,
 ) -> dict[str, str]:
     if item.get("profile") not in VIDEO_PHASE2_PROFILES or not item.get("operations") or not before:
         return {}
     errors: dict[str, str] = {}
     if before.get("isBroken") is True or before.get("isWarning") is True:
-        errors["health"] = "Video-family dry-runs require a healthy cue without warnings."
+        operation = _phase8_video_io_operation(item)
+        requested = _phase8_video_io_requested_value(operation) if operation else None
+        if not _phase8_stageid_recovery_allowed(workspace_id, item, before, requested):
+            errors["health"] = "Video-family dry-runs require a healthy cue without warnings."
     if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
         errors["active"] = "Video-family dry-runs require an inactive cue."
     return errors
@@ -3064,7 +3349,7 @@ def _phase7_video_geometry_call_structure_error(items: list[dict[str, Any]]) -> 
         operation.get("property") not in VIDEO_PHASE7_GEOMETRY_PROPERTIES
         or operation.get("path") != operation.get("property")
     ):
-        return "Phase 7 real writes allow only fillStage or fillStyle."
+        return "Phase 7 real writes allow only fillStage, fillStyle, layer, quaternion, resetRotation, or smooth."
     if operation.get("mode") != "saved":
         return "Phase 7 geometry real writes require saved mode."
     if not _is_exact_cue_uuid(item.get("cue_ref")):
@@ -3072,18 +3357,65 @@ def _phase7_video_geometry_call_structure_error(items: list[dict[str, Any]]) -> 
     return None
 
 
+def _phase7_video_geometry_baseline_key(property_name: str) -> str:
+    return "quaternion" if property_name == "resetRotation" else property_name
+
+
 def _video_geometry_value_valid(property_name: str, value: Any) -> bool:
+    if property_name == "resetRotation":
+        return _is_quaternion_value(value)
     if property_name == "fillStage":
+        return isinstance(value, bool)
+    if property_name == "smooth":
         return isinstance(value, bool)
     if property_name == "fillStyle":
         return isinstance(value, int) and not isinstance(value, bool) and value in {0, 1, 2}
+    if property_name == "layer":
+        return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 1000
+    if property_name == "quaternion":
+        return _is_quaternion_value(value)
     return False
 
 
-def _video_geometry_sha256(value: Any) -> str:
+def _is_quaternion_value(value: Any) -> bool:
+    return (
+        isinstance(value, (list, tuple))
+        and len(value) == 4
+        and all(_is_plain_finite_number(component) for component in value)
+    )
+
+
+def _video_geometry_canonical_value(property_name: str, value: Any) -> Any:
+    if property_name in {"quaternion", "resetRotation"} and _is_quaternion_value(value):
+        return list(value)
+    return value
+
+
+def _phase7_video_geometry_requested_value(operation: dict[str, Any]) -> Any:
+    if operation.get("property") == "resetRotation":
+        return "resetRotation"
+    if operation.get("property") == "quaternion":
+        return list(operation.get("args") or [])
+    return operation["args"][0] if operation.get("args") else None
+
+
+def _video_geometry_sha256(property_name: str, value: Any) -> str:
+    canonical = _video_geometry_canonical_value(property_name, value)
     return hashlib.sha256(
-        json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
+
+
+def _phase7_video_geometry_token_version(property_name: str) -> int:
+    if property_name == "resetRotation":
+        return PHASE7E_VIDEO_GEOMETRY_RESET_TOKEN_VERSION
+    if property_name == "quaternion":
+        return PHASE7D_VIDEO_GEOMETRY_TOKEN_VERSION
+    if property_name == "smooth":
+        return PHASE7F_VIDEO_GEOMETRY_TOKEN_VERSION
+    if property_name == "layer":
+        return PHASE7B_VIDEO_GEOMETRY_TOKEN_VERSION
+    return PHASE7_VIDEO_GEOMETRY_TOKEN_VERSION
 
 
 def _phase7_video_geometry_token_payload(
@@ -3096,20 +3428,22 @@ def _phase7_video_geometry_token_payload(
     baseline: Any,
     requested: Any,
 ) -> dict[str, Any]:
+    property_name = operation["property"]
     return {
-        "version": PHASE7_VIDEO_GEOMETRY_TOKEN_VERSION,
+        "version": _phase7_video_geometry_token_version(property_name),
         "operation_kind": PHASE7_VIDEO_GEOMETRY_OPERATION_KIND,
         "workspace_id": workspace_id,
         "cue_ref": cue_ref,
         "cue_id": cue_id,
         "cue_type": VIDEO_PHASE7_GEOMETRY_TYPES[item["profile"]],
         "profile": item["profile"],
-        "property": operation["property"],
+        "property": property_name,
+        "action": property_name if property_name == "resetRotation" else None,
         "path": operation["path"],
         "mode": operation["mode"],
-        "baseline": baseline,
-        "baseline_sha256": _video_geometry_sha256(baseline),
-        "requested": requested,
+        "baseline": _video_geometry_canonical_value(property_name, baseline),
+        "baseline_sha256": _video_geometry_sha256(property_name, baseline),
+        "requested": _video_geometry_canonical_value(property_name, requested),
         "risk_tier": operation["risk_tier"],
         "capability_gate": operation.get("capability_gate"),
         "mcp_secret_version": 1,
@@ -3122,19 +3456,37 @@ def _phase7_video_geometry_confirm_token(**payload_args: Any) -> str:
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).decode("ascii").rstrip("=")
     signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
-    return f"confirm:videoGeometry:v{PHASE7_VIDEO_GEOMETRY_TOKEN_VERSION}:{encoded}:{signature}"
+    family = "videoGeometryReset" if payload.get("property") == "resetRotation" else "videoGeometry"
+    return f"confirm:{family}:v{payload['version']}:{encoded}:{signature}"
 
 
 def _decode_phase7_video_geometry_confirm_token(
     token: str,
+    *,
+    expected_version: int | None = None,
+    expected_family: str = "videoGeometry",
 ) -> tuple[dict[str, Any] | None, str | None]:
     parts = token.split(":", 4)
-    expected_prefix = [
-        "confirm",
-        "videoGeometry",
-        f"v{PHASE7_VIDEO_GEOMETRY_TOKEN_VERSION}",
-    ]
-    if len(parts) != 5 or parts[:3] != expected_prefix:
+    supported_versions = (
+        {PHASE7E_VIDEO_GEOMETRY_RESET_TOKEN_VERSION}
+        if expected_family == "videoGeometryReset"
+        else {
+            PHASE7_VIDEO_GEOMETRY_TOKEN_VERSION,
+            PHASE7B_VIDEO_GEOMETRY_TOKEN_VERSION,
+            PHASE7D_VIDEO_GEOMETRY_TOKEN_VERSION,
+            PHASE7F_VIDEO_GEOMETRY_TOKEN_VERSION,
+        }
+    )
+    allowed_versions = {expected_version} if expected_version is not None else supported_versions
+    if (
+        len(parts) != 5
+        or parts[0] != "confirm"
+        or parts[1] != expected_family
+        or not parts[2].startswith("v")
+        or not parts[2][1:].isdigit()
+        or int(parts[2][1:]) not in allowed_versions
+        or int(parts[2][1:]) not in supported_versions
+    ):
         return None, "Phase 7 geometry confirm_token is malformed or has an unsupported version."
     encoded, signature = parts[3], parts[4]
     expected_signature = hmac.new(
@@ -3167,11 +3519,11 @@ def _phase7_video_geometry_dry_run_errors(
     ):
         return {}
     property_name = operation["property"]
-    baseline = before.get(property_name)
-    requested = operation["args"][0] if operation.get("args") else None
+    baseline = before.get(_phase7_video_geometry_baseline_key(property_name))
+    requested = _phase7_video_geometry_requested_value(operation)
     if not _video_geometry_value_valid(property_name, baseline):
-        return {property_name: f"Phase 7 geometry requires readable {property_name} baseline."}
-    if not _video_geometry_value_valid(property_name, requested):
+        return {property_name: f"Phase 7 geometry requires readable {_phase7_video_geometry_baseline_key(property_name)} baseline."}
+    if property_name != "resetRotation" and not _video_geometry_value_valid(property_name, requested):
         return {property_name: f"Phase 7 geometry requested {property_name} value is invalid."}
     return {}
 
@@ -3188,15 +3540,15 @@ def _annotate_phase7_video_geometry_operation(
         return []
     property_name = operation["property"]
     cue_id = _resolved_cue_id(before)
-    baseline = before.get(property_name) if isinstance(before, dict) else None
-    requested = operation["args"][0] if operation.get("args") else None
+    baseline = before.get(_phase7_video_geometry_baseline_key(property_name)) if isinstance(before, dict) else None
+    requested = _phase7_video_geometry_requested_value(operation)
     candidate = (
         candidate_shape
         and isinstance(before, dict)
         and before.get("type") == VIDEO_PHASE7_GEOMETRY_TYPES.get(item.get("profile"))
         and cue_id == item.get("cue_ref")
         and _video_geometry_value_valid(property_name, baseline)
-        and _video_geometry_value_valid(property_name, requested)
+        and (property_name == "resetRotation" or _video_geometry_value_valid(property_name, requested))
     )
     if not candidate:
         operation.pop("confirm_token", None)
@@ -3215,6 +3567,7 @@ def _annotate_phase7_video_geometry_operation(
                 "uuid_cue_ref",
                 "saved_mode",
                 "fresh_baseline",
+                *(["quaternion_backup"] if property_name == "resetRotation" else []),
                 "exact_readback",
                 "manual_rollback_plan",
             ],
@@ -3252,16 +3605,20 @@ def _validate_phase7_video_geometry_real_write(
     if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
         return {property_name: "Phase 7 geometry real writes require an inactive cue."}
     cue_id = _resolved_cue_id(before)
-    baseline = before.get(property_name)
-    requested = operation["args"][0] if operation.get("args") else None
+    baseline = before.get(_phase7_video_geometry_baseline_key(property_name))
+    requested = _phase7_video_geometry_requested_value(operation)
     if cue_id != item.get("cue_ref"):
         return {property_name: "Phase 7 fresh read uniqueID does not exactly match requested cue UUID."}
     if not _video_geometry_value_valid(property_name, baseline):
-        return {property_name: f"Phase 7 geometry requires readable {property_name} baseline."}
-    if not _video_geometry_value_valid(property_name, requested):
+        return {property_name: f"Phase 7 geometry requires readable {_phase7_video_geometry_baseline_key(property_name)} baseline."}
+    if property_name != "resetRotation" and not _video_geometry_value_valid(property_name, requested):
         return {property_name: f"Phase 7 geometry requested {property_name} value is invalid."}
     token = item["confirm_gates"][0]
-    payload, token_error = _decode_phase7_video_geometry_confirm_token(token)
+    payload, token_error = _decode_phase7_video_geometry_confirm_token(
+        token,
+        expected_version=_phase7_video_geometry_token_version(property_name),
+        expected_family="videoGeometryReset" if property_name == "resetRotation" else "videoGeometry",
+    )
     if token_error or payload is None:
         return {property_name: token_error or "Phase 7 geometry confirm_token is invalid."}
     expected = _phase7_video_geometry_token_payload(
@@ -3287,6 +3644,1153 @@ def _validate_phase7_video_geometry_real_write(
         return {
             property_name: (
                 f"stale_video_geometry_baseline: current {property_name} no longer matches "
+                "the reviewed dry-run baseline."
+            )
+        }
+    return {}
+
+
+def _phase8_video_io_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    allowed = VIDEO_PHASE8_IO_PROPERTIES_BY_PROFILE.get(item.get("profile"), frozenset())
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in allowed
+        ),
+        None,
+    )
+
+
+def _phase8_video_io_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 8A I/O real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") not in VIDEO_PHASE8_IO_TYPES:
+        return "Phase 8A I/O real writes require video_basic, camera_basic, or text_basic profile."
+    if len(operations) != 1:
+        return "Phase 8A I/O real writes require exactly one property."
+    operation = operations[0]
+    allowed = VIDEO_PHASE8_IO_PROPERTIES_BY_PROFILE[item["profile"]]
+    if operation.get("property") not in allowed or operation.get("path") != operation.get("property"):
+        return "Phase 8A I/O real writes allow only ID-based cue I/O properties for this cue type."
+    if operation.get("mode") != "saved":
+        return "Phase 8A I/O real writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Phase 8A I/O real writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _phase8_video_io_requested_value(operation: dict[str, Any]) -> Any:
+    return operation["args"][0] if operation.get("args") else None
+
+
+def _phase8_stageid_recovery_key(workspace_id: str, cue_id: str | None, property_name: str) -> tuple[str, str, str] | None:
+    if not cue_id or property_name != "stageID":
+        return None
+    return (workspace_id, cue_id, property_name)
+
+
+def _phase8_stageid_recovery_allowed(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+    requested: Any,
+) -> bool:
+    operation = _phase8_video_io_operation(item)
+    if operation is None or operation.get("property") != "stageID" or not isinstance(before, dict):
+        return False
+    cue_id = _resolved_cue_id(before)
+    key = _phase8_stageid_recovery_key(workspace_id, cue_id, "stageID")
+    return (
+        key is not None
+        and before.get("isBroken") is True
+        and isinstance(requested, str)
+        and _PHASE8_STAGEID_RECOVERY_BASELINES.get(key) == requested
+    )
+
+
+def _phase8_stage_warning_from_settings(reader: Any, workspace_id: str, stage_id: Any) -> dict[str, Any] | None:
+    if not isinstance(stage_id, str) or not stage_id:
+        return None
+    try:
+        stages_reply = reader.client.request(_workspace_address(workspace_id, "settings/video/stages"))
+    except Exception:
+        return None
+    stages = _collection_items(stages_reply.data)
+    stage = next(
+        (
+            item
+            for item in stages
+            if isinstance(item, dict)
+            and str(item.get("uniqueID") or item.get("id") or item.get("stageID") or "") == stage_id
+        ),
+        None,
+    )
+    if not isinstance(stage, dict):
+        return None
+    regions: list[Any] = []
+    try:
+        regions_reply = reader.client.request(_workspace_address(workspace_id, f"settings/video/stageID/{stage_id}/regions"))
+        regions = list(_collection_items(regions_reply.data))
+    except Exception:
+        regions = []
+    stage_name = stage.get("name") or stage.get("stageName") or stage.get("displayName")
+    disconnected = False
+    for region in regions:
+        if not isinstance(region, dict):
+            continue
+        route = region.get("route")
+        if not isinstance(route, dict):
+            continue
+        device = route.get("device") if isinstance(route.get("device"), dict) else {}
+        disconnected = (
+            route.get("connected") is False
+            or route.get("destination_present") is False
+            or route.get("present") is False
+            or device.get("connected") is False
+            or device.get("present") is False
+        )
+        if disconnected:
+            break
+    if not disconnected:
+        return None
+    return {
+        "code": "stage_route_disconnected",
+        "stageID": stage_id,
+        "stageName": stage_name,
+        "message": "Stage exists, but its route/device is currently disconnected; QLab may mark the cue broken until output is connected.",
+    }
+
+
+def _video_io_value_valid(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    stripped = value.strip()
+    return bool(stripped) and stripped.casefold() != "none"
+
+
+def _video_io_sha256(value: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _phase8_video_io_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    baseline: Any,
+    requested: Any,
+) -> dict[str, Any]:
+    return {
+        "version": PHASE8_VIDEO_IO_TOKEN_VERSION,
+        "operation_kind": PHASE8_VIDEO_IO_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "cue_type": VIDEO_PHASE8_IO_TYPES[item["profile"]],
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": baseline,
+        "baseline_sha256": _video_io_sha256(baseline),
+        "requested": requested,
+        "requested_sha256": _video_io_sha256(requested),
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "workspace_validation": "post_write_fresh_readback_required",
+        "mcp_secret_version": 1,
+    }
+
+
+def _phase8_video_io_confirm_token(**payload_args: Any) -> str:
+    payload = _phase8_video_io_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:videoIO:v{payload['version']}:{encoded}:{signature}"
+
+
+def _decode_phase8_video_io_confirm_token(token: str) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    if (
+        len(parts) != 5
+        or parts[0] != "confirm"
+        or parts[1] != "videoIO"
+        or parts[2] != f"v{PHASE8_VIDEO_IO_TOKEN_VERSION}"
+    ):
+        return None, "Phase 8A I/O confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(
+        _LIGHT_WRITE_TOKEN_SECRET,
+        encoded.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 8A I/O confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 8A I/O confirm_token payload is invalid."
+    if not isinstance(payload, dict):
+        return None, "Phase 8A I/O confirm_token payload is invalid."
+    return payload, None
+
+
+def _phase8_video_io_dry_run_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase8_video_io_operation(item)
+    if (
+        operation is None
+        or item.get("profile") not in VIDEO_PHASE8_IO_TYPES
+        or not isinstance(before, dict)
+        or before.get("type") != VIDEO_PHASE8_IO_TYPES.get(item.get("profile"))
+    ):
+        return {}
+    property_name = operation["property"]
+    baseline = before.get(property_name)
+    requested = _phase8_video_io_requested_value(operation)
+    if not isinstance(baseline, str):
+        return {property_name: f"Phase 8A I/O requires readable {property_name} baseline."}
+    if not _video_io_value_valid(requested):
+        return {property_name: f"Phase 8A I/O requested {property_name} must be a non-empty patch/stage ID string."}
+    return {}
+
+
+def _annotate_phase8_video_io_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    reader: Any,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operation = _phase8_video_io_operation(item)
+    if operation is None or item.get("profile") not in VIDEO_PHASE8_IO_TYPES:
+        return []
+    property_name = operation["property"]
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name) if isinstance(before, dict) else None
+    requested = _phase8_video_io_requested_value(operation)
+    candidate = (
+        candidate_shape
+        and isinstance(before, dict)
+        and before.get("type") == VIDEO_PHASE8_IO_TYPES.get(item.get("profile"))
+        and cue_id == item.get("cue_ref")
+        and isinstance(baseline, str)
+        and _video_io_value_valid(requested)
+    )
+    if not candidate:
+        operation.pop("confirm_token", None)
+        return []
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase8_video_io_candidate": True,
+            "planned_only_reason": "video_io_requires_confirm_token",
+            "future_gate_requirements": [
+                "phase8_video_io_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+                "workspace_id_list_validation_future",
+            ],
+        }
+    )
+    operation["confirm_token"] = _phase8_video_io_confirm_token(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    stage_warning = None
+    if property_name == "stageID":
+        stage_warning = _phase8_stage_warning_from_settings(reader, workspace_id, requested)
+        if stage_warning:
+            operation["warning_metadata"] = stage_warning
+            item.setdefault("notices", []).append(stage_warning["code"])
+    return [
+        stage_warning["message"]
+        for stage_warning in ([stage_warning] if stage_warning else [])
+    ]
+
+
+def _validate_phase8_video_io_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase8_video_io_operation(item)
+    property_name = operation.get("property") if operation else "video_io"
+    if operation is None or not isinstance(before, dict):
+        return {property_name: "Phase 8A I/O preflight is incomplete."}
+    if before.get("type") != VIDEO_PHASE8_IO_TYPES.get(item.get("profile")):
+        return {
+            property_name: "Phase 8A I/O real writes require matching Video, Camera, or Text cue type/profile."
+        }
+    requested = _phase8_video_io_requested_value(operation)
+    recovery_allowed = _phase8_stageid_recovery_allowed(workspace_id, item, before, requested)
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        if not recovery_allowed:
+            return {property_name: "Phase 8A I/O real writes require a healthy cue without warnings."}
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return {property_name: "Phase 8A I/O real writes require an inactive cue."}
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name)
+    if cue_id != item.get("cue_ref"):
+        return {property_name: "Phase 8A fresh read uniqueID does not exactly match requested cue UUID."}
+    if not isinstance(baseline, str):
+        return {property_name: f"Phase 8A I/O requires readable {property_name} baseline."}
+    if not _video_io_value_valid(requested):
+        return {property_name: f"Phase 8A I/O requested {property_name} must be a non-empty patch/stage ID string."}
+    token = item["confirm_gates"][0]
+    payload, token_error = _decode_phase8_video_io_confirm_token(token)
+    if token_error or payload is None:
+        return {property_name: token_error or "Phase 8A I/O confirm_token is invalid."}
+    expected = _phase8_video_io_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    for key, value in expected.items():
+        if key in {"baseline", "baseline_sha256"}:
+            continue
+        if payload.get(key) != value:
+            return {
+                property_name: (
+                    "Phase 8A I/O confirm_token does not match this workspace, cue, property, "
+                    "value, or risk context."
+                )
+            }
+    if payload.get("baseline_sha256") != expected["baseline_sha256"] or payload.get("baseline") != expected["baseline"]:
+        return {
+            property_name: (
+                f"stale_video_io_baseline: current {property_name} no longer matches "
+                "the reviewed dry-run baseline."
+            )
+        }
+    return {}
+
+
+def _phase8b_video_audio_time_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") != "video_basic":
+        return None
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in VIDEO_PHASE8B_AUDIO_TIME_PROPERTIES
+        ),
+        None,
+    )
+
+
+def _phase8b_video_audio_time_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 8B Video audio time writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") != "video_basic":
+        return "Phase 8B Video audio time writes require video_basic profile."
+    if len(operations) != 1:
+        return "Phase 8B Video audio time writes require exactly one property."
+    operation = operations[0]
+    if operation.get("property") not in VIDEO_PHASE8B_AUDIO_TIME_PROPERTIES or operation.get("path") != operation.get("property"):
+        return "Phase 8B Video audio time writes allow only Time & Loops scalar properties."
+    if operation.get("mode") != "saved":
+        return "Phase 8B Video audio time writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Phase 8B Video audio time writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _phase8b_video_audio_time_requested_value(operation: dict[str, Any]) -> Any:
+    return operation["args"][0] if operation.get("args") else None
+
+
+def _video_audio_time_value_valid(property_name: str, value: Any) -> bool:
+    if property_name in {"infiniteLoop", "preservePitch", "holdLastFrame"}:
+        return isinstance(value, bool)
+    if property_name == "playCount":
+        return isinstance(value, int) and not isinstance(value, bool) and value >= 1
+    if property_name in {"startTime", "endTime"}:
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value)) and value >= 0
+    if property_name == "rate":
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value)) and 0.03 <= float(value) <= 33.0
+    return False
+
+
+def _video_audio_time_readback_value_valid(property_name: str, value: Any) -> bool:
+    if property_name == "preservePitch":
+        return isinstance(value, bool) or (isinstance(value, int) and not isinstance(value, bool) and value in {0, 1})
+    return _video_audio_time_value_valid(property_name, value)
+
+
+def _video_audio_time_canonical_value(property_name: str, value: Any) -> Any:
+    if property_name == "preservePitch" and isinstance(value, int) and not isinstance(value, bool) and value in {0, 1}:
+        return bool(value)
+    return value
+
+
+def _video_audio_time_has_embedded_audio_evidence(before: dict[str, Any]) -> bool:
+    formats = before.get("audioTrackFormats")
+    if isinstance(formats, str) and formats.strip():
+        return True
+    if isinstance(formats, (list, tuple, set, dict)) and bool(formats):
+        return True
+    channels = before.get("numChannelsIn")
+    if isinstance(channels, (int, float)) and not isinstance(channels, bool) and channels > 0:
+        return True
+    levels = before.get("levels")
+    return isinstance(levels, (list, tuple)) and bool(levels)
+
+
+def _phase8b_video_audio_time_needs_audio_evidence(property_name: str) -> bool:
+    return property_name in VIDEO_PHASE8B_AUDIO_TIME_AUDIO_TRACK_PROPERTIES
+
+
+def _phase8b_video_audio_time_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    baseline: Any,
+    requested: Any,
+) -> dict[str, Any]:
+    return {
+        "version": PHASE8B_VIDEO_AUDIO_TIME_TOKEN_VERSION,
+        "operation_kind": PHASE8B_VIDEO_AUDIO_TIME_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "cue_type": "Video",
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": _video_audio_time_canonical_value(operation["property"], baseline),
+        "baseline_sha256": _video_io_sha256(_video_audio_time_canonical_value(operation["property"], baseline)),
+        "requested": _video_audio_time_canonical_value(operation["property"], requested),
+        "requested_sha256": _video_io_sha256(_video_audio_time_canonical_value(operation["property"], requested)),
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "workspace_validation": "post_write_fresh_readback_required",
+        "mcp_secret_version": 1,
+    }
+
+
+def _phase8b_video_audio_time_confirm_token(**payload_args: Any) -> str:
+    payload = _phase8b_video_audio_time_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:videoAudioTime:v{payload['version']}:{encoded}:{signature}"
+
+
+def _decode_phase8b_video_audio_time_confirm_token(token: str) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    if (
+        len(parts) != 5
+        or parts[0] != "confirm"
+        or parts[1] != "videoAudioTime"
+        or parts[2] != f"v{PHASE8B_VIDEO_AUDIO_TIME_TOKEN_VERSION}"
+    ):
+        return None, "Phase 8B Video audio time confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 8B Video audio time confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 8B Video audio time confirm_token payload is invalid."
+    if not isinstance(payload, dict):
+        return None, "Phase 8B Video audio time confirm_token payload is invalid."
+    return payload, None
+
+
+def _phase8b_video_audio_time_dry_run_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase8b_video_audio_time_operation(item)
+    if operation is None or item.get("profile") != "video_basic" or not isinstance(before, dict) or before.get("type") != "Video":
+        return {}
+    property_name = operation["property"]
+    baseline = before.get(property_name)
+    requested = _phase8b_video_audio_time_requested_value(operation)
+    if not _video_audio_time_readback_value_valid(property_name, baseline):
+        return {property_name: f"Phase 8B Video audio time requires readable {property_name} baseline."}
+    if not _video_audio_time_value_valid(property_name, requested):
+        return {property_name: f"Phase 8B Video audio time requested {property_name} value is outside the validated range or type."}
+    if _phase8b_video_audio_time_needs_audio_evidence(property_name) and not _video_audio_time_has_embedded_audio_evidence(before):
+        return {property_name: "Phase 8B Video audio time requires readable embedded-audio evidence."}
+    return {}
+
+
+def _annotate_phase8b_video_audio_time_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operation = _phase8b_video_audio_time_operation(item)
+    if operation is None or item.get("profile") != "video_basic":
+        return []
+    property_name = operation["property"]
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name) if isinstance(before, dict) else None
+    requested = _phase8b_video_audio_time_requested_value(operation)
+    has_audio_evidence = (
+        isinstance(before, dict)
+        and (
+            not _phase8b_video_audio_time_needs_audio_evidence(property_name)
+            or _video_audio_time_has_embedded_audio_evidence(before)
+        )
+    )
+    candidate = (
+        candidate_shape
+        and isinstance(before, dict)
+        and before.get("type") == "Video"
+        and cue_id == item.get("cue_ref")
+        and _video_audio_time_readback_value_valid(property_name, baseline)
+        and _video_audio_time_value_valid(property_name, requested)
+        and has_audio_evidence
+    )
+    if not candidate:
+        operation.pop("confirm_token", None)
+        return []
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase8b_video_audio_time_candidate": True,
+            "planned_only_reason": "video_audio_time_requires_confirm_token",
+            "future_gate_requirements": [
+                "phase8b_video_audio_time_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+                *(
+                    ["embedded_audio_evidence"]
+                    if _phase8b_video_audio_time_needs_audio_evidence(property_name)
+                    else []
+                ),
+            ],
+        }
+    )
+    operation["confirm_token"] = _phase8b_video_audio_time_confirm_token(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    return []
+
+
+def _validate_phase8b_video_audio_time_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase8b_video_audio_time_operation(item)
+    property_name = operation.get("property") if operation else "video_audio_time"
+    if operation is None or not isinstance(before, dict):
+        return {property_name: "Phase 8B Video audio time preflight is incomplete."}
+    if before.get("type") != "Video" or item.get("profile") != "video_basic":
+        return {property_name: "Phase 8B Video audio time real writes require a Video cue with video_basic profile."}
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return {property_name: "Phase 8B Video audio time real writes require a healthy cue without warnings."}
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return {property_name: "Phase 8B Video audio time real writes require an inactive cue."}
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name)
+    requested = _phase8b_video_audio_time_requested_value(operation)
+    if cue_id != item.get("cue_ref"):
+        return {property_name: "Phase 8B fresh read uniqueID does not exactly match requested cue UUID."}
+    if not _video_audio_time_readback_value_valid(property_name, baseline):
+        return {property_name: f"Phase 8B Video audio time requires readable {property_name} baseline."}
+    if not _video_audio_time_value_valid(property_name, requested):
+        return {property_name: f"Phase 8B Video audio time requested {property_name} value is outside the validated range or type."}
+    if _phase8b_video_audio_time_needs_audio_evidence(property_name) and not _video_audio_time_has_embedded_audio_evidence(before):
+        return {property_name: "Phase 8B Video audio time requires readable embedded-audio evidence."}
+    token = item["confirm_gates"][0]
+    payload, token_error = _decode_phase8b_video_audio_time_confirm_token(token)
+    if token_error or payload is None:
+        return {property_name: token_error or "Phase 8B Video audio time confirm_token is invalid."}
+    expected = _phase8b_video_audio_time_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        requested=requested,
+    )
+    for key, value in expected.items():
+        if key in {"baseline", "baseline_sha256"}:
+            continue
+        if payload.get(key) != value:
+            return {
+                property_name: (
+                    "Phase 8B Video audio time confirm_token does not match this workspace, cue, "
+                    "property, value, or risk context."
+                )
+            }
+    if payload.get("baseline_sha256") != expected["baseline_sha256"] or payload.get("baseline") != expected["baseline"]:
+        return {
+            property_name: (
+                f"stale_video_audio_time_baseline: current {property_name} no longer matches "
+                "the reviewed dry-run baseline."
+            )
+        }
+    return {}
+
+
+def _phase8c_video_slice_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") != "video_basic":
+        return None
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in VIDEO_PHASE8C_SLICE_MARKER_PROPERTIES
+        ),
+        None,
+    )
+
+
+def _phase8c_video_slice_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Phase 8C Video slice writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") != "video_basic":
+        return "Phase 8C Video slice writes require video_basic profile."
+    if len(operations) != 1:
+        return "Phase 8C Video slice writes require exactly one property or operation."
+    operation = operations[0]
+    if operation.get("property") not in VIDEO_PHASE8C_SLICE_MARKER_PROPERTIES:
+        return "Phase 8C Video slice writes allow only safe slice marker operations and lastSlicePlayCount."
+    if operation.get("mode") != "saved":
+        return "Phase 8C Video slice marker writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Phase 8C Video slice marker writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _canonical_slice_markers(value: Any) -> list[dict[str, Any]] | None:
+    if not isinstance(value, list):
+        return None
+    markers: list[dict[str, Any]] = []
+    for marker in value:
+        if not isinstance(marker, dict):
+            return None
+        time_value = marker.get("time")
+        play_count = marker.get("playCount")
+        if not _is_plain_finite_number(time_value) or float(time_value) < 0:
+            return None
+        if not _slice_play_count_valid(play_count):
+            return None
+        markers.append({"time": float(time_value), "playCount": int(play_count)})
+    return markers
+
+
+def _phase8c_baseline_slice_markers(before: dict[str, Any]) -> list[dict[str, Any]] | None:
+    if "sliceMarkers" not in before and before.get("type") in {"Audio", "Video"}:
+        return []
+    return _canonical_slice_markers(before.get("sliceMarkers"))
+
+
+def _slice_markers_equal(actual: Any, requested: Any) -> bool:
+    if actual is None and requested == []:
+        return True
+    actual_markers = _canonical_slice_markers(actual)
+    requested_markers = _canonical_slice_markers(requested)
+    if actual_markers is None or requested_markers is None or len(actual_markers) != len(requested_markers):
+        return False
+    for actual_marker, requested_marker in zip(actual_markers, requested_markers, strict=True):
+        if not math.isclose(
+            actual_marker["time"],
+            requested_marker["time"],
+            rel_tol=UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
+            abs_tol=UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
+        ):
+            return False
+        if actual_marker["playCount"] != requested_marker["playCount"]:
+            return False
+    return True
+
+
+def _slice_play_count_valid(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and (value == -1 or value > 0)
+
+
+def _phase8c_last_slice_play_count_operation(operation: dict[str, Any] | None) -> bool:
+    return isinstance(operation, dict) and operation.get("property") == "lastSlicePlayCount"
+
+
+def _slice_time_valid(value: Any) -> bool:
+    return _is_plain_finite_number(value) and float(value) >= 0
+
+
+def _phase8c_value_from_args(operation: dict[str, Any], key: str) -> Any:
+    values = operation.get("arg_values")
+    if isinstance(values, dict) and key in values:
+        return values[key]
+    args = operation.get("args") or []
+    if operation.get("property") == "addSliceMarker":
+        if key == "time" and len(args) >= 1:
+            return args[0]
+        if key == "playCount" and len(args) >= 2:
+            return args[1]
+    if operation.get("property") == "sliceMarker/time" and key == "time" and args:
+        return args[0]
+    if operation.get("property") == "sliceMarker/playCount" and key == "playCount" and args:
+        return args[0]
+    return None
+
+
+def _phase8c_marker_index(operation: dict[str, Any]) -> int | None:
+    values = operation.get("arg_values")
+    index = values.get("index") if isinstance(values, dict) else None
+    return index if isinstance(index, int) and not isinstance(index, bool) and index >= 0 else None
+
+
+def _phase8c_time_window(before: dict[str, Any]) -> tuple[float, float | None]:
+    start = before.get("startTime")
+    lower = float(start) if _is_plain_finite_number(start) and float(start) >= 0 else 0.0
+    for key in ("endTime", "duration"):
+        value = before.get(key)
+        if _is_plain_finite_number(value) and float(value) > lower:
+            return lower, float(value)
+    return lower, None
+
+
+def _phase8c_spacing_ok(
+    markers: list[dict[str, Any]],
+    *,
+    time_value: float,
+    ignore_index: int | None,
+    lower: float,
+    upper: float | None,
+) -> bool:
+    if time_value < lower:
+        return False
+    if upper is not None and time_value > upper:
+        return False
+    if ignore_index is not None:
+        if ignore_index > 0:
+            previous_time = float(markers[ignore_index - 1]["time"])
+            if time_value - previous_time < SLICE_MARKER_MIN_SPACING_SECONDS:
+                return False
+        if ignore_index + 1 < len(markers):
+            next_time = float(markers[ignore_index + 1]["time"])
+            if next_time - time_value < SLICE_MARKER_MIN_SPACING_SECONDS:
+                return False
+    for index, marker in enumerate(markers):
+        if ignore_index is not None and index == ignore_index:
+            continue
+        if abs(float(marker["time"]) - time_value) < SLICE_MARKER_MIN_SPACING_SECONDS:
+            return False
+    return True
+
+
+def _phase8c_expected_slice_markers(
+    operation: dict[str, Any],
+    before: dict[str, Any],
+) -> tuple[list[dict[str, Any]] | None, str | None]:
+    markers = _phase8c_baseline_slice_markers(before)
+    if markers is None:
+        return None, "Phase 8C requires readable sliceMarkers baseline with finite time and playCount."
+    lower, upper = _phase8c_time_window(before)
+    property_name = operation.get("property")
+    expected = [dict(marker) for marker in markers]
+    if property_name == "sliceMarker/time":
+        index = _phase8c_marker_index(operation)
+        time_value = _phase8c_value_from_args(operation, "time")
+        if index is None or index >= len(expected):
+            return None, "Phase 8C sliceMarker/time requires an existing marker index."
+        if not _slice_time_valid(time_value):
+            return None, "Phase 8C slice marker time must be a finite non-negative number."
+        requested_time = float(time_value)
+        if not _phase8c_spacing_ok(expected, time_value=requested_time, ignore_index=index, lower=lower, upper=upper):
+            return None, "Phase 8C slice marker time violates cue bounds or 0.05s minimum spacing."
+        expected[index]["time"] = requested_time
+        return expected, None
+    if property_name == "sliceMarker/playCount":
+        index = _phase8c_marker_index(operation)
+        play_count = _phase8c_value_from_args(operation, "playCount")
+        if index is None or index >= len(expected):
+            return None, "Phase 8C sliceMarker/playCount requires an existing marker index."
+        if not _slice_play_count_valid(play_count):
+            return None, "Phase 8C slice marker playCount must be positive int or -1; 0 is rejected."
+        expected[index]["playCount"] = int(play_count)
+        return expected, None
+    if property_name == "addSliceMarker":
+        time_value = _phase8c_value_from_args(operation, "time")
+        play_count = _phase8c_value_from_args(operation, "playCount")
+        if not _slice_time_valid(time_value):
+            return None, "Phase 8C addSliceMarker requires finite non-negative time."
+        requested_time = float(time_value)
+        if not _slice_play_count_valid(play_count):
+            return None, "Phase 8C addSliceMarker playCount must be positive int or -1; 0 is rejected."
+        if not _phase8c_spacing_ok(expected, time_value=requested_time, ignore_index=None, lower=lower, upper=upper):
+            return None, "Phase 8C addSliceMarker violates cue bounds or 0.05s minimum spacing."
+        expected.append({"time": requested_time, "playCount": int(play_count)})
+        expected.sort(key=lambda marker: marker["time"])
+        return expected, None
+    if property_name == "deleteSliceMarker":
+        index = _phase8c_marker_index(operation)
+        if index is None or index >= len(expected):
+            return None, "Phase 8C deleteSliceMarker requires an existing marker index."
+        del expected[index]
+        return expected, None
+    if property_name == "deleteSliceMarkers":
+        if not expected:
+            return None, "Phase 8C deleteSliceMarkers requires at least one existing marker; empty baseline is a no-op."
+        return [], None
+    if property_name == "lastSlicePlayCount":
+        return None, None
+    return None, "Phase 8C operation is blocked until readback and rollback semantics are proven."
+
+
+def _phase8c_requested_scalar(operation: dict[str, Any]) -> Any:
+    args = operation.get("args") or []
+    return args[0] if args else None
+
+
+def _phase8c_requested_payload(operation: dict[str, Any]) -> dict[str, Any]:
+    property_name = operation.get("property")
+    payload = {"property": property_name}
+    if property_name == "lastSlicePlayCount":
+        payload["value"] = _phase8c_requested_scalar(operation)
+        return payload
+    index = _phase8c_marker_index(operation)
+    if index is not None:
+        payload["index"] = index
+    if property_name in {"sliceMarker/time", "addSliceMarker"}:
+        payload["time"] = _phase8c_value_from_args(operation, "time")
+    if property_name in {"sliceMarker/playCount", "addSliceMarker"}:
+        payload["playCount"] = _phase8c_value_from_args(operation, "playCount")
+    return payload
+
+
+def _phase8c_video_slice_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    baseline: Any,
+    expected: Any,
+) -> dict[str, Any]:
+    requested = _phase8c_requested_payload(operation)
+    return {
+        "version": PHASE8C_VIDEO_SLICE_TOKEN_VERSION,
+        "operation_kind": PHASE8C_VIDEO_SLICE_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "cue_type": "Video",
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": baseline,
+        "baseline_sha256": _video_io_sha256(baseline),
+        "requested": requested,
+        "requested_sha256": _video_io_sha256(requested),
+        "expected": expected,
+        "expected_sha256": _video_io_sha256(expected),
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "workspace_validation": "post_write_fresh_sliceMarkers_readback_required",
+        "mcp_secret_version": 1,
+    }
+
+
+def _phase8c_video_slice_confirm_token(**payload_args: Any) -> str:
+    payload = _phase8c_video_slice_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:videoSlices:v{payload['version']}:{encoded}:{signature}"
+
+
+def _decode_phase8c_video_slice_confirm_token(token: str) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    if (
+        len(parts) != 5
+        or parts[0] != "confirm"
+        or parts[1] != "videoSlices"
+        or parts[2] != f"v{PHASE8C_VIDEO_SLICE_TOKEN_VERSION}"
+    ):
+        return None, "Phase 8C Video slice confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Phase 8C Video slice confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Phase 8C Video slice confirm_token payload is invalid."
+    if not isinstance(payload, dict):
+        return None, "Phase 8C Video slice confirm_token payload is invalid."
+    return payload, None
+
+
+def _phase8c_video_slice_dry_run_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase8c_video_slice_operation(item)
+    if operation is None or item.get("profile") != "video_basic" or not isinstance(before, dict) or before.get("type") != "Video":
+        return {}
+    if _phase8c_last_slice_play_count_operation(operation):
+        baseline = before.get("lastSlicePlayCount")
+        requested = _phase8c_requested_scalar(operation)
+        if not _slice_play_count_valid(baseline):
+            return {"lastSlicePlayCount": "Phase 8C requires readable lastSlicePlayCount baseline."}
+        if not _slice_play_count_valid(requested):
+            return {"lastSlicePlayCount": "Phase 8C lastSlicePlayCount must be a positive integer or -1; 0 is rejected."}
+        return {}
+    _, error = _phase8c_expected_slice_markers(operation, before)
+    return {operation["property"]: error} if error else {}
+
+
+def _annotate_phase8c_video_slice_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operation = _phase8c_video_slice_operation(item)
+    if operation is None or item.get("profile") != "video_basic":
+        return []
+    cue_id = _resolved_cue_id(before)
+    if _phase8c_last_slice_play_count_operation(operation):
+        baseline = before.get("lastSlicePlayCount") if isinstance(before, dict) else None
+        requested = _phase8c_requested_scalar(operation)
+        candidate = (
+            candidate_shape
+            and isinstance(before, dict)
+            and before.get("type") == "Video"
+            and cue_id == item.get("cue_ref")
+            and _slice_play_count_valid(baseline)
+            and _slice_play_count_valid(requested)
+        )
+        if not candidate:
+            operation.pop("confirm_token", None)
+            return []
+        operation.update(
+            {
+                "risk_tier": "high",
+                "real_write_enabled": False,
+                "real_write_possible": True,
+                "requires_confirm_token": True,
+                "phase8c_video_slice_candidate": True,
+                "planned_only_reason": "video_slice_marker_requires_confirm_token",
+                "future_gate_requirements": [
+                    "phase8c_video_slice_confirm_token",
+                    "single_cue_single_property",
+                    "uuid_cue_ref",
+                    "saved_mode",
+                    "fresh_lastSlicePlayCount_baseline",
+                    "exact_lastSlicePlayCount_readback",
+                    "manual_rollback_plan",
+                ],
+            }
+        )
+        operation["confirm_token"] = _phase8c_video_slice_confirm_token(
+            workspace_id=workspace_id,
+            cue_ref=item["cue_ref"],
+            cue_id=cue_id,
+            item=item,
+            operation=operation,
+            baseline=baseline,
+            expected=requested,
+        )
+        return []
+    baseline = _phase8c_baseline_slice_markers(before) if isinstance(before, dict) else None
+    expected, error = _phase8c_expected_slice_markers(operation, before) if isinstance(before, dict) else (None, "missing baseline")
+    candidate = (
+        candidate_shape
+        and isinstance(before, dict)
+        and before.get("type") == "Video"
+        and cue_id == item.get("cue_ref")
+        and baseline is not None
+        and expected is not None
+        and error is None
+    )
+    if not candidate:
+        operation.pop("confirm_token", None)
+        operation.pop("phase8c_expected_slice_markers", None)
+        return []
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase8c_video_slice_candidate": True,
+            "phase8c_expected_slice_markers": expected,
+            "planned_only_reason": "video_slice_marker_requires_confirm_token",
+            "future_gate_requirements": [
+                "phase8c_video_slice_confirm_token",
+                "single_cue_single_operation",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_sliceMarkers_baseline",
+                "exact_sliceMarkers_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation["confirm_token"] = _phase8c_video_slice_confirm_token(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        expected=expected,
+    )
+    return []
+
+
+def _validate_phase8c_video_slice_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase8c_video_slice_operation(item)
+    property_name = operation.get("property") if operation else "video_slice_marker"
+    if operation is None or not isinstance(before, dict):
+        return {property_name: "Phase 8C Video slice preflight is incomplete."}
+    if before.get("type") != "Video" or item.get("profile") != "video_basic":
+        return {property_name: "Phase 8C Video slice real writes require a Video cue with video_basic profile."}
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return {property_name: "Phase 8C Video slice real writes require a healthy cue without warnings."}
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return {property_name: "Phase 8C Video slice real writes require an inactive cue."}
+    cue_id = _resolved_cue_id(before)
+    if _phase8c_last_slice_play_count_operation(operation):
+        baseline = before.get("lastSlicePlayCount")
+        requested = _phase8c_requested_scalar(operation)
+        if cue_id != item.get("cue_ref"):
+            return {property_name: "Phase 8C fresh read uniqueID does not exactly match requested cue UUID."}
+        if not _slice_play_count_valid(baseline):
+            return {property_name: "Phase 8C requires readable lastSlicePlayCount baseline."}
+        if not _slice_play_count_valid(requested):
+            return {property_name: "Phase 8C lastSlicePlayCount must be a positive integer or -1; 0 is rejected."}
+        token = item["confirm_gates"][0]
+        payload, token_error = _decode_phase8c_video_slice_confirm_token(token)
+        if token_error or payload is None:
+            return {property_name: token_error or "Phase 8C Video slice confirm_token is invalid."}
+        expected_payload = _phase8c_video_slice_token_payload(
+            workspace_id=workspace_id,
+            cue_ref=item["cue_ref"],
+            cue_id=cue_id,
+            item=item,
+            operation=operation,
+            baseline=baseline,
+            expected=requested,
+        )
+        for key, value in expected_payload.items():
+            if key in {"baseline", "baseline_sha256"}:
+                continue
+            if payload.get(key) != value:
+                return {
+                    property_name: (
+                        "Phase 8C Video slice confirm_token does not match this workspace, cue, "
+                        "property, value, or risk context."
+                    )
+                }
+        if payload.get("baseline_sha256") != expected_payload["baseline_sha256"] or payload.get("baseline") != expected_payload["baseline"]:
+            return {
+                property_name: (
+                    "stale_video_slice_last_slice_baseline: current lastSlicePlayCount no longer "
+                    "matches the reviewed dry-run baseline."
+                )
+            }
+        return {}
+    baseline = _phase8c_baseline_slice_markers(before)
+    expected, expected_error = _phase8c_expected_slice_markers(operation, before)
+    if cue_id != item.get("cue_ref"):
+        return {property_name: "Phase 8C fresh read uniqueID does not exactly match requested cue UUID."}
+    if baseline is None:
+        return {property_name: "Phase 8C requires readable sliceMarkers baseline with finite time and playCount."}
+    if expected_error or expected is None:
+        return {property_name: expected_error or "Phase 8C could not build expected slice marker readback."}
+    token = item["confirm_gates"][0]
+    payload, token_error = _decode_phase8c_video_slice_confirm_token(token)
+    if token_error or payload is None:
+        return {property_name: token_error or "Phase 8C Video slice confirm_token is invalid."}
+    operation["phase8c_expected_slice_markers"] = expected
+    expected_payload = _phase8c_video_slice_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        baseline=baseline,
+        expected=expected,
+    )
+    for key, value in expected_payload.items():
+        if key in {"baseline", "baseline_sha256"}:
+            continue
+        if payload.get(key) != value:
+            return {
+                property_name: (
+                    "Phase 8C Video slice confirm_token does not match this workspace, cue, "
+                    "operation, value, or risk context."
+                )
+            }
+    if payload.get("baseline_sha256") != expected_payload["baseline_sha256"] or payload.get("baseline") != expected_payload["baseline"]:
+        return {
+            property_name: (
+                "stale_video_slice_markers_baseline: current sliceMarkers no longer match "
                 "the reviewed dry-run baseline."
             )
         }
@@ -4839,6 +6343,77 @@ def _refresh_phase7_video_geometry_real_result(
             operation["requires_confirm_token"] = True
             operation.pop("planned_only_reason", None)
     for operation in result.get("planned_operations") or []:
+        if operation.get("operation") in {"set_property", "action"} and operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    plan = result.get("updateq_plan")
+    if isinstance(plan, dict):
+        cue_type = (result.get("before") or {}).get("type") or "visual"
+        plan["status"] = result.get("status")
+        plan["intent"] = f"Executed saved {property_name} change on {cue_type} cue."
+        plan["real_write_enabled"] = True
+        plan["real_write_possible"] = True
+        plan["requires_confirm_token"] = True
+        plan.pop("why_not_written", None)
+        after_key = _phase7_video_geometry_baseline_key(property_name)
+        plan["after"] = (result.get("after") or {}).get(after_key)
+        if property_name == "resetRotation":
+            plan["rollback"] = {"property": "quaternion", "value": (result.get("before") or {}).get("quaternion")}
+        plan["verification"] = {"readback_matched": result.get("errors") is None}
+        safety = dict(plan.get("safety") or {})
+        safety.update({"no_executed_operations": False, "will_modify_qlab": True})
+        plan["safety"] = safety
+
+
+def _mark_phase8_video_io_real_operation(item: dict[str, Any]) -> None:
+    operation = _phase8_video_io_operation(item)
+    if operation is None:
+        return
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": True,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase8_video_io_candidate": True,
+            "future_gate_requirements": [
+                "phase8_video_io_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+                "workspace_id_list_validation_future",
+            ],
+        }
+    )
+    operation.pop("planned_only_reason", None)
+
+
+def _label_phase8_video_io_rejection(item: dict[str, Any]) -> None:
+    operation = _phase8_video_io_operation(item)
+    if operation is not None:
+        operation["planned_only_reason"] = "video_io_requires_confirm_token"
+
+
+def _refresh_phase8_video_io_real_result(
+    result: dict[str, Any],
+    item: dict[str, Any],
+) -> None:
+    io_operation = _phase8_video_io_operation(item)
+    if io_operation is None or not result.get("executed_operations"):
+        return
+    property_name = io_operation["property"]
+    for operation in result.get("operations") or []:
+        if operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    for operation in result.get("planned_operations") or []:
         if operation.get("operation") == "set_property" and operation.get("property") == property_name:
             operation["real_write_enabled"] = True
             operation["real_write_possible"] = True
@@ -4854,6 +6429,162 @@ def _refresh_phase7_video_geometry_real_result(
         plan["requires_confirm_token"] = True
         plan.pop("why_not_written", None)
         plan["after"] = (result.get("after") or {}).get(property_name)
+        plan["rollback"] = {"property": property_name, "value": (result.get("before") or {}).get(property_name)}
+        plan["verification"] = {"readback_matched": result.get("errors") is None}
+        safety = dict(plan.get("safety") or {})
+        safety.update({"no_executed_operations": False, "will_modify_qlab": True})
+        plan["safety"] = safety
+
+
+def _mark_phase8b_video_audio_time_real_operation(item: dict[str, Any]) -> None:
+    operation = _phase8b_video_audio_time_operation(item)
+    if operation is None:
+        return
+    property_name = operation["property"]
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": True,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase8b_video_audio_time_candidate": True,
+            "future_gate_requirements": [
+                "phase8b_video_audio_time_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_baseline",
+                "exact_readback",
+                "manual_rollback_plan",
+                *(
+                    ["embedded_audio_evidence"]
+                    if _phase8b_video_audio_time_needs_audio_evidence(property_name)
+                    else []
+                ),
+            ],
+        }
+    )
+    operation.pop("planned_only_reason", None)
+
+
+def _label_phase8b_video_audio_time_rejection(item: dict[str, Any]) -> None:
+    operation = _phase8b_video_audio_time_operation(item)
+    if operation is not None:
+        operation["planned_only_reason"] = "video_audio_time_requires_confirm_token"
+
+
+def _refresh_phase8b_video_audio_time_real_result(
+    result: dict[str, Any],
+    item: dict[str, Any],
+) -> None:
+    audio_time_operation = _phase8b_video_audio_time_operation(item)
+    if audio_time_operation is None or not result.get("executed_operations"):
+        return
+    property_name = audio_time_operation["property"]
+    for operation in result.get("operations") or []:
+        if operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    for operation in result.get("planned_operations") or []:
+        if operation.get("operation") == "set_property" and operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    plan = result.get("updateq_plan")
+    if isinstance(plan, dict):
+        plan["status"] = result.get("status")
+        plan["intent"] = f"Executed saved {property_name} Time & Loops change on Video cue."
+        plan["real_write_enabled"] = True
+        plan["real_write_possible"] = True
+        plan["requires_confirm_token"] = True
+        plan.pop("why_not_written", None)
+        plan["after"] = (result.get("after") or {}).get(property_name)
+        plan["rollback"] = {"property": property_name, "value": (result.get("before") or {}).get(property_name)}
+        plan["verification"] = {"readback_matched": result.get("errors") is None}
+        safety = dict(plan.get("safety") or {})
+        safety.update({"no_executed_operations": False, "will_modify_qlab": True})
+        plan["safety"] = safety
+
+
+def _mark_phase8c_video_slice_real_operation(item: dict[str, Any]) -> None:
+    operation = _phase8c_video_slice_operation(item)
+    if operation is None:
+        return
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": True,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "phase8c_video_slice_candidate": True,
+            "future_gate_requirements": [
+                "phase8c_video_slice_confirm_token",
+                "single_cue_single_property" if _phase8c_last_slice_play_count_operation(operation) else "single_cue_single_operation",
+                "uuid_cue_ref",
+                "saved_mode",
+                (
+                    "fresh_lastSlicePlayCount_baseline"
+                    if _phase8c_last_slice_play_count_operation(operation)
+                    else "fresh_sliceMarkers_baseline"
+                ),
+                (
+                    "exact_lastSlicePlayCount_readback"
+                    if _phase8c_last_slice_play_count_operation(operation)
+                    else "exact_sliceMarkers_readback"
+                ),
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation.pop("planned_only_reason", None)
+
+
+def _label_phase8c_video_slice_rejection(item: dict[str, Any]) -> None:
+    operation = _phase8c_video_slice_operation(item)
+    if operation is not None:
+        operation["planned_only_reason"] = "video_slice_marker_requires_confirm_token"
+
+
+def _refresh_phase8c_video_slice_real_result(
+    result: dict[str, Any],
+    item: dict[str, Any],
+) -> None:
+    slice_operation = _phase8c_video_slice_operation(item)
+    if slice_operation is None or not result.get("executed_operations"):
+        return
+    property_name = slice_operation["property"]
+    for operation in result.get("operations") or []:
+        if operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    for operation in result.get("planned_operations") or []:
+        if operation.get("operation") == "set_property" and operation.get("property") == property_name:
+            operation["real_write_enabled"] = True
+            operation["real_write_possible"] = True
+            operation["requires_confirm_token"] = True
+            operation.pop("planned_only_reason", None)
+    plan = result.get("updateq_plan")
+    if isinstance(plan, dict):
+        plan["status"] = result.get("status")
+        plan["intent"] = f"Executed saved {property_name} slice change on Video cue."
+        plan["real_write_enabled"] = True
+        plan["real_write_possible"] = True
+        plan["requires_confirm_token"] = True
+        plan.pop("why_not_written", None)
+        if _phase8c_last_slice_play_count_operation(slice_operation):
+            plan["after"] = (result.get("after") or {}).get(property_name)
+            plan["rollback"] = {"property": property_name, "value": (result.get("before") or {}).get(property_name)}
+        else:
+            plan["after"] = (result.get("after") or {}).get("sliceMarkers")
+            plan["rollback"] = {
+                "operation": "manual_inverse_slice_marker_operation",
+                "baseline": (result.get("before") or {}).get("sliceMarkers"),
+            }
         plan["verification"] = {"readback_matched": result.get("errors") is None}
         safety = dict(plan.get("safety") or {})
         safety.update({"no_executed_operations": False, "will_modify_qlab": True})
@@ -5066,7 +6797,7 @@ def _batch_item_result(
     warnings: list[str],
     notices: list[str] | None = None,
 ) -> dict[str, Any]:
-    item_notices = list(notices or [])
+    item_notices = list(dict.fromkeys([*(notices or []), *(item.get("notices") or [])]))
     diff = _diff_properties(before, item["properties"], after)
     planned_operations = []
     if not errors:
@@ -5216,6 +6947,8 @@ def _video_phase2_updateq_plan(
                 "warning": "Changing text inherits formatting from the first existing character.",
             }
         )
+    if property_name == "stageID" and isinstance(operation.get("warning_metadata"), dict):
+        plan["warning_metadata"] = operation["warning_metadata"]
     return plan
 
 
@@ -5227,7 +6960,7 @@ def _is_video_phase2_property(property_name: str, operation: dict[str, Any] | No
     return (
         property_name in {"anchor", "crop", "fileTarget", "quaternion", "resetRotation", "rotation", "scale", "translation"}
         or property_name == "cameraPatch"
-        or property_name.startswith(("rotate/", "stage", "text/format", "videoEffect", "videoInputPatch"))
+        or property_name.startswith(("audioInputPatch", "audioOutputPatch", "rotate/", "stage", "text/format", "videoEffect", "videoInputPatch"))
     )
 
 
@@ -5388,6 +7121,9 @@ def _planned_update_operations(
             "real_write_enabled": update_operation["real_write_enabled"],
             "capability_gate": update_operation.get("capability_gate"),
         }
+        if update_operation.get("property") == "resetRotation":
+            planned["operation"] = "action"
+            planned["rollback_property"] = "quaternion"
         if update_operation.get("confirm_token"):
             planned["confirm_token"] = update_operation["confirm_token"]
         for key in (
@@ -5406,6 +7142,11 @@ def _planned_update_operations(
             "phase4_real_write_candidate",
             "phase5_light_behavior_candidate",
             "phase7_video_geometry_candidate",
+            "phase8_video_io_candidate",
+            "phase8b_video_audio_time_candidate",
+            "phase8c_video_slice_candidate",
+            "phase8c_expected_slice_markers",
+            "warning_metadata",
             "light_command_analysis",
         ):
             if key in update_operation:
@@ -5556,11 +7297,30 @@ def _properties_match(values: Any, requested: dict[str, Any]) -> bool:
     return all(_property_values_match(key, values.get(key), value) for key, value in requested.items())
 
 
+def _is_readback_confirmable_gated_item(item: dict[str, Any]) -> bool:
+    return (
+        _phase3_video_opacity_operation(item) is not None
+        or _phase3_video_translation_operation(item) is not None
+        or _phase3_video_scalar_operation(item) is not None
+        or _phase3_video_appearance_operation(item) is not None
+        or _phase7_video_geometry_operation(item) is not None
+        or _phase8_video_io_operation(item) is not None
+        or _phase8b_video_audio_time_operation(item) is not None
+        or _phase8c_video_slice_operation(item) is not None
+        or _phase3e_text_basic_operation(item) is not None
+        or _phase3f_text_style_operation(item) is not None
+        or _phase4c_video_fx_scalar_operation(item) is not None
+    )
+
+
 def _verification_requested_values(item: dict[str, Any]) -> dict[str, Any]:
     requested = dict(item["properties"])
     for operation in item["operations"]:
         read_key = operation.get("read_key")
         args = operation.get("args") or []
+        if read_key == "sliceMarkers" and operation.get("phase8c_expected_slice_markers") is not None:
+            requested[str(read_key)] = operation["phase8c_expected_slice_markers"]
+            continue
         if _phase4c_video_fx_scalar_operation(item) is operation:
             values = operation.get("arg_values") or {}
             requested["videoEffects"] = {
@@ -5572,6 +7332,10 @@ def _verification_requested_values(item: dict[str, Any]) -> dict[str, Any]:
             continue
         if read_key and len(args) == 1:
             requested[str(read_key)] = args[0]
+        elif read_key == "quaternion" and operation.get("property") == "quaternion" and len(args) == 4:
+            requested[str(read_key)] = list(args)
+        elif read_key == "quaternion" and operation.get("property") == "resetRotation":
+            requested[str(read_key)] = {"__reset_rotation_readback__": True}
     return requested
 
 
@@ -5587,6 +7351,8 @@ def _verification_mismatch_message(values: Any, requested: dict[str, Any]) -> st
 
 
 def _property_values_match(key: str, actual: Any, requested: Any) -> bool:
+    if key == "quaternion" and isinstance(requested, dict) and requested.get("__reset_rotation_readback__") is True:
+        return _is_quaternion_value(actual)
     if key == "videoEffects" and isinstance(requested, dict) and requested.get("__video_fx_scalar__") is True:
         index = requested.get("index")
         parameter_key = requested.get("parameterKey")
@@ -5599,6 +7365,8 @@ def _property_values_match(key: str, actual: Any, requested: Any) -> bool:
         actual_value = parameters.get(parameter_key)
         requested_value = requested.get("setting")
         return _property_values_match(parameter_key, actual_value, requested_value)
+    if key == "sliceMarkers":
+        return _slice_markers_equal(actual, requested)
     actual_value = _comparison_value(key, actual)
     requested_value = _comparison_value(key, requested)
     if _is_plain_number(actual_value) and _is_plain_number(requested_value):
@@ -5608,12 +7376,19 @@ def _property_values_match(key: str, actual: Any, requested: Any) -> bool:
             rel_tol=UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
             abs_tol=UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
         )
+    if isinstance(actual_value, (list, tuple)) and isinstance(requested_value, (list, tuple)):
+        return len(actual_value) == len(requested_value) and all(
+            _property_values_match(key, actual_item, requested_item)
+            for actual_item, requested_item in zip(actual_value, requested_value, strict=True)
+        )
     return actual_value == requested_value
 
 
 def _comparison_value(key: str, value: Any) -> Any:
     if key == "continueMode":
         return _continue_mode_comparison_value(value)
+    if key == "preservePitch":
+        return _video_audio_time_canonical_value(key, value)
     if key in CASEFOLD_COMPARISON_KEYS and isinstance(value, str):
         return value.strip().casefold()
     return value

@@ -8,6 +8,14 @@ Base documents used to design and verify QLab OSC coverage.
 - `references/osc_queries.md`
 - `references/video_phase1_osc_matrix.md`
 
+## QClass Transcripts
+
+Official QClass 5.5 class transcripts. These are reference material for QLab behavior, usage patterns, and recommended workflows.
+
+- `qclass/September 2025 QClass 5.5 at the Voxel - Day 1.md`
+- `qclass/September 2025 QClass 5.5 at the Voxel - Day 2.md`
+- `qclass/September 2025 QClass 5.5 at the Voxel - Day 3.md`
+
 ## Prompts
 
 The `prompts/` folder contains reusable Codex prompts for planned implementation steps.
@@ -48,6 +56,16 @@ Documents that still guide current implementation work.
 - `current/workorders/010_video_docs_consistency_cleanup.md`
 - `current/workorders/011_video_fx_scalar_v2_candidate.md`
 - `current/workorders/012_geometry_completion_video_camera_text.md`
+- `current/workorders/013_full_geometry_completion_video_camera_text.md`
+- `current/workorders/014_rotation_quaternion_shutter_geometry.md`
+- `current/workorders/015_quaternion_geometry_write.md`
+- `current/workorders/016_safe_reset_rotation.md`
+- `current/workorders/017_geometry_completion_smooth_and_defaults.md`
+- `current/workorders/018_blend_mode_audit_and_completion.md`
+- `current/workorders/019_video_io_selection_edit_cues.md`
+- `current/workorders/020_video_embedded_audio_research.md`
+- `current/workorders/021_video_audio_time_loops.md`
+- `current/workorders/022_slice_markers_audio_video.md`
 - `current/video_phase3a_opacity_real_write_plan.md`
 - `current/video_phase2c_gate_test_vectors.md`
 - `current/qlab_update_cues_runtime_checklist.md`

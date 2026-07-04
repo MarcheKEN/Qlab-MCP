@@ -23,6 +23,7 @@ from .coverage import default_read_coverage_report
 MAX_VALUES_FOR_KEYS = 100
 MAX_BATCH_CUE_DETAILS = 50
 UNRESOLVED_CUE_ERROR_CODE = "cue_ref_unresolved"
+SLICE_DETAIL_KEYS = ("sliceMarkers", "lastSlicePlayCount", "lastSliceInfiniteLoop")
 EXHAUSTIVE_WARNING = (
     "profile='exhaustive' may return large, sensitive, or heavy read-only payloads "
     "including notes, file targets, scripts, stage data, maps, routing, and geometry."
@@ -69,6 +70,10 @@ def _profile_warnings(profile: str, requested_count: int = 1) -> list[str]:
     if requested_count > 1:
         warnings.append(EXHAUSTIVE_BATCH_WARNING)
     return warnings
+
+
+def _is_slice_capable_type(cue_type: Any) -> bool:
+    return str(cue_type or "").strip().casefold() in {"audio", "video"}
 
 
 def _attach_read_coverage(result: dict[str, Any], profile: str) -> None:
@@ -192,6 +197,27 @@ class CueDetailsMixin:
                     errors[property_path] = sanitize_exception_message(property_exc)
         return values
 
+    def _fill_missing_slice_detail_values(
+        self,
+        workspace_id: str,
+        cue_ref: str,
+        requested_keys: list[str] | tuple[str, ...],
+        values: dict[str, Any],
+        errors: dict[str, str],
+    ) -> None:
+        if not _is_slice_capable_type(values.get("type")):
+            return
+        for key in SLICE_DETAIL_KEYS:
+            if key not in requested_keys or key in values:
+                continue
+            try:
+                values[key] = self.read_cue_property(workspace_id, cue_ref, key)["value"]
+            except Exception as exc:
+                if key == "sliceMarkers":
+                    values[key] = []
+                    continue
+                continue
+
     def _get_auto_cue_details(self, workspace_id: str, cue_ref: str) -> dict[str, Any]:
         errors: dict[str, str] = {}
         common_keys = list(properties_for_profile("auto"))
@@ -232,6 +258,7 @@ class CueDetailsMixin:
                 cacheable=cacheable,
             )
             values.update(type_specific_values)
+            self._fill_missing_slice_detail_values(workspace_id, cue_ref, type_specific_keys, values, errors)
             values = truncate_profile_payload("auto", _derive_profile_fields("auto", values))
 
         result: dict[str, Any] = {
@@ -305,6 +332,7 @@ class CueDetailsMixin:
             )
         if _looks_unresolved(values, errors):
             errors = _compact_unresolved_errors()
+        self._fill_missing_slice_detail_values(workspace_id, cue_ref, keys, values, errors)
         values = truncate_profile_payload(profile, _derive_profile_fields(profile, values))
 
         result: dict[str, Any] = {

@@ -6,7 +6,7 @@ Status: runtime validated + closed.
 
 | Property | Cue types | OSC setter/readback | Value | Decision |
 |---|---|---|---|---|
-| `blendMode` | Video, Camera, Text | `/cue/{cue_number}/blendMode` | existing QLab blend-mode enum | implement |
+| `blendMode` | Video, Camera, Text | `/cue/{cue_number}/blendMode` | QLab full-name blend mode string | implement |
 | `preserveAspectRatio` | Video, Camera, Text | `/cue/{cue_number}/preserveAspectRatio` | boolean | implement |
 | `rotation` | none in this bundle | scalar `/rotation` is documented under Fade cues and depends on single-axis mode | number | skip |
 | `shutterTop` | none | no QLab 5 OSC dictionary entry | unknown | skip |
@@ -27,6 +27,13 @@ Token-gated saved writes for `Video`, `Camera`, and `Text`:
 - `preserveAspectRatio`
 
 Token family: `confirm:videoAppearance:v1:`.
+
+`blendMode` belongs to QLab's Video FX tab, but it is not a Video FX parameter
+write in MCP. OSC writes the full blend mode name as a string, for example
+`Screen` or `Source Atop Compositing`; it is not a numeric enum. The registry
+canonicalizes existing case-insensitive full-name input to QLab's official
+spelling and rejects unknown names, partial names, numbers, booleans, lists,
+dicts, and nulls.
 
 ## Gate
 

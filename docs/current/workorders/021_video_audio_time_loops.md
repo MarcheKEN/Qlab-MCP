@@ -1,6 +1,8 @@
 # Video Phase 8B - Video Embedded Audio Time & Loops
 
-Status: local implementation added; runtime validation pending MCP restart.
+Status: status audit needed. This workorder records Phase 8B implementation and
+runtime-safety scope; confirm current validation status in
+`docs/current/active_roadmap.md`.
 
 ## Sources
 
@@ -36,7 +38,7 @@ GO, start, stop, audition, raw OSC, `/live`, or workspace save.
 | Rate | `rate` | `/cue/{cue_number}/rate {number}` | finite number `0.03..33.0` | read/write; `/live` exists | Video with embedded audio evidence | implemented, saved only |
 | Preserve Pitch | `preservePitch` | `/cue/{cue_number}/preservePitch {boolean}` | boolean | read/write | Video with embedded audio evidence | implemented |
 | Hold at End | `holdLastFrame` | `/cue/{cue_number}/holdLastFrame {boolean}` | boolean | read/write | Video-only visual playback state | implemented as official property name |
-| Integrated Fade | `doFade` | `/cue/{cue_number}/doFade {boolean}` | boolean | read/write | Shared Audio route | blocked |
+| Integrated Fade | `doFade` | `/cue/{cue_number}/doFade {boolean}` | boolean | read/write | Shared Audio route | moved to separate token-gated implementation; runtime pending |
 | Linear Curve / fade curve | no isolated scalar confirmed | tied to integrated fade curve model | unclear | unclear | Shared Audio/Fade behavior | blocked |
 | Slices / loops / vamps / devamps | `sliceMarker/*`, `addSliceMarker`, `deleteSliceMarker*` | indexed routes/actions | mixed | read/write/action | Shared Audio route | blocked |
 
@@ -114,11 +116,11 @@ without matching readback remain failures.
 
 ## Blocked / Future Only
 
-- `doFade`: integrated fade changes playback envelope behavior and needs its
-  own curve/baseline proof.
 - Linear Curve: no isolated safe OSC scalar was confirmed for the Time & Loops
   checkbox/curve behavior.
-- `lockFadeToCue`: fade coupling affects cue playback behavior.
+- `doFade` and `lockFadeToCue` are no longer blocked in this workorder; they
+  moved to separate saved Video Integrated Fade token gates and remain runtime
+  pending.
 - `sliceMarker/*`, `addSliceMarker`, `deleteSliceMarker*`: slice editing is
   multi-route/indexed and can change loop/vamp/devamp semantics.
 - Levels matrix, `sliderLevel`, `level`, `gang`, `setDefaultLevels`,

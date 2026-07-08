@@ -6,7 +6,7 @@ Source docs:
 
 - `docs/references/qlab_osc_dictionary.md`
 - `docs/references/osc_queries.md`
-- `docs/references/video_phase1_osc_matrix.md`
+- `docs/current/coverage/video_phase1_osc_matrix.md`
 
 ## Decision
 

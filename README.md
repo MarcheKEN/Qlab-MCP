@@ -76,7 +76,7 @@ Cue edit flow:
 1. `qlab_check_connection`
 2. `qlab_check_write_readiness`
 3. `qlab_query_cues` and `qlab_get_cue_details(profile="editable")`
-4. `qlab_update_cues(..., dry_run=true)`
+4. `qlab_edit_cues(..., dry_run=true)`
 5. Review `planned_operations`, `diff`, warnings, and per-item errors.
 6. Use `dry_run=false` only in a deliberate gated write session.
 7. Verify after with `qlab_get_cue_details`, `qlab_query_cues`, or other read
@@ -112,7 +112,8 @@ Cue edit flow:
 | --- | --- |
 | `qlab_check_write_readiness` | Checks disabled-by-default write readiness without mutation. |
 | `qlab_create_cue` | Dry-runs or creates one blank allowlisted cue with safe initial properties. |
-| `qlab_update_cues` | Dry-runs or updates 1-50 concrete cues through the cue editing registry. |
+| `qlab_edit_cues` | Dry-runs or updates 1-50 concrete cues through the cue editing registry. |
+| `qlab_update_cues` | Compatibility alias for older prompts, tests, and clients. |
 
 ## Read Model
 
@@ -170,7 +171,7 @@ Allowed cue creation is intentionally narrow:
 Cue updates use concrete cue numbers or unique IDs. `selected`, `active`,
 `playhead`, and `playbackPosition` are rejected for updates.
 
-`qlab_update_cues` supports these update profiles:
+`qlab_edit_cues` supports these update profiles:
 
 ```text
 common
@@ -210,7 +211,7 @@ both a reviewed dry-run `confirm_token` and a path inside
 `QLAB_ALLOWED_FILE_ROOTS`. Paths outside those roots are blocked before OSC.
 
 If a setter times out but a fresh after-read confirms the requested value,
-`qlab_update_cues` reports `updated_with_confirmed_timeouts` with a warning. If
+`qlab_edit_cues` reports `updated_with_confirmed_timeouts` with a warning. If
 fresh verification cannot prove the requested value, the result is failed or
 inconclusive.
 
@@ -237,7 +238,7 @@ Cue detail profiles are tiered:
   media paths.
 - `auto` / `inspector_safe`: operational cue data; type-specific fields are
   summarized and compact.
-- `editable`: capability discovery for `qlab_update_cues`, including
+- `editable`: capability discovery for `qlab_edit_cues`, including
   dry-run-only properties and dry-run confirmation tokens; it does not imply
   real writes are enabled.
 - `full_sensitive` / `exhaustive`: explicit large/sensitive reads; still no MCP
@@ -357,10 +358,11 @@ qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=No
 qlab_get_cue_details(workspace_id, cue_ref, profile="auto")
 qlab_check_write_readiness(workspace_id)
 qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
-qlab_update_cues(workspace_id, updates, dry_run=None)
+qlab_edit_cues(workspace_id, updates, dry_run=None)
+qlab_update_cues(workspace_id, updates, dry_run=None)  # compatibility alias
 ```
 
-`qlab_update_cues` update items use this shape:
+`qlab_edit_cues` update items use this shape:
 
 ```json
 {
@@ -399,8 +401,8 @@ Structured update operations inside each item use this shape:
 
 References:
 
-- [QLab update cues runtime checklist](docs/current/qlab_update_cues_runtime_checklist.md)
-- [Update cue OSC coverage snapshot](docs/current/updateq_osc_coverage_snapshot.md)
+- [QLab edit cues runtime checklist](docs/guides/edit_cues_runtime_checklist.md)
+- [OSC coverage snapshot](docs/current/coverage/osc_coverage_snapshot.md)
 - [QLab OSC dictionary](docs/references/qlab_osc_dictionary.md)
 - [QLab OSC queries](docs/references/osc_queries.md)
-- [Video Phase 1 OSC matrix](docs/references/video_phase1_osc_matrix.md)
+- [Video Phase 1 OSC matrix](docs/current/coverage/video_phase1_osc_matrix.md)

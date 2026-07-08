@@ -1,4 +1,4 @@
-# UpdateQ OSC Coverage Snapshot
+# OSC Coverage Snapshot
 
 Source of truth: `docs/references/qlab_osc_dictionary.md`.
 
@@ -195,6 +195,39 @@ exceptions are listed in Current Invariants.
   save remain blocked. Setter timeout or QLab setter error is warning-confirmed
   success only when fresh readback matches. Runtime validation is required
   before Phase 8B closure.
+- Phase 9A emits `confirm:videoAudioLevels:v1:` only for saved-mode exact-UUID
+  one-cue/one-operation `Video` `video_basic.sliderLevel/{channel}` writes.
+  Runtime validation passed on `v5 Con slices`, including rollback. Embedded
+  audio evidence for this gate is now only `numChannelsIn > 0` or non-empty
+  `audioTrackFormats`; `levels` and `sliderLevels` are not evidence because
+  `v11 dorado.png` exposed them with `numChannelsIn = 0` and
+  `audioTrackFormats = {}`. They remain required only for baseline/readback.
+  Phase 9A accepts finite numeric dB only and blocks `-inf`, output names,
+  `/live`, raw OSC, playback/show-control, save, batch, and multi-property.
+- Phase 9B is runtime validated for one saved
+  `level/{inChannel}/{outChannel}` matrix crosspoint using
+  `confirm:videoAudioMatrix:v1:`. Row `0` remains Phase 9A territory because
+  `/levels[0]` is equivalent to `sliderLevels`. Broad matrix editing, `/live`,
+  names, `-inf`, mute/solo/default/silent actions, Objects, Trim, Audio FX,
+  Audio Maps, and routing/patch editor writes remain blocked.
+- Phase 9C `gang/{inChannel}/{outChannel}` is runtime validated for one saved
+  metadata crosspoint using `confirm:videoAudioLevelMeta:v1:`. Validation
+  proved empty baseline rollback: `gang/1/0` `"" -> "MCPG" -> ""` on
+  `v5 Con slices`. Scope remains Video-only, exact UUID, one cue, one
+  operation, healthy inactive cue, real embedded-audio evidence, integer
+  indexes, row `1..numChannelsIn`, no output names, no control characters, no
+  `/live`, no batch, and no multi-property.
+- Video `clockType` is locally implemented with
+  `confirm:videoClockType:v1:` for saved exact-UUID one-cue/one-operation
+  Video writes with real embedded-audio evidence, strict `audio`/`video`
+  values, fresh readback, and rollback plan. Runtime validation is pending.
+- Video Integrated Fade `doFade` and `lockFadeToCue` are locally implemented
+  with `confirm:videoIntegratedFade:v1:` for saved exact-UUID
+  one-cue/one-operation Video writes with real embedded-audio evidence, strict
+  booleans, fresh readback, and rollback plan. Runtime validation is pending.
+- `setDefaultLevels` and `setSilentLevels` stay planned-only. QLab documents
+  both as actions, but the MCP does not yet have a proven complete rollback
+  contract for all affected saved level values.
 - Phase 8C exposes Audio/Video `sliceMarkers` readback in cue detail profiles
   using a canonical slice read path shared with write dry-run. Missing
   Audio/Video `sliceMarkers` is normalized to `[]` only after the slice route

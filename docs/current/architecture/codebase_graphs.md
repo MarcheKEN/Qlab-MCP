@@ -51,7 +51,7 @@ flowchart LR
     Tools --> CueDetails["qlab_get_cue_details"]
     Tools --> Ready["qlab_check_write_readiness"]
     Tools --> Create["qlab_create_cue"]
-    Tools --> Update["qlab_update_cues"]
+    Tools --> Update["qlab_edit_cues"]
 ```
 
 ## Flujo Read-Only Recomendado
@@ -85,7 +85,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    Update["qlab_update_cues"] --> Ready["ensure_write_ready"]
+    Update["qlab_edit_cues"] --> Ready["ensure_write_ready"]
     Ready --> Env["QLAB_ENABLE_WRITE=true<br/>QLAB_PASSCODE set"]
     Ready --> Connect["/connect confirms edit scope"]
     Ready --> Mode["/showMode confirms Edit Mode"]

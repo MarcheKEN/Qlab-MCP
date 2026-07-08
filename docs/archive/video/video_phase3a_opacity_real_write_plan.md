@@ -2,7 +2,7 @@
 
 ## A. Markdown path
 
-`docs/current/video_phase3a_opacity_real_write_plan.md`
+`docs/archive/video/video_phase3a_opacity_real_write_plan.md`
 
 ## B. Summary / scope
 

@@ -1,6 +1,8 @@
 # Video I/O Selection and Edit Cues
 
-Status: local implementation complete; runtime validation pending after MCP restart.
+Status: status audit needed. This workorder records Phase 8A implementation and
+runtime-safety scope; confirm current validation status in
+`docs/current/active_roadmap.md`.
 
 ## Scope
 

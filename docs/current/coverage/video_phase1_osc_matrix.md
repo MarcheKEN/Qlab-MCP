@@ -12,7 +12,7 @@ Runtime coverage remains generated from the dictionary; this matrix records Phas
 | Video/Camera/Text | anchor axis | `/cue/{cue_number}/anchor/x`, `/anchor/y` | yes | yes | yes | yes | no | dry-run only | high |
 | Video/Camera/Text | crop edges | `/cue/{cue_number}/cropTop`, `/cropBottom`, `/cropLeft`, `/cropRight` | yes | yes | yes | yes | no | dry-run only | high |
 | Video/Camera/Text | blend mode | `/cue/{cue_number}/blendMode` | yes | yes | no | no | no | dry-run only | high |
-| Video/Camera/Text | clock type | `/cue/{cue_number}/clockType` | yes | yes | no | no | no | dry-run only | high |
+| Video | clock type | `/cue/{cue_number}/clockType` | yes | yes | no | no | no | local token-gated saved write; runtime pending | high |
 | Video/Camera | rotation quaternion | `/cue/{cue_number}/quaternion`, `/resetRotation` | yes/action | yes/action | no | no | no | blocked | critical |
 | Video/Camera | scalar rotation | `/cue/{cue_number}/rotation` | no | no | no | no | no | blocked; removed from Video/Camera registry | critical |
 | Video | file target | `/cue/{cue_number}/fileTarget` | yes | yes | no | no | no | blocked | critical |

@@ -370,6 +370,109 @@ VIDEO_AUDIO_TIME_PROPERTIES = (
     _planned_prop("preservePitch", "boolean", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
 )
 
+VIDEO_AUDIO_LEVEL_PROPERTIES = (
+    _op(
+        "sliderLevel",
+        (("channel", "audio_output_ref"), ("decibel", "decibel")),
+        path="sliderLevel/{channel}",
+        modes=("saved", "live"),
+        read_key="sliderLevels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_levels_require_confirm_token",
+    ),
+)
+
+VIDEO_AUDIO_MATRIX_PROPERTIES = (
+    _op(
+        "level",
+        (("inChannel", "audio_level_row"), ("outChannel", "audio_output_ref"), ("decibel", "decibel")),
+        path="level/{inChannel}/{outChannel}",
+        modes=("saved", "live"),
+        read_key="levels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_matrix_requires_confirm_token",
+    ),
+)
+
+VIDEO_AUDIO_LEVEL_META_PROPERTIES = (
+    _op(
+        "inputChannelName",
+        (("number", "positive_int"), ("name", "string")),
+        path="inputChannelName/{number}",
+        risk_tier="medium",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_level_meta_requires_confirm_token",
+    ),
+    _op(
+        "gang",
+        (("inChannel", "audio_level_row"), ("outChannel", "audio_output_ref"), ("gang", "string")),
+        path="gang/{inChannel}/{outChannel}",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_level_meta_requires_confirm_token",
+    ),
+)
+
+VIDEO_AUDIO_MUTE_SOLO_PROPERTIES = (
+    _op(
+        "mute/channel",
+        (("output", "audio_output_ref"), ("value", "boolean")),
+        path="mute/channel/{output}",
+        read_key="muteChannels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_mute_solo_requires_confirm_token",
+    ),
+    _op(
+        "solo/channel",
+        (("output", "audio_output_ref"), ("value", "boolean")),
+        path="solo/{output}",
+        read_key="soloChannels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_mute_solo_requires_confirm_token",
+    ),
+)
+
+VIDEO_AUDIO_LEVEL_BULK_PROPERTIES = (
+    _op(
+        "mute/channel/clear",
+        (),
+        path="mute/channel/clear",
+        read_key="muteChannels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_level_bulk_requires_confirm_token",
+    ),
+    _op(
+        "solo/channel/clear",
+        (),
+        path="solo/channel/clear",
+        read_key="soloChannels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_level_bulk_requires_confirm_token",
+    ),
+    _op(
+        "setDefaultLevels",
+        (),
+        path="setDefaultLevels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_level_bulk_requires_full_runtime_validation",
+    ),
+    _op(
+        "setSilentLevels",
+        (),
+        path="setSilentLevels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_level_bulk_requires_full_runtime_validation",
+    ),
+)
+
 VIDEO_SLICE_MARKER_PROPERTIES = (
     _planned_prop(
         "lastSlicePlayCount",
@@ -967,6 +1070,7 @@ VIDEO_PHASE2_VISUAL_PROPERTY_NAMES = frozenset(
         "cropLeft",
         "cropRight",
         "cropTop",
+        "doFade",
         "fillStage",
         "fillStyle",
         "layer",
@@ -984,6 +1088,16 @@ VIDEO_PHASE2_VISUAL_PROPERTY_NAMES = frozenset(
         "infiniteLoop",
         "preservePitch",
         "holdLastFrame",
+        "level",
+        "sliderLevel",
+        "inputChannelName",
+        "gang",
+        "mute/channel",
+        "solo/channel",
+        "mute/channel/clear",
+        "solo/channel/clear",
+        "setDefaultLevels",
+        "setSilentLevels",
         "stageID",
         "audioOutputPatchID",
         "videoInputPatchID",
@@ -995,6 +1109,7 @@ VIDEO_PHASE2_VISUAL_PROPERTY_NAMES = frozenset(
         "deleteSliceMarkers",
         "lastSlicePlayCount",
         "lastSliceInfiniteLoop",
+        "lockFadeToCue",
         "translation/x",
         "translation/y",
     }
@@ -1271,7 +1386,7 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
         "Audio profile; only transport metadata is real-write enabled.",
     ),
     "mic_basic": UpdateProfileSpec("mic_basic", ("Mic",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES), "medium", True, "Mic profile with safe channel metadata writes."),
-    "video_basic": UpdateProfileSpec("video_basic", ("Video",), (*COMMON_PROPERTIES, *VIDEO_AUDIO_TIME_PROPERTIES, *VIDEO_SLICE_MARKER_PROPERTIES, *VIDEO_CATALOG_PROPERTIES), "medium", True, "Video opacity, translation, visual scalars, embedded-audio timing, and slice marker edits use specialized confirmation gates; remaining visual properties stay dry-run only."),
+    "video_basic": UpdateProfileSpec("video_basic", ("Video",), (*COMMON_PROPERTIES, *VIDEO_AUDIO_TIME_PROPERTIES, *VIDEO_AUDIO_LEVEL_PROPERTIES, *VIDEO_AUDIO_MATRIX_PROPERTIES, *VIDEO_AUDIO_LEVEL_META_PROPERTIES, *VIDEO_AUDIO_MUTE_SOLO_PROPERTIES, *VIDEO_AUDIO_LEVEL_BULK_PROPERTIES, _planned_prop("doFade", "boolean", reason="video_integrated_fade_requires_confirm_token"), _planned_prop("lockFadeToCue", "boolean", reason="video_integrated_fade_requires_confirm_token"), *VIDEO_SLICE_MARKER_PROPERTIES, *VIDEO_CATALOG_PROPERTIES), "medium", True, "Video opacity, translation, visual scalars, embedded-audio timing, audio level, audio matrix, audio level metadata, mute/solo, integrated fade, clockType, and slice marker edits use specialized confirmation gates; remaining visual properties stay dry-run only."),
     "camera_basic": UpdateProfileSpec("camera_basic", ("Camera",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES, *VIDEO_CATALOG_PROPERTIES, *CAMERA_CATALOG_PROPERTIES), "medium", True, "Camera opacity, translation, and visual scalars use specialized confirmation gates; remaining visual properties stay dry-run only."),
     TEXT_BASIC_UPDATE_PROFILE: UpdateProfileSpec(
         TEXT_BASIC_UPDATE_PROFILE,
@@ -1902,7 +2017,9 @@ def _validate_value(validator: str, value: Any) -> Any:
     if validator == "video_blend_mode":
         return _blend_mode(value)
     if validator == "video_clock_type":
-        return _enum_string(value, {"audio", "video"}, "value must be audio or video")
+        if value not in {"audio", "video"}:
+            raise UnsafeWriteOperationError("value must be exactly audio or video")
+        return value
     if validator == "continue_mode":
         return _continue_mode(value)
     if validator == "color_condition":

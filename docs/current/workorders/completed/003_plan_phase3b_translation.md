@@ -1,6 +1,7 @@
 # Workorder 003 — Plan Video Phase 3B Translation
 
-Status: implemented locally; runtime validation pending
+Status: completed. Historical note below said runtime validation was pending;
+Phase 3B is now closed in `docs/current/active_roadmap.md`.
 
 Phase 3B code enables token-gated saved real writes for Video, Camera, and
 Text `translation/x` and `translation/y`. Video runtime validation passed.

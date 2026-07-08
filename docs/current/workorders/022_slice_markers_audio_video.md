@@ -1,6 +1,7 @@
 # Video Phase 8C - Slice Markers for Audio and Video
 
-Status: Phase 8C.2 local hardening added; runtime validation pending MCP restart.
+Status: status audit needed. This workorder records Phase 8C/8C.2 local
+hardening; confirm current validation status in `docs/current/active_roadmap.md`.
 
 ## Sources
 

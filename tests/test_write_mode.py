@@ -282,6 +282,58 @@ class BatchFakeWriteClient:
             self.cues[cue_id]["isBroken"] = value in self.broken_stage_ids
         if prop in self.numeric_bool_readback_properties and isinstance(value, bool):
             value = int(value)
+        if prop.startswith("sliderLevel/"):
+            channel = int(prop.split("/")[1])
+            levels = list(self.cues[cue_id].setdefault("sliderLevels", []))
+            while len(levels) <= channel:
+                levels.append(0)
+            levels[channel] = value
+            self.cues[cue_id]["sliderLevels"] = levels
+            return
+        if prop.startswith("level/"):
+            _, in_channel_text, out_channel_text = prop.split("/", 2)
+            in_channel = int(in_channel_text)
+            out_channel = int(out_channel_text)
+            matrix = [list(row) if isinstance(row, list) else [] for row in self.cues[cue_id].setdefault("levels", [])]
+            while len(matrix) <= in_channel:
+                matrix.append([])
+            row = list(matrix[in_channel])
+            while len(row) <= out_channel:
+                row.append(0)
+            row[out_channel] = value
+            matrix[in_channel] = row
+            self.cues[cue_id]["levels"] = matrix
+            return
+        if prop.startswith("inputChannelName/"):
+            self.cues[cue_id][prop] = value
+            return
+        if prop.startswith("gang/"):
+            self.cues[cue_id][prop] = value
+            return
+        if prop.startswith("mute/channel/") and prop != "mute/channel/clear":
+            output = int(prop.split("/")[-1])
+            channels = set(self.cues[cue_id].setdefault("muteChannels", []))
+            if value:
+                channels.add(output)
+            else:
+                channels.discard(output)
+            self.cues[cue_id]["muteChannels"] = sorted(channels)
+            return
+        if prop == "mute/channel/clear":
+            self.cues[cue_id]["muteChannels"] = []
+            return
+        if prop.startswith("solo/") and prop != "solo/channel/clear":
+            output = int(prop.split("/")[-1])
+            channels = set(self.cues[cue_id].setdefault("soloChannels", []))
+            if value:
+                channels.add(output)
+            else:
+                channels.discard(output)
+            self.cues[cue_id]["soloChannels"] = sorted(channels)
+            return
+        if prop == "solo/channel/clear":
+            self.cues[cue_id]["soloChannels"] = []
+            return
         parameter_prefix = "videoEffectIndex/0/parameter/"
         if prop.startswith(parameter_prefix):
             parameter_key = prop.removeprefix(parameter_prefix)
@@ -408,6 +460,7 @@ VIDEO_PHASE2_ALLOWED_PROPERTIES = {
     "cropLeft",
     "cropRight",
     "cropTop",
+    "doFade",
     "fillStage",
     "fillStyle",
     "holdLastFrame",
@@ -421,6 +474,15 @@ VIDEO_PHASE2_ALLOWED_PROPERTIES = {
     "rate",
     "scale/x",
     "scale/y",
+    "level",
+    "sliderLevel",
+    "inputChannelName",
+    "gang",
+    "lockFadeToCue",
+    "mute/channel",
+    "solo/channel",
+    "mute/channel/clear",
+    "solo/channel/clear",
     "smooth",
     "stageID",
     "startTime",
@@ -480,7 +542,7 @@ VIDEO_PHASE2_REQUESTED_VALUES = {
     "anchor/x": 12.5,
     "anchor/y": -4.5,
     "blendMode": "Normal",
-    "clockType": "VIDEO",
+    "clockType": "video",
     "cropBottom": 2.5,
     "cropLeft": 3.5,
     "cropRight": 4.5,
@@ -1175,6 +1237,71 @@ def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_os
                 "preservePitch": True,
                 "holdLastFrame": False,
                 "audioTrackFormats": [{"channels": 2}],
+            }
+        )
+    elif profile == "video_basic" and prop_name == "sliderLevel":
+        cue_values.update(
+            {
+                "sliderLevels": [0.0, 0.0],
+                "audioTrackFormats": [{"channels": 2}],
+                "isBroken": False,
+                "isWarning": False,
+                "isRunning": False,
+                "isPaused": False,
+                "isAuditioning": False,
+            }
+        )
+    elif profile == "video_basic" and prop_name == "level":
+        cue_values.update(
+            {
+                "levels": [[0.0, 0.0], [0.0, 0.0]],
+                "numChannelsIn": 1,
+                "audioTrackFormats": [{"channels": 2}],
+                "isBroken": False,
+                "isWarning": False,
+                "isRunning": False,
+                "isPaused": False,
+                "isAuditioning": False,
+            }
+        )
+    elif profile == "video_basic" and prop_name in {"clockType", "doFade", "lockFadeToCue"}:
+        cue_values.update(
+            {
+                "audioTrackFormats": [{"channels": 2}],
+                "numChannelsIn": 2,
+                "clockType": "video",
+                "doFade": False,
+                "lockFadeToCue": False,
+                "isBroken": False,
+                "isWarning": False,
+                "isRunning": False,
+                "isPaused": False,
+                "isAuditioning": False,
+            }
+        )
+    elif profile == "video_basic" and prop_name in {
+        "inputChannelName",
+        "gang",
+        "mute/channel",
+        "solo/channel",
+        "mute/channel/clear",
+        "solo/channel/clear",
+    }:
+        cue_values.update(
+            {
+                "audioTrackFormats": [{"channels": 2}],
+                "numChannelsIn": 2,
+                "sliderLevels": [0.0, 0.0],
+                "levels": [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]],
+                "inputChannelName/2": "R",
+                "gang/1/1": "music",
+                "muteChannels": [1],
+                "soloChannels": [1],
+                "isBroken": False,
+                "isWarning": False,
+                "isRunning": False,
+                "isPaused": False,
+                "isAuditioning": False,
             }
         )
     elif profile == "video_basic" and prop_name in {
@@ -2004,7 +2131,7 @@ def test_update_cues_dry_run_reports_video_text_extended_validation_per_item() -
     assert [item["status"] for item in result["results"]] == ["dry_run_preflight_failed"] * 6
     assert all(item["planned_operations"] == [] for item in result["results"])
     assert "blendMode must be one of:" in result["results"][0]["errors"]["validation"]
-    assert result["results"][1]["errors"]["validation"] == "clockType must be audio or video"
+    assert result["results"][1]["errors"]["validation"] == "clockType must be exactly audio or video"
     assert result["results"][2]["errors"]["validation"] == "layer must be an integer from 0 to 1000"
     assert result["results"][3]["errors"]["validation"] == "fillStyle must be 0 for fit, 1 for fill, or 2 for stretch"
     assert result["results"][4]["errors"]["validation"] == "text/format/shadowBlurRadius must be a non-negative number"
@@ -3731,7 +3858,11 @@ def test_update_cue_video_opacity_uses_qlab_unit_interval() -> None:
 
 
 def test_video_phase2c_gate_vectors_doc_preserves_non_mutating_contract() -> None:
-    doc = (Path(__file__).resolve().parents[1] / "docs/current/video_phase2c_gate_test_vectors.md").read_text()
+    repo_root = Path(__file__).resolve().parents[1]
+    doc_path = repo_root / "docs/current/video_phase2c_gate_test_vectors.md"
+    if not doc_path.exists():
+        doc_path = repo_root / "docs/archive/video/video_phase2c_gate_test_vectors.md"
+    doc = doc_path.read_text()
 
     for required in (
         "No token generation.",
@@ -3755,16 +3886,16 @@ def test_video_phase2c_gate_vectors_doc_preserves_non_mutating_contract() -> Non
         assert required in doc
 
 
-def test_video_phase2_non_phase3_property_emits_no_token_and_fabricated_token_cannot_unlock_real_write() -> None:
+def test_camera_phase2_non_gated_property_emits_no_token_and_fabricated_token_cannot_unlock_real_write() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = FakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
         existing_cue_id=cue_id,
-        cue_values={"uniqueID": cue_id, "type": "Video", "clockType": "video"},
+        cue_values={"uniqueID": cue_id, "type": "Camera", "clockType": "video"},
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     dry_run = reader.update_cue(
-        "ws-1", cue_id, {"clockType": "audio"}, dry_run=True, profile="video_basic"
+        "ws-1", cue_id, {"clockType": "audio"}, dry_run=True, profile="camera_basic"
     )
     setter = planned_setters(dry_run)["clockType"]
     assert_no_confirm_token(dry_run)
@@ -3778,7 +3909,7 @@ def test_video_phase2_non_phase3_property_emits_no_token_and_fabricated_token_ca
         [
             {
                 "cue_ref": cue_id,
-                "profile": "video_basic",
+                "profile": "camera_basic",
                 "properties": {"clockType": "audio"},
                 "confirm_gates": ["confirm:clockType:fabricated"],
             }
@@ -4014,6 +4145,7 @@ def test_video_phase2_dry_run_rejects_explicitly_blocked_families_before_osc(
             and property_name not in VIDEO_PHASE3C_SCALAR_PROPERTIES
             and property_name not in VIDEO_PHASE3D_APPEARANCE_PROPERTIES
             and property_name != "layer"
+            and property_name != "clockType"
         ],
         *[
             ("text_basic", "Text", property_name)
@@ -4084,7 +4216,6 @@ def test_video_phase2_scalar_matrix_plans_normalized_diff_without_token(
 @pytest.mark.parametrize(
     ("profile", "cue_type", "property_name", "before_value", "requested_value"),
     [
-        ("video_basic", "Video", "clockType", "audio", "video"),
         ("text_basic", "Text", "fixedWidth", 500, 640),
     ],
 )
@@ -6531,6 +6662,922 @@ def test_phase8b_end_time_setter_error_mismatched_readback_fails() -> None:
     assert result["status"] == "partial_failed"
     assert result["results"][0]["after"]["endTime"] == 10
     assert result["results"][0]["errors"]["endTime"]
+
+
+def _phase9a_video_audio_level_fixture(
+    *,
+    channel: int = 0,
+    baseline: float = 0.0,
+    requested: float = -1.0,
+    cue_type: str = "Video",
+    timeout: bool = False,
+    audio_evidence: bool = True,
+    slider_levels: list[Any] | None = None,
+    num_channels_in: int | None = None,
+) -> tuple[BatchFakeWriteClient, QLabReader, str, dict[str, Any], str]:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    levels = list(slider_levels) if slider_levels is not None else [baseline, 0.0]
+    cue_values: dict[str, Any] = {"type": cue_type, "sliderLevels": levels}
+    if audio_evidence:
+        cue_values["audioTrackFormats"] = [{"channels": 2, "format": "AAC"}]
+    if num_channels_in is not None:
+        cue_values["numChannelsIn"] = num_channels_in
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: cue_values},
+        timeout_set_property=(cue_id, f"sliderLevel/{channel}") if timeout else None,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "video_basic",
+        "operations": [{"property": "sliderLevel", "args": {"channel": channel, "decibel": requested}}],
+    }
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["sliderLevel"]["confirm_token"]
+    client.requests.clear()
+    return client, reader, cue_id, update, token
+
+
+def test_phase9a_video_audio_level_dry_run_emits_bound_token() -> None:
+    client, reader, cue_id, update, _ = _phase9a_video_audio_level_fixture(channel=0, baseline=0.0, requested=-1.0)
+
+    result = reader.edit_cues("ws-1", [update], dry_run=True)
+    item = result["results"][0]
+    setter = planned_setters(item)["sliderLevel"]
+    payload, error = write_operations._decode_phase9a_video_audio_level_confirm_token(setter["confirm_token"])
+
+    assert error is None
+    assert setter["confirm_token"].startswith("confirm:videoAudioLevels:v1:")
+    assert setter["real_write_enabled"] is False
+    assert setter["real_write_possible"] is True
+    assert setter["requires_confirm_token"] is True
+    assert setter["address"] == f"/workspace/ws-1/cue_id/{cue_id}/sliderLevel/0"
+    assert setter["args"] == [-1.0]
+    assert item["executed_operations"] == []
+    assert payload["operation_kind"] == "video_phase9a_audio_level_write"
+    assert payload["cue_type"] == "Video"
+    assert payload["profile"] == "video_basic"
+    assert payload["property"] == "sliderLevel"
+    assert payload["channel"] == 0
+    assert payload["baseline"] == 0.0
+    assert payload["requested"] == -1.0
+    assert payload["workspace_validation"] == "post_write_fresh_sliderLevels_readback_required"
+    assert not any(address.endswith("/sliderLevel/0") for address, _, _ in client.requests)
+
+
+def test_phase9a_video_audio_level_accepts_num_channels_audio_evidence() -> None:
+    client, reader, _, update, _ = _phase9a_video_audio_level_fixture(audio_evidence=False, num_channels_in=2)
+
+    result = reader.edit_cues("ws-1", [update], dry_run=True)
+
+    setter = planned_setters(result["results"][0])["sliderLevel"]
+    assert setter["confirm_token"].startswith("confirm:videoAudioLevels:v1:")
+    assert setter["real_write_possible"] is True
+    assert result["results"][0]["executed_operations"] == []
+    assert not any(address.endswith("/sliderLevel/0") for address, _, _ in client.requests)
+
+
+def test_phase9a_video_audio_level_real_write_sets_once_and_verifies_channel_readback() -> None:
+    client, reader, cue_id, update, token = _phase9a_video_audio_level_fixture(
+        channel=1,
+        baseline=0.0,
+        requested=-1.5,
+        slider_levels=[0.0, 0.0],
+    )
+
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    item = result["results"][0]
+    setter = planned_setters(item)["sliderLevel"]
+    address = f"/workspace/ws-1/cue_id/{cue_id}/sliderLevel/1"
+    assert result["status"] == "updated"
+    assert item["after"]["sliderLevels"] == [0.0, -1.5]
+    assert setter["real_write_enabled"] is True
+    assert setter["real_write_possible"] is True
+    assert setter["requires_confirm_token"] is True
+    assert "planned_only_reason" not in setter
+    assert item["updateq_plan"]["rollback"] == {"property": "sliderLevel", "args": {"channel": 1, "decibel": 0.0}}
+    assert [request[0] for request in client.requests].count(address) == 1
+    assert not any("/live" in request[0] for request in client.requests)
+    assert not any("/level/" in request[0] for request in client.requests)
+    assert not any(request[0].endswith(("/setDefaultLevels", "/setSilentLevels")) for request in client.requests)
+
+
+def test_phase9a_video_audio_level_rejects_wrong_scope_tokens_and_shape_before_setter() -> None:
+    client, reader, cue_id, update, token = _phase9a_video_audio_level_fixture()
+    _, _, _, time_update, time_token = _phase8b_video_audio_time_fixture()
+    _, _, _, geometry_update, geometry_token = _phase7_geometry_fixture(property_name="smooth")
+    _, _, _, io_update, io_token = _phase8_io_fixture(property_name="audioOutputPatchID")
+    client.cue_numbers["v4"] = cue_id
+    cases = [
+        [{**update, "confirm_gates": ["confirm:videoAudioLevels:v1:fake"]}],
+        [{**update, "operations": [{"property": "sliderLevel", "args": {"channel": 0, "decibel": -2.0}}], "confirm_gates": [token]}],
+        [{**update, "cue_ref": "v4", "confirm_gates": [token]}],
+        [{**update, "operations": [update["operations"][0], {"property": "rate", "args": 1.25}], "confirm_gates": [token]}],
+        [{**update, "confirm_gates": [token]}, {**update, "confirm_gates": [token]}],
+        [{"cue_ref": cue_id, "profile": "audio_basic", "operations": update["operations"], "confirm_gates": [token]}],
+        [{**update, "confirm_gates": [time_token]}],
+        [{**update, "confirm_gates": [geometry_token]}],
+        [{**update, "confirm_gates": [io_token]}],
+        [{**time_update, "confirm_gates": [token]}],
+        [{**geometry_update, "confirm_gates": [token]}],
+        [{**io_update, "confirm_gates": [token]}],
+    ]
+
+    for case in cases:
+        result = reader.edit_cues("ws-1", case, dry_run=False)
+        assert result["status"] == "preflight_failed"
+        assert all(item["executed_operations"] == [] for item in result["results"])
+    assert not any("/sliderLevel/" in address or address.endswith(("/rate", "/smooth", "/audioOutputPatchID")) for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize("bad_value", [True, "0", "-inf", math.nan, math.inf, None, [], {}])
+def test_phase9a_video_audio_level_invalid_decibels_reject_before_setter(bad_value: Any) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Video", "sliderLevels": [0.0], "audioTrackFormats": [{"channels": 2}]}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.edit_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "video_basic",
+                "operations": [{"property": "sliderLevel", "args": {"channel": 0, "decibel": bad_value}}],
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert_no_confirm_token(result)
+    assert not any("/sliderLevel/" in address for address, _, _ in client.requests)
+
+
+def test_phase9a_video_audio_level_rejects_missing_evidence_and_unreadable_channel() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Video", "sliderLevels": [0.0]}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    no_evidence = reader.edit_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "video_basic", "operations": [{"property": "sliderLevel", "args": {"channel": 0, "decibel": -1.0}}]}],
+        dry_run=True,
+    )
+    channel_client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Video", "sliderLevels": [0.0], "audioTrackFormats": [{"channels": 2, "format": "AAC"}]}},
+    )
+    channel_reader = QLabReader(channel_client)  # type: ignore[arg-type]
+    missing_channel = channel_reader.edit_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "video_basic", "operations": [{"property": "sliderLevel", "args": {"channel": 1, "decibel": -1.0}}]}],
+        dry_run=True,
+    )
+
+    assert no_evidence["status"] == "preflight_failed"
+    assert no_evidence["results"][0]["errors"]["sliderLevel"] == "Phase 9A Video audio level requires readable embedded-audio evidence."
+    client.cues[cue_id]["levels"] = [[0.0]]
+    levels_only = reader.edit_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "video_basic", "operations": [{"property": "sliderLevel", "args": {"channel": 0, "decibel": -1.0}}]}],
+        dry_run=True,
+    )
+    assert levels_only["status"] == "preflight_failed"
+    assert levels_only["results"][0]["errors"]["sliderLevel"] == "Phase 9A Video audio level requires readable embedded-audio evidence."
+    assert missing_channel["status"] == "preflight_failed"
+    assert missing_channel["results"][0]["errors"]["sliderLevel"] == "Phase 9A Video audio level requires readable sliderLevels baseline for channel."
+    assert_no_confirm_token(no_evidence)
+    assert_no_confirm_token(levels_only)
+    assert_no_confirm_token(missing_channel)
+
+
+def test_phase9a_video_audio_level_timeout_and_rollback_contract() -> None:
+    client, reader, _, update, forward_token = _phase9a_video_audio_level_fixture(timeout=True)
+    forward = reader.edit_cues("ws-1", [{**update, "confirm_gates": [forward_token]}], dry_run=False)
+    rollback_update = {
+        **update,
+        "operations": [{"property": "sliderLevel", "args": {"channel": 0, "decibel": 0.0}}],
+    }
+    old_token = reader.edit_cues("ws-1", [{**rollback_update, "confirm_gates": [forward_token]}], dry_run=False)
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_token = planned_setters(rollback_plan["results"][0])["sliderLevel"]["confirm_token"]
+    rollback = reader.edit_cues("ws-1", [{**rollback_update, "confirm_gates": [rollback_token]}], dry_run=False)
+
+    assert forward["status"] == "updated"
+    assert "setter_timeout_but_readback_matched" in forward["results"][0]["warnings"]
+    assert old_token["status"] == "preflight_failed"
+    assert rollback["status"] == "updated"
+    assert rollback["results"][0]["after"]["sliderLevels"][0] == 0.0
+
+
+def _phase9b_video_audio_matrix_fixture(
+    *,
+    in_channel: int = 1,
+    out_channel: int = 0,
+    baseline: float = 0.0,
+    requested: float = -1.0,
+    cue_type: str = "Video",
+    timeout: bool = False,
+    audio_evidence: bool = True,
+    levels: list[Any] | None = None,
+    num_channels_in: int | None = 2,
+) -> tuple[BatchFakeWriteClient, QLabReader, str, dict[str, Any], str]:
+    cue_id = "22222222-2222-4222-8222-222222222222"
+    matrix = [list(row) for row in levels] if levels is not None else [[0.0, 0.0], [baseline, 0.0], [0.0, 0.0]]
+    cue_values: dict[str, Any] = {"type": cue_type, "levels": matrix}
+    if audio_evidence:
+        cue_values["audioTrackFormats"] = [{"channels": 2, "format": "AAC"}]
+    if num_channels_in is not None:
+        cue_values["numChannelsIn"] = num_channels_in
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: cue_values},
+        timeout_set_property=(cue_id, f"level/{in_channel}/{out_channel}") if timeout else None,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "video_basic",
+        "operations": [
+            {"property": "level", "args": {"inChannel": in_channel, "outChannel": out_channel, "decibel": requested}}
+        ],
+    }
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["level"]["confirm_token"]
+    client.requests.clear()
+    return client, reader, cue_id, update, token
+
+
+def test_phase9b_video_audio_matrix_dry_run_emits_bound_token() -> None:
+    client, reader, cue_id, update, _ = _phase9b_video_audio_matrix_fixture(requested=-1.0)
+
+    result = reader.edit_cues("ws-1", [update], dry_run=True)
+    item = result["results"][0]
+    setter = planned_setters(item)["level"]
+    payload, error = write_operations._decode_phase9b_video_audio_matrix_confirm_token(setter["confirm_token"])
+
+    assert error is None
+    assert setter["confirm_token"].startswith("confirm:videoAudioMatrix:v1:")
+    assert setter["real_write_enabled"] is False
+    assert setter["real_write_possible"] is True
+    assert setter["requires_confirm_token"] is True
+    assert setter["address"] == f"/workspace/ws-1/cue_id/{cue_id}/level/1/0"
+    assert setter["args"] == [-1.0]
+    assert item["executed_operations"] == []
+    assert payload["operation_kind"] == "video_phase9b_audio_matrix_write"
+    assert payload["cue_type"] == "Video"
+    assert payload["profile"] == "video_basic"
+    assert payload["property"] == "level"
+    assert payload["inChannel"] == 1
+    assert payload["outChannel"] == 0
+    assert payload["baseline"] == 0.0
+    assert payload["requested"] == -1.0
+    assert payload["workspace_validation"] == "post_write_fresh_levels_matrix_readback_required"
+    assert not any(address.endswith("/level/1/0") for address, _, _ in client.requests)
+
+
+def test_phase9b_video_audio_matrix_real_write_sets_once_and_verifies_crosspoint_readback() -> None:
+    client, reader, cue_id, update, token = _phase9b_video_audio_matrix_fixture(requested=-1.5)
+
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    item = result["results"][0]
+    setter = planned_setters(item)["level"]
+    address = f"/workspace/ws-1/cue_id/{cue_id}/level/1/0"
+    assert result["status"] == "updated"
+    assert item["after"]["levels"][1][0] == -1.5
+    assert setter["real_write_enabled"] is True
+    assert setter["real_write_possible"] is True
+    assert setter["requires_confirm_token"] is True
+    assert "planned_only_reason" not in setter
+    assert item["updateq_plan"]["rollback"] == {
+        "property": "level",
+        "args": {"inChannel": 1, "outChannel": 0, "decibel": 0.0},
+    }
+    assert [request[0] for request in client.requests].count(address) == 1
+    assert not any("/live" in request[0] for request in client.requests)
+    assert not any("/sliderLevel/" in request[0] for request in client.requests)
+    assert not any(request[0].endswith(("/setDefaultLevels", "/setSilentLevels")) for request in client.requests)
+
+
+def test_phase9b_video_audio_matrix_rejects_wrong_scope_tokens_and_shape_before_setter() -> None:
+    client, reader, cue_id, update, token = _phase9b_video_audio_matrix_fixture()
+    _, _, _, slider_update, slider_token = _phase9a_video_audio_level_fixture()
+    client.cue_numbers["v5"] = cue_id
+    cases = [
+        [{**update, "confirm_gates": ["confirm:videoAudioMatrix:v1:fake"]}],
+        [{**update, "operations": [{"property": "level", "args": {"inChannel": 1, "outChannel": 0, "decibel": -2.0}}], "confirm_gates": [token]}],
+        [{**update, "cue_ref": "v5", "confirm_gates": [token]}],
+        [{**update, "operations": [update["operations"][0], {"property": "rate", "args": 1.25}], "confirm_gates": [token]}],
+        [{**update, "confirm_gates": [token]}, {**update, "confirm_gates": [token]}],
+        [{"cue_ref": cue_id, "profile": "audio_basic", "operations": update["operations"], "confirm_gates": [token]}],
+        [{**update, "confirm_gates": [slider_token]}],
+        [{**slider_update, "confirm_gates": [token]}],
+    ]
+
+    for case in cases:
+        result = reader.edit_cues("ws-1", case, dry_run=False)
+        assert result["status"] == "preflight_failed"
+        assert all(item["executed_operations"] == [] for item in result["results"])
+    assert not any("/level/" in address or "/sliderLevel/" in address or address.endswith("/rate") for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize("bad_value", [True, "0", "-inf", math.nan, math.inf, None, [], {}])
+def test_phase9b_video_audio_matrix_invalid_decibels_reject_before_setter(bad_value: Any) -> None:
+    cue_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Video", "levels": [[0.0], [0.0]], "numChannelsIn": 1}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.edit_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "video_basic",
+                "operations": [{"property": "level", "args": {"inChannel": 1, "outChannel": 0, "decibel": bad_value}}],
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert_no_confirm_token(result)
+    assert not any("/level/" in address for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize(
+    ("args", "levels", "num_channels_in", "expected_error"),
+    [
+        ({"inChannel": 0, "outChannel": 0, "decibel": -1.0}, [[0.0], [0.0]], 1, "Phase 9B Video audio matrix row 0 is blocked; use Phase 9A sliderLevel."),
+        ({"inChannel": 2, "outChannel": 0, "decibel": -1.0}, [[0.0], [0.0], [0.0]], 1, "Phase 9B Video audio matrix requires inChannel within numChannelsIn."),
+        ({"inChannel": 2, "outChannel": 0, "decibel": -1.0}, [[0.0], [0.0]], 2, "Phase 9B Video audio matrix requires readable levels baseline for crosspoint."),
+        ({"inChannel": 1, "outChannel": 2, "decibel": -1.0}, [[0.0], [0.0]], 1, "Phase 9B Video audio matrix requires readable levels baseline for crosspoint."),
+        ({"inChannel": 1, "outChannel": "Main", "decibel": -1.0}, [[0.0], [0.0]], 1, "Phase 9B Video audio matrix requires integer outChannel."),
+    ],
+)
+def test_phase9b_video_audio_matrix_rejects_unsafe_indexing(
+    args: dict[str, Any],
+    levels: list[Any],
+    num_channels_in: int,
+    expected_error: str,
+) -> None:
+    cue_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Video", "levels": levels, "numChannelsIn": num_channels_in}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.edit_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "video_basic", "operations": [{"property": "level", "args": args}]}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"]["level"] == expected_error
+    assert_no_confirm_token(result)
+    assert not any("/level/" in address for address, _, _ in client.requests)
+
+
+def test_phase9b_video_audio_matrix_rejects_missing_evidence_live_batch_and_blocked_actions() -> None:
+    cue_id = "22222222-2222-4222-8222-222222222222"
+    operation = {"property": "level", "args": {"inChannel": 1, "outChannel": 0, "decibel": -1.0}}
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Video", "levels": [[0.0], [0.0]], "sliderLevels": [0.0]}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    no_evidence = reader.edit_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "video_basic", "operations": [operation]}],
+        dry_run=True,
+    )
+    live = reader.edit_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "video_basic", "operations": [{**operation, "mode": "live"}]}],
+        dry_run=True,
+    )
+    batch = reader.edit_cues(
+        "ws-1",
+        [
+            {"cue_ref": cue_id, "profile": "video_basic", "operations": [operation]},
+            {"cue_ref": cue_id, "profile": "video_basic", "operations": [operation]},
+        ],
+        dry_run=True,
+    )
+    multi = reader.edit_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "video_basic", "operations": [operation, {"property": "sliderLevel", "args": {"channel": 0, "decibel": -1.0}}]}],
+        dry_run=True,
+    )
+
+    assert no_evidence["status"] == "preflight_failed"
+    assert no_evidence["results"][0]["errors"]["level"] == "Phase 9B Video audio matrix requires readable embedded-audio evidence."
+    assert live["status"] == "preflight_failed"
+    assert batch["status"] == "preflight_failed"
+    assert multi["status"] == "preflight_failed"
+    for result in [no_evidence, live, batch, multi]:
+        assert_no_confirm_token(result)
+        assert all(item["executed_operations"] == [] for item in result["results"])
+    assert not any("/level/" in address or "/live" in address for address, _, _ in client.requests)
+
+
+def test_phase9b_video_audio_matrix_timeout_and_rollback_contract() -> None:
+    client, reader, _, update, forward_token = _phase9b_video_audio_matrix_fixture(timeout=True)
+    forward = reader.edit_cues("ws-1", [{**update, "confirm_gates": [forward_token]}], dry_run=False)
+    rollback_update = {
+        **update,
+        "operations": [{"property": "level", "args": {"inChannel": 1, "outChannel": 0, "decibel": 0.0}}],
+    }
+    old_token = reader.edit_cues("ws-1", [{**rollback_update, "confirm_gates": [forward_token]}], dry_run=False)
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_token = planned_setters(rollback_plan["results"][0])["level"]["confirm_token"]
+    rollback = reader.edit_cues("ws-1", [{**rollback_update, "confirm_gates": [rollback_token]}], dry_run=False)
+
+    assert forward["status"] == "updated"
+    assert "setter_timeout_but_readback_matched" in forward["results"][0]["warnings"]
+    assert old_token["status"] == "preflight_failed"
+    assert rollback["status"] == "updated"
+    assert rollback["results"][0]["after"]["levels"][1][0] == 0.0
+
+
+def _phase9_levels_fixture(
+    operation: dict[str, Any],
+    *,
+    cue_values: dict[str, Any] | None = None,
+    timeout_property: str | None = None,
+) -> tuple[BatchFakeWriteClient, QLabReader, str, dict[str, Any], str]:
+    cue_id = "33333333-3333-4333-8333-333333333333"
+    values = {
+        "type": "Video",
+        "audioTrackFormats": [{"channels": 2, "format": "AAC"}],
+        "numChannelsIn": 2,
+        "sliderLevels": [0.0, 0.0, 0.0],
+        "levels": [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
+        "inputChannelName/1": "L",
+        "inputChannelName/2": "R",
+        "gang/1/0": "music",
+        "muteChannels": [2],
+        "soloChannels": [1],
+    }
+    if cue_values:
+        values.update(cue_values)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: values},
+        timeout_set_property=(cue_id, timeout_property) if timeout_property else None,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": cue_id, "profile": "video_basic", "operations": [operation]}
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    token = planned_setters(plan["results"][0])[operation["property"]]["confirm_token"]
+    client.requests.clear()
+    return client, reader, cue_id, update, token
+
+
+def test_video_clock_type_dry_run_real_write_and_rollback() -> None:
+    operation = {"property": "clockType", "args": {"value": "audio"}}
+    client, reader, cue_id, update, token = _phase9_levels_fixture(operation, cue_values={"clockType": "video"})
+
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    rollback_update = {**update, "operations": [{"property": "clockType", "args": {"value": "video"}}]}
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_token = planned_setters(rollback_plan["results"][0])["clockType"]["confirm_token"]
+    rollback = reader.edit_cues("ws-1", [{**rollback_update, "confirm_gates": [rollback_token]}], dry_run=False)
+
+    assert planned_setters(plan["results"][0])["clockType"]["confirm_token"].startswith("confirm:videoClockType:v1:")
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["clockType"] == "audio"
+    assert rollback["status"] == "updated"
+    assert rollback["results"][0]["after"]["clockType"] == "video"
+    assert [request[0] for request in client.requests].count(f"/workspace/ws-1/cue_id/{cue_id}/clockType") == 2
+
+
+@pytest.mark.parametrize("property_name", ["doFade", "lockFadeToCue"])
+@pytest.mark.parametrize("requested", [True, False])
+def test_video_integrated_fade_dry_run_and_real_write(property_name: str, requested: bool) -> None:
+    operation = {"property": property_name, "args": {"value": requested}}
+    client, reader, cue_id, update, token = _phase9_levels_fixture(
+        operation,
+        cue_values={"doFade": False, "lockFadeToCue": False},
+    )
+
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    assert planned_setters(plan["results"][0])[property_name]["confirm_token"].startswith(
+        "confirm:videoIntegratedFade:v1:"
+    )
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"][property_name] is requested
+    assert result["results"][0]["updateq_plan"]["rollback"] == {"property": property_name, "args": {"value": False}}
+    assert [request[0] for request in client.requests].count(f"/workspace/ws-1/cue_id/{cue_id}/{property_name}") == 1
+
+
+@pytest.mark.parametrize("value", ["Audio", "VIDEO", "sound", "", None, True, 1, [], {}])
+def test_video_clock_type_rejects_invalid_values(value: Any) -> None:
+    cue_id = "33333333-3333-4333-8333-333333333333"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Video", "audioTrackFormats": [{"channels": 2}], "clockType": "video"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.edit_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "video_basic", "operations": [{"property": "clockType", "args": {"value": value}}]}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert_no_confirm_token(result)
+
+
+@pytest.mark.parametrize("property_name", ["doFade", "lockFadeToCue"])
+@pytest.mark.parametrize("value", ["true", "false", 1, 0, None, [], {}])
+def test_video_integrated_fade_rejects_invalid_values(property_name: str, value: Any) -> None:
+    cue_id = "33333333-3333-4333-8333-333333333333"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            cue_id: {
+                "type": "Video",
+                "audioTrackFormats": [{"channels": 2}],
+                "doFade": False,
+                "lockFadeToCue": False,
+            }
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.edit_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "video_basic", "operations": [{"property": property_name, "args": {"value": value}}]}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert_no_confirm_token(result)
+
+
+def test_video_clock_and_integrated_fade_reject_cross_tokens_batch_wrong_type_and_no_audio() -> None:
+    clock_client, clock_reader, cue_id, clock_update, clock_token = _phase9_levels_fixture(
+        {"property": "clockType", "args": {"value": "audio"}},
+        cue_values={"clockType": "video"},
+    )
+    _, _, _, fade_update, fade_token = _phase9_levels_fixture(
+        {"property": "doFade", "args": {"value": True}},
+        cue_values={"doFade": False},
+    )
+    cases = [
+        [{**clock_update, "confirm_gates": [fade_token]}],
+        [{**fade_update, "confirm_gates": [clock_token]}],
+        [{**clock_update, "confirm_gates": ["confirm:videoClockType:v1:fabricated"]}],
+        [{**clock_update, "confirm_gates": [clock_token]}, {**clock_update, "confirm_gates": [clock_token]}],
+        [{**clock_update, "cue_ref": "v5", "confirm_gates": [clock_token]}],
+        [{**clock_update, "operations": [*clock_update["operations"], {"property": "doFade", "args": {"value": True}}], "confirm_gates": [clock_token]}],
+    ]
+    for case in cases:
+        result = clock_reader.edit_cues("ws-1", case, dry_run=False)
+        assert result["status"] == "preflight_failed"
+        assert all(item["executed_operations"] == [] for item in result["results"])
+
+    live = clock_reader.edit_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "video_basic",
+                "operations": [{"property": "clockType", "mode": "live", "args": {"value": "audio"}}],
+            }
+        ],
+        dry_run=True,
+    )
+    assert live["status"] == "preflight_failed"
+    assert_no_confirm_token(live)
+
+    for cue_type in ("Audio", "Camera", "Text"):
+        client = BatchFakeWriteClient(
+            QLabConfig(enable_write=True, passcode="server-pass"),
+            cues={cue_id: {"type": cue_type, "audioTrackFormats": [{"channels": 2}], "clockType": "video"}},
+        )
+        reader = QLabReader(client)  # type: ignore[arg-type]
+        result = reader.edit_cues("ws-1", [clock_update], dry_run=True)
+        assert result["status"] == "preflight_failed"
+        assert_no_confirm_token(result)
+
+    no_audio = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Video", "audioTrackFormats": [], "numChannelsIn": 0, "clockType": "video", "doFade": False}},
+    )
+    reader = QLabReader(no_audio)  # type: ignore[arg-type]
+    for update in (clock_update, fade_update):
+        result = reader.edit_cues("ws-1", [update], dry_run=True)
+        assert result["status"] == "preflight_failed"
+        assert_no_confirm_token(result)
+    assert not any("/clockType" in address or "/doFade" in address for address, _, _ in clock_client.requests)
+
+
+def test_phase9c_input_channel_name_dry_run_and_real_write() -> None:
+    operation = {"property": "inputChannelName", "args": {"number": 1, "name": "Dialog"}}
+    client, reader, cue_id, update, token = _phase9_levels_fixture(operation)
+
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    setter = planned_setters(plan["results"][0])["inputChannelName"]
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    assert setter["confirm_token"].startswith("confirm:videoAudioLevelMeta:v1:")
+    assert setter["address"] == f"/workspace/ws-1/cue_id/{cue_id}/inputChannelName/1"
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["inputChannelName/1"] == "Dialog"
+    assert result["results"][0]["updateq_plan"]["rollback"] == {
+        "property": "inputChannelName",
+        "args": {"number": 1, "name": "L"},
+    }
+    assert [request[0] for request in client.requests].count(f"/workspace/ws-1/cue_id/{cue_id}/inputChannelName/1") == 1
+
+
+def test_phase9c_gang_dry_run_and_real_write() -> None:
+    operation = {"property": "gang", "args": {"inChannel": 1, "outChannel": 0, "gang": "speech"}}
+    client, reader, cue_id, update, token = _phase9_levels_fixture(operation)
+
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["gang/1/0"] == "speech"
+    assert result["results"][0]["updateq_plan"]["rollback"] == {
+        "property": "gang",
+        "args": {"inChannel": 1, "outChannel": 0, "gang": "music"},
+    }
+    assert [request[0] for request in client.requests].count(f"/workspace/ws-1/cue_id/{cue_id}/gang/1/0") == 1
+
+
+def test_phase9c_gang_allows_empty_baseline_and_empty_rollback() -> None:
+    operation = {"property": "gang", "args": {"inChannel": 1, "outChannel": 0, "gang": "MCPG"}}
+    client, reader, cue_id, update, token = _phase9_levels_fixture(operation, cue_values={"gang/1/0": ""})
+
+    forward = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    rollback_update = {
+        "cue_ref": cue_id,
+        "profile": "video_basic",
+        "operations": [{"property": "gang", "args": {"inChannel": 1, "outChannel": 0, "gang": ""}}],
+    }
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_token = planned_setters(rollback_plan["results"][0])["gang"]["confirm_token"]
+    rollback = reader.edit_cues("ws-1", [{**rollback_update, "confirm_gates": [rollback_token]}], dry_run=False)
+
+    assert forward["status"] == "updated"
+    assert forward["results"][0]["after"]["gang/1/0"] == "MCPG"
+    assert forward["results"][0]["updateq_plan"]["rollback"] == {
+        "property": "gang",
+        "args": {"inChannel": 1, "outChannel": 0, "gang": ""},
+    }
+    assert rollback["status"] == "updated"
+    assert rollback["results"][0]["after"]["gang/1/0"] == ""
+    assert [request[0] for request in client.requests].count(f"/workspace/ws-1/cue_id/{cue_id}/gang/1/0") == 2
+
+
+@pytest.mark.parametrize(
+    ("operation", "cue_values", "expected_error"),
+    [
+        (
+            {"property": "inputChannelName", "args": {"number": 3, "name": "Bad"}},
+            {},
+            "Phase 9C inputChannelName number must be within numChannelsIn and starts at 1.",
+        ),
+        (
+            {"property": "inputChannelName", "args": {"number": 1, "name": "Bad\nName"}},
+            {},
+            "Phase 9C inputChannelName requires a 1-64 character string without control characters.",
+        ),
+        (
+            {"property": "gang", "args": {"inChannel": 0, "outChannel": 0, "gang": "g"}},
+            {},
+            "Phase 9C gang row 0 is blocked; row 0 belongs to sliderLevels.",
+        ),
+        (
+            {"property": "gang", "args": {"inChannel": 1, "outChannel": 0, "gang": "bad\nname"}},
+            {},
+            "Phase 9C gang requires a string up to 64 characters without control characters.",
+        ),
+    ],
+)
+def test_phase9c_level_metadata_rejects_unsafe_values(
+    operation: dict[str, Any],
+    cue_values: dict[str, Any],
+    expected_error: str,
+) -> None:
+    cue_id = "33333333-3333-4333-8333-333333333333"
+    values = {
+        "type": "Video",
+        "numChannelsIn": 2,
+        "sliderLevels": [0.0],
+        "levels": [[0.0], [0.0]],
+        "inputChannelName/1": "L",
+        "gang/1/0": "music",
+        **cue_values,
+    }
+    client = BatchFakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"), cues={cue_id: values})
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.edit_cues("ws-1", [{"cue_ref": cue_id, "profile": "video_basic", "operations": [operation]}], dry_run=True)
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"][operation["property"]] == expected_error
+    assert_no_confirm_token(result)
+
+
+@pytest.mark.parametrize(
+    ("operation", "read_key", "expected", "expected_path"),
+    [
+        (
+            {"property": "mute/channel", "args": {"output": 1, "value": True}},
+            "muteChannels",
+            [1, 2],
+            "mute/channel/1",
+        ),
+        (
+            {"property": "solo/channel", "args": {"output": 1, "value": False}},
+            "soloChannels",
+            [],
+            "solo/1",
+        ),
+    ],
+)
+def test_phase9d_mute_solo_real_write_uses_channel_routes(
+    operation: dict[str, Any],
+    read_key: str,
+    expected: list[int],
+    expected_path: str,
+) -> None:
+    client, reader, cue_id, update, token = _phase9_levels_fixture(operation)
+
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    setter = planned_setters(plan["results"][0])[operation["property"]]
+    assert setter["confirm_token"].startswith("confirm:videoAudioMuteSolo:v1:")
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"][read_key] == expected
+    assert not any("/object" in address or "/mute/clear" in address or "/solo/clear" in address for address, _, _ in client.requests)
+    assert [request[0] for request in client.requests].count(f"/workspace/ws-1/cue_id/{cue_id}/{expected_path}") == 1
+
+
+@pytest.mark.parametrize(
+    ("operation", "expected_error"),
+    [
+        ({"property": "mute/channel", "args": {"output": "Main", "value": True}}, "Phase 9D mute/solo requires integer output within readable sliderLevels."),
+        ({"property": "solo/channel", "args": {"output": 99, "value": True}}, "Phase 9D mute/solo requires integer output within readable sliderLevels."),
+        ({"property": "mute/channel", "args": {"output": 1, "value": "true"}}, "value must be a boolean"),
+    ],
+)
+def test_phase9d_mute_solo_rejects_names_bounds_and_non_booleans(operation: dict[str, Any], expected_error: str) -> None:
+    cue_id = "33333333-3333-4333-8333-333333333333"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            cue_id: {
+                "type": "Video",
+                "numChannelsIn": 2,
+                "sliderLevels": [0.0, 0.0],
+                "muteChannels": [],
+                "soloChannels": [],
+            }
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.edit_cues("ws-1", [{"cue_ref": cue_id, "profile": "video_basic", "operations": [operation]}], dry_run=True)
+
+    assert result["status"] == "preflight_failed"
+    assert expected_error in str(result["results"][0]["errors"])
+    assert_no_confirm_token(result)
+
+
+@pytest.mark.parametrize(
+    ("operation", "cue_values", "read_key"),
+    [
+        ({"property": "mute/channel", "args": {"output": 1, "value": False}}, {"muteChannels": [1]}, "muteChannels"),
+        ({"property": "solo/channel", "args": {"output": 1, "value": False}}, {"soloChannels": [1]}, "soloChannels"),
+    ],
+)
+def test_phase9d_mute_solo_can_rollback_self_induced_warning(
+    operation: dict[str, Any],
+    cue_values: dict[str, Any],
+    read_key: str,
+) -> None:
+    client, reader, _, update, token = _phase9_levels_fixture(
+        operation,
+        cue_values={"isWarning": True, **cue_values},
+    )
+
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    assert planned_setters(plan["results"][0])[operation["property"]]["confirm_token"].startswith(
+        "confirm:videoAudioMuteSolo:v1:"
+    )
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"][read_key] == []
+
+
+@pytest.mark.parametrize(
+    ("operation", "read_key", "rollback", "expected_path"),
+    [
+        (
+            {"property": "mute/channel/clear", "args": {}},
+            "muteChannels",
+            [{"property": "mute/channel", "args": {"output": 2, "value": True}}],
+            "mute/channel/clear",
+        ),
+        (
+            {"property": "solo/channel/clear", "args": {}},
+            "soloChannels",
+            [{"property": "solo/channel", "args": {"output": 1, "value": True}}],
+            "solo/channel/clear",
+        ),
+    ],
+)
+def test_phase9e_channel_clear_real_write_and_rollback_plan(
+    operation: dict[str, Any],
+    read_key: str,
+    rollback: list[dict[str, Any]],
+    expected_path: str,
+) -> None:
+    client, reader, cue_id, update, token = _phase9_levels_fixture(operation)
+
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    setter = planned_setters(plan["results"][0])[operation["property"]]
+    assert setter["confirm_token"].startswith("confirm:videoAudioLevelBulk:v1:")
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"][read_key] == []
+    assert result["results"][0]["updateq_plan"]["rollback"] == rollback
+    assert result["results"][0]["executed_operations"][0]["operation"] == "action"
+    assert [request[0] for request in client.requests].count(f"/workspace/ws-1/cue_id/{cue_id}/{expected_path}") == 1
+
+
+@pytest.mark.parametrize("property_name", ["setDefaultLevels", "setSilentLevels"])
+def test_phase9e_default_and_silent_levels_stay_planned_only(property_name: str) -> None:
+    cue_id = "33333333-3333-4333-8333-333333333333"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Video", "numChannelsIn": 2, "sliderLevels": [0.0], "levels": [[0.0], [0.0]]}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.edit_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "video_basic", "operations": [{"property": property_name, "args": {}}]}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "dry_run"
+    assert result["results"][0]["executed_operations"] == []
+    assert_no_confirm_token(result)
+    setter = planned_setters(result["results"][0])[property_name]
+    assert setter["planned_only_reason"] == "video_audio_level_bulk_requires_full_runtime_validation"
+
+
+def test_phase9c_9d_9e_reject_cross_tokens_and_batch_before_setter() -> None:
+    meta_client, meta_reader, cue_id, meta_update, meta_token = _phase9_levels_fixture(
+        {"property": "inputChannelName", "args": {"number": 1, "name": "Dialog"}}
+    )
+    _, _, _, mute_update, mute_token = _phase9_levels_fixture(
+        {"property": "mute/channel", "args": {"output": 1, "value": True}}
+    )
+    _, _, _, clear_update, clear_token = _phase9_levels_fixture({"property": "mute/channel/clear", "args": {}})
+    cases = [
+        [{**meta_update, "confirm_gates": [mute_token]}],
+        [{**mute_update, "confirm_gates": [clear_token]}],
+        [{**clear_update, "confirm_gates": [meta_token]}],
+        [{**meta_update, "confirm_gates": [meta_token]}, {**meta_update, "confirm_gates": [meta_token]}],
+        [{**meta_update, "cue_ref": "v5", "confirm_gates": [meta_token]}],
+    ]
+    meta_client.cue_numbers["v5"] = cue_id
+
+    for case in cases:
+        result = meta_reader.edit_cues("ws-1", case, dry_run=False)
+        assert result["status"] == "preflight_failed"
+        assert all(item["executed_operations"] == [] for item in result["results"])
+    assert not any("/inputChannelName/" in address or "/mute/channel/" in address for address, _, _ in meta_client.requests)
 
 
 PHASE8C_VIDEO_SLICE_CASES = [
@@ -9391,10 +10438,7 @@ def test_update_cue_operations_support_video_text_and_midi_dry_run_shapes() -> N
         cue_values={"uniqueID": cue_id, "type": "Video", "blendMode": "Normal"},
     )
     video = QLabReader(video_client)  # type: ignore[arg-type]
-    video_updates = [
-        ({"blendMode": "Normal"}, None),
-        ({"clockType": "video"}, None),
-    ]
+    video_updates = [({"blendMode": "Normal"}, None)]
     video_setters = []
     for properties, operations in video_updates:
         result = video.update_cue(
@@ -9438,7 +10482,6 @@ def test_update_cue_operations_support_video_text_and_midi_dry_run_shapes() -> N
     midi_setters = [op["address"] for op in midi_result["planned_operations"] if op["operation"] == "set_property"]
     assert [(op["property"], op["address"], op["args"]) for op in video_setters] == [
         ("blendMode", f"/workspace/ws-1/cue_id/{cue_id}/blendMode", ["Normal"]),
-        ("clockType", f"/workspace/ws-1/cue_id/{cue_id}/clockType", ["video"]),
     ]
     assert [(op["property"], op["address"], op["args"]) for op in text_setters] == [
         ("text/format/alignment", f"/workspace/ws-1/cue_id/{cue_id}/text/format/alignment", ["center"]),

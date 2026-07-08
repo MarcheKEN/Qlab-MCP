@@ -1,6 +1,8 @@
 # Workorder 017 - Geometry Completion: Smooth and Defaults
 
-Status: local implementation complete for `smooth`; runtime validation pending.
+Status: status audit needed. This workorder records the local `smooth`
+implementation; confirm current runtime validation status in
+`docs/current/active_roadmap.md` before treating it as open or closed.
 
 ## Research Summary
 

@@ -1,7 +1,10 @@
 # Video Embedded Audio Research
 
-Status: research complete; superseded for implementation by
-`docs/current/workorders/021_video_audio_time_loops.md`.
+Status: Phase 9A runtime validated; Phase 9B minimal matrix crosspoint runtime
+validated for its exact narrow scope; Phase 9C `inputChannelName` and scoped
+`gang` runtime validated. `clockType`, `doFade`, and `lockFadeToCue` are
+locally implemented with token-gated saved writes and runtime validation
+pending. `setDefaultLevels` and `setSilentLevels` remain planned-only.
 
 ## Scope
 
@@ -55,10 +58,10 @@ The safe MCP implication is narrow:
 |---|---|---:|---:|
 | I/O audio output patch | `audioOutputPatchID` | Video with embedded audio; also already Phase 8A | Already implemented |
 | I/O audio track metadata | `audioTrackFormats`, `audioTrackID` | Video-specific usefulness | Read-only only |
-| I/O clock choice | `clockType` | Video cue with audio can use `audio` or `video` | Runtime-probe only |
+| I/O clock choice | `clockType` | Video cue with audio can use `audio` or `video` | Local token-gated implementation; runtime pending |
 | Time & Loops | Audio cue timing routes | Video responds; meaningful with audio track | Safe candidate subset |
-| Integrated fade | `doFade`, `lockFadeToCue` | Shared Audio route | Block for now |
-| Levels | `levels`, `sliderLevel`, `level`, `gang`, `setDefaultLevels`, `setSilentLevels` | Shared Audio route | Block for now except possible future main slider |
+| Integrated fade | `doFade`, `lockFadeToCue` | Shared Audio route | Local token-gated implementation; runtime pending |
+| Levels | `levels`, `sliderLevel`, `level`, `gang`, `setDefaultLevels`, `setSilentLevels` | Shared Audio route | Phase 9A slider, Phase 9B matrix crosspoint, and Phase 9C metadata real-writes validated |
 | Objects | `objects`, `objectLevel`, `object/position`, `object/spread` | Shared Audio route | Block |
 | Trim | UI final adjustment layer | QClass says un-remote-controllable/un-fadable | Block |
 | Audio FX | Audio Unit effects | Available on Video with audio | Block |
@@ -75,15 +78,15 @@ The safe MCP implication is narrow:
 | `infiniteLoop` | `/cue/{cue_number}/infiniteLoop {boolean}` | boolean | read/write | real-write only in `audio_basic` | Safe candidate |
 | `rate` | `/cue/{cue_number}/rate {number}` and `/live` variant | 0.03..33.0 | read/write | real-write only in `audio_basic` | Safe candidate, saved only |
 | `preservePitch` | `/cue/{cue_number}/preservePitch {boolean}` | boolean | read/write | real-write only in `audio_basic` | Safe candidate |
-| `doFade` | `/cue/{cue_number}/doFade {boolean}` | boolean | read/write | planned-only | Block initially |
-| `lockFadeToCue` | `/cue/{cue_number}/lockFadeToCue {boolean}` | boolean | read/write | planned-only | Block initially |
+| `doFade` | `/cue/{cue_number}/doFade {boolean}` | boolean | read/write | `confirm:videoIntegratedFade:v1:` | Local implementation; runtime pending |
+| `lockFadeToCue` | `/cue/{cue_number}/lockFadeToCue {boolean}` | boolean | read/write | `confirm:videoIntegratedFade:v1:` | Local implementation; runtime pending |
 | `sliceMarker/*` | `/sliceMarker`, `/addSliceMarker`, `/deleteSliceMarker*` | indexed time/play count actions | read/write/action | planned-only | Block |
-| `clockType` | `/cue/{cue_number}/clockType {audio|video}` | enum string | read/write | Video planned-only | Runtime-probe only |
+| `clockType` | `/cue/{cue_number}/clockType {audio|video}` | enum string | read/write | `confirm:videoClockType:v1:` | Local implementation; runtime pending |
 | `holdLastFrame` | `/cue/{cue_number}/holdLastFrame {boolean}` | boolean | read/write | Video planned-only/gated elsewhere | Not part of audio phase |
 
-Safe first phase should not include slices, integrated fade, or clock changes.
-Those can affect playback semantics more deeply and need their own targeted
-validation.
+`clockType`, `doFade`, and `lockFadeToCue` now have local token-gated saved
+write support only for healthy inactive `Video` cues with real embedded-audio
+evidence. Runtime validation is intentionally deferred until MCP restart.
 
 ## Levels Matrix
 
@@ -91,20 +94,71 @@ validation.
 |---|---|---|---|---|---|
 | all levels | `/cue/{cue_number}/levels` | array-of-arrays | read-only | read key allowlisted | Read-only baseline source |
 | slider levels | `/cue/{cue_number}/sliderLevels` | array row 0 | read-only | allowlisted/tests | Read-only baseline source |
-| one slider | `/cue/{cue_number}/sliderLevel/{channel} {decibel}` | number or `-inf`; channel 0..128 or output name; 0 = main | yes | planned-only | Future candidate: main slider only |
-| one matrix crosspoint | `/cue/{cue_number}/level/{inChannel}/{outChannel} {decibel}` | number or `-inf`; rows 0..24, outputs 0..128/name | yes | planned-only | Block |
-| gangs | `/cue/{cue_number}/gang/{inChannel}/{outChannel} {gang}` | string | yes | planned-only | Block |
+| one slider | `/cue/{cue_number}/sliderLevel/{channel} {decibel}` | finite number only in MCP Phase 9A; channel integer only; 0 = main | yes via `sliderLevels[channel]` | `confirm:videoAudioLevels:v1:` | Runtime validated |
+| one matrix crosspoint | `/cue/{cue_number}/level/{inChannel}/{outChannel} {decibel}` | finite number only in MCP Phase 9B; rows `1..numChannelsIn`; outputs integer only | yes via `levels[inChannel][outChannel]` | `confirm:videoAudioMatrix:v1:` | Runtime validated |
+| gangs | `/cue/{cue_number}/gang/{inChannel}/{outChannel} {gang}` | string | yes | `confirm:videoAudioLevelMeta:v1:` | Runtime validated for one saved crosspoint |
 | set defaults | `/cue/{cue_number}/setDefaultLevels` | action | indirect | planned-only | Block |
 | set silent | `/cue/{cue_number}/setSilentLevels` | action | indirect | planned-only | Block |
 | mute/solo | `/mute*`, `/solo*` | boolean/actions | partial | planned-only | Block |
 
 `-inf` is documented for level and sliderLevel. Any string is coerced by QLab
-to `-inf`, so the MCP must keep validating exactly number or literal `-inf`.
+to `-inf`, so Phase 9A and planned Phase 9B intentionally reject strings,
+including `"-inf"`, and accept finite numeric dB only.
 
-Main slider `sliderLevel/0` is the only plausible level write for a small future
-phase. It still needs a dedicated token, exact `sliderLevels` readback, and
-runtime proof on an inactive Video cue with embedded audio. Matrix crosspoints
-should stay blocked.
+Phase 9A runtime validation passed on `v5 Con slices`
+(`D68AA7F9-2C5B-4D3A-A860-78E5F522ACD8`) in `mcp_prueba.qlab5`.
+`sliderLevel/0` and `sliderLevel/1` were written to a small finite value and
+rolled back with fresh readback. QLab setter timeouts were accepted only because
+fresh `sliderLevels[channel]` readback matched
+(`setter_timeout_but_readback_matched`).
+
+The Phase 9A evidence gate was corrected after runtime validation found that
+`v11 dorado.png` (`680CB8B6-CA66-4D15-AC15-0A92FC3E89FE`) exposes readable
+`levels` and `sliderLevels` despite `numChannelsIn = 0` and
+`audioTrackFormats = {}`. Therefore `levels` and `sliderLevels` are only
+baseline/readback data, not embedded-audio evidence. Phase 9A token eligibility
+requires `numChannelsIn > 0` or non-empty `audioTrackFormats`.
+
+Final Phase 9A scope: Video cue only, `video_basic`, saved mode only, exact UUID
+only, one cue, one operation, healthy inactive cue, real embedded-audio evidence,
+readable `sliderLevels[channel]`, finite numeric dB only, fresh
+`confirm:videoAudioLevels:v1:` token, fresh readback, rollback with fresh token,
+no `/live`, raw OSC, playback, save, batch, multi-property, output names, or
+`-inf`.
+
+Phase 9B minimal runtime validation passed on `v5 Con slices`
+(`D68AA7F9-2C5B-4D3A-A860-78E5F522ACD8`) in `mcp_prueba.qlab5`. Lower-matrix
+`level/1/0` baseline `0` changed to `-1.0`, fresh readback matched
+`-1.000009003387651`, rollback restored `0`, and setter timeout was accepted
+only because fresh readback matched with
+`setter_timeout_but_readback_matched`.
+
+Phase 9B remains limited to one lower-matrix crosspoint with
+`confirm:videoAudioMatrix:v1:` and must exclude row `0` because row `0` is the
+top slider row already handled by Phase 9A.
+
+Phase 9C `gang` runtime validation passed on `v5 Con slices`
+(`D68AA7F9-2C5B-4D3A-A860-78E5F522ACD8`) in `mcp_prueba.qlab5`. The validated
+flow used `gang/1/0` baseline `""`, dry-run token
+`confirm:videoAudioLevelMeta:v1:`, real write to `"MCPG"`, fresh readback
+`"MCPG"`, fresh rollback token, real rollback to `""`, and fresh readback `""`.
+Both real writes timed out at the setter but were accepted only because fresh
+readback matched (`setter_timeout_but_readback_matched`).
+
+Final Phase 9C `gang` scope: Video cue only, `video_basic`, saved mode only,
+exact UUID only, one cue, one operation, healthy inactive cue, real
+embedded-audio evidence, readable `levels` bounds, `inChannel` integer
+`1..numChannelsIn`, integer `outChannel` within the row, string gang value up
+to 64 characters with no control characters, fresh metadata token, fresh
+readback, and rollback. Row `0`, output names, `/live`, raw OSC, playback,
+save, batch, multi-property, Audio/Camera/Text promotion, and Video cues
+without embedded audio remain blocked.
+
+`setDefaultLevels` and `setSilentLevels` are documented QLab actions. They
+remain planned-only because docs do not prove every affected saved value or a
+complete deterministic rollback contract, and the MCP does not yet implement
+bounded internal restoration of captured `sliderLevels` and `levels` after
+these bulk actions. They should not use another bulk action as rollback.
 
 ## Trim Matrix
 
@@ -211,22 +265,29 @@ Token must not authorize:
 - Video FX
 - playback/show-control/raw OSC
 
-## Future Runtime-Probe Only
+## Runtime Pending
 
-- `clockType` (`audio`/`video`): meaningful for Video with audio but can change
-  sync behavior. Probe separately.
-- `doFade` and `lockFadeToCue`: integrated fade is useful but has curve state
-  and timing semantics not represented by a single safe scalar.
-- `sliderLevel/0`: possible small level phase, but only after stable
-  `sliderLevels` baseline/readback and rollback are proven.
+- `clockType` (`audio`/`video`): locally implemented with
+  `confirm:videoClockType:v1:` for saved exact-UUID one-cue/one-operation
+  Video writes with embedded-audio evidence, strict enum validation, fresh
+  readback, and rollback plan. Runtime validation pending.
+- `doFade` and `lockFadeToCue`: locally implemented with
+  `confirm:videoIntegratedFade:v1:` for saved exact-UUID
+  one-cue/one-operation Video writes with embedded-audio evidence, strict
+  boolean validation, fresh readback, and rollback plan. Runtime validation
+  pending.
+- `level/{inChannel}/{outChannel}`: Phase 9B minimal validated only for
+  `inChannel` `1..numChannelsIn`, integer output columns present in the fresh
+  `levels` matrix, saved mode, finite numeric dB, exact UUID, fresh token,
+  readback, and rollback.
 
 ## Blocked / Future-Only
 
 - `/live` variants
-- `levels` matrix write via `level/{row}/{output}`
+- broad `levels` matrix writes; only one scoped Phase 9B crosspoint may be
+  considered
 - `setDefaultLevels`
 - `setSilentLevels`
-- `gang`
 - `mute` / `solo`
 - slice creation/deletion/editing
 - object audio position/spread/levels

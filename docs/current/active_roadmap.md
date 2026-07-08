@@ -1,6 +1,6 @@
 # Active Roadmap
 
-Status: 2026-06-28
+Status: 2026-07-05
 
 ## Closed
 
@@ -219,10 +219,99 @@ Video Phase 8B — Video embedded-audio Time & Loops:
   is normalized internally for baseline, verification, and rollback
 - setter timeout or QLab setter error is accepted only when fresh readback
   matches, and remains warning-visible
-- Integrated Fade, Linear Curve, `doFade`, `lockFadeToCue`, slices/vamps/
-  devamps, levels, objects, Audio FX, Trim, `/live`, raw OSC, playback, batch,
-  multi-property, and save remain blocked
+- Linear Curve, slices/vamps/devamps, levels, objects, Audio FX, Trim, `/live`,
+  raw OSC, playback, batch, multi-property, and save remain blocked for
+  Phase 8B. `doFade` and `lockFadeToCue` moved to their own local
+  token-gated implementation, with runtime validation pending.
 - runtime validation is required before closure
+
+Video Phase 9A — Video embedded-audio Levels top-row sliders:
+
+- local implementation adds saved `video_basic.sliderLevel` real-write
+  candidates using `confirm:videoAudioLevels:v1:`
+- runtime validation passed on `v5 Con slices`
+  (`D68AA7F9-2C5B-4D3A-A860-78E5F522ACD8`) in `mcp_prueba.qlab5`:
+  `sliderLevel/0` baseline `0` -> `-1.0` -> fresh readback
+  `-1.000009003387651` -> rollback `0`; `sliderLevel/1` previously passed
+  with the same write/readback/rollback pattern
+- setter timeout is accepted only with warning
+  `setter_timeout_but_readback_matched` when fresh readback matches
+- token eligibility requires real embedded-audio evidence:
+  `numChannelsIn > 0` or non-empty `audioTrackFormats`
+- `levels` and `sliderLevels` may be readable on Video cues without embedded
+  audio, so they are baseline/readback data only, not evidence gates; this was
+  validated on `v11 dorado.png`
+  (`680CB8B6-CA66-4D15-AC15-0A92FC3E89FE`)
+- final scope: Video only, `sliderLevel/{channel}` only, saved mode, exact UUID,
+  one cue, one operation, healthy inactive cue, readable `sliderLevels`,
+  finite numeric dB only, fresh token/readback/rollback; `/live`, raw OSC,
+  playback, save, batch, multi-property, output names, and `-inf` remain blocked
+
+Video Phase 9B — Video embedded-audio Matrix Crosspoints:
+
+- research confirms `/cue/{cue_number}/levels` is read-only matrix readback and
+  `/cue/{cue_number}/level/{inChannel}/{outChannel} {decibel}` is read/write
+- `/levels[0]` maps to the top-row slider levels handled by Phase 9A, so first
+  Phase 9B scope must reject `inChannel = 0`
+- minimal runtime validation passed on `v5 Con slices`
+  (`D68AA7F9-2C5B-4D3A-A860-78E5F522ACD8`) in `mcp_prueba.qlab5`:
+  lower-matrix `level/1/0` baseline `0` -> `-1.0` -> fresh readback
+  `-1.000009003387651` -> rollback `0`
+- final minimal scope: one saved `level/{inChannel}/{outChannel}` operation,
+  `Video` cue only, exact UUID, one cue, one operation, healthy inactive cue,
+  real embedded-audio evidence, readable matrix, finite numeric dB only, integer
+  indexes only, fresh `confirm:videoAudioMatrix:v1:` token, fresh readback, and
+  rollback
+- setter timeout is accepted only with warning
+  `setter_timeout_but_readback_matched` when fresh readback matches
+- `/live`, raw OSC, playback, save, batch, multi-property, output names,
+  `-inf`, row `0`, `setDefaultLevels`, `setSilentLevels`, `mute`, `solo`,
+  `gang`, `inputChannelName`, Trim, Objects, Audio FX, Audio Maps, Object Audio,
+  and routing/patch editor writes remain blocked
+
+Video Phase 9C — Video embedded-audio Levels metadata:
+
+- `inputChannelName/{number}` runtime validation passed for saved exact-UUID
+  Video cues with real embedded-audio evidence
+- `gang/{inChannel}/{outChannel}` runtime validation passed on `v5 Con slices`
+  (`D68AA7F9-2C5B-4D3A-A860-78E5F522ACD8`) in `mcp_prueba.qlab5`:
+  `gang/1/0` baseline `""` -> `"MCPG"` -> fresh readback `"MCPG"` ->
+  rollback `""`
+- final scope: one saved gang crosspoint, `Video` cue only, exact UUID, one cue,
+  one operation, healthy inactive cue, real embedded-audio evidence, readable
+  `levels` bounds, integer indexes only, `inChannel` `1..numChannelsIn`,
+  string up to 64 chars without control characters, fresh
+  `confirm:videoAudioLevelMeta:v1:` token, fresh readback, and rollback
+- setter timeout is accepted only with warning
+  `setter_timeout_but_readback_matched` when fresh readback matches
+- `/live`, row `0`, output names, batch, multi-property, raw OSC, playback,
+  save, Audio/Camera/Text promotion, and Video cues without embedded audio
+  remain blocked
+
+Video clock type and Integrated Fade:
+
+- `clockType` is locally implemented for saved exact-UUID `Video` cue writes
+  with real embedded-audio evidence, strict `audio`/`video` values, fresh
+  `confirm:videoClockType:v1:` token, fresh readback, and rollback plan
+- `doFade` and `lockFadeToCue` are locally implemented for saved exact-UUID
+  `Video` cue writes with real embedded-audio evidence, strict boolean values,
+  fresh `confirm:videoIntegratedFade:v1:` token, fresh readback, and rollback
+  plan
+- runtime validation is pending until Codex/Code/MCP restart; no QLab runtime
+  validation was attempted in this local implementation pass
+- `/live`, raw OSC, playback/show-control, save, batch, multi-property,
+  Audio/Camera/Text promotion, wrong token families, fake/stale tokens, and
+  Video cues without embedded audio remain blocked
+
+Video Phase 9F — Video embedded-audio Levels reset actions:
+
+- `/cue/{cue_number}/setDefaultLevels` and
+  `/cue/{cue_number}/setSilentLevels` are documented QLab actions, not scalar
+  properties
+- they remain planned-only because docs do not prove a complete deterministic
+  rollback contract for every affected `levels`/`sliderLevels` value, and the
+  MCP does not yet implement bounded internal per-cell rollback for these bulk
+  actions
 
 Video Phase 8C — Slice Markers for Audio/Video:
 
@@ -262,23 +351,23 @@ Video Phase 8C — Slice Markers for Audio/Video:
 
 See:
 
-- `workorders/002_close_phase3a_docs.md`
-- `workorders/003_plan_phase3b_translation.md`
-- `workorders/004_implement_phase3c_visual_scalars.md`
-- `workorders/005_implement_phase3d_visual_appearance.md`
-- `workorders/006_implement_phase3e_text_basics.md`
+- `workorders/completed/002_close_phase3a_docs.md`
+- `workorders/completed/003_plan_phase3b_translation.md`
+- `workorders/completed/004_implement_phase3c_visual_scalars.md`
+- `workorders/completed/005_implement_phase3d_visual_appearance.md`
+- `workorders/completed/006_implement_phase3e_text_basics.md`
 - `workorders/007_text_style_and_video_fx_read_plan.md`
-- `workorders/008_video_fx_real_write_candidate.md`
-- `workorders/009_video_completion_matrix.md`
-- `workorders/010_video_docs_consistency_cleanup.md`
-- `workorders/011_video_fx_scalar_v2_candidate.md`
-- `workorders/012_geometry_completion_video_camera_text.md`
-- `workorders/013_full_geometry_completion_video_camera_text.md`
-- `workorders/014_rotation_quaternion_shutter_geometry.md`
-- `workorders/015_quaternion_geometry_write.md`
-- `workorders/016_safe_reset_rotation.md`
+- `workorders/completed/008_video_fx_real_write_candidate.md`
+- `workorders/completed/009_video_completion_matrix.md`
+- `workorders/completed/010_video_docs_consistency_cleanup.md`
+- `workorders/completed/011_video_fx_scalar_v2_candidate.md`
+- `workorders/completed/012_geometry_completion_video_camera_text.md`
+- `workorders/completed/013_full_geometry_completion_video_camera_text.md`
+- `workorders/completed/014_rotation_quaternion_shutter_geometry.md`
+- `workorders/completed/015_quaternion_geometry_write.md`
+- `workorders/completed/016_safe_reset_rotation.md`
 - `workorders/017_geometry_completion_smooth_and_defaults.md`
-- `workorders/018_blend_mode_audit_and_completion.md`
+- `workorders/completed/018_blend_mode_audit_and_completion.md`
 - `workorders/019_video_io_selection_edit_cues.md`
 - `workorders/020_video_embedded_audio_research.md`
 - `workorders/021_video_audio_time_loops.md`

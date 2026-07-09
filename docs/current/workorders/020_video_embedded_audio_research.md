@@ -3,8 +3,9 @@
 Status: Phase 9A runtime validated; Phase 9B minimal matrix crosspoint runtime
 validated for its exact narrow scope; Phase 9C `inputChannelName` and scoped
 `gang` runtime validated. `clockType`, `doFade`, and `lockFadeToCue` are
-locally implemented with token-gated saved writes and runtime validation
-pending. `setDefaultLevels` and `setSilentLevels` remain planned-only.
+locally implemented with token-gated saved writes. The relaxed `clockType`
+no-audio gate is local-only pending MCP restart/runtime validation.
+`setDefaultLevels` and `setSilentLevels` remain planned-only.
 
 ## Scope
 
@@ -58,9 +59,9 @@ The safe MCP implication is narrow:
 |---|---|---:|---:|
 | I/O audio output patch | `audioOutputPatchID` | Video with embedded audio; also already Phase 8A | Already implemented |
 | I/O audio track metadata | `audioTrackFormats`, `audioTrackID` | Video-specific usefulness | Read-only only |
-| I/O clock choice | `clockType` | Video cue with audio can use `audio` or `video` | Local token-gated implementation; runtime pending |
+| I/O clock choice | `clockType` | Video cue can use `audio` or `video`; no OSC-documented embedded-audio prerequisite | Local token-gated implementation; relaxed no-audio gate runtime pending |
 | Time & Loops | Audio cue timing routes | Video responds; meaningful with audio track | Safe candidate subset |
-| Integrated fade | `doFade`, `lockFadeToCue` | Shared Audio route | Local token-gated implementation; runtime pending |
+| Integrated fade | `doFade`, `lockFadeToCue` | Shared Audio route; internal curve UI has no confirmed direct OSC route | Local token-gated implementation for checkboxes; points/curve blocked |
 | Levels | `levels`, `sliderLevel`, `level`, `gang`, `setDefaultLevels`, `setSilentLevels` | Shared Audio route | Phase 9A slider, Phase 9B matrix crosspoint, and Phase 9C metadata real-writes validated |
 | Objects | `objects`, `objectLevel`, `object/position`, `object/spread` | Shared Audio route | Block |
 | Trim | UI final adjustment layer | QClass says un-remote-controllable/un-fadable | Block |
@@ -81,12 +82,21 @@ The safe MCP implication is narrow:
 | `doFade` | `/cue/{cue_number}/doFade {boolean}` | boolean | read/write | `confirm:videoIntegratedFade:v1:` | Local implementation; runtime pending |
 | `lockFadeToCue` | `/cue/{cue_number}/lockFadeToCue {boolean}` | boolean | read/write | `confirm:videoIntegratedFade:v1:` | Local implementation; runtime pending |
 | `sliceMarker/*` | `/sliceMarker`, `/addSliceMarker`, `/deleteSliceMarker*` | indexed time/play count actions | read/write/action | planned-only | Block |
-| `clockType` | `/cue/{cue_number}/clockType {audio|video}` | enum string | read/write | `confirm:videoClockType:v1:` | Local implementation; runtime pending |
+| `clockType` | `/cue/{cue_number}/clockType {audio|video}` | enum string | read/write | `confirm:videoClockType:v1:` | Local implementation; no-audio runtime pending |
 | `holdLastFrame` | `/cue/{cue_number}/holdLastFrame {boolean}` | boolean | read/write | Video planned-only/gated elsewhere | Not part of audio phase |
 
 `clockType`, `doFade`, and `lockFadeToCue` now have local token-gated saved
-write support only for healthy inactive `Video` cues with real embedded-audio
-evidence. Runtime validation is intentionally deferred until MCP restart.
+write support only for healthy inactive `Video` cues. `clockType` requires a
+readable baseline and exact `audio`/`video` value, but no embedded-audio
+evidence. `doFade` and `lockFadeToCue` remain embedded-audio gated.
+
+Integrated Fade envelope points, Custom Curve, and Linear Curve remain blocked.
+The OSC Dictionary exposes the internal Integrated Fade checkbox state through
+`doFade` and `lockFadeToCue`, but no direct Audio/Video Integrated Fade
+point/curve route with deterministic readback and rollback was found.
+`fadeEntries`, `fadeType`, `fadeFrom`, and `fadeTo` are not reused because the
+dictionary documents them under Fade/Network cue fade shape/path behavior, not
+the Audio/Video internal Integrated Fade envelope.
 
 ## Levels Matrix
 
@@ -269,8 +279,9 @@ Token must not authorize:
 
 - `clockType` (`audio`/`video`): locally implemented with
   `confirm:videoClockType:v1:` for saved exact-UUID one-cue/one-operation
-  Video writes with embedded-audio evidence, strict enum validation, fresh
-  readback, and rollback plan. Runtime validation pending.
+  Video writes with strict enum validation, fresh readback, and rollback plan.
+  No embedded-audio evidence is required. Relaxed no-audio gate runtime
+  validation pending after MCP restart.
 - `doFade` and `lockFadeToCue`: locally implemented with
   `confirm:videoIntegratedFade:v1:` for saved exact-UUID
   one-cue/one-operation Video writes with embedded-audio evidence, strict

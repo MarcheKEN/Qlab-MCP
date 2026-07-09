@@ -2,13 +2,15 @@
 
 Proyecto Codebase MCP: `Users-filarmonica-Documents-qlab-mcp-osc`.
 
-Snapshot:
+Snapshot regenerado con `codebase-memory-mcp` el 2026-07-09.
 
-- 1787 nodos, 10305 relaciones.
-- Nodos principales: 756 funciones, 271 metodos, 73 modulos, 52 clases.
-- Relaciones principales: 2645 `CALLS`, 1407 `USAGE`, 1004 `TESTS`, 541 `WRITES`, 222 `IMPORTS`.
+- 2363 nodos, 14148 relaciones.
+- Nodos principales: 1037 funciones, 403 secciones, 338 variables, 285 metodos, 106 modulos, 105 archivos, 52 clases.
+- Relaciones principales: 3582 `SEMANTICALLY_RELATED`, 3568 `CALLS`, 2221 `DEFINES`, 1762 `USAGE`, 1248 `TESTS`, 691 `WRITES`.
+- Lenguajes indexados: Python 44 archivos, TOML 1 archivo.
 - Entry point: `qlab-mcp = qlab_mcp.server:main`.
 - Runtime FastMCP: `src/qlab_mcp/server.py:mcp`.
+- Persistencia del indice local: el MCP respondio `artifact_present:false`; no se encontro `.codebase-memory/graph.db.zst` dentro del repo.
 
 ## Arquitectura
 
@@ -25,6 +27,7 @@ flowchart TD
     Reader --> Status["status.py<br/>derived workspace status"]
     Reader --> Write["write.operations<br/>create/update gated writes"]
 
+    Details --> Profiles["cues.profiles<br/>video/text/camera summaries"]
     Connection --> OSC["osc.client<br/>UDP + TCP fallback"]
     Overview --> OSC
     Query --> OSC
@@ -33,6 +36,7 @@ flowchart TD
     Status --> OSC
     Write --> Safety["write.safety<br/>write gates"]
     Write --> Registry["write.registry<br/>allowlisted profiles"]
+    Write --> Timeouts["write.timeouts<br/>operation budgets"]
     Write --> OSC
 
     OSC --> QLab["QLab 5 OSC"]
@@ -51,7 +55,8 @@ flowchart LR
     Tools --> CueDetails["qlab_get_cue_details"]
     Tools --> Ready["qlab_check_write_readiness"]
     Tools --> Create["qlab_create_cue"]
-    Tools --> Update["qlab_edit_cues"]
+    Tools --> Edit["qlab_edit_cues"]
+    Tools --> UpdateAlias["qlab_update_cues<br/>compatibility alias"]
 ```
 
 ## Flujo Read-Only Recomendado
@@ -73,24 +78,27 @@ sequenceDiagram
     R-->>S: normalized dict
     S-->>User: QlabConnectionCheckResult
 
-    User->>S: qlab_get_workspace_overview()
-    S->>R: get_workspace_overview()
-    R->>C: bounded cue-list/cue reads
+    User->>S: qlab_get_cue_details(profile="inspector_safe")
+    S->>R: get_cue_details()
+    R->>C: bounded cue reads
     C->>Q: OSC UDP/TCP fallback
     Q-->>C: JSON reply
-    S-->>User: WorkspaceOverviewResult
+    S-->>User: CueDetailsResult
 ```
 
 ## Flujo Write Gated
 
 ```mermaid
 flowchart TD
-    Update["qlab_edit_cues"] --> Ready["ensure_write_ready"]
+    Edit["qlab_edit_cues"] --> Alias["qlab_update_cues alias"]
+    Alias --> Update["QLabWriteMixin.update_cues"]
+    Edit --> Update
+    Update --> Ready["ensure_write_ready"]
     Ready --> Env["QLAB_ENABLE_WRITE=true<br/>QLAB_PASSCODE set"]
     Ready --> Connect["/connect confirms edit scope"]
     Ready --> Mode["/showMode confirms Edit Mode"]
     Update --> DryRun{"dry_run?"}
-    DryRun -->|true| Plan["build planned_operations<br/>no setters sent"]
+    DryRun -->|true| Plan["plan + diff<br/>no setters sent"]
     DryRun -->|false| Validate["validate profile + confirm gates"]
     Validate --> Registry["write.registry specs"]
     Validate --> BatchGate{"any preflight error?"}
@@ -123,24 +131,34 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    Update["write.operations.QLabWriteMixin.update_cues<br/>in:182 out:97"] --> Many["many phase/profile helpers"]
-    Overview["cues.overview.CueOverviewMixin.get_workspace_overview<br/>in:30 out:13"] --> ReadMap["tree + index + counts"]
-    Client["osc.client.QLabOscClient.request<br/>in:12 out:4"] --> Boundary["QLab OSC boundary"]
-    Reader["qlab.QLabReader<br/>in:340"] --> Mixins["connection/settings/status/cues/write mixins"]
+    Update["write.operations.QLabWriteMixin.update_cues<br/>fan-in:222"] --> WriteMix["planning + validation + tokens + execution + verification"]
+    Edit["write.operations.QLabWriteMixin.edit_cues<br/>fan-in:71"] --> Update
+    Details["cues.details.CueDetailsMixin.get_cue_details<br/>fan-in:64"] --> Profiles["cues.profiles"]
+    UpdateOne["write.operations.QLabWriteMixin.update_cue<br/>fan-in:44"] --> Update
+    Cache["runtime.read_cache.ReadCache.clear<br/>fan-in:41"] --> OSCBoundary["OSC/readback boundary"]
+    Resolve["write.operations._resolved_cue_id<br/>fan-in:36"] --> Update
 ```
+
+## Video/Text/Camera Write Surface
+
+- `video_basic`: common cue fields plus video visual, geometry, IO, embedded audio, slice marker and video FX paths. Most real writes are specialized and confirm-token gated.
+- `camera_basic`: common fields plus mic/video/catalog camera paths. Shares much of video visual geometry machinery.
+- `text_basic`: common fields, text content basics, selected visual properties, and rich text/style paths. Phase 3F real writes remain blocked where fresh readback is unreliable.
+- Public preferred tool name is `qlab_edit_cues`; `qlab_update_cues` remains a compatibility alias.
 
 ## Cambio Seguro: Donde Tocar
 
-- Nueva tool MCP: empezar en `src/qlab_mcp/server.py`, delegar a `QLabReader`.
-- Nueva lectura de cues: mirar `src/qlab_mcp/cues/*`; usar `_request_data` para cache seguro.
+- Nueva tool MCP: empezar en `src/qlab_mcp/server.py`, delegar a `QLabReader`, no cambiar firmas publicas sin decision explicita.
+- Nueva lectura de cues: mirar `src/qlab_mcp/cues/*`; usar `_request_data` y perfiles de `cues.profiles`.
 - Nueva lectura de settings: mirar `src/qlab_mcp/settings/workspace.py`.
 - Nuevo write profile: mirar primero `src/qlab_mcp/write/registry.py`; luego el minimo helper en `src/qlab_mcp/write/operations.py`.
+- Refactor de write: extraer una responsabilidad cada vez desde `src/qlab_mcp/write/operations.py`; no dividir todas las familias en una sola PR.
 - Cambios OSC bajo nivel: tocar `src/qlab_mcp/osc/client.py` solo si el problema es transporte, timeout, parseo o passcode.
 
 ## Checks Minimos
 
 ```bash
 uv run pytest tests/test_server_tools.py
-uv run pytest tests/test_write_mode.py
+uv run pytest tests/test_write_mode.py tests/test_update_registry_coverage.py
 uv run pytest tests/test_qlab_reader.py
 ```

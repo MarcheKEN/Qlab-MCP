@@ -7,7 +7,8 @@ Generated view: `extract_cue_osc_inventory(...)` + `registry_coverage(...)` agai
 
 The summary table is registry baseline coverage for mutating OSC routes in the
 official dictionary. It does not count specialized runtime token exceptions
-implemented above the registry gate, such as the closed Phase 4C
+implemented above the registry gate, such as Text cue `confirm:textBasic:v1:`
+exceptions, the closed Phase 4C
 `Video` `videoEffectIndex/0/parameter/inputRadius` real write, Phase 6
 `inputIntensity`, Phase 7 `fillStage`/`fillStyle`, Phase 7B `layer`, the
 Phase 7D local `quaternion` candidate, the Phase 7E local `resetRotation`
@@ -48,11 +49,20 @@ exceptions are listed in Current Invariants.
 - `Mic.channelOffset` is gated by `patch_routing` until input patch bounds validation exists.
 - Dangerous output families remain gated: audio output, patch routing, video visual/effects, text rich format, fade targets, light output, network output, MIDI output, script compile.
 - Video Phases 3A–3E expose only their documented token-gated scalar/Text
-  setters. Phase 3F Text Style candidates are blocked because QLab 5.5.10 did
-  not return reliable fresh baselines/readback; no `confirm:textStyle:v1:` token
-  is emitted. Phase 4C exposes one runtime-validated Video FX scalar exception:
-  `Video`, exact cue UUID, saved mode, `videoEffectIndex/0/parameter/inputRadius`,
-  finite numeric scalar only.
+  setters. The Text expansion gates `Text`-only saved writes under
+  `confirm:textBasic:v1:` for runtime-confirmed `text`, `fixedWidth`,
+  `text/format/alignment`, `text/format/fontName`, `text/format/fontSize`,
+  `text/format/lineSpacing`, and `text/format/color`.
+  `text/format/backgroundColor`, `text/format/shadowColor`,
+  `text/format/strikethroughColor`, and `text/format/underlineColor` stay
+  planned-only/runtime-blocked because QLab did not expose reliable readable
+  baseline/readback on the safe Text cue.
+  Phase 3F Text Style candidates are blocked
+  because QLab 5.5.10 did not return reliable fresh baselines/readback for
+  shadow offset/blur and decoration style routes; no `confirm:textStyle:v1:`
+  token is emitted. Phase 4C exposes one runtime-validated Video FX scalar
+  exception: `Video`, exact cue UUID, saved mode,
+  `videoEffectIndex/0/parameter/inputRadius`, finite numeric scalar only.
 - Phase 3D `blendMode` is a Video FX tab control but remains a visual appearance
   write, not a Video FX parameter write. OSC uses
   `/cue/{cue_number}/blendMode {string}` with the full QLab blend mode name from
@@ -219,12 +229,19 @@ exceptions are listed in Current Invariants.
   `/live`, no batch, and no multi-property.
 - Video `clockType` is locally implemented with
   `confirm:videoClockType:v1:` for saved exact-UUID one-cue/one-operation
-  Video writes with real embedded-audio evidence, strict `audio`/`video`
-  values, fresh readback, and rollback plan. Runtime validation is pending.
+  Video writes with strict `audio`/`video` values, fresh readback, and rollback
+  plan. It no longer requires embedded-audio evidence; the OSC Dictionary
+  documents `/cue/{cue_number}/clockType` as a direct Video clock route.
+  Runtime validation of the relaxed no-audio gate is pending after MCP restart.
 - Video Integrated Fade `doFade` and `lockFadeToCue` are locally implemented
   with `confirm:videoIntegratedFade:v1:` for saved exact-UUID
   one-cue/one-operation Video writes with real embedded-audio evidence, strict
   booleans, fresh readback, and rollback plan. Runtime validation is pending.
+- Internal Integrated Fade curve/shape/point editing remains blocked. No
+  documented Audio/Video Integrated Fade OSC route was found beyond `doFade`
+  and `lockFadeToCue`; `fadeEntries`/`fadeType`/`fadeFrom`/`fadeTo` stay out of
+  scope because they are documented under Fade/Network cue shape/path behavior,
+  not this internal envelope.
 - `setDefaultLevels` and `setSilentLevels` stay planned-only. QLab documents
   both as actions, but the MCP does not yet have a proven complete rollback
   contract for all affected saved level values.

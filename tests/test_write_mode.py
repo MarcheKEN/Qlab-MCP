@@ -246,7 +246,15 @@ class BatchFakeWriteClient:
 
     @staticmethod
     def _request_value(prop: str, args: tuple[Any, ...]) -> Any:
-        if prop in {"quaternion", "addSliceMarker"}:
+        if prop in {
+            "quaternion",
+            "addSliceMarker",
+            "text/format/color",
+            "text/format/backgroundColor",
+            "text/format/shadowColor",
+            "text/format/strikethroughColor",
+            "text/format/underlineColor",
+        }:
             return list(args)
         return args[0] if args else None
 
@@ -489,12 +497,18 @@ VIDEO_PHASE2_ALLOWED_PROPERTIES = {
     "endTime",
     "text",
     "text/format/alignment",
+    "text/format/backgroundColor",
+    "text/format/color",
     "text/format/fontName",
     "text/format/fontSize",
+    "text/format/lineSpacing",
+    "text/format/shadowColor",
     "text/format/shadowBlurRadius",
     "text/format/shadowOffset/width",
     "text/format/shadowOffset/height",
+    "text/format/strikethroughColor",
     "text/format/underlineStyle",
+    "text/format/underlineColor",
     "text/format/strikethroughStyle",
     "translation/x",
     "translation/y",
@@ -522,8 +536,12 @@ VIDEO_PHASE3C_SCALAR_PROPERTIES = {
 VIDEO_PHASE3D_APPEARANCE_PROPERTIES = {"blendMode", "preserveAspectRatio"}
 PHASE3E_TEXT_BASIC_PROPERTIES = {
     "text",
+    "fixedWidth",
     "text/format/alignment",
+    "text/format/color",
+    "text/format/fontName",
     "text/format/fontSize",
+    "text/format/lineSpacing",
 }
 PHASE3F_TEXT_STYLE_VALUES = {
     "text/format/shadowBlurRadius": 2,
@@ -553,7 +571,7 @@ VIDEO_PHASE2_REQUESTED_VALUES = {
     "scale/x": 125,
     "scale/y": 90,
     "text": "New title",
-    "text/format/alignment": "CENTER",
+    "text/format/alignment": "center",
     "text/format/fontName": "Helvetica",
     "text/format/fontSize": 56,
     "translation/x": 10.5,
@@ -564,7 +582,6 @@ VIDEO_PHASE2_NORMALIZED_VALUES = {
     "blendMode": "Normal",
     "clockType": "video",
     "preserveAspectRatio": False,
-    "text/format/alignment": "center",
 }
 
 
@@ -938,9 +955,7 @@ def _assert_media_profile_catalog(catalog: dict[str, Any]) -> None:
         catalog,
         "text_basic",
         (
-            "text/format/backgroundColor",
             "text/format/shadowOffset",
-            "text/format/lineSpacing",
             "text/format/shadowBlurRadius",
             "text/format/underlineStyle",
         ),
@@ -1330,8 +1345,16 @@ def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_os
     elif profile == "text_basic" and prop_name in PHASE3E_TEXT_BASIC_PROPERTIES:
         cue_values[prop_name] = {
             "text": "Old text",
+            "fixedWidth": 500,
             "text/format/alignment": "left",
+            "text/format/backgroundColor": [1, 1, 1, 1],
+            "text/format/color": [1, 1, 1, 1],
+            "text/format/fontName": "Helvetica",
             "text/format/fontSize": 48,
+            "text/format/lineSpacing": 1,
+            "text/format/shadowColor": [0, 0, 0, 1],
+            "text/format/strikethroughColor": [1, 1, 1, 1],
+            "text/format/underlineColor": [1, 1, 1, 1],
         }[prop_name]
     elif profile == "text_basic" and prop_name in PHASE3F_TEXT_STYLE_VALUES:
         cue_values[prop_name] = PHASE3F_TEXT_STYLE_VALUES[prop_name]
@@ -1373,6 +1396,8 @@ def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_os
             assert prop_name in dry_result["errors"]
         elif profile == "text_basic" and prop_name in PHASE3F_TEXT_STYLE_VALUES:
             assert "baseline/readback is unavailable" in dry_result["errors"][prop_name]
+        elif profile == "text_basic" and prop_name in PHASE3E_TEXT_BASIC_PROPERTIES:
+            assert f"requires readable {prop_name} baseline" in dry_result["errors"][prop_name]
         else:
             assert "read_before" in dry_result["errors"], (profile, prop_name, dry_result)
 
@@ -2144,8 +2169,8 @@ def test_update_cues_dry_run_reports_text_rgba_validation_per_item() -> None:
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
         cues={
-            valid_text_id: {"type": "Text"},
-            invalid_text_id: {"type": "Text"},
+            valid_text_id: {"type": "Text", "text/format/color": [1, 1, 1, 1]},
+            invalid_text_id: {"type": "Text", "text/format/color": [1, 1, 1, 1]},
         },
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
@@ -2176,7 +2201,8 @@ def test_update_cues_dry_run_reports_text_rgba_validation_per_item() -> None:
     assert result["status"] == "preflight_failed"
     assert result["results"][0]["status"] == "dry_run_preflight_failed"
     assert result["results"][1]["status"] == "dry_run_preflight_failed"
-    assert "rich text formatting" in result["results"][0]["errors"]["text/format/color"]
+    assert "Video-family dry-runs require exactly one cue and one property" in result["results"][0]["errors"]["video_phase2"]
+    assert_no_confirm_token(result["results"][0])
     assert result["results"][1]["errors"]["validation"] == "text/format/color.red must be a number from 0 to 1"
     assert "read_before" not in result["results"][1]["errors"]
     assert result["results"][1]["planned_operations"] == []
@@ -3819,7 +3845,7 @@ def test_update_cue_text_font_name_real_write_is_blocked_before_osc() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    with pytest.raises(UnsafeWriteOperationError, match="current Video write policy"):
+    with pytest.raises(UnsafeWriteOperationError, match="Phase 3E confirm_token"):
         reader.update_cue(
             "ws-1",
             cue_id,
@@ -3944,18 +3970,6 @@ def test_camera_phase2_non_gated_property_emits_no_token_and_fabricated_token_ca
             "text/format",
             None,
             [{"property": "text/format", "args": {"format": {"fontName": "Helvetica"}}}],
-        ),
-        (
-            "text_basic",
-            "Text",
-            "text/format/color",
-            None,
-            [
-                {
-                    "property": "text/format/color",
-                    "args": {"red": 1, "green": 1, "blue": 1, "alpha": 1},
-                }
-            ],
         ),
         (
             "text_basic",
@@ -4147,13 +4161,6 @@ def test_video_phase2_dry_run_rejects_explicitly_blocked_families_before_osc(
             and property_name != "layer"
             and property_name != "clockType"
         ],
-        *[
-            ("text_basic", "Text", property_name)
-            for property_name in (
-                "fixedWidth",
-                "text/format/fontName",
-            )
-        ],
     ],
 )
 def test_video_phase2_scalar_matrix_plans_normalized_diff_without_token(
@@ -4211,65 +4218,6 @@ def test_video_phase2_scalar_matrix_plans_normalized_diff_without_token(
     assert_no_confirm_token(result)
     assert result["after"] is None
     assert result["executed_operations"] == []
-
-
-@pytest.mark.parametrize(
-    ("profile", "cue_type", "property_name", "before_value", "requested_value"),
-    [
-        ("text_basic", "Text", "fixedWidth", 500, 640),
-    ],
-)
-def test_video_phase2_success_includes_updateq_plan(
-    profile: str,
-    cue_type: str,
-    property_name: str,
-    before_value: Any,
-    requested_value: Any,
-) -> None:
-    cue_id = "11111111-1111-4111-8111-111111111111"
-    client = FakeWriteClient(
-        QLabConfig(enable_write=False, passcode=None),
-        existing_cue_id=cue_id,
-        cue_values={
-            "uniqueID": cue_id,
-            "number": "v1",
-            "name": "Fixture cue",
-            "type": cue_type,
-            property_name: before_value,
-        },
-    )
-    result = QLabReader(client).update_cue(  # type: ignore[arg-type]
-        "ws-1", cue_id, {property_name: requested_value}, dry_run=True, profile=profile
-    )
-
-    plan = result["updateq_plan"]
-    assert plan["status"] == "planned"
-    assert plan["cue"] == {
-        "uniqueID": cue_id,
-        "number": "v1",
-        "name": "Fixture cue",
-        "type": cue_type,
-    }
-    assert plan["property"] == property_name
-    assert plan["profile"] == profile
-    assert plan["mode"] == "saved"
-    assert plan["before"] == before_value
-    assert plan["requested"] == requested_value
-    assert plan["diff"] == {"before": before_value, "requested": requested_value}
-    assert plan["risk_tier"] == "high"
-    assert plan["real_write_enabled"] is False
-    assert plan["real_write_possible"] is False
-    assert plan["requires_confirm_token"] is False
-    assert plan["why_not_written"]
-    assert plan["safety"] == {
-        "no_live": True,
-        "no_playback": True,
-        "no_workspace_video_write": True,
-        "no_executed_operations": True,
-        "will_modify_qlab": False,
-    }
-    assert result["executed_operations"] == []
-    assert_no_confirm_token(result)
 
 
 @pytest.mark.parametrize(
@@ -7169,6 +7117,25 @@ def test_video_clock_type_dry_run_real_write_and_rollback() -> None:
     assert [request[0] for request in client.requests].count(f"/workspace/ws-1/cue_id/{cue_id}/clockType") == 2
 
 
+def test_video_clock_type_dry_run_allows_video_without_audio_evidence() -> None:
+    cue_id = "33333333-3333-4333-8333-333333333333"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Video", "audioTrackFormats": [], "numChannelsIn": 0, "clockType": "video"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.edit_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "video_basic", "operations": [{"property": "clockType", "args": {"value": "audio"}}]}],
+        dry_run=True,
+    )
+
+    setter = planned_setters(result["results"][0])["clockType"]
+    assert result["status"] == "dry_run"
+    assert setter["confirm_token"].startswith("confirm:videoClockType:v1:")
+
+
 @pytest.mark.parametrize("property_name", ["doFade", "lockFadeToCue"])
 @pytest.mark.parametrize("requested", [True, False])
 def test_video_integrated_fade_dry_run_and_real_write(property_name: str, requested: bool) -> None:
@@ -7190,7 +7157,7 @@ def test_video_integrated_fade_dry_run_and_real_write(property_name: str, reques
     assert [request[0] for request in client.requests].count(f"/workspace/ws-1/cue_id/{cue_id}/{property_name}") == 1
 
 
-@pytest.mark.parametrize("value", ["Audio", "VIDEO", "sound", "", None, True, 1, [], {}])
+@pytest.mark.parametrize("value", ["Audio", "VIDEO", "sound", "", None, True, False, 1, 0, [], {}])
 def test_video_clock_type_rejects_invalid_values(value: Any) -> None:
     cue_id = "33333333-3333-4333-8333-333333333333"
     client = BatchFakeWriteClient(
@@ -7287,7 +7254,11 @@ def test_video_clock_and_integrated_fade_reject_cross_tokens_batch_wrong_type_an
         cues={cue_id: {"type": "Video", "audioTrackFormats": [], "numChannelsIn": 0, "clockType": "video", "doFade": False}},
     )
     reader = QLabReader(no_audio)  # type: ignore[arg-type]
-    for update in (clock_update, fade_update):
+    clock_plan = reader.edit_cues("ws-1", [clock_update], dry_run=True)
+    assert clock_plan["status"] == "dry_run"
+    assert planned_setters(clock_plan["results"][0])["clockType"]["confirm_token"].startswith("confirm:videoClockType:v1:")
+
+    for update in (fade_update,):
         result = reader.edit_cues("ws-1", [update], dry_run=True)
         assert result["status"] == "preflight_failed"
         assert_no_confirm_token(result)
@@ -8633,8 +8604,11 @@ def test_phase3d_skipped_candidates_remain_unregistered(property_name: str) -> N
 
 PHASE3E_TEXT_BASIC_CASES = [
     ("text", "Old text", "New\ntext"),
+    ("fixedWidth", 0, 640),
     ("text/format/fontSize", 48, 56),
     ("text/format/alignment", "left", "center"),
+    ("text/format/fontName", "Helvetica", "Courier New"),
+    ("text/format/lineSpacing", 1.0, 1.25),
 ]
 
 
@@ -8658,6 +8632,31 @@ def _phase3e_text_basic_fixture(
         "cue_ref": cue_id,
         "profile": "text_basic",
         "properties": {property_name: requested},
+    }
+    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    token = planned_setters(plan["results"][0])[property_name]["confirm_token"]
+    client.requests.clear()
+    return client, reader, cue_id, update, token
+
+
+def _phase3e_text_color_fixture(
+    *,
+    property_name: str = "text/format/color",
+    baseline: list[float] | None = None,
+    requested: dict[str, float] | None = None,
+) -> tuple[BatchFakeWriteClient, QLabReader, str, dict[str, Any], str]:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    baseline = baseline or [1.0, 1.0, 1.0, 1.0]
+    requested = requested or {"red": 0.25, "green": 0.5, "blue": 0.75, "alpha": 1.0}
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Text", property_name: baseline}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "text_basic",
+        "operations": [{"property": property_name, "args": requested}],
     }
     plan = reader.update_cues("ws-1", [update], dry_run=True)
     token = planned_setters(plan["results"][0])[property_name]["confirm_token"]
@@ -8699,9 +8698,7 @@ def test_phase3e_text_basic_dry_run_emits_bound_token(
     assert payload["cue_type"] == "Text"
     assert payload["profile"] == "text_basic"
     assert payload["property"] == property_name
-    assert payload["requested"] == (
-        float(requested) if property_name == "text/format/fontSize" else requested
-    )
+    assert payload["requested"] == write_operations._text_basic_canonical_value(property_name, requested)
     assert not any(address.endswith(f"/{property_name}") for address, _, _ in client.requests)
 
 
@@ -8739,6 +8736,80 @@ def test_phase3e_text_basic_real_write_sets_once_and_verifies(
     assert item["updateq_plan"]["safety"]["will_modify_qlab"] is True
     assert [request[0] for request in client.requests].count(address) == 1
     assert not any("/live" in request[0] for request in client.requests)
+
+
+@pytest.mark.parametrize(
+    "property_name",
+    [
+        "text/format/color",
+    ],
+)
+def test_phase3e_text_color_dry_run_real_write_and_rollback(property_name: str) -> None:
+    client, reader, cue_id, update, token = _phase3e_text_color_fixture(property_name=property_name)
+
+    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    result = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    rollback_update = {
+        **update,
+        "operations": [
+            {"property": property_name, "args": {"red": 1.0, "green": 1.0, "blue": 1.0, "alpha": 1.0}}
+        ],
+    }
+    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_token = planned_setters(rollback_plan["results"][0])[property_name]["confirm_token"]
+    rollback = reader.update_cues("ws-1", [{**rollback_update, "confirm_gates": [rollback_token]}], dry_run=False)
+
+    setter = planned_setters(plan["results"][0])[property_name]
+    assert setter["confirm_token"].startswith("confirm:textBasic:v1:")
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"][property_name] == [0.25, 0.5, 0.75, 1.0]
+    assert rollback["status"] == "updated"
+    assert rollback["results"][0]["after"][property_name] == [1.0, 1.0, 1.0, 1.0]
+    assert [request[0] for request in client.requests].count(f"/workspace/ws-1/cue_id/{cue_id}/{property_name}") == 2
+
+
+@pytest.mark.parametrize(
+    "property_name",
+    [
+        "text/format/backgroundColor",
+        "text/format/shadowColor",
+        "text/format/strikethroughColor",
+        "text/format/underlineColor",
+    ],
+)
+def test_phase3e_text_runtime_blocked_color_routes_stay_planned_only(property_name: str) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Text", property_name: [1.0, 1.0, 1.0, 1.0]}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": "text_basic",
+        "operations": [
+            {
+                "property": property_name,
+                "args": {"red": 0.25, "green": 0.5, "blue": 0.75, "alpha": 1.0},
+            }
+        ],
+    }
+
+    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": ["confirm:textBasic:v1:fake"]}],
+        dry_run=False,
+    )
+
+    setter = planned_setters(plan["results"][0])[property_name]
+    assert setter["real_write_enabled"] is False
+    assert setter["planned_only_reason"] == "text_color_changes_need_visual_validation"
+    assert_no_confirm_token(plan)
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert_no_confirm_token(result)
+    assert not any(address.endswith(f"/{property_name}") for address, _, _ in client.requests)
 
 
 def test_phase3e_text_basic_token_binding_and_structure_rejections() -> None:
@@ -8832,11 +8903,20 @@ def test_phase3e_text_basic_rejects_unhealthy_or_active_cue(
     ("property_name", "value"),
     [
         ("text", {"rich": "object"}),
+        ("text", "x" * 20001),
+        ("fixedWidth", -1),
+        ("fixedWidth", "640"),
+        ("fixedWidth", math.nan),
         ("text/format/fontSize", 0),
         ("text/format/fontSize", 1001),
         ("text/format/fontSize", math.nan),
         ("text/format/fontSize", math.inf),
         ("text/format/alignment", "middle"),
+        ("text/format/alignment", "Center"),
+        ("text/format/fontName", ""),
+        ("text/format/fontName", "Bad\nFont"),
+        ("text/format/lineSpacing", -1),
+        ("text/format/lineSpacing", math.inf),
     ],
 )
 def test_phase3e_text_basic_rejects_invalid_values(
@@ -8857,12 +8937,41 @@ def test_phase3e_text_basic_rejects_invalid_values(
 
 
 @pytest.mark.parametrize(
+    "args",
+    [
+        {"red": 1, "green": 1, "blue": 1},
+        {"red": -0.1, "green": 1, "blue": 1, "alpha": 1},
+        {"red": 1.1, "green": 1, "blue": 1, "alpha": 1},
+        {"red": True, "green": 1, "blue": 1, "alpha": 1},
+        {"red": "1", "green": 1, "blue": 1, "alpha": 1},
+        {"red": 1, "green": math.nan, "blue": 1, "alpha": 1},
+    ],
+)
+def test_phase3e_text_color_rejects_invalid_values(args: dict[str, Any]) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Text", "text/format/color": [1, 1, 1, 1]}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "text_basic", "operations": [{"property": "text/format/color", "args": args}]}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert_no_confirm_token(result)
+    assert result["results"][0]["executed_operations"] == []
+
+
+@pytest.mark.parametrize(
     ("property_name", "value"),
     [
         ("text/format", {"fontSize": 56}),
-        ("text/format/fontName", "Helvetica"),
-        ("text/format/color", {"red": 1, "green": 1, "blue": 1, "alpha": 1}),
-        ("text/format/shadowColor", {"red": 0, "green": 0, "blue": 0, "alpha": 1}),
+        ("text/format/fontFamilyAndStyle", {"family": "Helvetica", "style": "Regular"}),
+        ("text/format/shadowOffset", {"width": 1, "height": 2}),
     ],
 )
 def test_phase3e_rich_text_properties_remain_blocked(

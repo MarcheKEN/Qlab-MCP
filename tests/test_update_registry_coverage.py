@@ -44,7 +44,7 @@ def test_update_registry_has_specs_for_all_mutating_cue_osc_routes() -> None:
 def test_updateq_coverage_snapshot_doc_matches_summary() -> None:
     inventory = extract_cue_osc_inventory(DICTIONARY_PATH.read_text())
     summary = coverage_summary(registry_coverage(inventory, profile_catalog()))
-    snapshot = (PROJECT_ROOT / "docs" / "current" / "updateq_osc_coverage_snapshot.md").read_text()
+    snapshot = (PROJECT_ROOT / "docs" / "current" / "coverage" / "osc_coverage_snapshot.md").read_text()
 
     for section, counts in summary.items():
         expected_row = (
@@ -100,7 +100,7 @@ def test_workspace_video_inventory_is_explicitly_read_only_or_blocked() -> None:
 
 
 def test_video_phase1_matrix_documents_required_columns_and_blocked_families() -> None:
-    matrix = (PROJECT_ROOT / "docs" / "references" / "video_phase1_osc_matrix.md").read_text()
+    matrix = (PROJECT_ROOT / "docs" / "current" / "coverage" / "video_phase1_osc_matrix.md").read_text()
 
     assert "| Area | Property | OSC path | Read | Write | Live | +/- | Deprecated | MCP status | Risk |" in matrix
     assert "`/cue/{cue_number}/cameraPatch`" in matrix

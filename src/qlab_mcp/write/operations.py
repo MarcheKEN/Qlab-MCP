@@ -146,8 +146,21 @@ VIDEO_PHASE8_IO_TYPES = {
     "text_basic": "Text",
 }
 VIDEO_PHASE8_IO_PROPERTIES = frozenset().union(*VIDEO_PHASE8_IO_PROPERTIES_BY_PROFILE.values())
+TEXT_PHASE3E_COLOR_PROPERTIES = frozenset(
+    {
+        "text/format/color",
+    }
+)
 TEXT_PHASE3E_PROPERTIES = frozenset(
-    {"text", "text/format/fontSize", "text/format/alignment"}
+    {
+        "text",
+        "fixedWidth",
+        "text/format/alignment",
+        "text/format/fontName",
+        "text/format/fontSize",
+        "text/format/lineSpacing",
+        *TEXT_PHASE3E_COLOR_PROPERTIES,
+    }
 )
 TEXT_PHASE3F_PROPERTIES = frozenset(
     {
@@ -2065,6 +2078,7 @@ class QLabWriteMixin:
                 or (
                     len(operation.get("args") or []) != 1
                     and operation.get("property") not in {"quaternion", "resetRotation"}
+                    and operation.get("property") not in TEXT_PHASE3E_COLOR_PROPERTIES
                     and operation.get("phase8c_expected_slice_markers") is None
                     and operation.get("phase9_expected_readback") is None
                 )
@@ -5666,8 +5680,6 @@ def _video_simple_preflight_common(before: dict[str, Any], operation: dict[str, 
 
 
 def _video_clock_type_preflight_error(before: dict[str, Any], operation: dict[str, Any]) -> str | None:
-    if not _phase9a_audio_level_has_embedded_audio_evidence(before):
-        return "Video clockType requires readable embedded-audio evidence."
     common = _video_simple_preflight_common(before, operation)
     if isinstance(common, str):
         return f"Video clockType {common}"
@@ -6555,7 +6567,7 @@ def _phase3e_text_basic_call_structure_error(items: list[dict[str, Any]]) -> str
         operation.get("property") not in TEXT_PHASE3E_PROPERTIES
         or operation.get("path") != operation.get("property")
     ):
-        return "Phase 3E real writes allow only text, text/format/fontSize, or text/format/alignment."
+        return "Phase 3E real writes allow only approved scalar Text cue properties."
     if operation.get("mode") != "saved":
         return "Phase 3E Text Basics real writes require saved mode."
     if not _is_exact_cue_uuid(item.get("cue_ref")):
@@ -6565,24 +6577,31 @@ def _phase3e_text_basic_call_structure_error(items: list[dict[str, Any]]) -> str
 
 def _text_basic_value_valid(property_name: str, value: Any) -> bool:
     if property_name == "text":
-        return isinstance(value, str)
+        return isinstance(value, str) and len(value) <= 20000
+    if property_name == "fixedWidth":
+        return _is_plain_finite_number(value) and float(value) >= 0
     if property_name == "text/format/alignment":
-        return isinstance(value, str) and value.strip().casefold() in {
-            "left",
-            "center",
-            "right",
-            "justify",
-        }
+        return isinstance(value, str) and value in {"left", "center", "right", "justify"}
+    if property_name == "text/format/fontName":
+        return isinstance(value, str) and 0 < len(value) <= 128 and not any(ord(ch) < 32 for ch in value)
     if property_name == "text/format/fontSize":
         return _is_plain_finite_number(value) and 0 < float(value) <= 1000
+    if property_name == "text/format/lineSpacing":
+        return _is_plain_finite_number(value) and float(value) >= 0
+    if property_name in TEXT_PHASE3E_COLOR_PROPERTIES:
+        return (
+            isinstance(value, list)
+            and len(value) == 4
+            and all(_is_plain_finite_number(component) and 0 <= float(component) <= 1 for component in value)
+        )
     return False
 
 
 def _text_basic_canonical_value(property_name: str, value: Any) -> Any:
-    if property_name == "text/format/fontSize":
+    if property_name in {"fixedWidth", "text/format/fontSize", "text/format/lineSpacing"}:
         return float(value)
-    if property_name == "text/format/alignment":
-        return value.strip().casefold()
+    if property_name in TEXT_PHASE3E_COLOR_PROPERTIES:
+        return [float(component) for component in value]
     return value
 
 
@@ -6591,6 +6610,16 @@ def _text_basic_sha256(property_name: str, value: Any) -> str:
     return hashlib.sha256(
         json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
+
+
+def _text_basic_requested_value(operation: dict[str, Any]) -> Any:
+    property_name = operation.get("property")
+    if property_name in TEXT_PHASE3E_COLOR_PROPERTIES:
+        values = operation.get("arg_values")
+        if not isinstance(values, dict):
+            values = operation.get("args") if isinstance(operation.get("args"), dict) else {}
+        return [values.get("red"), values.get("green"), values.get("blue"), values.get("alpha")]
+    return operation["args"][0] if operation.get("args") else None
 
 
 def _phase3e_text_basic_token_payload(
@@ -6667,7 +6696,7 @@ def _phase3e_text_basic_dry_run_errors(
         return {}
     property_name = operation["property"]
     baseline = before.get(property_name)
-    requested = operation["args"][0] if operation.get("args") else None
+    requested = _text_basic_requested_value(operation)
     if not _text_basic_value_valid(property_name, baseline):
         return {property_name: f"Phase 3E Text Basics requires readable {property_name} baseline."}
     if not _text_basic_value_valid(property_name, requested):
@@ -6688,7 +6717,7 @@ def _annotate_phase3e_text_basic_operation(
     property_name = operation["property"]
     cue_id = _resolved_cue_id(before)
     baseline = before.get(property_name) if isinstance(before, dict) else None
-    requested = operation["args"][0] if operation.get("args") else None
+    requested = _text_basic_requested_value(operation)
     candidate = (
         candidate_shape
         and isinstance(before, dict)
@@ -6748,7 +6777,7 @@ def _validate_phase3e_text_basic_real_write(
         return {property_name: "Phase 3E Text Basics real writes require an inactive cue."}
     cue_id = _resolved_cue_id(before)
     baseline = before.get(property_name)
-    requested = operation["args"][0] if operation.get("args") else None
+    requested = _text_basic_requested_value(operation)
     if cue_id != item.get("cue_ref"):
         return {property_name: "Phase 3E fresh read uniqueID does not exactly match requested cue UUID."}
     if not _text_basic_value_valid(property_name, baseline):
@@ -6759,12 +6788,14 @@ def _validate_phase3e_text_basic_real_write(
     payload, token_error = _decode_phase3e_text_basic_confirm_token(token)
     if token_error or payload is None:
         return {property_name: token_error or "Phase 3E Text Basics confirm_token is invalid."}
+    token_operation = dict(operation)
+    token_operation["risk_tier"] = "high"
     expected = _phase3e_text_basic_token_payload(
         workspace_id=workspace_id,
         cue_ref=item["cue_ref"],
         cue_id=cue_id,
         item=item,
-        operation=operation,
+        operation=token_operation,
         baseline=baseline,
         requested=requested,
     )
@@ -6785,7 +6816,7 @@ def _validate_phase3e_text_basic_real_write(
             abs_tol=UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
             rel_tol=UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
         )
-        if property_name == "text/format/fontSize"
+        if property_name in {"fixedWidth", "text/format/fontSize", "text/format/lineSpacing"}
         else payload.get("baseline") == expected["baseline"]
     )
     if payload.get("baseline_sha256") != expected["baseline_sha256"] or not baseline_matches:
@@ -9284,6 +9315,11 @@ def _verification_requested_values(item: dict[str, Any]) -> dict[str, Any]:
             expected = operation.get("phase9_expected_readback")
             if read_key:
                 requested[str(read_key)] = expected
+            continue
+        if operation.get("property") in TEXT_PHASE3E_COLOR_PROPERTIES:
+            read_key = operation.get("read_key")
+            if read_key:
+                requested[str(read_key)] = _text_basic_requested_value(operation)
             continue
         if read_key and len(args) == 1:
             requested[str(read_key)] = args[0]

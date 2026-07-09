@@ -104,6 +104,18 @@ AUTO_TEXT_KEYS = (
     "text/outputSize",
     "text/outputSize/width",
     "text/outputSize/height",
+    "text/format/alignment",
+    "text/format/backgroundColor",
+    "text/format/color",
+    "text/format/fontFamily",
+    "text/format/fontFamilyAndStyle",
+    "text/format/fontName",
+    "text/format/fontSize",
+    "text/format/fontStyle",
+    "text/format/lineSpacing",
+    "text/format/shadowColor",
+    "text/format/strikethroughColor",
+    "text/format/underlineColor",
 )
 AUTO_LIGHT_KEYS = (
     "lightCommandText",

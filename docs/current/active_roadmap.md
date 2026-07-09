@@ -1,6 +1,6 @@
 # Active Roadmap
 
-Status: 2026-07-05
+Status: 2026-07-08
 
 ## Closed
 
@@ -155,6 +155,25 @@ Video Phase 3F — Text Style:
 - no `confirm:textStyle:v1:` tokens emitted
 - no Text Style setters enabled
 
+Text cue expansion — runtime validation closed:
+
+- expands `confirm:textBasic:v1:` saved writes for `Text` cues only
+- runtime-confirmed real-write routes: `text`, `fixedWidth`,
+  `text/format/alignment`, `text/format/fontName`, `text/format/fontSize`,
+  `text/format/lineSpacing`, and `text/format/color`
+- planned-only/runtime-blocked routes: `text/format/backgroundColor`,
+  `text/format/shadowColor`, `text/format/strikethroughColor`, and
+  `text/format/underlineColor`; QLab runtime did not expose reliable readable
+  baseline/readback on the safe Text cue, so these routes do not emit
+  `confirm:textBasic:v1:` tokens and are not real-write enabled
+- exact cue UUID only, one cue, one property/operation, saved mode only,
+  healthy inactive Text cue, readable baseline, fresh token, exact readback,
+  and rollback required
+- `/live`, batch, multi-property, wrong cue types, cue numbers,
+  selected/playhead/active refs, fake/wrong/stale tokens, full `text/format`
+  JSON, substring/range/word formatting, `fontFamilyAndStyle`, output-size
+  writes, Stage Editor, Video FX, raw OSC, playback, and save remain blocked
+
 Video Phase 4A/4B — Video FX read model and dry-run planner:
 
 - lightweight safe effect/parameter summaries
@@ -291,17 +310,26 @@ Video Phase 9C — Video embedded-audio Levels metadata:
 Video clock type and Integrated Fade:
 
 - `clockType` is locally implemented for saved exact-UUID `Video` cue writes
-  with real embedded-audio evidence, strict `audio`/`video` values, fresh
-  `confirm:videoClockType:v1:` token, fresh readback, and rollback plan
+  with strict `audio`/`video` values, fresh `confirm:videoClockType:v1:`
+  token, fresh readback, and rollback plan; it does not require embedded-audio
+  evidence because QLab documents `/clockType` directly for Video cues without
+  that prerequisite
 - `doFade` and `lockFadeToCue` are locally implemented for saved exact-UUID
   `Video` cue writes with real embedded-audio evidence, strict boolean values,
   fresh `confirm:videoIntegratedFade:v1:` token, fresh readback, and rollback
   plan
+- Integrated Fade envelope points, Custom Curve, and Linear Curve remain
+  blocked/planned-only. The OSC Dictionary exposes `doFade` and
+  `lockFadeToCue` for the internal Integrated Fade checkboxes, but does not
+  expose a documented Audio/Video Integrated Fade point/curve route with clear
+  readback and rollback. `fadeEntries`, `fadeType`, `fadeFrom`, and `fadeTo`
+  are not reused here because the dictionary places them in Fade/Network cue
+  shape/path behavior, not the Audio/Video Integrated Fade envelope.
 - runtime validation is pending until Codex/Code/MCP restart; no QLab runtime
   validation was attempted in this local implementation pass
 - `/live`, raw OSC, playback/show-control, save, batch, multi-property,
   Audio/Camera/Text promotion, wrong token families, fake/stale tokens, and
-  Video cues without embedded audio remain blocked
+  Video cues without embedded audio remain blocked for Integrated Fade only
 
 Video Phase 9F — Video embedded-audio Levels reset actions:
 

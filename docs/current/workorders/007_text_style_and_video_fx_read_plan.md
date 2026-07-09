@@ -25,20 +25,23 @@ Current behavior:
 - no confirm token is emitted;
 - real write rejects before any setter;
 - `executed_operations=[]`;
-- Phase 3E Text Basics remain unchanged.
+- Phase 3E Text Basics have since been expanded locally; see
+  `023_text_cue_safe_editing.md`.
 
 ## Phase 3F deferred properties
 
-Also remain blocked:
+Still blocked in this Phase 3F bucket:
 
-- `text/format/fontName` and `fontFamilyAndStyle`: installed-font identity and
-  exact canonical readback need runtime proof.
-- text/background/shadow/underline/strikethrough colors: RGBA serialization
-  and exact readback need runtime proof.
+- `text/format/fontFamilyAndStyle`: installed-font pair identity and exact
+  canonical readback need runtime proof.
 - aggregate `text/format` and aggregate `shadowOffset`: multi-field/rich
   payloads are outside the single-property gate.
-- line spacing, substring/word variants, `/live`, increment/decrement, and
-  independent bold/italic controls.
+- substring/word variants, `/live`, increment/decrement, and independent
+  bold/italic controls.
+
+Moved out of this blocked bucket into local Text Basics expansion pending
+runtime validation: `fixedWidth`, `text/format/fontName`,
+`text/format/lineSpacing`, and the five RGBA routes.
 
 No Video or Camera Text Style real write is enabled.
 

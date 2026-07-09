@@ -115,7 +115,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "output_schema_hash": "4981dabcf1bfb2e82e83bbf29f9a2aed315ddbea4b0f5634c3ed4ad14dbe6060",
     },
     "qlab_update_cues": {
-        "title": "Update QLab Cues",
+        "title": "Update QLab Cues (compatibility alias)",
         "timeout": UPDATE_CUES_TIMEOUT,
         "annotations": {
             "readOnlyHint": False,
@@ -123,9 +123,22 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "idempotentHint": False,
             "openWorldHint": True,
         },
-        "tags": ["batch-update", "cue-update", "gated-write", "qlab", "write-mode"],
+        "tags": ["batch-update", "cue-update", "deprecated-alias", "gated-write", "qlab", "write-mode"],
         "input_schema_hash": "d5202803e7b8b5bf7a07bc3693b27b3c86715258957fa8283284656cd6b280f6",
-        "output_schema_hash": "748245a9a4bccbd1764f91827536bed33e0e29b735eff3b6034d35bfcfbcd808",
+        "output_schema_hash": "853257a5192b69f070e159611c4aa2151bc998d905a789cca4b93eaea37b7e61",
+    },
+    "qlab_edit_cues": {
+        "title": "Edit QLab Cues",
+        "timeout": UPDATE_CUES_TIMEOUT,
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+        "tags": ["batch-edit", "cue-edit", "gated-write", "qlab", "write-mode"],
+        "input_schema_hash": "d5202803e7b8b5bf7a07bc3693b27b3c86715258957fa8283284656cd6b280f6",
+        "output_schema_hash": "853257a5192b69f070e159611c4aa2151bc998d905a789cca4b93eaea37b7e61",
     },
 }
 EXPECTED_DESCRIPTION_PHRASES = {
@@ -138,7 +151,8 @@ EXPECTED_DESCRIPTION_PHRASES = {
     "qlab_get_cue_details": ("editable for update capability discovery", "exhaustive only for deep audits"),
     "qlab_check_write_readiness": ("without sending any mutating OSC commands", "Edit Mode"),
     "qlab_create_cue": ("dry-run plan", "Dry-run planning never sends mutating OSC"),
-    "qlab_update_cues": ("Dry-run planning never sends mutating OSC", "High-risk profiles"),
+    "qlab_edit_cues": ("Dry-run planning never sends mutating OSC", "High-risk profiles"),
+    "qlab_update_cues": ("Compatibility alias", "qlab_edit_cues"),
 }
 
 
@@ -223,7 +237,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    write_tools = {"qlab_create_cue", "qlab_update_cues"}
+    write_tools = {"qlab_create_cue", "qlab_edit_cues", "qlab_update_cues"}
     read_only_tools = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) - write_tools
 
     for tool_name in read_only_tools:
@@ -271,6 +285,7 @@ def test_update_cues_fastmcp_schema_keeps_batch_contract() -> None:
         "message",
     ]
     assert "updated_with_confirmed_timeouts" in update_output["properties"]["status"]["enum"]
+    assert "updateq_plan" in update_output["properties"]["results"]["items"]["properties"]
 
 
 def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -> None:
@@ -289,6 +304,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_get_cue_details",
         "qlab_check_write_readiness",
         "qlab_create_cue",
+        "qlab_edit_cues",
         "qlab_update_cues",
     }
 
@@ -419,9 +435,15 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "workspace_unavailable",
     ]
 
+    edit = tools["qlab_edit_cues"]
+    assert edit.title == "Edit QLab Cues"
+    assert "Dry-run planning" in edit.description
+    assert "batch-edit" in edit.meta["fastmcp"]["tags"]
+
     update = tools["qlab_update_cues"]
-    assert update.title == "Update QLab Cues"
+    assert update.title == "Update QLab Cues (compatibility alias)"
     assert "Dry-run planning" in update.description
+    assert "Compatibility alias" in update.description
     assert "batch-update" in update.meta["fastmcp"]["tags"]
     assert update.annotations.readOnlyHint is False
     assert update.annotations.destructiveHint is False
@@ -460,6 +482,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
                 "qlab_get_cue_details",
                 "qlab_check_write_readiness",
                 "qlab_create_cue",
+                "qlab_edit_cues",
                 "qlab_update_cues",
             )
         }
@@ -475,6 +498,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
         "qlab_get_cue_details": CUE_DETAILS_TIMEOUT,
         "qlab_check_write_readiness": WRITE_READINESS_TIMEOUT,
         "qlab_create_cue": CREATE_CUE_TIMEOUT,
+        "qlab_edit_cues": UPDATE_CUES_TIMEOUT,
         "qlab_update_cues": UPDATE_CUES_TIMEOUT,
     }
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass, replace
 from string import Formatter
 from typing import Any
@@ -43,32 +44,33 @@ QLAB_COLOR_NAMES = {
 }
 AUDIO_OBJECT_COLOR_NAMES = QLAB_COLOR_NAMES
 
-QLAB_BLEND_MODES = {
-    "normal": "Normal",
-    "darken": "Darken",
-    "multiply": "Multiply",
-    "color burn": "Color Burn",
-    "linear burn": "Linear Burn",
-    "lighten": "Lighten",
-    "screen": "Screen",
-    "color dodge": "Color Dodge",
-    "linear dodge": "Linear Dodge",
-    "overlay": "Overlay",
-    "soft light": "Soft Light",
-    "hard light": "Hard Light",
-    "pin light": "Pin Light",
-    "difference": "Difference",
-    "exclusion": "Exclusion",
-    "subtract": "Subtract",
-    "divide": "Divide",
-    "hue": "Hue",
-    "saturation": "Saturation",
-    "color": "Color",
-    "luminosity": "Luminosity",
-    "addition compositing": "Addition Compositing",
-    "maximum compositing": "Maximum Compositing",
-    "source atop compositing": "Source Atop Compositing",
-}
+VALID_BLEND_MODES = (
+    "Normal",
+    "Darken",
+    "Multiply",
+    "Color Burn",
+    "Linear Burn",
+    "Lighten",
+    "Screen",
+    "Color Dodge",
+    "Linear Dodge",
+    "Overlay",
+    "Soft Light",
+    "Hard Light",
+    "Pin Light",
+    "Difference",
+    "Exclusion",
+    "Subtract",
+    "Divide",
+    "Hue",
+    "Saturation",
+    "Color",
+    "Luminosity",
+    "Addition Compositing",
+    "Maximum Compositing",
+    "Source Atop Compositing",
+)
+QLAB_BLEND_MODES = {name: name for name in VALID_BLEND_MODES}
 
 
 @dataclass(frozen=True)
@@ -357,6 +359,169 @@ AUDIO_SAFE_PROPERTIES = (
     _prop("playCount", "positive_int", real_write_enabled=True),
     _prop("infiniteLoop", "boolean", real_write_enabled=True),
     _prop("preservePitch", "boolean", real_write_enabled=True),
+)
+
+VIDEO_AUDIO_TIME_PROPERTIES = (
+    _planned_prop("rate", "rate", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
+    _planned_prop("startTime", "non_negative_number", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
+    _planned_prop("endTime", "non_negative_number", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
+    _planned_prop("playCount", "positive_int", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
+    _planned_prop("infiniteLoop", "boolean", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
+    _planned_prop("preservePitch", "boolean", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
+)
+
+VIDEO_AUDIO_LEVEL_PROPERTIES = (
+    _op(
+        "sliderLevel",
+        (("channel", "audio_output_ref"), ("decibel", "decibel")),
+        path="sliderLevel/{channel}",
+        modes=("saved", "live"),
+        read_key="sliderLevels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_levels_require_confirm_token",
+    ),
+)
+
+VIDEO_AUDIO_MATRIX_PROPERTIES = (
+    _op(
+        "level",
+        (("inChannel", "audio_level_row"), ("outChannel", "audio_output_ref"), ("decibel", "decibel")),
+        path="level/{inChannel}/{outChannel}",
+        modes=("saved", "live"),
+        read_key="levels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_matrix_requires_confirm_token",
+    ),
+)
+
+VIDEO_AUDIO_LEVEL_META_PROPERTIES = (
+    _op(
+        "inputChannelName",
+        (("number", "positive_int"), ("name", "string")),
+        path="inputChannelName/{number}",
+        risk_tier="medium",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_level_meta_requires_confirm_token",
+    ),
+    _op(
+        "gang",
+        (("inChannel", "audio_level_row"), ("outChannel", "audio_output_ref"), ("gang", "string")),
+        path="gang/{inChannel}/{outChannel}",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_level_meta_requires_confirm_token",
+    ),
+)
+
+VIDEO_AUDIO_MUTE_SOLO_PROPERTIES = (
+    _op(
+        "mute/channel",
+        (("output", "audio_output_ref"), ("value", "boolean")),
+        path="mute/channel/{output}",
+        read_key="muteChannels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_mute_solo_requires_confirm_token",
+    ),
+    _op(
+        "solo/channel",
+        (("output", "audio_output_ref"), ("value", "boolean")),
+        path="solo/{output}",
+        read_key="soloChannels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_mute_solo_requires_confirm_token",
+    ),
+)
+
+VIDEO_AUDIO_LEVEL_BULK_PROPERTIES = (
+    _op(
+        "mute/channel/clear",
+        (),
+        path="mute/channel/clear",
+        read_key="muteChannels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_level_bulk_requires_confirm_token",
+    ),
+    _op(
+        "solo/channel/clear",
+        (),
+        path="solo/channel/clear",
+        read_key="soloChannels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_level_bulk_requires_confirm_token",
+    ),
+    _op(
+        "setDefaultLevels",
+        (),
+        path="setDefaultLevels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_level_bulk_requires_full_runtime_validation",
+    ),
+    _op(
+        "setSilentLevels",
+        (),
+        path="setSilentLevels",
+        risk_tier="high",
+        capability_gate="audio_output",
+        planned_only_reason="video_audio_level_bulk_requires_full_runtime_validation",
+    ),
+)
+
+VIDEO_SLICE_MARKER_PROPERTIES = (
+    _planned_prop(
+        "lastSlicePlayCount",
+        "int_or_minus_one",
+        reason="video_slice_marker_requires_confirm_token",
+        capability_gate="slice_editing",
+    ),
+    _planned_prop("lastSliceInfiniteLoop", "boolean", reason="last_slice_semantics_need_runtime_validation"),
+    _planned_prop("sliceMarkers", "list", reason="slice_marker_collection_not_directly_settable_use_sliceMarker_operations"),
+    _op(
+        "sliceMarker/time",
+        (("index", "non_negative_int"), ("time", "non_negative_number")),
+        path="sliceMarker/{index}/time",
+        read_key="sliceMarkers",
+        risk_tier="high",
+        planned_only_reason="video_slice_marker_requires_confirm_token",
+    ),
+    _op(
+        "sliceMarker/playCount",
+        (("index", "non_negative_int"), ("playCount", "int_or_minus_one")),
+        path="sliceMarker/{index}/playCount",
+        read_key="sliceMarkers",
+        risk_tier="high",
+        planned_only_reason="video_slice_marker_requires_confirm_token",
+    ),
+    _op(
+        "addSliceMarker",
+        (("time", "non_negative_number"), ("playCount", "int_or_minus_one")),
+        path="addSliceMarker",
+        read_key="sliceMarkers",
+        risk_tier="high",
+        planned_only_reason="video_slice_marker_requires_confirm_token",
+    ),
+    _op(
+        "deleteSliceMarker",
+        (("index", "non_negative_int"),),
+        path="deleteSliceMarker/{index}",
+        read_key="sliceMarkers",
+        risk_tier="high",
+        planned_only_reason="video_slice_marker_requires_confirm_token",
+    ),
+    _op(
+        "deleteSliceMarkers",
+        (),
+        path="deleteSliceMarkers",
+        read_key="sliceMarkers",
+        risk_tier="high",
+        planned_only_reason="video_slice_marker_requires_confirm_token",
+    ),
 )
 
 AUDIO_CATALOG_PROPERTIES = (
@@ -774,31 +939,38 @@ VIDEO_CATALOG_PROPERTIES = (
     _planned_prop("fillStage", "boolean", reason="video_framing_changes_need_visual_validation"),
     _planned_prop("fillStyle", "video_fill_style", reason="video_framing_changes_need_visual_validation"),
     _planned_prop("holdLastFrame", "boolean", reason="video_playback_visual_state_needs_validation"),
-    _planned_prop("preserveAspectRatio", "boolean", reason="video_framing_changes_need_visual_validation"),
+    _planned_prop("preserveAspectRatio", "boolean", reason="video_appearance_requires_confirm_token"),
     _planned_prop("smooth", "boolean", reason="video_rendering_changes_need_visual_validation"),
+    _planned_prop("audioOutputPatchID", "string", reason="video_io_requires_confirm_token", capability_gate="patch_routing"),
     _op("anchor", (("x", "number"), ("y", "number")), modes=("saved", "live"), planned_only_reason="geometry_changes_need_visual_validation"),
-    _prop("anchor/x", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("anchor/y", "number", risk_tier="medium", real_write_enabled=True),
+    _planned_prop("anchor/x", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("anchor/y", "number", reason="video_phase2_dry_run_only"),
     _op("translation", (("x", "number"), ("y", "number")), modes=("saved", "live"), planned_only_reason="geometry_changes_need_visual_validation"),
-    _prop("translation/x", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("translation/y", "number", risk_tier="medium", real_write_enabled=True),
+    _planned_prop("translation/x", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("translation/y", "number", reason="video_phase2_dry_run_only"),
     _op("scale", (("x", "number"), ("y", "number")), modes=("saved", "live"), planned_only_reason="geometry_changes_need_visual_validation"),
-    _prop("scale/x", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("scale/y", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("rotation", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("opacity", "opacity", risk_tier="medium", real_write_enabled=True),
+    _planned_prop("scale/x", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("scale/y", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("opacity", "opacity", reason="video_phase2_dry_run_only"),
     _op("crop", (("top", "number"), ("bottom", "number"), ("left", "number"), ("right", "number")), modes=("saved", "live"), planned_only_reason="geometry_changes_need_visual_validation"),
-    _prop("cropTop", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("cropBottom", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("cropLeft", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("cropRight", "number", risk_tier="medium", real_write_enabled=True),
-    _prop("blendMode", "video_blend_mode", risk_tier="medium", real_write_enabled=True),
-    _prop("clockType", "video_clock_type", risk_tier="medium", real_write_enabled=True),
+    _planned_prop("cropTop", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("cropBottom", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("cropLeft", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("cropRight", "number", reason="video_phase2_dry_run_only"),
+    _planned_prop("blendMode", "video_blend_mode", reason="video_appearance_requires_confirm_token"),
+    _planned_prop("clockType", "video_clock_type", reason="video_phase2_dry_run_only"),
     _op("origin", (("x", "number"), ("y", "number")), modes=("saved", "live"), planned_only_reason="geometry_changes_need_visual_validation"),
     _planned_prop("origin/x", "number", modes=("saved", "live"), reason="geometry_changes_need_visual_validation"),
     _planned_prop("origin/y", "number", modes=("saved", "live"), reason="geometry_changes_need_visual_validation"),
-    _op("quaternion", (("a", "number"), ("b", "number"), ("c", "number"), ("d", "number")), risk_tier="high", planned_only_reason="3d_rotation_changes_need_visual_validation"),
-    _op("resetRotation", (), path="resetRotation", risk_tier="high", planned_only_reason="3d_rotation_changes_need_visual_validation"),
+    _planned_prop("quaternion", "quaternion", reason="video_quaternion_requires_confirm_token"),
+    _op(
+        "resetRotation",
+        (),
+        path="resetRotation",
+        read_key="quaternion",
+        risk_tier="high",
+        planned_only_reason="3d_rotation_changes_need_visual_validation",
+    ),
     _planned_prop("stage/name", "non_empty_string", reason="stage_name_changes_need_visual_validation"),
     _op("stage/region/bounds", (("region", "non_empty_string"), ("x", "number"), ("y", "number"), ("width", "positive_number"), ("height", "positive_number")), path="stage/region/{region}/bounds", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
     _op("stage/regionID/bounds", (("id", "non_empty_string"), ("x", "number"), ("y", "number"), ("width", "positive_number"), ("height", "positive_number")), path="stage/regionID/{id}/bounds", risk_tier="high", planned_only_reason="stage_region_changes_need_visual_validation"),
@@ -856,6 +1028,7 @@ VIDEO_CATALOG_PROPERTIES = (
         "videoEffect/parameter",
         (("name", "non_empty_string"), ("parameterKey", "non_empty_string"), ("setting", "json_value")),
         path="videoEffect/{name}/parameter/{parameterKey}",
+        read_key="videoEffects",
         modes=("saved", "live"),
         risk_tier="high",
         planned_only_reason="video_effect_parameters_need_profile_specific_validation",
@@ -864,6 +1037,7 @@ VIDEO_CATALOG_PROPERTIES = (
         "videoEffectIndex/parameter",
         (("index", "non_negative_int"), ("parameterKey", "non_empty_string"), ("setting", "json_value")),
         path="videoEffectIndex/{index}/parameter/{parameterKey}",
+        read_key="videoEffects",
         modes=("saved", "live"),
         risk_tier="high",
         planned_only_reason="video_effect_parameters_need_profile_specific_validation",
@@ -886,12 +1060,91 @@ VIDEO_CATALOG_PROPERTIES = (
     ),
 )
 
+VIDEO_PHASE2_VISUAL_PROPERTY_NAMES = frozenset(
+    {
+        "anchor/x",
+        "anchor/y",
+        "blendMode",
+        "clockType",
+        "cropBottom",
+        "cropLeft",
+        "cropRight",
+        "cropTop",
+        "doFade",
+        "fillStage",
+        "fillStyle",
+        "layer",
+        "quaternion",
+        "resetRotation",
+        "opacity",
+        "preserveAspectRatio",
+        "scale/x",
+        "scale/y",
+        "smooth",
+        "rate",
+        "startTime",
+        "endTime",
+        "playCount",
+        "infiniteLoop",
+        "preservePitch",
+        "holdLastFrame",
+        "level",
+        "sliderLevel",
+        "inputChannelName",
+        "gang",
+        "mute/channel",
+        "solo/channel",
+        "mute/channel/clear",
+        "solo/channel/clear",
+        "setDefaultLevels",
+        "setSilentLevels",
+        "stageID",
+        "audioOutputPatchID",
+        "videoInputPatchID",
+        "audioInputPatchID",
+        "sliceMarker/time",
+        "sliceMarker/playCount",
+        "addSliceMarker",
+        "deleteSliceMarker",
+        "deleteSliceMarkers",
+        "lastSlicePlayCount",
+        "lastSliceInfiniteLoop",
+        "lockFadeToCue",
+        "translation/x",
+        "translation/y",
+    }
+)
+VIDEO_PHASE2_TEXT_PROPERTY_NAMES = frozenset(
+    {
+        "fixedWidth",
+        "text",
+        "text/format/alignment",
+        "text/format/backgroundColor",
+        "text/format/color",
+        "text/format/fontName",
+        "text/format/fontSize",
+        "text/format/lineSpacing",
+        "text/format/shadowColor",
+        "text/format/shadowBlurRadius",
+        "text/format/shadowOffset/width",
+        "text/format/shadowOffset/height",
+        "text/format/strikethroughColor",
+        "text/format/underlineStyle",
+        "text/format/underlineColor",
+        "text/format/strikethroughStyle",
+    }
+)
+VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES = VIDEO_PHASE2_VISUAL_PROPERTY_NAMES | VIDEO_PHASE2_TEXT_PROPERTY_NAMES
+VIDEO_PHASE2_VISUAL_PROPERTIES = tuple(
+    prop for prop in VIDEO_CATALOG_PROPERTIES if prop.name in VIDEO_PHASE2_VISUAL_PROPERTY_NAMES
+)
+
 TEXT_SAFE_PROPERTIES = (
-    _prop("text", "string", real_write_enabled=True),
-    _prop("fixedWidth", "non_negative_number", real_write_enabled=True),
-    _prop("text/format/alignment", "text_alignment", real_write_enabled=True),
-    _prop("text/format/fontName", "non_empty_string", real_write_enabled=True),
-    _prop("text/format/fontSize", "positive_number", real_write_enabled=True),
+    _planned_prop("text", "string", reason="video_phase2_text_format_inheritance_risk"),
+    _planned_prop("fixedWidth", "non_negative_number", reason="video_phase2_dry_run_only"),
+    _planned_prop("text/format/alignment", "text_alignment", reason="video_phase2_dry_run_only"),
+    _planned_prop("text/format/fontName", "non_empty_string", reason="video_phase2_dry_run_only"),
+    _planned_prop("text/format/fontSize", "text_font_size", reason="video_phase2_dry_run_only"),
 )
 
 CAMERA_CATALOG_PROPERTIES = (
@@ -902,11 +1155,11 @@ CAMERA_CATALOG_PROPERTIES = (
 TEXT_CATALOG_PROPERTIES = (
     _op("text/format", (("format", "dict_or_json_string"),), path="text/format", planned_only_reason="rich_text_format_needs_dedicated_validation"),
     _op("text/format/fontFamilyAndStyle", (("family", "non_empty_string"), ("style", "non_empty_string")), planned_only_reason="font_pair_needs_system_font_validation"),
-    _op("text/format/color", _rgba_args(), planned_only_reason="text_color_changes_need_visual_validation"),
-    _op("text/format/backgroundColor", _rgba_args(), planned_only_reason="text_color_changes_need_visual_validation"),
-    _op("text/format/shadowColor", _rgba_args(), planned_only_reason="text_color_changes_need_visual_validation"),
-    _op("text/format/underlineColor", _rgba_args(), planned_only_reason="text_color_changes_need_visual_validation"),
-    _op("text/format/strikethroughColor", _rgba_args(), planned_only_reason="text_color_changes_need_visual_validation"),
+    _op("text/format/color", _rgba_args(), read_key="text/format/color", planned_only_reason="text_color_changes_need_visual_validation"),
+    _op("text/format/backgroundColor", _rgba_args(), read_key="text/format/backgroundColor", planned_only_reason="text_color_changes_need_visual_validation"),
+    _op("text/format/shadowColor", _rgba_args(), read_key="text/format/shadowColor", planned_only_reason="text_color_changes_need_visual_validation"),
+    _op("text/format/underlineColor", _rgba_args(), read_key="text/format/underlineColor", planned_only_reason="text_color_changes_need_visual_validation"),
+    _op("text/format/strikethroughColor", _rgba_args(), read_key="text/format/strikethroughColor", planned_only_reason="text_color_changes_need_visual_validation"),
     _planned_prop("text/format/lineSpacing", "number", reason="text_layout_changes_need_visual_validation"),
     _planned_prop("text/format/shadowBlurRadius", "non_negative_number", reason="text_shadow_changes_need_visual_validation"),
     _op("text/format/shadowOffset", (("width", "number"), ("height", "number")), planned_only_reason="text_shadow_changes_need_visual_validation"),
@@ -918,9 +1171,9 @@ TEXT_CATALOG_PROPERTIES = (
 )
 
 LIGHT_CATALOG_PROPERTIES = (
-    _planned_prop("lightCommandText", "string", reason="light_commands_can_affect_visual_output"),
-    _planned_prop("alwaysCollate", "boolean", reason="light_collation_can_change_cue_output"),
-    _planned_prop("subcontroller", "boolean", reason="light_dashboard_behavior_needs_validation"),
+    _planned_prop("lightCommandText", "string", reason="light_command_requires_valid_analysis_and_confirm_token"),
+    _planned_prop("alwaysCollate", "boolean", reason="light_behavior_requires_confirm_token"),
+    _planned_prop("subcontroller", "boolean", reason="light_behavior_requires_confirm_token"),
     _op("collateAndStart", (), path="collateAndStart", risk_tier="high", planned_only_reason="light_commands_can_affect_visual_output"),
     _op(
         "setLight",
@@ -1139,17 +1392,17 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
         "Audio profile; only transport metadata is real-write enabled.",
     ),
     "mic_basic": UpdateProfileSpec("mic_basic", ("Mic",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES), "medium", True, "Mic profile with safe channel metadata writes."),
-    "video_basic": UpdateProfileSpec("video_basic", ("Video",), (*COMMON_PROPERTIES, *VIDEO_CATALOG_PROPERTIES), "medium", True, "Video profile with one-argument geometry writes."),
-    "camera_basic": UpdateProfileSpec("camera_basic", ("Camera",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES, *VIDEO_CATALOG_PROPERTIES, *CAMERA_CATALOG_PROPERTIES), "medium", True, "Camera profile with safe channel and geometry writes."),
+    "video_basic": UpdateProfileSpec("video_basic", ("Video",), (*COMMON_PROPERTIES, *VIDEO_AUDIO_TIME_PROPERTIES, *VIDEO_AUDIO_LEVEL_PROPERTIES, *VIDEO_AUDIO_MATRIX_PROPERTIES, *VIDEO_AUDIO_LEVEL_META_PROPERTIES, *VIDEO_AUDIO_MUTE_SOLO_PROPERTIES, *VIDEO_AUDIO_LEVEL_BULK_PROPERTIES, _planned_prop("doFade", "boolean", reason="video_integrated_fade_requires_confirm_token"), _planned_prop("lockFadeToCue", "boolean", reason="video_integrated_fade_requires_confirm_token"), *VIDEO_SLICE_MARKER_PROPERTIES, *VIDEO_CATALOG_PROPERTIES), "medium", True, "Video opacity, translation, visual scalars, embedded-audio timing, audio level, audio matrix, audio level metadata, mute/solo, integrated fade, clockType, and slice marker edits use specialized confirmation gates; remaining visual properties stay dry-run only."),
+    "camera_basic": UpdateProfileSpec("camera_basic", ("Camera",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES, *VIDEO_CATALOG_PROPERTIES, *CAMERA_CATALOG_PROPERTIES), "medium", True, "Camera opacity, translation, and visual scalars use specialized confirmation gates; remaining visual properties stay dry-run only."),
     TEXT_BASIC_UPDATE_PROFILE: UpdateProfileSpec(
         TEXT_BASIC_UPDATE_PROFILE,
         ("Text",),
-        (*COMMON_PROPERTIES, *TEXT_SAFE_PROPERTIES, *TEXT_CATALOG_PROPERTIES),
+        (*COMMON_PROPERTIES, *TEXT_SAFE_PROPERTIES, *VIDEO_PHASE2_VISUAL_PROPERTIES, *TEXT_CATALOG_PROPERTIES),
         "medium",
         True,
-        "Text profile; only simple text formatting is real-write enabled.",
+        "Text visual properties and basic text content, font size, and alignment use specialized confirmation gates; rich formatting stays dry-run only.",
     ),
-    "light_basic": UpdateProfileSpec("light_basic", ("Light",), (*COMMON_PROPERTIES, *LIGHT_CATALOG_PROPERTIES), "high", True, "Light profile; light commands remain dry-run only."),
+    "light_basic": UpdateProfileSpec("light_basic", ("Light",), (*COMMON_PROPERTIES, *LIGHT_CATALOG_PROPERTIES), "high", True, "Light profile; lightCommandText and saved behavior flags use specialized confirmation gates."),
     "fade_basic": UpdateProfileSpec("fade_basic", ("Fade",), (*COMMON_PROPERTIES, *FADE_CATALOG_PROPERTIES), "high", True, "Fade profile; fade targets remain dry-run only."),
     "network_basic": UpdateProfileSpec("network_basic", ("Network",), (*COMMON_PROPERTIES, *NETWORK_CATALOG_PROPERTIES), "high", True, "Network profile; network messages remain dry-run only."),
     "midi_basic": UpdateProfileSpec("midi_basic", ("MIDI",), (*COMMON_PROPERTIES, *MIDI_CATALOG_PROPERTIES), "high", True, "MIDI profile; MIDI messages remain dry-run only."),
@@ -1451,6 +1704,30 @@ def real_write_permission_errors(
     errors: dict[str, str] = {}
     for operation in operations:
         prop = str(operation["property"])
+        if profile == "light_basic" and prop == "lightCommandText":
+            errors[prop] = (
+                "lightCommandText is gated or dry-run only outside the specialized "
+                "single-cue Phase 4 qlab_update_cues flow."
+            )
+            continue
+        if profile == "light_basic" and prop in {
+            "collateAndStart",
+            "setLight",
+            "replaceLightCommand",
+            "removeLightCommandsMatching",
+            "safeSort",
+            "safeSortCommands",
+            "prune",
+            "pruneCommands",
+        }:
+            errors[prop] = f"{prop} is gated or dry-run only in PLAN LUCES Phase 5."
+            continue
+        if profile == "light_basic" and prop in {"alwaysCollate", "subcontroller"}:
+            errors[prop] = (
+                f"{prop} is gated or dry-run only outside the specialized single-cue Phase 5 "
+                "qlab_update_cues flow."
+            )
+            continue
         if operation["real_write_enabled"]:
             continue
         token = str(operation.get("confirm_token") or "")
@@ -1481,7 +1758,8 @@ def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
     catalog = profile_catalog()
     update_cues_capability = {
         "planned": True,
-        "tool": "qlab_update_cues",
+        "tool": "qlab_edit_cues",
+        "legacy_tool_aliases": ["qlab_update_cues"],
         "batch": {
             "min_items": 1,
             "max_items": 50,
@@ -1551,11 +1829,18 @@ def _normalize_one_operation(
 ) -> dict[str, Any]:
     spec = _property_spec(profile, property_name)
     normalized_mode = _validate_mode(spec, mode)
+    video_phase2_profiles = {"video_basic", "camera_basic", "text_basic"}
+    if normalized_mode == "live" and profile in video_phase2_profiles:
+        raise UnsafeWriteOperationError("Video-family editing blocks live mode; use saved mode for dry-run planning")
     normalized_args = _normalize_args(spec, raw_args, source=source)
     path = _render_path(spec, normalized_args)
     if normalized_mode == "live":
         path = f"{path}/live"
-    osc_args = [normalized_args[arg_name] for arg_name in spec.osc_args]
+    osc_args = (
+        list(normalized_args["value"])
+        if spec.name == "quaternion"
+        else [normalized_args[arg_name] for arg_name in spec.osc_args]
+    )
     operation = {
         "operation": "set_property",
         "property": spec.name,
@@ -1571,7 +1856,23 @@ def _normalize_one_operation(
         "readback": spec.readback,
         "contextual_requirements": list(spec.contextual_requirements),
     }
-    if not spec.real_write_enabled:
+    if profile in video_phase2_profiles and spec.name in VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES:
+        operation.update(
+            {
+                "real_write_possible": False,
+                "requires_confirm_token": False,
+                "future_gate_requirements": [
+                    "future_versioned_confirm_token",
+                    "single_cue_single_property",
+                    "saved_mode",
+                    "fresh_baseline",
+                    "exact_readback",
+                    "manual_rollback_plan",
+                    *(["verify_first_character_inherited_format"] if spec.name == "text" else []),
+                ],
+            }
+        )
+    elif not spec.real_write_enabled:
         operation["confirm_token"] = _confirm_token(profile, spec.name, path, normalized_mode, osc_args)
     return operation
 
@@ -1610,8 +1911,14 @@ def _validate_mode(spec: CuePropertySpec, mode: Any) -> str:
 
 def _normalize_args(spec: CuePropertySpec, raw_args: Any, *, source: str) -> dict[str, Any]:
     if source == "properties":
+        if spec.name == "resetRotation" and len(spec.args) == 0:
+            if raw_args is not True:
+                raise UnsafeWriteOperationError("resetRotation property form must be true")
+            return {}
         if len(spec.args) != 1 or spec.args[0][0] != "value":
             raise UnsafeWriteOperationError(f"{spec.name} requires operations[] because it has structured arguments")
+        return {"value": _validate_named_value(spec.name, spec.args[0][1], raw_args)}
+    if spec.name == "quaternion" and len(spec.args) == 1 and spec.args[0][0] == "value":
         return {"value": _validate_named_value(spec.name, spec.args[0][1], raw_args)}
     if len(spec.args) == 1 and spec.args[0][0] == "value" and not isinstance(raw_args, dict):
         return {"value": _validate_named_value(spec.name, spec.args[0][1], raw_args)}
@@ -1675,6 +1982,11 @@ def _validate_value(validator: str, value: Any) -> Any:
         if number <= 0:
             raise UnsafeWriteOperationError("value must be a positive number")
         return number
+    if validator == "text_font_size":
+        number = _number(value, "value must be a finite number greater than 0 and at most 1000")
+        if not math.isfinite(float(number)) or number <= 0 or number > 1000:
+            raise UnsafeWriteOperationError("value must be a finite number greater than 0 and at most 1000")
+        return number
     if validator == "int":
         return _int(value, "value must be an integer")
     if validator == "non_negative_int":
@@ -1699,17 +2011,21 @@ def _validate_value(validator: str, value: Any) -> Any:
         return number
     if validator == "opacity":
         number = _number(value, "opacity must be a number from 0 to 1")
-        if number < 0 or number > 1:
+        if not math.isfinite(float(number)) or number < 0 or number > 1:
             raise UnsafeWriteOperationError("opacity must be a number from 0 to 1")
         return number
     if validator == "video_layer":
         return _int_range(value, 0, 1000, "value must be an integer from 0 to 1000")
     if validator == "video_fill_style":
         return _int_range(value, 0, 2, "value must be 0 for fit, 1 for fill, or 2 for stretch")
+    if validator == "quaternion":
+        return _quaternion(value)
     if validator == "video_blend_mode":
         return _blend_mode(value)
     if validator == "video_clock_type":
-        return _enum_string(value, {"audio", "video"}, "value must be audio or video")
+        if value not in {"audio", "video"}:
+            raise UnsafeWriteOperationError("value must be exactly audio or video")
+        return value
     if validator == "continue_mode":
         return _continue_mode(value)
     if validator == "color_condition":
@@ -1832,7 +2148,22 @@ def _group_mode(value: Any) -> int:
 def _number(value: Any, message: str) -> int | float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise UnsafeWriteOperationError(message)
+    if not math.isfinite(float(value)):
+        raise UnsafeWriteOperationError(message)
     return value
+
+
+def _quaternion(value: Any) -> list[int | float]:
+    if not isinstance(value, (list, tuple)) or len(value) != 4:
+        raise UnsafeWriteOperationError("value must be an array of exactly four finite numbers")
+    quaternion: list[int | float] = []
+    for component in value:
+        if isinstance(component, bool) or not isinstance(component, (int, float)):
+            raise UnsafeWriteOperationError("value must be an array of exactly four finite numbers")
+        if not math.isfinite(float(component)):
+            raise UnsafeWriteOperationError("value must be an array of exactly four finite numbers")
+        quaternion.append(component)
+    return quaternion
 
 
 def _decibel(value: Any) -> int | float | str:
@@ -1870,11 +2201,10 @@ def _enum_string(value: Any, allowed: set[str], message: str) -> str:
 def _blend_mode(value: Any) -> str:
     if not isinstance(value, str):
         raise UnsafeWriteOperationError("value must be a QLab video blend mode")
-    normalized = value.strip().casefold()
-    if normalized not in QLAB_BLEND_MODES:
+    if value not in QLAB_BLEND_MODES:
         allowed = ", ".join(QLAB_BLEND_MODES.values())
         raise UnsafeWriteOperationError(f"value must be one of: {allowed}")
-    return QLAB_BLEND_MODES[normalized]
+    return value
 
 
 def _json_value(value: Any) -> Any:

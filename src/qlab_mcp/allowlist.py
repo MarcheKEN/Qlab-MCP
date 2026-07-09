@@ -130,6 +130,7 @@ TYPE_SPECIFIC_PROPERTIES = {
     "audioOutputPatchName",
     "audioOutputPatchNumber",
     "audioOutputPatchID",
+    "audioTrackFormats",
     "audioInputPatchName",
     "audioInputPatchNumber",
     "audioInputPatchID",
@@ -147,6 +148,7 @@ TYPE_SPECIFIC_PROPERTIES = {
     "lockFadeToCue",
     "lastSlicePlayCount",
     "lastSliceInfiniteLoop",
+    "sliceMarkers",
     "channelOffset",
     "channels",
     "stage",
@@ -446,6 +448,11 @@ INSPECTOR_SAFE_PROFILE = tuple(
             *tuple(sorted(TARGET_PROPERTIES - SENSITIVE_CUE_PROPERTIES)),
             *tuple(sorted(GROUP_PROPERTIES)),
             *tuple(sorted(TYPE_SPECIFIC_PROPERTIES - SENSITIVE_CUE_PROPERTIES - HEAVY_CUE_PROPERTIES)),
+            "cueSize",
+            "cueSize/width",
+            "cueSize/height",
+            "text/outputSize/width",
+            "text/outputSize/height",
         )
     )
 )
@@ -532,7 +539,7 @@ def validate_property_path(property_path: str) -> str:
         raise UnsafeCuePropertyError("Cue property path cannot be empty")
     if any(part in {"..", ""} for part in normalized.split("/")):
         raise UnsafeCuePropertyError(f"Unsafe cue property path: {property_path!r}")
-    if normalized not in READ_ONLY_CUE_PROPERTIES:
+    if normalized not in READ_ONLY_CUE_PROPERTIES and not _is_dynamic_audio_level_read_key(normalized):
         raise UnsafeCuePropertyError(f"Cue property is not allowlisted for read-only access: {normalized}")
     return normalized
 
@@ -576,8 +583,17 @@ def validate_value_keys(keys: list[str] | tuple[str, ...]) -> list[str]:
             raise UnsafeCuePropertyError(f"Unsafe cue value key: {key!r}")
         if value in BLOCKED_VALUE_KEYS or value.split("/", 1)[0] in BLOCKED_VALUE_KEYS:
             raise UnsafeCuePropertyError(f"Cue value key is not read-only: {value}")
-        if value not in READ_ONLY_CUE_PROPERTIES:
+        if value not in READ_ONLY_CUE_PROPERTIES and not _is_dynamic_audio_level_read_key(value):
             raise UnsafeCuePropertyError(f"Cue value key is not allowlisted for read-only access: {value}")
         normalized.append(value)
     return normalized
+
+
+def _is_dynamic_audio_level_read_key(value: str) -> bool:
+    parts = value.split("/")
+    if len(parts) == 2 and parts[0] == "inputChannelName":
+        return parts[1].isdigit() and int(parts[1]) >= 1
+    if len(parts) == 3 and parts[0] == "gang":
+        return all(part.isdigit() for part in parts[1:]) and int(parts[1]) >= 0 and int(parts[2]) >= 0
+    return False
 

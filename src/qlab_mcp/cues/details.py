@@ -12,6 +12,7 @@ from ..write.registry import editable_update_capabilities
 from .profiles import (
     _auto_type_specific_keys,
     _build_auto_sections,
+    _build_video_summary,
     _derive_profile_fields,
     _empty_auto_sections,
     _is_active_cue_ref,
@@ -22,6 +23,7 @@ from .coverage import default_read_coverage_report
 MAX_VALUES_FOR_KEYS = 100
 MAX_BATCH_CUE_DETAILS = 50
 UNRESOLVED_CUE_ERROR_CODE = "cue_ref_unresolved"
+SLICE_DETAIL_KEYS = ("sliceMarkers", "lastSlicePlayCount", "lastSliceInfiniteLoop")
 EXHAUSTIVE_WARNING = (
     "profile='exhaustive' may return large, sensitive, or heavy read-only payloads "
     "including notes, file targets, scripts, stage data, maps, routing, and geometry."
@@ -68,6 +70,10 @@ def _profile_warnings(profile: str, requested_count: int = 1) -> list[str]:
     if requested_count > 1:
         warnings.append(EXHAUSTIVE_BATCH_WARNING)
     return warnings
+
+
+def _is_slice_capable_type(cue_type: Any) -> bool:
+    return str(cue_type or "").strip().casefold() in {"audio", "video"}
 
 
 def _attach_read_coverage(result: dict[str, Any], profile: str) -> None:
@@ -126,6 +132,33 @@ def _normalize_cue_detail_result(result: dict[str, Any]) -> dict[str, Any]:
 
 
 class CueDetailsMixin:
+    def _attach_video_summaries(
+        self,
+        workspace_id: str,
+        results: list[dict[str, Any]],
+        profile: str,
+    ) -> None:
+        if profile.strip().lower() != "inspector_safe":
+            return
+        visual_results = [
+            result for result in results
+            if str(result.get("cue_type") or "").strip().casefold() in {"video", "text", "camera"}
+        ]
+        if not visual_results:
+            return
+        settings_errors: dict[str, str] = {}
+        try:
+            video_settings = self._workspace_settings_video(workspace_id, "safe", [], settings_errors)
+        except Exception as exc:
+            settings_errors["video.settings"] = sanitize_exception_message(exc)
+            video_settings = None
+        for result in visual_results:
+            summary = _build_video_summary(result.get("properties", {}), video_settings, settings_errors)
+            if summary is None:
+                continue
+            sections = result.setdefault("sections", {})
+            sections["video_summary"] = summary
+
     def _read_cue_values_with_fallback(
         self,
         workspace_id: str,
@@ -163,6 +196,27 @@ class CueDetailsMixin:
                 except Exception as property_exc:
                     errors[property_path] = sanitize_exception_message(property_exc)
         return values
+
+    def _fill_missing_slice_detail_values(
+        self,
+        workspace_id: str,
+        cue_ref: str,
+        requested_keys: list[str] | tuple[str, ...],
+        values: dict[str, Any],
+        errors: dict[str, str],
+    ) -> None:
+        if not _is_slice_capable_type(values.get("type")):
+            return
+        for key in SLICE_DETAIL_KEYS:
+            if key not in requested_keys or key in values:
+                continue
+            try:
+                values[key] = self.read_cue_property(workspace_id, cue_ref, key)["value"]
+            except Exception as exc:
+                if key == "sliceMarkers":
+                    values[key] = []
+                    continue
+                continue
 
     def _get_auto_cue_details(self, workspace_id: str, cue_ref: str) -> dict[str, Any]:
         errors: dict[str, str] = {}
@@ -204,6 +258,7 @@ class CueDetailsMixin:
                 cacheable=cacheable,
             )
             values.update(type_specific_values)
+            self._fill_missing_slice_detail_values(workspace_id, cue_ref, type_specific_keys, values, errors)
             values = truncate_profile_payload("auto", _derive_profile_fields("auto", values))
 
         result: dict[str, Any] = {
@@ -277,6 +332,7 @@ class CueDetailsMixin:
             )
         if _looks_unresolved(values, errors):
             errors = _compact_unresolved_errors()
+        self._fill_missing_slice_detail_values(workspace_id, cue_ref, keys, values, errors)
         values = truncate_profile_payload(profile, _derive_profile_fields(profile, values))
 
         result: dict[str, Any] = {
@@ -332,7 +388,9 @@ class CueDetailsMixin:
                 "warnings": ["Requested workspace could not be resolved."],
             }
         if isinstance(cue_ref, str):
-            return _normalize_cue_detail_result(self._get_single_cue_details(resolved_workspace_id, cue_ref, profile))
+            result = _normalize_cue_detail_result(self._get_single_cue_details(resolved_workspace_id, cue_ref, profile))
+            self._attach_video_summaries(resolved_workspace_id, [result], profile)
+            return result
         if not isinstance(cue_ref, list):
             raise ValueError("cue_ref must be a string or a list of strings")
         if not cue_ref:
@@ -376,6 +434,7 @@ class CueDetailsMixin:
                 failed_count += 1
 
         succeeded_count = len(cue_ref) - failed_count
+        self._attach_video_summaries(resolved_workspace_id, results, profile)
         if failed_count:
             warnings.append("One or more cue detail reads failed; inspect errors for per-cue failures.")
         batch_result = {

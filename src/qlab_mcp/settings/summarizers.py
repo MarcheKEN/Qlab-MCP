@@ -170,6 +170,22 @@ def _summarize_audio_map_detail(item: Any) -> dict[str, Any]:
     }
 
 
+def _summarize_video_device(item: Any) -> dict[str, Any]:
+    if not isinstance(item, dict):
+        return {"present": False}
+    summary: dict[str, Any] = {"present": bool(item)}
+    name = _first_present(item, ("name", "deviceName", "displayName"))
+    device_type = _first_present(item, ("destinationType", "deviceType", "type"))
+    if name is not None:
+        summary["name"] = name
+    if device_type is not None:
+        summary["type"] = device_type
+    connected = item.get("connected")
+    if connected is not None:
+        summary["connected"] = connected
+    return summary
+
+
 def _summarize_video_route(item: Any) -> dict[str, Any]:
     summary = _basic_item_summary(item)
     if isinstance(item, dict):
@@ -189,16 +205,26 @@ def _summarize_video_route(item: Any) -> dict[str, Any]:
             destination_type = destination_info.get("destinationType")
             if destination_type is not None:
                 summary["destination_type"] = destination_type
+            summary["device"] = _summarize_video_device(destination_info)
         summary["destination_present"] = _contains_any_key(item, {"destinationinfo", "device", "deviceid", "devicename"})
         summary["guides_present"] = _contains_any_key(item, {"enableguides", "guides"})
     return summary
 
 
-def _summarize_video_input_patch(item: Any) -> dict[str, Any]:
+def _summarize_video_input_patch(item: Any, number: int | None = None) -> dict[str, Any]:
     summary = _basic_item_summary(item)
+    if number is not None:
+        summary["number"] = number
     if isinstance(item, dict):
-        summary["device_present"] = _contains_any_key(item, SAFE_DEVICE_REDACT_KEYS)
-        summary["source_present"] = _contains_any_key(item, {"source", "input", "camera", "capturedevice"})
+        device_known = "device_present" in item or _contains_any_key(item, SAFE_DEVICE_REDACT_KEYS)
+        source_known = "source_present" in item or _contains_any_key(item, {"source", "input", "camera", "capturedevice"})
+        summary["device_present"] = bool(item.get("device_present")) if "device_present" in item else device_known
+        summary["source_present"] = bool(item.get("source_present")) if "source_present" in item else source_known
+        summary["device_presence_known"] = device_known
+        summary["source_presence_known"] = source_known
+        for key in ("connected", "available"):
+            if key in item:
+                summary[key] = item[key]
     return summary
 
 
@@ -213,21 +239,29 @@ def _summarize_video_stage(item: Any, regions: Any | None = None) -> dict[str, A
         embedded_region_count = _count_nested(item, ("regions",))
         if embedded_region_count is not None:
             summary["region_count"] = embedded_region_count
-        route = None
-        item_regions = item.get("regions")
-        if isinstance(item_regions, list) and item_regions and isinstance(item_regions[0], dict):
-            route = item_regions[0].get("route")
-        if isinstance(route, dict):
-            route_summary = _summarize_video_route(route)
-            if route_summary:
-                summary["route"] = route_summary
-    if regions is not None:
-        summary["region_count"] = len(_collection_items(regions))
+    region_items = _collection_items(regions if regions is not None else item.get("regions") if isinstance(item, dict) else None)
+    region_summaries = [_summarize_video_region(region, index) for index, region in enumerate(region_items)]
+    summary["region_count"] = len(region_summaries)
+    summary["regions"] = region_summaries
+    route_keys: set[tuple[str, str]] = set()
+    for region in region_summaries:
+        route = region.get("route")
+        if not isinstance(route, dict):
+            continue
+        route_id = route.get("uniqueID")
+        route_name = route.get("name")
+        device = route.get("device") if isinstance(route.get("device"), dict) else {}
+        key = (str(route_id or route_name or ""), str(device.get("name") or device.get("type") or ""))
+        if any(key):
+            route_keys.add(key)
+    summary["multi_output"] = len(route_keys) > 1
     return summary
 
 
-def _summarize_video_region(item: Any) -> dict[str, Any]:
+def _summarize_video_region(item: Any, index: int | None = None) -> dict[str, Any]:
     summary = _basic_item_summary(item)
+    if index is not None:
+        summary["index"] = index
     if not isinstance(item, dict):
         return summary
     for key in (
@@ -260,7 +294,10 @@ def _summarize_video_region(item: Any) -> dict[str, Any]:
 
 
 def _summarize_video_stage_detail(stage: Any, regions: Any | None) -> dict[str, Any]:
-    region_summaries = [_summarize_video_region(region) for region in _collection_items(regions)]
+    region_summaries = [
+        _summarize_video_region(region, index)
+        for index, region in enumerate(_collection_items(regions))
+    ]
     return {
         "stage": _summarize_video_stage(stage, regions),
         "regions": region_summaries,
@@ -271,6 +308,28 @@ def _summarize_video_stage_detail(stage: Any, regions: Any | None) -> dict[str, 
             "regions[].route.destinationInfo",
         ],
     }
+
+
+def _video_settings_problems(stages: list[dict[str, Any]], routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    problems: list[dict[str, Any]] = []
+    for route in routes:
+        if route.get("connected") is False:
+            problems.append({"code": "disconnected_route", "route": _basic_item_summary(route)})
+        device = route.get("device") if isinstance(route.get("device"), dict) else {}
+        if device.get("connected") is False:
+            problems.append({"code": "disconnected_device", "route": _basic_item_summary(route)})
+        if route.get("destination_present") is False:
+            problems.append({"code": "route_without_device", "route": _basic_item_summary(route)})
+    for stage in stages:
+        routed_regions = [
+            region for region in stage.get("regions", [])
+            if isinstance(region, dict) and isinstance(region.get("route"), dict) and region["route"]
+        ]
+        if not routed_regions:
+            problems.append({"code": "stage_without_routes", "stage": _basic_item_summary(stage)})
+        if stage.get("multi_output") is True:
+            problems.append({"code": "multi_output_stage", "stage": _basic_item_summary(stage)})
+    return problems
 
 
 def _summarize_network_patch(item: Any) -> dict[str, Any]:
@@ -363,22 +422,27 @@ def _light_instruments(value: Any) -> list[Any]:
 def _light_definition_summary(definition: Any) -> dict[str, Any]:
     if not isinstance(definition, dict):
         return {}
-    summary: dict[str, Any] = {}
-    for key in ("name", "manufacturer", "definitionVersion", "defaultParameter", "isBroken"):
-        if key in definition:
-            summary[key] = definition[key]
+    summary: dict[str, Any] = {
+        "name": definition.get("name"),
+        "manufacturer": definition.get("manufacturer"),
+        "version": definition.get("definitionVersion"),
+        "broken": definition.get("isBroken"),
+        "default_parameter_index": definition.get("defaultParameter"),
+        "default_parameter_name": None,
+    }
     parameters = definition.get("parameters")
     parameter_items = _collection_items(parameters)
     if parameter_items:
-        summary["parameter_count"] = len(parameter_items)
         parameter_names: list[str] = []
         for item in parameter_items:
             if isinstance(item, dict):
                 name = item.get("name")
                 if name not in (None, "") and str(name) not in parameter_names:
                     parameter_names.append(str(name))
-        if parameter_names:
-            summary["parameter_names"] = parameter_names
+                if str(item.get("_key")) == str(definition.get("defaultParameter")):
+                    summary["default_parameter_name"] = name
+        summary["parameter_count"] = len(parameter_items)
+        summary["parameter_names"] = parameter_names
     return summary
 
 
@@ -425,19 +489,78 @@ def _light_instrument_summary(item: Any) -> dict[str, Any]:
     return summary
 
 
+def _light_parameter_summary(parameter: Any, *, scope: str, owner_name: Any) -> dict[str, Any]:
+    if not isinstance(parameter, dict):
+        return {
+            "scope": scope,
+            "owner_name": owner_name,
+            "name": None,
+            "unique_name": None,
+            "type": "unknown",
+            "broken": None,
+            "home_value": None,
+            "home_value_dmx": None,
+            "value_is_percentage": None,
+            "two_bytes": None,
+        }
+    definition_parameter = parameter.get("definitionParameter")
+    definition_parameter = definition_parameter if isinstance(definition_parameter, dict) else {}
+
+    def value(*keys: str) -> Any:
+        for source in (parameter, definition_parameter):
+            result = _first_present_case_insensitive(source, keys)
+            if result not in (None, ""):
+                return result
+        return None
+
+    return {
+        "scope": scope,
+        "owner_name": owner_name,
+        "name": value("name"),
+        "unique_name": value("uniqueName"),
+        "type": value("type") or "unknown",
+        "broken": value("isBroken"),
+        "home_value": value("homeValue"),
+        "home_value_dmx": value("homeValueInDMX"),
+        "value_is_percentage": value("valueIsPercentage"),
+        "two_bytes": value("twoBytes"),
+    }
+
+
+def _light_parameters(owner: Any, *, scope: str) -> list[dict[str, Any]]:
+    if not isinstance(owner, dict):
+        return []
+    parameters = _collection_items(owner.get("parameters"))
+    if not parameters and scope == "instrument" and isinstance(owner.get("definition"), dict):
+        parameters = _collection_items(owner["definition"].get("parameters"))
+    return [
+        _light_parameter_summary(parameter, scope=scope, owner_name=owner.get("name"))
+        for parameter in parameters
+    ]
+
+
 def _summarize_light_patch_detail(value: Any) -> dict[str, Any]:
     summary = _summarize_light_patch(value)
-    instruments = [_light_instrument_summary(item) for item in _light_instruments(value)]
+    instrument_items = _light_instruments(value)
+    instruments = [_light_instrument_summary(item) for item in instrument_items]
+    parameters = [parameter for item in instrument_items for parameter in _light_parameters(item, scope="instrument")]
     groups = []
     for group in _light_groups(value):
         group_summary = _basic_item_summary(group)
         group_instruments = _collection_items(group.get("instruments")) if isinstance(group, dict) else []
+        group_parameters = _light_parameters(group, scope="group")
         group_summary["instrument_count"] = len(group_instruments)
         group_summary["instrument_names"] = [
             str(item.get("name"))
             for item in group_instruments
             if isinstance(item, dict) and item.get("name") not in (None, "")
         ]
+        group_summary["parameter_names"] = [
+            str(parameter["name"])
+            for parameter in group_parameters
+            if parameter.get("name") not in (None, "")
+        ]
+        parameters.extend(group_parameters)
         groups.append(group_summary)
 
     definition_counts: dict[str, int] = {}
@@ -454,7 +577,9 @@ def _summarize_light_patch_detail(value: Any) -> dict[str, Any]:
 
     return {
         "summary": summary,
+        "instruments": instruments,
         "groups": groups,
+        "parameters": parameters,
         "instrument_index": {
             "columns": [
                 "name",

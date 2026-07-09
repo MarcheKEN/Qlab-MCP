@@ -383,6 +383,8 @@ class UpdateCueResult(BaseModel):
     verification: dict[str, Any] | None = None
     errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
+    notices: list[str] = Field(default_factory=list)
+    updateq_plan: dict[str, Any] | None = None
     message: str
 
 
@@ -446,6 +448,8 @@ class UpdateCueItemResult(BaseModel):
         description="Per-cue read, setter, timeout, profile, or verification errors; null when none.",
     )
     warnings: list[str] = Field(default_factory=list)
+    notices: list[str] = Field(default_factory=list)
+    updateq_plan: dict[str, Any] | None = None
     debug: dict[str, Any] | None = Field(
         default=None,
         description="Optional verification diagnostics when QLAB_UPDATE_DEBUG is enabled.",

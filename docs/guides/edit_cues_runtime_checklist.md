@@ -1,4 +1,7 @@
-# qlab_update_cues Runtime Checklist
+# qlab_edit_cues Runtime Checklist
+
+`qlab_edit_cues` is the preferred public tool name. `qlab_update_cues` remains a
+compatibility alias for older prompts, tests, and clients.
 
 Use this checklist only on a disposable editable QLab test workspace.
 
@@ -33,7 +36,7 @@ Batch timeout smoke:
 
 1. Pick 20-50 existing disposable test cues with concrete cue IDs.
 2. Read current `flagged` and `colorName` with `qlab_get_cue_details(profile="basic_safe")`.
-3. Run `qlab_update_cues(..., dry_run=true)` using profile `common` and safe properties:
+3. Run `qlab_edit_cues(..., dry_run=true)` using profile `common` and safe properties:
    - `flagged=true`
    - `colorName="blue"`
 4. Expected dry-run:
@@ -54,7 +57,7 @@ Batch timeout smoke:
 
 Rollback smoke:
 
-1. Run `qlab_update_cues(..., dry_run=true)` with the exact before values.
+1. Run `qlab_edit_cues(..., dry_run=true)` with the exact before values.
 2. Expected rollback dry-run:
    - `ok=true`
    - `status="dry_run"`
@@ -71,7 +74,7 @@ Safety block smoke:
 
 1. Pick one returned `dry_run_only_properties` field from
    `qlab_get_cue_details(profile="editable")`, preferably a clear test cue.
-2. Run `qlab_update_cues(..., dry_run=true)`.
+2. Run `qlab_edit_cues(..., dry_run=true)`.
 3. If the field's read key is readable, expect planned operations and
    `executed_operations=[]`. Some cataloged dry-run-only fields may instead fail
    read-before preflight because their read key is intentionally not exposed by
@@ -85,7 +88,7 @@ Safety block smoke:
 Playlist Group smoke:
 
 1. Pick one disposable Group cue whose `mode` is not `6`.
-2. Run `qlab_update_cues(..., dry_run=false)` for
+2. Run `qlab_edit_cues(..., dry_run=false)` for
    `playlist/crossfade/duration`.
 3. Expected block:
    - preflight fails before setters
@@ -101,7 +104,7 @@ Playlist Group smoke:
 
 Mic input routing smoke:
 
-1. Run `qlab_update_cues(..., dry_run=true)` for `mic_basic.channelOffset`.
+1. Run `qlab_edit_cues(..., dry_run=true)` for `mic_basic.channelOffset`.
 2. Expected dry-run:
    - planned setter exists
    - `real_write_enabled=false`
@@ -116,7 +119,7 @@ Editable duration smoke:
 1. Pick one disposable Wait or Memo cue where
    `qlab_get_cue_details(profile="editable")` reports
    `allowsEditingDuration=false`.
-2. Run `qlab_update_cues(..., dry_run=false)` for `duration`.
+2. Run `qlab_edit_cues(..., dry_run=false)` for `duration`.
 3. Expected block:
    - preflight fails before setters
    - no `/duration` setter is sent
@@ -132,7 +135,7 @@ Editable duration smoke:
 Target resolution smoke:
 
 1. Pick one disposable target cue and one disposable Start/Stop/Pause/Load/GoTo/Arm/Disarm cue.
-2. Run `qlab_update_cues(..., dry_run=true)` for `cueTargetID`.
+2. Run `qlab_edit_cues(..., dry_run=true)` for `cueTargetID`.
 3. Copy the exact `planned_operations[].confirm_token` for `cueTargetID` into
    `updates[].confirm_gates`, then run the same with `dry_run=false`.
 4. Expected real write:
@@ -152,7 +155,7 @@ Capability gate smoke:
 
 1. Pick one disposable cue and one high-risk property whose
    `planned_operations[]` includes a `capability_gate`.
-2. Run `qlab_update_cues(..., dry_run=true)` with no `confirm_gates`.
+2. Run `qlab_edit_cues(..., dry_run=true)` with no `confirm_gates`.
 3. Confirm the dry-run plan includes `capability_gate` and `confirm_token`.
 4. Run the same update with `dry_run=false` and no `confirm_gates`.
 5. Expected block:
@@ -192,7 +195,7 @@ Report:
 - real-write status
 - rollback status
 - final readback result
-- count of `qlab_update_cues` calls
+- count of `qlab_edit_cues` calls
 - count of real-write calls
 - count of timeout-confirmed cues
 - any unexpected `executed_operations`

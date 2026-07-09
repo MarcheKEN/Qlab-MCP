@@ -21,9 +21,11 @@ from .summarizers import (
     _summarize_midi_patch,
     _summarize_network_patch,
     _summarize_setting_detail_item,
+    _summarize_video_input_patch,
     _summarize_video_route,
     _summarize_video_stage,
     _summarize_video_stage_detail,
+    _video_settings_problems,
 )
 
 
@@ -390,13 +392,20 @@ class WorkspaceSettingsMixin:
         _record_redactions(routes, "video", profile, redactions, "video.routes")
         _record_redactions(stages, "video", profile, redactions, "video.stages")
         _record_redactions(stage_regions, "video", profile, redactions, "video.stage_regions")
-        return {
-            "input_patches": [_basic_item_summary(item) for item in _collection_items(input_patches)],
-            "routes": [_summarize_video_route(item) for item in _collection_items(routes)],
-            "stages": [
+        summarized_input_patches = [
+            _summarize_video_input_patch(item, index)
+            for index, item in enumerate(_collection_items(input_patches), start=1)
+        ]
+        summarized_routes = [_summarize_video_route(item) for item in _collection_items(routes)]
+        summarized_stages = [
                 _summarize_video_stage(stage, region_data_for_stage(stage))
                 for stage in _collection_items(stages)
-            ],
+        ]
+        return {
+            "input_patches": summarized_input_patches,
+            "routes": summarized_routes,
+            "stages": summarized_stages,
+            "problems": _video_settings_problems(summarized_stages, summarized_routes),
         }
 
     def _workspace_settings_network(

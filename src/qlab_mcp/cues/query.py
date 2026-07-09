@@ -105,8 +105,16 @@ QUERY_BASE_PROPERTIES = (
 )
 QUERY_DEFAULT_OUTPUT_KEYS = QUERY_BASE_PROPERTIES
 
+MAX_VALUES_FOR_KEYS = 100
+
+
 def _dedupe_preserve_order(values: list[str] | tuple[str, ...]) -> list[str]:
     return list(dict.fromkeys(values))
+
+
+def _chunk_keys(keys: list[str], size: int = MAX_VALUES_FOR_KEYS) -> list[list[str]]:
+    return [keys[index : index + size] for index in range(0, len(keys), size)]
+
 
 def _normalize_query_filter(filter_name: str, value: Any) -> dict[str, Any]:
     normalized = filter_name.strip()
@@ -297,7 +305,8 @@ class CueQueryMixin:
         filter_keys: list[str] = []
         for query_filter in filters:
             filter_keys.extend(QUERY_FILTER_PROPERTIES[query_filter["filter"]])
-        keys = validate_value_keys(_dedupe_preserve_order([*QUERY_BASE_PROPERTIES, *profile_keys, *filter_keys]))
+        keys = _dedupe_preserve_order([*QUERY_BASE_PROPERTIES, *profile_keys, *filter_keys])
+        key_chunks = [validate_value_keys(chunk) for chunk in _chunk_keys(keys)]
 
         scanned_count = 0
         matched_count = 0
@@ -310,15 +319,18 @@ class CueQueryMixin:
                 continue
             scanned_count += 1
             try:
-                values = self.read_cue_values(
-                    resolved_workspace_id,
-                    str(cue_id),
-                    keys,
-                    cache_profile=profile,
-                    cacheable=cacheable,
-                )["values"]
-                if not isinstance(values, dict):
-                    raise ValueError("QLab valuesForKeys response must be an object")
+                values: dict[str, Any] = {}
+                for key_chunk in key_chunks:
+                    chunk_values = self.read_cue_values(
+                        resolved_workspace_id,
+                        str(cue_id),
+                        key_chunk,
+                        cache_profile=profile,
+                        cacheable=cacheable,
+                    )["values"]
+                    if not isinstance(chunk_values, dict):
+                        raise ValueError("QLab valuesForKeys response must be an object")
+                    values.update(chunk_values)
             except Exception as exc:
                 errors[str(cue_id)] = sanitize_exception_message(exc)
                 continue

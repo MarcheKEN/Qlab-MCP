@@ -5,11 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from dataclasses import dataclass, replace
-from string import Formatter
+from dataclasses import replace
 from typing import Any
 
 from ..errors import UnsafeWriteOperationError
+from .property_specs import CuePropertySpec, UpdateProfileSpec, _op, _path_arg_names, _planned_prop, _prop
+from .sections.basics import COMMON_PROPERTIES
 
 
 COMMON_UPDATE_PROFILE = "common"
@@ -71,137 +72,6 @@ VALID_BLEND_MODES = (
     "Source Atop Compositing",
 )
 QLAB_BLEND_MODES = {name: name for name in VALID_BLEND_MODES}
-
-
-@dataclass(frozen=True)
-class CuePropertySpec:
-    name: str
-    path: str | None = None
-    args: tuple[tuple[str, str], ...] = (("value", "any"),)
-    osc_args: tuple[str, ...] = ("value",)
-    read_key: str | None = None
-    modes: tuple[str, ...] = ("saved",)
-    risk_tier: str = "safe"
-    real_write_enabled: bool = False
-    planned_only_reason: str | None = None
-    doc_section: str | None = None
-    osc_paths: tuple[str, ...] = ()
-    capability_gate: str | None = None
-    readback: str = "value"
-    contextual_requirements: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class UpdateProfileSpec:
-    name: str
-    cue_types: tuple[str, ...]
-    properties: tuple[CuePropertySpec, ...]
-    risk_tier: str
-    real_write_enabled: bool
-    description: str
-
-
-def _prop(
-    name: str,
-    validator: str = "any",
-    *,
-    path: str | None = None,
-    read_key: str | None = None,
-    modes: tuple[str, ...] = ("saved",),
-    risk_tier: str = "safe",
-    real_write_enabled: bool = False,
-    planned_only_reason: str | None = None,
-    doc_section: str | None = None,
-    osc_paths: tuple[str, ...] = (),
-    capability_gate: str | None = None,
-    readback: str = "value",
-    contextual_requirements: tuple[str, ...] = (),
-) -> CuePropertySpec:
-    return CuePropertySpec(
-        name=name,
-        path=path,
-        args=(("value", validator),),
-        osc_args=("value",),
-        read_key=read_key if read_key is not None else name,
-        modes=modes,
-        risk_tier=risk_tier,
-        real_write_enabled=real_write_enabled,
-        planned_only_reason=planned_only_reason,
-        doc_section=doc_section,
-        osc_paths=osc_paths,
-        capability_gate=capability_gate,
-        readback=readback,
-        contextual_requirements=contextual_requirements,
-    )
-
-
-def _op(
-    name: str,
-    args: tuple[tuple[str, str], ...],
-    *,
-    path: str | None = None,
-    osc_args: tuple[str, ...] | None = None,
-    read_key: str | None = None,
-    modes: tuple[str, ...] = ("saved",),
-    risk_tier: str = "medium",
-    real_write_enabled: bool = False,
-    planned_only_reason: str = "planned_only_until_real_world_validation",
-    doc_section: str | None = None,
-    osc_paths: tuple[str, ...] = (),
-    capability_gate: str | None = None,
-    readback: str = "value",
-    contextual_requirements: tuple[str, ...] = (),
-) -> CuePropertySpec:
-    path_args = _path_arg_names(path or name)
-    return CuePropertySpec(
-        name=name,
-        path=path,
-        args=args,
-        osc_args=osc_args if osc_args is not None else tuple(arg for arg, _ in args if arg not in path_args),
-        read_key=read_key,
-        modes=modes,
-        risk_tier=risk_tier,
-        real_write_enabled=real_write_enabled,
-        planned_only_reason=planned_only_reason if not real_write_enabled else None,
-        doc_section=doc_section,
-        osc_paths=osc_paths,
-        capability_gate=capability_gate,
-        readback=readback,
-        contextual_requirements=contextual_requirements,
-    )
-
-
-def _planned_prop(
-    name: str,
-    validator: str = "any",
-    *,
-    path: str | None = None,
-    read_key: str | None = None,
-    reason: str,
-    modes: tuple[str, ...] = ("saved",),
-    capability_gate: str | None = None,
-    doc_section: str | None = None,
-    osc_paths: tuple[str, ...] = (),
-    contextual_requirements: tuple[str, ...] = (),
-) -> CuePropertySpec:
-    return _prop(
-        name,
-        validator,
-        path=path,
-        read_key=read_key,
-        modes=modes,
-        risk_tier="high",
-        real_write_enabled=False,
-        planned_only_reason=reason,
-        capability_gate=capability_gate,
-        doc_section=doc_section,
-        osc_paths=osc_paths,
-        contextual_requirements=contextual_requirements,
-    )
-
-
-def _path_arg_names(path: str) -> tuple[str, ...]:
-    return tuple(field_name for _, field_name, _, _ in Formatter().parse(path) if field_name)
 
 
 def _planned_patch_refs(prefix: str, *, validator: str) -> tuple[CuePropertySpec, ...]:
@@ -298,34 +168,6 @@ def _group_properties() -> tuple[CuePropertySpec, ...]:
         _prop("timecodeSyncMode", "int", real_write_enabled=True),
     )
 
-
-COMMON_PROPERTIES = (
-    _prop("name", "string", real_write_enabled=True),
-    _prop("number", "string", real_write_enabled=True),
-    _prop("notes", "string", real_write_enabled=True),
-    _prop("armed", "boolean", real_write_enabled=True),
-    _prop("flagged", "boolean", real_write_enabled=True),
-    _prop("colorName", "color_name", real_write_enabled=True),
-    _prop("preWait", "non_negative_number", real_write_enabled=True),
-    _prop("postWait", "non_negative_number", real_write_enabled=True),
-    _prop(
-        "duration",
-        "non_negative_number",
-        real_write_enabled=True,
-        contextual_requirements=("allows_editing_duration",),
-    ),
-    _prop(
-        "tempDuration",
-        "non_negative_number",
-        real_write_enabled=True,
-        contextual_requirements=("allows_editing_duration",),
-    ),
-    _prop("continueMode", "continue_mode", real_write_enabled=True),
-    _prop("skipIfDisarmed", "boolean", real_write_enabled=True),
-    _prop("autoLoad", "boolean", real_write_enabled=True),
-    _prop("secondColorName", "color_name", modes=("saved", "live"), real_write_enabled=True),
-    _prop("useSecondColor", "boolean", real_write_enabled=True),
-)
 
 COMMON_CATALOG_PROPERTIES = (
     _planned_prop("colorCondition", "color_condition", reason="deprecated_unsupported_in_current_qlab"),

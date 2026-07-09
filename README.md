@@ -195,6 +195,33 @@ devamp_basic
 script_basic
 ```
 
+Current visual, text, and light write support is intentionally token-gated:
+
+- `video_basic`: safe cue metadata is the only normal real-write surface.
+  Visual, embedded-audio, and slice edits are dry-run-first candidates with
+  specialized confirm tokens. This includes opacity, translation, anchor/scale
+  and crop scalars, blend/fit appearance, selected geometry flags, stage/audio
+  output IDs, time/loop fields, video audio levels/mute/solo metadata, and slice
+  marker edits. Video FX real-write support is deliberately narrow and only
+  applies when dry-run marks an exact scalar candidate such as the validated
+  `videoEffectIndex/0/parameter/inputRadius` or `inputIntensity` paths.
+- `camera_basic`: supports safe camera `channels`; camera visual geometry and
+  I/O fields follow the same dry-run/confirm-token model as visual cue edits.
+- `text_basic`: text content, `fixedWidth`, alignment, `fontName`, `fontSize`,
+  `lineSpacing`, text color, and shared visual geometry are gated candidates.
+  Rich text shadows, decoration, and unreliable color/readback paths remain
+  planned-only unless a dry-run emits a concrete confirm token.
+- `light_basic`: `lightCommandText` can become a real-write candidate only for a
+  single Light cue after safe Light Patch analysis returns valid. `alwaysCollate`
+  and `subcontroller` are separate saved-mode behavior candidates. Other Light
+  operations such as `setLight`, replace/remove, sort, and prune remain
+  dry-run planning surfaces unless the dry-run says otherwise.
+
+For these families, the dry-run is the contract. Only trust
+`planned_operations[]` fields such as `real_write_possible`,
+`requires_confirm_token`, and `confirm_token`; broad profile names or
+`capability_gate` labels are not approval to mutate.
+
 All update profiles can exist for planning and targeting, but real writes are
 limited to safe properties unless the item explicitly lists the exact
 `confirm_token` values from reviewed dry-run `planned_operations`. Some

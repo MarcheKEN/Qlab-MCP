@@ -72,6 +72,10 @@ class FakeWriteClient:
             return SimpleNamespace(data=self.connect_data, status=self.connect_status)
         if address == "/workspace/ws-1/showMode":
             return SimpleNamespace(data=self.show_mode_data, status=self.show_mode_status)
+        if address == "/workspace/ws-1/settings/audio/patchList":
+            return SimpleNamespace(data=[{"uniqueID": "Patch 1"}, {"uniqueID": "value"}], status="ok")
+        if address == "/workspace/ws-1/settings/mic/patchList":
+            return SimpleNamespace(data=[{"uniqueID": "Patch 1"}, {"uniqueID": "value"}], status="ok")
         if address == "/workspace/ws-1/new":
             self.created = True
             self.cue_values["uniqueID"] = self.created_cue_id
@@ -153,6 +157,8 @@ class BatchFakeWriteClient:
         light_patch_error: bool = False,
         video_stages: list[dict[str, Any]] | None = None,
         video_stage_regions: dict[str, list[dict[str, Any]]] | None = None,
+        audio_output_patches: list[dict[str, Any]] | None = None,
+        audio_input_patches: list[dict[str, Any]] | None = None,
         broken_stage_ids: set[str] | None = None,
         numeric_bool_readback_properties: set[str] | None = None,
         omit_slice_markers_after_delete: bool = False,
@@ -179,6 +185,8 @@ class BatchFakeWriteClient:
         self.light_patch_error = light_patch_error
         self.video_stages = video_stages or []
         self.video_stage_regions = video_stage_regions or {}
+        self.audio_output_patches = audio_output_patches or []
+        self.audio_input_patches = audio_input_patches or []
         self.broken_stage_ids = broken_stage_ids or set()
         self.numeric_bool_readback_properties = numeric_bool_readback_properties or set()
         self.omit_slice_markers_after_delete = omit_slice_markers_after_delete
@@ -202,6 +210,10 @@ class BatchFakeWriteClient:
             return SimpleNamespace(data=self.connect_data, status="ok")
         if address == f"/workspace/{self.workspace_id}/showMode":
             return SimpleNamespace(data=self.show_mode_data, status="ok")
+        if address == f"/workspace/{self.workspace_id}/settings/audio/patchList":
+            return SimpleNamespace(data=self.audio_output_patches, status="ok")
+        if address == f"/workspace/{self.workspace_id}/settings/mic/patchList":
+            return SimpleNamespace(data=self.audio_input_patches, status="ok")
         if address == f"/workspace/{self.workspace_id}/settings/light/patch":
             if self.light_patch_error:
                 raise QLabReplyError("error", "Light Patch unavailable", address)
@@ -920,7 +932,10 @@ def _assert_audio_group_profile_catalog(catalog: dict[str, Any]) -> None:
 
 def _assert_media_profile_catalog(catalog: dict[str, Any]) -> None:
     assert catalog["mic_basic"]["real_write_enabled"] is True
-    assert catalog["mic_basic"]["properties"]["channels"]["real_write_enabled"] is True
+    assert catalog["mic_basic"]["properties"]["channels"]["real_write_enabled"] is False
+    assert catalog["mic_basic"]["properties"]["channels"]["planned_only_reason"] == (
+        "audio_input_channel_count_needs_patch_bounds_validation"
+    )
     assert catalog["video_basic"]["real_write_enabled"] is True
     assert catalog["video_basic"]["properties"]["translation/x"]["real_write_enabled"] is False
     assert catalog["video_basic"]["properties"]["translation/x"]["planned_only_reason"] == (
@@ -1294,17 +1309,15 @@ def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_os
                 "isAuditioning": False,
             }
         )
-    elif profile == "video_basic" and prop_name in {
-        "inputChannelName",
-        "gang",
-        "mute/channel",
-        "solo/channel",
-        "mute/channel/clear",
-        "solo/channel/clear",
-    }:
+    elif (
+        profile in {"video_basic", "audio_basic", "mic_basic"}
+        and prop_name in {"inputChannelName", "gang"}
+    ) or (
+        profile == "video_basic"
+        and prop_name in {"mute/channel", "solo/channel", "mute/channel/clear", "solo/channel/clear"}
+    ):
         cue_values.update(
             {
-                "audioTrackFormats": [{"channels": 2}],
                 "numChannelsIn": 2,
                 "sliderLevels": [0.0, 0.0],
                 "levels": [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]],
@@ -1319,6 +1332,8 @@ def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_os
                 "isAuditioning": False,
             }
         )
+        if profile == "video_basic":
+            cue_values["audioTrackFormats"] = [{"channels": 2}]
     elif profile == "video_basic" and prop_name in {
         "sliceMarker/time",
         "sliceMarker/playCount",
@@ -6083,6 +6098,9 @@ PHASE8_IO_CASES = [
     ("camera_basic", "Camera", "videoInputPatchID", "video-in-old", "video-in-new"),
     ("camera_basic", "Camera", "audioInputPatchID", "audio-in-old", "audio-in-new"),
     ("text_basic", "Text", "stageID", "stage-old", "stage-new"),
+    ("audio_basic", "Audio", "audioOutputPatchID", "audio-out-old", "audio-out-new"),
+    ("mic_basic", "Mic", "audioOutputPatchID", "audio-out-old", "audio-out-new"),
+    ("mic_basic", "Mic", "audioInputPatchID", "audio-in-old", "audio-in-new"),
 ]
 
 
@@ -6097,11 +6115,23 @@ def _phase8_io_fixture(
     timeout_without_apply: bool = False,
 ) -> tuple[BatchFakeWriteClient, QLabReader, str, dict[str, Any], str]:
     cue_id = "11111111-1111-4111-8111-111111111111"
+    audio_output_patches = (
+        [{"uniqueID": baseline}, {"uniqueID": requested}]
+        if profile in {"audio_basic", "mic_basic"} and property_name == "audioOutputPatchID"
+        else []
+    )
+    audio_input_patches = (
+        [{"uniqueID": baseline}, {"uniqueID": requested}]
+        if profile == "mic_basic" and property_name == "audioInputPatchID"
+        else []
+    )
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
         cues={cue_id: {"type": cue_type, property_name: baseline}},
         timeout_set_property=(cue_id, property_name) if timeout else None,
         timeout_without_apply=timeout_without_apply,
+        audio_output_patches=audio_output_patches,
+        audio_input_patches=audio_input_patches,
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {
@@ -6150,6 +6180,14 @@ def test_phase8a_video_io_dry_run_emits_bound_token(
     assert payload["baseline"] == baseline
     assert payload["requested"] == requested
     assert payload["workspace_validation"] == "post_write_fresh_readback_required"
+    if profile in {"audio_basic", "mic_basic"} and property_name in {"audioOutputPatchID", "audioInputPatchID"}:
+        setting = "audio/patchList" if property_name == "audioOutputPatchID" else "mic/patchList"
+        assert "workspace_patch_id_membership" in setter["future_gate_requirements"]
+        assert "workspace_id_list_validation_future" not in setter["future_gate_requirements"]
+        assert any(
+            address == f"/workspace/ws-1/settings/{setting}"
+            for address, _, _ in client.requests
+        )
     assert not any(address.endswith(f"/{property_name}") for address, _, _ in client.requests)
 
 
@@ -6185,6 +6223,71 @@ def test_phase8a_video_io_real_write_sets_once_and_verifies(
     assert not any("/live" in request[0] for request in client.requests)
 
 
+@pytest.mark.parametrize(
+    ("profile", "cue_type", "property_name", "setting"),
+    [
+        ("audio_basic", "Audio", "audioOutputPatchID", "audio/patchList"),
+        ("mic_basic", "Mic", "audioOutputPatchID", "audio/patchList"),
+        ("mic_basic", "Mic", "audioInputPatchID", "mic/patchList"),
+    ],
+)
+def test_phase8a_audio_mic_patch_selection_requires_current_workspace_id(
+    profile: str,
+    cue_type: str,
+    property_name: str,
+    setting: str,
+) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": cue_type, property_name: "patch-old"}},
+        audio_output_patches=[{"uniqueID": "patch-old"}],
+        audio_input_patches=[{"uniqueID": "patch-old"}],
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": cue_id,
+        "profile": profile,
+        "properties": {property_name: "patch-missing"},
+    }
+
+    result = reader.edit_cues("ws-1", [update], dry_run=True)
+
+    item = result["results"][0]
+    assert result["status"] == "preflight_failed"
+    assert "not a current" in item["errors"][property_name]
+    assert item["executed_operations"] == []
+    assert_no_confirm_token(result)
+    assert any(address == f"/workspace/ws-1/settings/{setting}" for address, _, _ in client.requests)
+    assert not any(
+        address == f"/workspace/ws-1/cue_id/{cue_id}/{property_name}"
+        for address, _, _ in client.requests
+    )
+
+
+def test_phase8a_audio_mic_patch_selection_revalidates_before_setter() -> None:
+    client, reader, cue_id, update, token = _phase8_io_fixture(
+        profile="mic_basic",
+        cue_type="Mic",
+        property_name="audioInputPatchID",
+        baseline="input-old",
+        requested="input-new",
+    )
+    client.audio_input_patches = [{"uniqueID": "input-old"}]
+
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    item = result["results"][0]
+    assert result["status"] == "preflight_failed"
+    assert "not a current" in item["errors"]["audioInputPatchID"]
+    assert item["executed_operations"] == []
+    assert any(address == "/workspace/ws-1/settings/mic/patchList" for address, _, _ in client.requests)
+    assert not any(
+        address == f"/workspace/ws-1/cue_id/{cue_id}/audioInputPatchID"
+        for address, _, _ in client.requests
+    )
+
+
 def test_phase8a_video_io_rejects_wrong_scope_tokens_and_shape_before_setter() -> None:
     client, reader, cue_id, update, token = _phase8_io_fixture()
     _, _, _, geometry_update, geometry_token = _phase7_geometry_fixture(property_name="smooth")
@@ -6205,6 +6308,32 @@ def test_phase8a_video_io_rejects_wrong_scope_tokens_and_shape_before_setter() -
         assert result["status"] == "preflight_failed"
         assert all(item["executed_operations"] == [] for item in result["results"])
     assert not any(address.endswith(("/stageID", "/smooth")) for address, _, _ in client.requests)
+
+
+def test_phase8a_audio_and_mic_tokens_are_type_profile_bound() -> None:
+    _, _, _, audio_update, audio_token = _phase8_io_fixture(
+        profile="audio_basic",
+        cue_type="Audio",
+        property_name="audioOutputPatchID",
+        baseline="audio-out-old",
+        requested="audio-out-new",
+    )
+    mic_client, mic_reader, cue_id, mic_update, _ = _phase8_io_fixture(
+        profile="mic_basic",
+        cue_type="Mic",
+        property_name="audioOutputPatchID",
+        baseline="audio-out-old",
+        requested="audio-out-new",
+    )
+
+    result = mic_reader.edit_cues("ws-1", [{**mic_update, "confirm_gates": [audio_token]}], dry_run=False)
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert not any(
+        address == f"/workspace/ws-1/cue_id/{cue_id}/audioOutputPatchID"
+        for address, _, _ in mic_client.requests
+    )
 
 
 @pytest.mark.parametrize("bad_value", [None, 1, True, "", "none", [], {}])
@@ -6617,6 +6746,7 @@ def _phase9a_video_audio_level_fixture(
     channel: int = 0,
     baseline: float = 0.0,
     requested: float = -1.0,
+    profile: str = "video_basic",
     cue_type: str = "Video",
     timeout: bool = False,
     audio_evidence: bool = True,
@@ -6638,7 +6768,7 @@ def _phase9a_video_audio_level_fixture(
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {
         "cue_ref": cue_id,
-        "profile": "video_basic",
+        "profile": profile,
         "operations": [{"property": "sliderLevel", "args": {"channel": channel, "decibel": requested}}],
     }
     plan = reader.edit_cues("ws-1", [update], dry_run=True)
@@ -6710,6 +6840,67 @@ def test_phase9a_video_audio_level_real_write_sets_once_and_verifies_channel_rea
     assert not any("/live" in request[0] for request in client.requests)
     assert not any("/level/" in request[0] for request in client.requests)
     assert not any(request[0].endswith(("/setDefaultLevels", "/setSilentLevels")) for request in client.requests)
+
+
+@pytest.mark.parametrize(("profile", "cue_type"), [("audio_basic", "Audio"), ("mic_basic", "Mic")])
+def test_phase9a_audio_and_mic_level_reuse_slider_contract(
+    profile: str,
+    cue_type: str,
+) -> None:
+    client, reader, cue_id, update, token = _phase9a_video_audio_level_fixture(
+        profile=profile,
+        cue_type=cue_type,
+        channel=1,
+        baseline=0.0,
+        requested=-1.5,
+        slider_levels=[0.0, 0.0],
+        audio_evidence=False,
+    )
+
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    setter = planned_setters(plan["results"][0])["sliderLevel"]
+    payload, error = write_operations._decode_phase9a_video_audio_level_confirm_token(setter["confirm_token"])
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    assert error is None
+    assert payload["cue_type"] == cue_type
+    assert payload["profile"] == profile
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["sliderLevels"] == [0.0, -1.5]
+    assert result["results"][0]["updateq_plan"]["rollback"] == {
+        "property": "sliderLevel",
+        "args": {"channel": 1, "decibel": 0.0},
+    }
+    assert [request[0] for request in client.requests].count(
+        f"/workspace/ws-1/cue_id/{cue_id}/sliderLevel/1"
+    ) == 1
+    assert not any("/live" in request[0] for request in client.requests)
+
+
+def test_phase9a_audio_and_mic_slider_tokens_are_type_profile_bound() -> None:
+    _, _, _, _, audio_token = _phase9a_video_audio_level_fixture(
+        profile="audio_basic",
+        cue_type="Audio",
+        channel=0,
+        slider_levels=[0.0],
+        audio_evidence=False,
+    )
+    mic_client, mic_reader, cue_id, mic_update, _ = _phase9a_video_audio_level_fixture(
+        profile="mic_basic",
+        cue_type="Mic",
+        channel=0,
+        slider_levels=[0.0],
+        audio_evidence=False,
+    )
+
+    result = mic_reader.edit_cues("ws-1", [{**mic_update, "confirm_gates": [audio_token]}], dry_run=False)
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert not any(
+        address == f"/workspace/ws-1/cue_id/{cue_id}/sliderLevel/0"
+        for address, _, _ in mic_client.requests
+    )
 
 
 def test_phase9a_video_audio_level_rejects_wrong_scope_tokens_and_shape_before_setter() -> None:
@@ -6833,6 +7024,7 @@ def _phase9b_video_audio_matrix_fixture(
     out_channel: int = 0,
     baseline: float = 0.0,
     requested: float = -1.0,
+    profile: str = "video_basic",
     cue_type: str = "Video",
     timeout: bool = False,
     audio_evidence: bool = True,
@@ -6854,7 +7046,7 @@ def _phase9b_video_audio_matrix_fixture(
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {
         "cue_ref": cue_id,
-        "profile": "video_basic",
+        "profile": profile,
         "operations": [
             {"property": "level", "args": {"inChannel": in_channel, "outChannel": out_channel, "decibel": requested}}
         ],
@@ -6915,6 +7107,42 @@ def test_phase9b_video_audio_matrix_real_write_sets_once_and_verifies_crosspoint
     assert not any("/live" in request[0] for request in client.requests)
     assert not any("/sliderLevel/" in request[0] for request in client.requests)
     assert not any(request[0].endswith(("/setDefaultLevels", "/setSilentLevels")) for request in client.requests)
+
+
+@pytest.mark.parametrize(("profile", "cue_type"), [("audio_basic", "Audio"), ("mic_basic", "Mic")])
+def test_phase9b_audio_and_mic_level_reuse_matrix_contract(
+    profile: str,
+    cue_type: str,
+) -> None:
+    client, reader, cue_id, update, token = _phase9b_video_audio_matrix_fixture(
+        profile=profile,
+        cue_type=cue_type,
+        in_channel=1,
+        out_channel=0,
+        baseline=0.0,
+        requested=-1.5,
+        audio_evidence=False,
+        num_channels_in=2,
+    )
+
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    setter = planned_setters(plan["results"][0])["level"]
+    payload, error = write_operations._decode_phase9b_video_audio_matrix_confirm_token(setter["confirm_token"])
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    assert error is None
+    assert payload["cue_type"] == cue_type
+    assert payload["profile"] == profile
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["levels"][1][0] == -1.5
+    assert result["results"][0]["updateq_plan"]["rollback"] == {
+        "property": "level",
+        "args": {"inChannel": 1, "outChannel": 0, "decibel": 0.0},
+    }
+    assert [request[0] for request in client.requests].count(
+        f"/workspace/ws-1/cue_id/{cue_id}/level/1/0"
+    ) == 1
+    assert not any("/live" in request[0] for request in client.requests)
 
 
 def test_phase9b_video_audio_matrix_rejects_wrong_scope_tokens_and_shape_before_setter() -> None:
@@ -7069,11 +7297,13 @@ def _phase9_levels_fixture(
     *,
     cue_values: dict[str, Any] | None = None,
     timeout_property: str | None = None,
+    profile: str = "video_basic",
+    cue_type: str = "Video",
+    audio_evidence: bool = True,
 ) -> tuple[BatchFakeWriteClient, QLabReader, str, dict[str, Any], str]:
     cue_id = "33333333-3333-4333-8333-333333333333"
     values = {
-        "type": "Video",
-        "audioTrackFormats": [{"channels": 2, "format": "AAC"}],
+        "type": cue_type,
         "numChannelsIn": 2,
         "sliderLevels": [0.0, 0.0, 0.0],
         "levels": [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
@@ -7083,6 +7313,8 @@ def _phase9_levels_fixture(
         "muteChannels": [2],
         "soloChannels": [1],
     }
+    if audio_evidence:
+        values["audioTrackFormats"] = [{"channels": 2, "format": "AAC"}]
     if cue_values:
         values.update(cue_values)
     client = BatchFakeWriteClient(
@@ -7091,7 +7323,7 @@ def _phase9_levels_fixture(
         timeout_set_property=(cue_id, timeout_property) if timeout_property else None,
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
-    update = {"cue_ref": cue_id, "profile": "video_basic", "operations": [operation]}
+    update = {"cue_ref": cue_id, "profile": profile, "operations": [operation]}
     plan = reader.edit_cues("ws-1", [update], dry_run=True)
     token = planned_setters(plan["results"][0])[operation["property"]]["confirm_token"]
     client.requests.clear()
@@ -7322,6 +7554,167 @@ def test_phase9c_gang_allows_empty_baseline_and_empty_rollback() -> None:
     assert rollback["status"] == "updated"
     assert rollback["results"][0]["after"]["gang/1/0"] == ""
     assert [request[0] for request in client.requests].count(f"/workspace/ws-1/cue_id/{cue_id}/gang/1/0") == 2
+
+
+@pytest.mark.parametrize(("profile", "cue_type"), [("audio_basic", "Audio"), ("mic_basic", "Mic")])
+@pytest.mark.parametrize(
+    ("operation", "after_key", "expected", "rollback"),
+    [
+        (
+            {"property": "inputChannelName", "args": {"number": 1, "name": "Dialog"}},
+            "inputChannelName/1",
+            "Dialog",
+            {"property": "inputChannelName", "args": {"number": 1, "name": "L"}},
+        ),
+        (
+            {"property": "gang", "args": {"inChannel": 1, "outChannel": 0, "gang": "speech"}},
+            "gang/1/0",
+            "speech",
+            {"property": "gang", "args": {"inChannel": 1, "outChannel": 0, "gang": "music"}},
+        ),
+    ],
+)
+def test_phase9c_audio_and_mic_reuse_level_metadata_contract(
+    profile: str,
+    cue_type: str,
+    operation: dict[str, Any],
+    after_key: str,
+    expected: str,
+    rollback: dict[str, Any],
+) -> None:
+    client, reader, cue_id, update, token = _phase9_levels_fixture(
+        operation,
+        profile=profile,
+        cue_type=cue_type,
+        audio_evidence=False,
+    )
+
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    setter = planned_setters(plan["results"][0])[operation["property"]]
+    payload, error = write_operations._decode_phase9_confirm_token(
+        setter["confirm_token"],
+        family="videoAudioLevelMeta",
+        version=1,
+        label="Phase 9C audio level metadata",
+    )
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    assert error is None
+    assert payload["cue_type"] == cue_type
+    assert payload["profile"] == profile
+    assert "audioTrackFormats" not in result["results"][0]["before"]
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"][after_key] == expected
+    assert result["results"][0]["updateq_plan"]["rollback"] == rollback
+    assert [request[0] for request in client.requests].count(
+        f"/workspace/ws-1/cue_id/{cue_id}/{after_key}"
+    ) == 1
+    assert not any("/live" in address or "/mute" in address or "/solo" in address for address, _, _ in client.requests)
+
+
+def test_phase9c_audio_and_mic_tokens_are_type_profile_bound() -> None:
+    _, _, _, _, audio_token = _phase9_levels_fixture(
+        {"property": "inputChannelName", "args": {"number": 1, "name": "Dialog"}},
+        profile="audio_basic",
+        cue_type="Audio",
+        audio_evidence=False,
+    )
+    mic_client, mic_reader, cue_id, mic_update, _ = _phase9_levels_fixture(
+        {"property": "inputChannelName", "args": {"number": 1, "name": "Dialog"}},
+        profile="mic_basic",
+        cue_type="Mic",
+        audio_evidence=False,
+    )
+
+    result = mic_reader.edit_cues("ws-1", [{**mic_update, "confirm_gates": [audio_token]}], dry_run=False)
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert not any(
+        address == f"/workspace/ws-1/cue_id/{cue_id}/inputChannelName/1"
+        for address, _, _ in mic_client.requests
+    )
+
+
+def test_phase9c_audio_level_metadata_rejects_stale_baseline_before_setter() -> None:
+    client, reader, cue_id, update, token = _phase9_levels_fixture(
+        {"property": "inputChannelName", "args": {"number": 1, "name": "Dialog"}},
+        profile="audio_basic",
+        cue_type="Audio",
+        audio_evidence=False,
+    )
+    client.cues[cue_id]["inputChannelName/1"] = "Changed elsewhere"
+
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+
+    assert result["status"] == "preflight_failed"
+    assert "stale_video_phase9c_audio_level_meta_write" in result["results"][0]["errors"]["inputChannelName"]
+    assert result["results"][0]["executed_operations"] == []
+
+
+@pytest.mark.parametrize(
+    ("profile", "cue_type", "operation", "cue_values", "expected_error"),
+    [
+        (
+            "audio_basic",
+            "Audio",
+            {"property": "inputChannelName", "args": {"number": 1, "name": "Dialog"}},
+            {"inputChannelName/1": None},
+            "requires readable inputChannelName/",
+        ),
+        (
+            "mic_basic",
+            "Mic",
+            {"property": "inputChannelName", "args": {"number": 3, "name": "Dialog"}},
+            {},
+            "number must be within numChannelsIn",
+        ),
+        (
+            "audio_basic",
+            "Audio",
+            {"property": "inputChannelName", "args": {"number": 1, "name": "Bad\nName"}},
+            {},
+            "1-64 character string",
+        ),
+        (
+            "mic_basic",
+            "Mic",
+            {"property": "gang", "args": {"inChannel": 0, "outChannel": 0, "gang": "g"}},
+            {},
+            "row 0 is blocked",
+        ),
+    ],
+)
+def test_phase9c_audio_and_mic_metadata_rejects_unsafe_baselines_indexes_and_strings(
+    profile: str,
+    cue_type: str,
+    operation: dict[str, Any],
+    cue_values: dict[str, Any],
+    expected_error: str,
+) -> None:
+    cue_id = "33333333-3333-4333-8333-333333333333"
+    values = {
+        "type": cue_type,
+        "numChannelsIn": 2,
+        "sliderLevels": [0.0, 0.0],
+        "levels": [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]],
+        "inputChannelName/1": "L",
+        "gang/1/0": "music",
+        **cue_values,
+    }
+    client = BatchFakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"), cues={cue_id: values})
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.edit_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": profile, "operations": [operation]}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert expected_error in result["results"][0]["errors"][operation["property"]]
+    assert_no_confirm_token(result)
+    assert not any("/inputChannelName/" in address or "/gang/" in address for address, _, _ in client.requests)
 
 
 @pytest.mark.parametrize(
@@ -10761,13 +11154,13 @@ def test_update_cues_confirm_token_is_bound_to_cue_ref() -> None:
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {
         "profile": "audio_basic",
-        "operations": [{"property": "level", "args": {"inChannel": 1, "outChannel": 1, "decibel": -6}}],
+        "operations": [{"property": "objectIDLevel", "args": {"row": 1, "objectID": "object-1", "decibel": -6}}],
     }
 
     token_a = confirm_token_for(reader, cue_a, update)
     token_b = confirm_token_for(reader, cue_b, update)
 
-    assert token_a.startswith("confirm:level:")
+    assert token_a.startswith("confirm:objectIDLevel:")
     assert token_a != token_b
 
 
@@ -10851,7 +11244,8 @@ def test_update_cues_mic_basic_dry_run_plans_documented_mic_and_audio_fields() -
 
     assert result["ok"] is True
     setters = planned_setters(result["results"][0])
-    assert setters["channels"]["real_write_enabled"] is True
+    assert setters["channels"]["real_write_enabled"] is False
+    assert setters["channels"]["planned_only_reason"] == "audio_input_channel_count_needs_patch_bounds_validation"
     assert setters["channelOffset"]["real_write_enabled"] is False
     assert setters["channelOffset"]["capability_gate"] == "patch_routing"
     for prop in ("channelOffset", "audioInputPatchID", "audioOutputPatchName", "level", "mute"):
@@ -12350,7 +12744,6 @@ def test_create_cue_dry_run_reviews_supported_and_unsupported_non_light_types() 
 @pytest.mark.parametrize(
     ("profile", "cue_type", "properties"),
     [
-        ("mic_basic", "Mic", {"channels": 2}),
         ("midi_file_basic", "MIDI File", {"rate": 1.1, "startTime": 0, "endTime": 8, "playCount": 2}),
         ("timecode_basic", "Timecode", {"outputType": 1, "startTime": "01:00:00:00"}),
         ("target_basic", "Start", {"name": "Start cue renamed"}),

@@ -14,7 +14,9 @@ exceptions, the closed Phase 4C
 Phase 7D local `quaternion` candidate, the Phase 7E local `resetRotation`
 action candidate, the Phase 7F local `smooth` candidate, and the Phase 8A local
 cue I/O ID candidates, and the Phase 8B local Video embedded-audio Time & Loops
-candidates, and the Phase 8C local Video slice marker candidates. Those
+candidates, the local Audio/Mic Phase 9A slider, Phase 9B matrix, and Phase 9C
+metadata candidates, and the Phase 8C local Video slice marker candidates.
+Those
 exceptions are listed in Current Invariants.
 
 ## Summary
@@ -24,7 +26,7 @@ exceptions are listed in Current Invariants.
 | common/global cue properties | 15 | 21 | 0 | 0 |
 | Group/List/Cart | 7 | 0 | 6 | 0 |
 | Audio | 6 | 65 | 0 | 0 |
-| Mic | 3 | 4 | 0 | 0 |
+| Mic | 2 | 5 | 0 | 0 |
 | Video | 0 | 79 | 0 | 0 |
 | Camera | 2 | 4 | 0 | 0 |
 | Text | 0 | 19 | 0 | 0 |
@@ -46,7 +48,18 @@ exceptions are listed in Current Invariants.
 - `playlist/*` real writes require Group mode `6` (Playlist mode).
 - `cueTargetID`, `cueTargetNumber`, and temporary target refs require target resolution before real writes.
 - `cueTargetName` remains blocked for real writes; callers must use `cueTargetID` or `cueTargetNumber`.
-- `Mic.channelOffset` is gated by `patch_routing` until input patch bounds validation exists.
+- `Mic.channelOffset` and `Mic.channels` are gated by `patch_routing` until input
+  patch bounds validation exists. `settings/mic/patchList` exposes only ID/name;
+  cue `numChannelsIn`, `channelOffset`, and `channels` do not expose the selected
+  patch's capacity.
+- Phase 8A also covers `Audio.audioOutputPatchID` and Mic input/output patch
+  IDs through exact-ID, type/profile-bound token candidates. Audio/Mic IDs are
+  checked against the fresh workspace output/input patch lists in eligible dry-run and
+  again before the real setter; name/number and unpatch forms remain gated.
+- Phase 9A/9B/9C also have local Audio/Mic slider, lower-matrix, and Levels
+  metadata candidates. They require deterministic fresh baselines/readback but
+  remain runtime pending; Trim mute/solo and clears, resets, Objects, Audio FX,
+  and patch-routing edits remain gated.
 - Dangerous output families remain gated: audio output, patch routing, video visual/effects, text rich format, fade targets, light output, network output, MIDI output, script compile.
 - Video Phases 3A–3E expose only their documented token-gated scalar/Text
   setters. The Text expansion gates `Text`-only saved writes under
@@ -178,8 +191,11 @@ exceptions are listed in Current Invariants.
 - Phase 8A emits `confirm:videoIO:v1:` only for saved-mode exact-UUID
   one-cue/one-property cue-level I/O ID selection. `Video` supports `stageID`
   and `audioOutputPatchID`; `Camera` supports `stageID`, `audioOutputPatchID`,
-  `videoInputPatchID`, and `audioInputPatchID`; `Text` supports `stageID`.
-  Values must be non-empty string IDs. Name/number refs, deprecated
+  `videoInputPatchID`, and `audioInputPatchID`; `Text` supports `stageID`;
+  `Audio` supports `audioOutputPatchID`; and `Mic` supports input/output patch
+  IDs. Values must be non-empty string IDs. Audio/Mic output/input IDs must
+  additionally match their current workspace patch list in eligible dry-run and in
+  real-write preflight. Name/number refs, deprecated
   `cameraPatch`, unpatch values, workspace stage/patch definition edits, `/live`,
   batch, multi-property, raw OSC, playback/show-control, and save remain
   blocked. Unknown IDs cannot be reported as success because post-write fresh
@@ -205,28 +221,38 @@ exceptions are listed in Current Invariants.
   save remain blocked. Setter timeout or QLab setter error is warning-confirmed
   success only when fresh readback matches. Runtime validation is required
   before Phase 8B closure.
-- Phase 9A emits `confirm:videoAudioLevels:v1:` only for saved-mode exact-UUID
-  one-cue/one-operation `Video` `video_basic.sliderLevel/{channel}` writes.
-  Runtime validation passed on `v5 Con slices`, including rollback. Embedded
+- Phase 9A emits `confirm:videoAudioLevels:v1:` for saved-mode exact-UUID
+  one-cue/one-operation `sliderLevel/{channel}` writes. Runtime validation
+  passed on the `Video` `video_basic` scope on `v5 Con slices`, including
+  rollback. Embedded
   audio evidence for this gate is now only `numChannelsIn > 0` or non-empty
   `audioTrackFormats`; `levels` and `sliderLevels` are not evidence because
   `v11 dorado.png` exposed them with `numChannelsIn = 0` and
   `audioTrackFormats = {}`. They remain required only for baseline/readback.
   Phase 9A accepts finite numeric dB only and blocks `-inf`, output names,
   `/live`, raw OSC, playback/show-control, save, batch, and multi-property.
-- Phase 9B is runtime validated for one saved
+  Local `Audio`/`Mic` candidates reuse this contract without the Video
+  embedded-audio-evidence requirement; their runtime validation is pending.
+- Phase 9B is runtime validated for one saved `Video`
   `level/{inChannel}/{outChannel}` matrix crosspoint using
   `confirm:videoAudioMatrix:v1:`. Row `0` remains Phase 9A territory because
-  `/levels[0]` is equivalent to `sliderLevels`. Broad matrix editing, `/live`,
-  names, `-inf`, mute/solo/default/silent actions, Objects, Trim, Audio FX,
-  Audio Maps, and routing/patch editor writes remain blocked.
+  `/levels[0]` is equivalent to `sliderLevels`. Local `Audio`/`Mic` candidates
+  reuse the strict finite-dB, `numChannelsIn`, baseline/readback, token, and
+  rollback contract without Video embedded-audio evidence; their runtime
+  validation is pending. Broad matrix editing, `/live`, names, `-inf`,
+  mute/solo/default/silent actions, Objects, Trim, Audio FX, Audio Maps, and
+  routing/patch editor writes remain blocked.
 - Phase 9C `gang/{inChannel}/{outChannel}` is runtime validated for one saved
-  metadata crosspoint using `confirm:videoAudioLevelMeta:v1:`. Validation
-  proved empty baseline rollback: `gang/1/0` `"" -> "MCPG" -> ""` on
-  `v5 Con slices`. Scope remains Video-only, exact UUID, one cue, one
-  operation, healthy inactive cue, real embedded-audio evidence, integer
-  indexes, row `1..numChannelsIn`, no output names, no control characters, no
-  `/live`, no batch, and no multi-property.
+  `Video` metadata crosspoint using `confirm:videoAudioLevelMeta:v1:`.
+  Validation proved empty baseline rollback: `gang/1/0` `"" -> "MCPG" -> ""`
+  on `v5 Con slices`. Local `Audio`/`Mic` candidates additionally cover
+  `inputChannelName/{number}` and `gang/{inChannel}/{outChannel}` with exact
+  UUID, one cue, one operation, healthy inactive cue, integer indexes,
+  `1..numChannelsIn` input rows, no output names, bounded strings without
+  control characters, and fresh baseline/readback/token/rollback. They do not
+  require Video embedded-audio evidence and remain runtime pending. `/live`,
+  batch, multi-property, Trim mute/solo, Objects, Audio FX, and patch routing
+  remain blocked.
 - Video `clockType` is locally implemented with
   `confirm:videoClockType:v1:` for saved exact-UUID one-cue/one-operation
   Video writes with strict `audio`/`video` values, fresh readback, and rollback

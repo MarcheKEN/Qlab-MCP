@@ -935,7 +935,12 @@ MIC_CATALOG_PROPERTIES = (
         reason="audio_input_channel_offset_needs_patch_bounds_validation",
         capability_gate="patch_routing",
     ),
-    _prop("channels", "positive_int", risk_tier="medium", real_write_enabled=True),
+    _planned_prop(
+        "channels",
+        "positive_int",
+        reason="audio_input_channel_count_needs_patch_bounds_validation",
+        capability_gate="patch_routing",
+    ),
     *AUDIO_CATALOG_PROPERTIES,
 )
 
@@ -1395,9 +1400,16 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
         (*COMMON_PROPERTIES, *AUDIO_SAFE_PROPERTIES, *AUDIO_CATALOG_PROPERTIES),
         "medium",
         True,
-        "Audio profile; only transport metadata is real-write enabled.",
+        "Audio transport, cue I/O selection, and Levels use specialized confirmation gates; other catalog routes remain dry-run only.",
     ),
-    "mic_basic": UpdateProfileSpec("mic_basic", ("Mic",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES), "medium", True, "Mic profile with safe channel metadata writes."),
+    "mic_basic": UpdateProfileSpec(
+        "mic_basic",
+        ("Mic",),
+        (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES),
+        "medium",
+        True,
+        "Mic cue I/O selection and Levels use specialized confirmation gates; Format remains dry-run only pending input-patch capacity validation.",
+    ),
     "video_basic": UpdateProfileSpec("video_basic", ("Video",), (*COMMON_PROPERTIES, *VIDEO_AUDIO_TIME_PROPERTIES, *VIDEO_AUDIO_LEVEL_PROPERTIES, *VIDEO_AUDIO_MATRIX_PROPERTIES, *VIDEO_AUDIO_LEVEL_META_PROPERTIES, *VIDEO_AUDIO_MUTE_SOLO_PROPERTIES, *VIDEO_AUDIO_LEVEL_BULK_PROPERTIES, _planned_prop("doFade", "boolean", reason="video_integrated_fade_requires_confirm_token"), _planned_prop("lockFadeToCue", "boolean", reason="video_integrated_fade_requires_confirm_token"), *VIDEO_SLICE_MARKER_PROPERTIES, *VIDEO_CATALOG_PROPERTIES), "medium", True, "Video opacity, translation, visual scalars, embedded-audio timing, audio level, audio matrix, audio level metadata, mute/solo, integrated fade, clockType, and slice marker edits use specialized confirmation gates; remaining visual properties stay dry-run only."),
     "camera_basic": UpdateProfileSpec("camera_basic", ("Camera",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES, *VIDEO_CATALOG_PROPERTIES, *CAMERA_CATALOG_PROPERTIES), "medium", True, "Camera opacity, translation, and visual scalars use specialized confirmation gates; remaining visual properties stay dry-run only."),
     TEXT_BASIC_UPDATE_PROFILE: UpdateProfileSpec(

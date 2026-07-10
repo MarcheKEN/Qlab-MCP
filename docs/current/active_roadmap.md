@@ -184,7 +184,7 @@ Video Phase 7F — Smooth Geometry:
 - v1/v2/v3 geometry tokens and reset tokens cannot authorize `smooth`; v4
   cannot authorize other geometry properties or `resetRotation`
 
-Video Phase 8A — Edit Cues and cue-level I/O selection:
+Cue I/O Phase 8A — Edit Cues and cue-level I/O selection:
 
 - local implementation exposes preferred `qlab_edit_cues` while keeping
   `qlab_update_cues` as a compatibility alias
@@ -193,8 +193,15 @@ Video Phase 8A — Edit Cues and cue-level I/O selection:
 - `Camera`: `stageID`, `audioOutputPatchID`, `videoInputPatchID`,
   `audioInputPatchID`
 - `Text`: `stageID`
+- `Audio`: `audioOutputPatchID`
+- `Mic`: `audioOutputPatchID`, `audioInputPatchID`
 - exact cue UUID only, one cue, one property, saved mode, healthy inactive cue,
   fresh baseline, fresh token, and fresh readback required
+- Audio/Mic patch IDs must also be current members of
+  `settings/audio/patchList` or `settings/mic/patchList`: dry-run refuses an
+  absent/unreadable ID before issuing a token when the one-cue/one-property
+  gate is eligible, and real-write preflight checks
+  the same list again before the setter
 - currently disconnected existing stages remain selectable by `stageID`, but
   results warn with `stage_route_disconnected` when route/device metadata is
   available; if the write makes the cue broken, only exact rollback to the
@@ -245,7 +252,7 @@ Video Phase 9A — Video embedded-audio Levels top-row sliders:
   audio, so they are baseline/readback data only, not evidence gates; this was
   validated on `v11 dorado.png`
   (`680CB8B6-CA66-4D15-AC15-0A92FC3E89FE`)
-- final scope: Video only, `sliderLevel/{channel}` only, saved mode, exact UUID,
+- runtime-validated scope: Video only, `sliderLevel/{channel}` only, saved mode, exact UUID,
   one cue, one operation, healthy inactive cue, readable `sliderLevels`,
   finite numeric dB only, fresh token/readback/rollback; `/live`, raw OSC,
   playback, save, batch, multi-property, output names, and `-inf` remain blocked
@@ -260,7 +267,7 @@ Video Phase 9B — Video embedded-audio Matrix Crosspoints:
   (`D68AA7F9-2C5B-4D3A-A860-78E5F522ACD8`) in `mcp_prueba.qlab5`:
   lower-matrix `level/1/0` baseline `0` -> `-1.0` -> fresh readback
   `-1.000009003387651` -> rollback `0`
-- final minimal scope: one saved `level/{inChannel}/{outChannel}` operation,
+- runtime-validated minimal scope: one saved `level/{inChannel}/{outChannel}` operation,
   `Video` cue only, exact UUID, one cue, one operation, healthy inactive cue,
   real embedded-audio evidence, readable matrix, finite numeric dB only, integer
   indexes only, fresh `confirm:videoAudioMatrix:v1:` token, fresh readback, and
@@ -269,8 +276,50 @@ Video Phase 9B — Video embedded-audio Matrix Crosspoints:
   `setter_timeout_but_readback_matched` when fresh readback matches
 - `/live`, raw OSC, playback, save, batch, multi-property, output names,
   `-inf`, row `0`, `setDefaultLevels`, `setSilentLevels`, `mute`, `solo`,
-  `gang`, `inputChannelName`, Trim, Objects, Audio FX, Audio Maps, Object Audio,
+  Trim, Objects, Audio FX, Audio Maps, Object Audio,
   and routing/patch editor writes remain blocked
+
+Audio/Mic Edit Cues — local I/O and core Levels candidates:
+
+- `audio_basic.audioOutputPatchID`, `mic_basic.audioOutputPatchID`, and
+  `mic_basic.audioInputPatchID` reuse the Phase 8A saved exact-ID gate. The
+  historical `confirm:videoIO:v1:` prefix remains, but its signed payload binds
+  cue type and profile, so tokens cannot cross-authorize cue families. Audio
+  output IDs are checked against the fresh workspace output-patch list and Mic
+  input IDs against the fresh input-patch list during dry-run and again before
+  the real setter.
+- `audio_basic.sliderLevel` and `mic_basic.sliderLevel` reuse the Phase 9A
+  saved scalar contract with readable `sliderLevels`, finite numeric dB,
+  integer channel, exact UUID, healthy inactive cue, one cue/operation, fresh
+  token/readback, and fresh-token rollback. Audio and Mic do not require
+  Video's embedded-audio evidence gate.
+- `audio_basic.level` and `mic_basic.level` reuse the Phase 9B lower-matrix
+  contract with readable `levels`, `numChannelsIn` bounds, finite numeric dB,
+  integer indexes, row `0` blocked, exact UUID, healthy inactive cue, one
+  cue/operation, fresh token/readback, and fresh-token rollback. They use the
+  existing `confirm:videoAudioLevels:v1:` and
+  `confirm:videoAudioMatrix:v1:` token families with type/profile-bound
+  payloads.
+- `audio_basic.inputChannelName` / `mic_basic.inputChannelName` and
+  `audio_basic.gang` / `mic_basic.gang` reuse the Phase 9C saved metadata
+  contract: dynamic fresh baseline/readback, `numChannelsIn` and matrix bounds,
+  exact UUID, healthy inactive cue, one cue/operation, strict bounded strings,
+  fresh token, and rollback. Audio and Mic do not require Video's
+  embedded-audio evidence; the historical `confirm:videoAudioLevelMeta:v1:`
+  payload binds type and profile.
+- Automated contract tests pass locally. No Audio or Mic runtime write has
+  been attempted; validation remains pending until a manual MCP restart and
+  the recorded readback/rollback plans are run through MCP only.
+- Audio Time & Loops remains the existing `audio_basic` saved-write scope;
+  Mic does not inherit it. Mic supports only I/O and Levels in this scope.
+- Mic Format is not promoted: `channelOffset` (Input Starting Channel) and
+  `channels` remain gated until the selected input patch's channel capacity can
+  be read and checked. The documented `settings/mic/patchList` exposes only
+  input-patch ID/name, while `channelOffset`, `channels`, and `numChannelsIn`
+  describe the cue rather than patch capacity; no static channel bound is safe
+  because QLab permits starting channels above 64. Object Audio, Audio FX,
+  `doLevel`, Trim mute/solo and clears, reset actions, `/live`, patch
+  definitions, and patch routing remain outside this scope.
 
 Video Phase 9C — Video embedded-audio Levels metadata:
 
@@ -288,8 +337,9 @@ Video Phase 9C — Video embedded-audio Levels metadata:
 - setter timeout is accepted only with warning
   `setter_timeout_but_readback_matched` when fresh readback matches
 - `/live`, row `0`, output names, batch, multi-property, raw OSC, playback,
-  save, Audio/Camera/Text promotion, and Video cues without embedded audio
-  remain blocked
+  save, Camera/Text promotion, and Video cues without embedded audio remain
+  blocked. The recorded QLab validation remains Video-only; the local Audio/Mic
+  Phase 9C candidates above still require their own MCP readback/rollback run.
 
 Video clock type and Integrated Fade:
 

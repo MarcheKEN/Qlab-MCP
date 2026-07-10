@@ -25,7 +25,7 @@ def test_update_registry_has_specs_for_all_mutating_cue_osc_routes() -> None:
         "common/global cue properties": {"real_write": 15, "gated": 21},
         "Group/List/Cart": {"real_write": 7, "planned_only": 6},
         "Audio": {"gated": 65, "real_write": 6},
-        "Mic": {"gated": 4, "real_write": 3},
+        "Mic": {"gated": 5, "real_write": 2},
         "Video": {"gated": 79},
         "Camera": {"gated": 4, "real_write": 2},
         "Text": {"gated": 19},
@@ -70,6 +70,25 @@ def test_audio_time_route_metadata_keeps_profile_specific_policies() -> None:
             assert property_spec["capability_gate"] == capability_gate
             assert property_spec["readback"] == "value"
             assert property_spec["contextual_requirements"] == []
+
+
+def test_audio_mic_scope_keeps_time_loops_and_format_type_specific() -> None:
+    catalog = profile_catalog()
+    audio = catalog["audio_basic"]["properties"]
+    mic = catalog["mic_basic"]["properties"]
+
+    for property_name in ("rate", "startTime", "endTime", "playCount", "infiniteLoop", "preservePitch"):
+        assert audio[property_name]["real_write_enabled"] is True
+        assert property_name not in mic
+
+    for property_name in ("audioOutputPatchID", "audioInputPatchID"):
+        if property_name == "audioOutputPatchID":
+            assert property_name in audio
+        assert property_name in mic
+        assert mic[property_name]["real_write_enabled"] is False
+
+    assert mic["channelOffset"]["planned_only_reason"] == "audio_input_channel_offset_needs_patch_bounds_validation"
+    assert mic["channels"]["planned_only_reason"] == "audio_input_channel_count_needs_patch_bounds_validation"
 
 
 def test_updateq_coverage_snapshot_doc_matches_summary() -> None:

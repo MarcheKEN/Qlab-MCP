@@ -128,13 +128,22 @@ VIDEO_PHASE8_IO_PROPERTIES_BY_PROFILE = {
     "video_basic": frozenset({"stageID", "audioOutputPatchID"}),
     "camera_basic": frozenset({"stageID", "audioOutputPatchID", "videoInputPatchID", "audioInputPatchID"}),
     "text_basic": frozenset({"stageID"}),
+    "audio_basic": frozenset({"audioOutputPatchID"}),
+    "mic_basic": frozenset({"audioOutputPatchID", "audioInputPatchID"}),
 }
 VIDEO_PHASE8_IO_TYPES = {
     "video_basic": "Video",
     "camera_basic": "Camera",
     "text_basic": "Text",
+    "audio_basic": "Audio",
+    "mic_basic": "Mic",
 }
 VIDEO_PHASE8_IO_PROPERTIES = frozenset().union(*VIDEO_PHASE8_IO_PROPERTIES_BY_PROFILE.values())
+PHASE8_AUDIO_MIC_PATCH_SETTING_BY_TARGET = {
+    ("audio_basic", "audioOutputPatchID"): ("audio/patchList", "audio output patch"),
+    ("mic_basic", "audioOutputPatchID"): ("audio/patchList", "audio output patch"),
+    ("mic_basic", "audioInputPatchID"): ("mic/patchList", "audio input patch"),
+}
 TEXT_PHASE3E_COLOR_PROPERTIES = frozenset(
     {
         "text/format/color",
@@ -224,13 +233,16 @@ VIDEO_INTEGRATED_FADE_PROPERTIES = frozenset({"doFade", "lockFadeToCue"})
 PHASE_VIDEO_INTEGRATED_FADE_OPERATION_KIND = "video_integrated_fade_write"
 PHASE_VIDEO_INTEGRATED_FADE_TOKEN_VERSION = 1
 VIDEO_PHASE9A_AUDIO_LEVEL_PROPERTIES = frozenset({"sliderLevel"})
-VIDEO_PHASE9A_AUDIO_LEVEL_EVIDENCE_KEYS = ("audioTrackFormats", "numChannelsIn", "levels", "sliderLevels")
 PHASE9A_VIDEO_AUDIO_LEVEL_OPERATION_KIND = "video_phase9a_audio_level_write"
 PHASE9A_VIDEO_AUDIO_LEVEL_TOKEN_VERSION = 1
 VIDEO_PHASE9B_AUDIO_MATRIX_PROPERTIES = frozenset({"level"})
-VIDEO_PHASE9B_AUDIO_MATRIX_EVIDENCE_KEYS = ("audioTrackFormats", "numChannelsIn", "levels")
 PHASE9B_VIDEO_AUDIO_MATRIX_OPERATION_KIND = "video_phase9b_audio_matrix_write"
 PHASE9B_VIDEO_AUDIO_MATRIX_TOKEN_VERSION = 1
+PHASE9_AUDIO_LEVEL_TYPES = {
+    "video_basic": "Video",
+    "audio_basic": "Audio",
+    "mic_basic": "Mic",
+}
 VIDEO_PHASE9C_AUDIO_LEVEL_META_PROPERTIES = frozenset({"inputChannelName", "gang"})
 PHASE9C_VIDEO_AUDIO_LEVEL_META_OPERATION_KIND = "video_phase9c_audio_level_meta_write"
 PHASE9C_VIDEO_AUDIO_LEVEL_META_TOKEN_VERSION = 1
@@ -603,16 +615,46 @@ class QLabWriteMixin:
         )
         for item in items:
             _strip_video_phase2_confirm_tokens(item)
-            if item.get("profile") in VIDEO_PHASE2_PROFILES and item.get("operations"):
+            phase8_io_operation = _phase8_video_io_operation(item)
+            if phase8_io_operation is not None and item.get("profile") not in VIDEO_PHASE2_PROFILES:
+                phase8_io_operation.pop("confirm_token", None)
+            phase9c_operation = _phase9c_video_audio_level_meta_operation(item)
+            if phase9c_operation is not None:
+                phase9c_operation.pop("confirm_token", None)
+            if (
+                item.get("profile") in VIDEO_PHASE2_PROFILES
+                or _phase8_video_io_operation(item) is not None
+            ) and item.get("operations"):
                 item["read_keys"] = list(dict.fromkeys([*item["read_keys"], *VIDEO_PHASE2_HEALTH_READ_KEYS]))
             if _phase8b_video_audio_time_operation(item) is not None:
                 item["read_keys"] = list(dict.fromkeys([*item["read_keys"], *VIDEO_PHASE8B_AUDIO_TIME_EVIDENCE_KEYS]))
             if _video_clock_type_operation(item) is not None or _video_integrated_fade_operation(item) is not None:
                 item["read_keys"] = list(dict.fromkeys([*item["read_keys"], "audioTrackFormats", "numChannelsIn"]))
             if _phase9a_video_audio_level_operation(item) is not None:
-                item["read_keys"] = list(dict.fromkeys([*item["read_keys"], *VIDEO_PHASE9A_AUDIO_LEVEL_EVIDENCE_KEYS]))
+                item["read_keys"] = list(
+                    dict.fromkeys(
+                        [
+                            *item["read_keys"],
+                            *_phase9_audio_level_read_keys(
+                                item,
+                                "numChannelsIn",
+                                "levels",
+                                "sliderLevels",
+                            ),
+                            *VIDEO_PHASE2_HEALTH_READ_KEYS,
+                        ]
+                    )
+                )
             if _phase9b_video_audio_matrix_operation(item) is not None:
-                item["read_keys"] = list(dict.fromkeys([*item["read_keys"], *VIDEO_PHASE9B_AUDIO_MATRIX_EVIDENCE_KEYS]))
+                item["read_keys"] = list(
+                    dict.fromkeys(
+                        [
+                            *item["read_keys"],
+                            *_phase9_audio_level_read_keys(item, "numChannelsIn", "levels"),
+                            *VIDEO_PHASE2_HEALTH_READ_KEYS,
+                        ]
+                    )
+                )
             if (
                 _phase9c_video_audio_level_meta_operation(item) is not None
                 or _phase9d_video_audio_mute_solo_operation(item) is not None
@@ -623,12 +665,13 @@ class QLabWriteMixin:
                     dict.fromkeys(
                         [
                             *item["read_keys"],
-                            "audioTrackFormats",
+                            *_phase9_audio_level_read_keys(item),
                             "numChannelsIn",
                             "sliderLevels",
                             "levels",
                             "muteChannels",
                             "soloChannels",
+                            *VIDEO_PHASE2_HEALTH_READ_KEYS,
                         ]
                     )
                 )
@@ -1315,7 +1358,15 @@ class QLabWriteMixin:
                     errors.update(_phase3_video_scalar_dry_run_errors(item, before))
                     errors.update(_phase3_video_appearance_dry_run_errors(item, before))
                     errors.update(_phase7_video_geometry_dry_run_errors(item, before))
-                    errors.update(_phase8_video_io_dry_run_errors(item, before))
+                    errors.update(
+                        _phase8_video_io_dry_run_errors(
+                            item,
+                            before,
+                            workspace_id=workspace,
+                            reader=self,
+                            candidate_shape=phase8_io_candidate_shape,
+                        )
+                    )
                     errors.update(_phase8b_video_audio_time_dry_run_errors(item, before))
                     errors.update(
                         _phase9_audio_dry_run_errors(
@@ -1335,14 +1386,7 @@ class QLabWriteMixin:
                     )
                     errors.update(_phase9a_video_audio_level_dry_run_errors(item, before))
                     errors.update(_phase9b_video_audio_matrix_dry_run_errors(item, before))
-                    errors.update(
-                        _phase9_audio_dry_run_errors(
-                            item,
-                            before,
-                            _phase9c_video_audio_level_meta_operation,
-                            _phase9c_audio_level_meta_preflight_error,
-                        )
-                    )
+                    errors.update(_phase9c_audio_level_meta_dry_run_errors(item, before))
                     errors.update(
                         _phase9_audio_dry_run_errors(
                             item,
@@ -1537,7 +1581,7 @@ class QLabWriteMixin:
                             version=PHASE9C_VIDEO_AUDIO_LEVEL_META_TOKEN_VERSION,
                             operation_kind=PHASE9C_VIDEO_AUDIO_LEVEL_META_OPERATION_KIND,
                             candidate_flag="phase9c_video_audio_level_meta_candidate",
-                            reason="video_audio_level_meta_requires_confirm_token",
+                            reason=_phase9_audio_level_reason(item, "level_meta_requires_confirm_token"),
                             workspace_validation="post_write_fresh_level_metadata_readback_required",
                             requirements=[
                                 "phase9c_video_audio_level_meta_confirm_token",
@@ -1547,7 +1591,11 @@ class QLabWriteMixin:
                                 "fresh_metadata_baseline",
                                 "exact_metadata_readback",
                                 "manual_rollback_plan",
-                                "embedded_audio_evidence",
+                                *(
+                                    ("embedded_audio_evidence",)
+                                    if _phase9_audio_level_requires_embedded_evidence(item)
+                                    else ()
+                                ),
                             ],
                         )
                     )
@@ -1761,7 +1809,7 @@ class QLabWriteMixin:
                 if not errors:
                     _mark_phase7_video_geometry_real_operation(item)
             elif not errors and phase8_video_io_call:
-                errors.update(_validate_phase8_video_io_real_write(workspace, item, before))
+                errors.update(_validate_phase8_video_io_real_write(workspace, item, before, reader=self))
                 if not errors:
                     _mark_phase8_video_io_real_operation(item)
             elif not errors and phase8b_video_audio_time_call:
@@ -1824,7 +1872,7 @@ class QLabWriteMixin:
                         family="videoAudioLevelMeta",
                         version=PHASE9C_VIDEO_AUDIO_LEVEL_META_TOKEN_VERSION,
                         operation_kind=PHASE9C_VIDEO_AUDIO_LEVEL_META_OPERATION_KIND,
-                        label="Phase 9C Video audio level metadata",
+                        label=f"{_phase9_audio_level_label(item, '9C')} metadata",
                         workspace_validation="post_write_fresh_level_metadata_readback_required",
                     )
                 )
@@ -1903,7 +1951,11 @@ class QLabWriteMixin:
                 if phase9b_video_audio_matrix_call:
                     _label_phase9b_video_audio_matrix_rejection(item)
                 if phase9c_video_audio_level_meta_call:
-                    _phase9_label_rejection(item, _phase9c_video_audio_level_meta_operation, "video_audio_level_meta_requires_confirm_token")
+                    _phase9_label_rejection(
+                        item,
+                        _phase9c_video_audio_level_meta_operation,
+                        _phase9_audio_level_reason(item, "level_meta_requires_confirm_token"),
+                    )
                 if phase9d_video_audio_mute_solo_call:
                     _phase9_label_rejection(item, _phase9d_video_audio_mute_solo_operation, "video_audio_mute_solo_requires_confirm_token")
                 if phase9e_video_audio_level_bulk_call:
@@ -4308,7 +4360,7 @@ def _phase8_video_io_call_structure_error(items: list[dict[str, Any]]) -> str | 
     item = items[0]
     operations = item.get("operations") or []
     if item.get("profile") not in VIDEO_PHASE8_IO_TYPES:
-        return "Phase 8A I/O real writes require video_basic, camera_basic, or text_basic profile."
+        return "Phase 8A I/O real writes require a supported cue I/O profile."
     if len(operations) != 1:
         return "Phase 8A I/O real writes require exactly one property."
     operation = operations[0]
@@ -4324,6 +4376,64 @@ def _phase8_video_io_call_structure_error(items: list[dict[str, Any]]) -> str | 
 
 def _phase8_video_io_requested_value(operation: dict[str, Any]) -> Any:
     return operation["args"][0] if operation.get("args") else None
+
+
+def _phase8_audio_mic_patch_setting(item: dict[str, Any]) -> tuple[str, str] | None:
+    operation = _phase8_video_io_operation(item)
+    if operation is None:
+        return None
+    return PHASE8_AUDIO_MIC_PATCH_SETTING_BY_TARGET.get(
+        (str(item.get("profile")), str(operation.get("property")))
+    )
+
+
+def _phase8_audio_mic_patch_membership_error(
+    reader: Any,
+    workspace_id: str,
+    item: dict[str, Any],
+    requested: Any,
+) -> str | None:
+    setting = _phase8_audio_mic_patch_setting(item)
+    if setting is None:
+        return None
+    command, label = setting
+    try:
+        reply = reader.client.request(_workspace_address(workspace_id, f"settings/{command}"))
+        patches = _collection_items(reply.data)
+    except Exception:
+        return f"Phase 8A I/O could not read current {label}s; refusing an unverified patch ID."
+
+    patch_ids: set[str] = set()
+    for patch in patches:
+        if not isinstance(patch, dict):
+            continue
+        for key in ("uniqueID", "id", "patchID"):
+            value = patch.get(key)
+            if value not in (None, ""):
+                patch_ids.add(str(value))
+    if not patch_ids:
+        return f"Phase 8A I/O current {label} list contains no usable IDs; refusing an unverified patch ID."
+    if requested not in patch_ids:
+        return f"Phase 8A I/O requested {item['operations'][0]['property']} is not a current {label} ID."
+    return None
+
+
+def _phase8_video_io_gate_requirements(item: dict[str, Any]) -> list[str]:
+    requirements = [
+        "phase8_video_io_confirm_token",
+        "single_cue_single_property",
+        "uuid_cue_ref",
+        "saved_mode",
+        "fresh_baseline",
+        "exact_readback",
+        "manual_rollback_plan",
+    ]
+    requirements.append(
+        "workspace_patch_id_membership"
+        if _phase8_audio_mic_patch_setting(item) is not None
+        else "workspace_id_list_validation_future"
+    )
+    return requirements
 
 
 def _phase8_stageid_recovery_key(workspace_id: str, cue_id: str | None, property_name: str) -> tuple[str, str, str] | None:
@@ -4488,6 +4598,10 @@ def _decode_phase8_video_io_confirm_token(token: str) -> tuple[dict[str, Any] | 
 def _phase8_video_io_dry_run_errors(
     item: dict[str, Any],
     before: dict[str, Any] | None,
+    *,
+    workspace_id: str,
+    reader: Any,
+    candidate_shape: bool,
 ) -> dict[str, str]:
     operation = _phase8_video_io_operation(item)
     if (
@@ -4497,6 +4611,8 @@ def _phase8_video_io_dry_run_errors(
         or before.get("type") != VIDEO_PHASE8_IO_TYPES.get(item.get("profile"))
     ):
         return {}
+    if _phase8_audio_mic_patch_setting(item) is not None and not candidate_shape:
+        return {}
     property_name = operation["property"]
     baseline = before.get(property_name)
     requested = _phase8_video_io_requested_value(operation)
@@ -4504,6 +4620,9 @@ def _phase8_video_io_dry_run_errors(
         return {property_name: f"Phase 8A I/O requires readable {property_name} baseline."}
     if not _video_io_value_valid(requested):
         return {property_name: f"Phase 8A I/O requested {property_name} must be a non-empty patch/stage ID string."}
+    patch_membership_error = _phase8_audio_mic_patch_membership_error(reader, workspace_id, item, requested)
+    if patch_membership_error:
+        return {property_name: patch_membership_error}
     return {}
 
 
@@ -4541,16 +4660,7 @@ def _annotate_phase8_video_io_operation(
             "requires_confirm_token": True,
             "phase8_video_io_candidate": True,
             "planned_only_reason": "video_io_requires_confirm_token",
-            "future_gate_requirements": [
-                "phase8_video_io_confirm_token",
-                "single_cue_single_property",
-                "uuid_cue_ref",
-                "saved_mode",
-                "fresh_baseline",
-                "exact_readback",
-                "manual_rollback_plan",
-                "workspace_id_list_validation_future",
-            ],
+            "future_gate_requirements": _phase8_video_io_gate_requirements(item),
         }
     )
     operation["confirm_token"] = _phase8_video_io_confirm_token(
@@ -4578,15 +4688,15 @@ def _validate_phase8_video_io_real_write(
     workspace_id: str,
     item: dict[str, Any],
     before: dict[str, Any] | None,
+    *,
+    reader: Any,
 ) -> dict[str, str]:
     operation = _phase8_video_io_operation(item)
     property_name = operation.get("property") if operation else "video_io"
     if operation is None or not isinstance(before, dict):
         return {property_name: "Phase 8A I/O preflight is incomplete."}
     if before.get("type") != VIDEO_PHASE8_IO_TYPES.get(item.get("profile")):
-        return {
-            property_name: "Phase 8A I/O real writes require matching Video, Camera, or Text cue type/profile."
-        }
+        return {property_name: "Phase 8A I/O real writes require matching cue type/profile."}
     requested = _phase8_video_io_requested_value(operation)
     recovery_allowed = _phase8_stageid_recovery_allowed(workspace_id, item, before, requested)
     if before.get("isBroken") is True or before.get("isWarning") is True:
@@ -4632,6 +4742,9 @@ def _validate_phase8_video_io_real_write(
                 "the reviewed dry-run baseline."
             )
         }
+    patch_membership_error = _phase8_audio_mic_patch_membership_error(reader, workspace_id, item, requested)
+    if patch_membership_error:
+        return {property_name: patch_membership_error}
     return {}
 
 
@@ -4923,8 +5036,35 @@ def _validate_phase8b_video_audio_time_real_write(
     return {}
 
 
+def _phase9_audio_level_cue_type(item: dict[str, Any]) -> str | None:
+    return PHASE9_AUDIO_LEVEL_TYPES.get(item.get("profile"))
+
+
+def _phase9_audio_level_label(item: dict[str, Any], phase: str) -> str:
+    cue_type = _phase9_audio_level_cue_type(item)
+    if cue_type == "Video":
+        return f"Phase {phase} Video audio level"
+    return f"Phase {phase} {cue_type or 'Audio/Mic'} level"
+
+
+def _phase9_audio_level_requires_embedded_evidence(item: dict[str, Any]) -> bool:
+    return item.get("profile") == "video_basic"
+
+
+def _phase9_audio_level_read_keys(item: dict[str, Any], *baseline_keys: str) -> tuple[str, ...]:
+    return (
+        *(("audioTrackFormats",) if _phase9_audio_level_requires_embedded_evidence(item) else ()),
+        *baseline_keys,
+    )
+
+
+def _phase9_audio_level_reason(item: dict[str, Any], suffix: str) -> str:
+    prefix = "video_audio" if _phase9_audio_level_cue_type(item) == "Video" else "audio"
+    return f"{prefix}_{suffix}"
+
+
 def _phase9a_video_audio_level_operation(item: dict[str, Any]) -> dict[str, Any] | None:
-    if item.get("profile") != "video_basic":
+    if _phase9_audio_level_cue_type(item) is None:
         return None
     return next(
         (
@@ -4938,20 +5078,20 @@ def _phase9a_video_audio_level_operation(item: dict[str, Any]) -> dict[str, Any]
 
 def _phase9a_video_audio_level_call_structure_error(items: list[dict[str, Any]]) -> str | None:
     if len(items) != 1:
-        return "Phase 9A Video audio level writes require exactly one cue update."
+        return "Phase 9A audio level writes require exactly one cue update."
     item = items[0]
     operations = item.get("operations") or []
-    if item.get("profile") != "video_basic":
-        return "Phase 9A Video audio level writes require video_basic profile."
+    if _phase9_audio_level_cue_type(item) is None:
+        return "Phase 9A audio level writes require video_basic, audio_basic, or mic_basic profile."
     if len(operations) != 1:
-        return "Phase 9A Video audio level writes require exactly one property."
+        return "Phase 9A audio level writes require exactly one property."
     operation = operations[0]
     if operation.get("property") != "sliderLevel" or not str(operation.get("path", "")).startswith("sliderLevel/"):
-        return "Phase 9A Video audio level writes allow only sliderLevel saved writes."
+        return "Phase 9A audio level writes allow only sliderLevel saved writes."
     if operation.get("mode") != "saved":
-        return "Phase 9A Video audio level writes require saved mode."
+        return "Phase 9A audio level writes require saved mode."
     if not _is_exact_cue_uuid(item.get("cue_ref")):
-        return "Phase 9A Video audio level writes require exact cue UUID as cue_ref; cue numbers are rejected."
+        return "Phase 9A audio level writes require exact cue UUID as cue_ref; cue numbers are rejected."
     return None
 
 
@@ -5007,7 +5147,7 @@ def _phase9a_video_audio_level_token_payload(
         "workspace_id": workspace_id,
         "cue_ref": cue_ref,
         "cue_id": cue_id,
-        "cue_type": "Video",
+        "cue_type": _phase9_audio_level_cue_type(item),
         "profile": item["profile"],
         "property": operation["property"],
         "path": operation["path"],
@@ -5061,18 +5201,22 @@ def _phase9a_video_audio_level_dry_run_errors(
     before: dict[str, Any] | None,
 ) -> dict[str, str]:
     operation = _phase9a_video_audio_level_operation(item)
-    if operation is None or item.get("profile") != "video_basic" or not isinstance(before, dict) or before.get("type") != "Video":
+    cue_type = _phase9_audio_level_cue_type(item)
+    if operation is None or cue_type is None or not isinstance(before, dict) or before.get("type") != cue_type:
         return {}
+    if item.get("profile") != "video_basic":
+        return {}
+    label = _phase9_audio_level_label(item, "9A")
     channel, requested = _phase9a_audio_level_values(operation)
     baseline = _phase9a_audio_level_baseline(before, channel)
     if not isinstance(channel, int) or isinstance(channel, bool):
-        return {"sliderLevel": "Phase 9A Video audio level requires integer channel."}
+        return {"sliderLevel": f"{label} requires integer channel."}
     if baseline is None or not _phase9a_audio_level_value_valid(baseline):
-        return {"sliderLevel": "Phase 9A Video audio level requires readable sliderLevels baseline for channel."}
+        return {"sliderLevel": f"{label} requires readable sliderLevels baseline for channel."}
     if not _phase9a_audio_level_value_valid(requested):
-        return {"sliderLevel": "Phase 9A Video audio level requested decibel must be a finite number."}
-    if not _phase9a_audio_level_has_embedded_audio_evidence(before):
-        return {"sliderLevel": "Phase 9A Video audio level requires readable embedded-audio evidence."}
+        return {"sliderLevel": f"{label} requested decibel must be a finite number."}
+    if _phase9_audio_level_requires_embedded_evidence(item) and not _phase9a_audio_level_has_embedded_audio_evidence(before):
+        return {"sliderLevel": f"{label} requires readable embedded-audio evidence."}
     return {}
 
 
@@ -5084,7 +5228,8 @@ def _annotate_phase9a_video_audio_level_operation(
     candidate_shape: bool,
 ) -> list[str]:
     operation = _phase9a_video_audio_level_operation(item)
-    if operation is None or item.get("profile") != "video_basic":
+    cue_type = _phase9_audio_level_cue_type(item)
+    if operation is None or cue_type is None:
         return []
     cue_id = _resolved_cue_id(before)
     channel, requested = _phase9a_audio_level_values(operation)
@@ -5092,16 +5237,20 @@ def _annotate_phase9a_video_audio_level_operation(
     candidate = (
         candidate_shape
         and isinstance(before, dict)
-        and before.get("type") == "Video"
+        and before.get("type") == cue_type
         and cue_id == item.get("cue_ref")
         and isinstance(channel, int)
         and not isinstance(channel, bool)
         and _phase9a_audio_level_value_valid(baseline)
         and _phase9a_audio_level_value_valid(requested)
-        and _phase9a_audio_level_has_embedded_audio_evidence(before)
+        and (
+            not _phase9_audio_level_requires_embedded_evidence(item)
+            or _phase9a_audio_level_has_embedded_audio_evidence(before)
+        )
     )
     if not candidate:
-        operation.pop("confirm_token", None)
+        if item.get("profile") == "video_basic":
+            operation.pop("confirm_token", None)
         return []
     operation.update(
         {
@@ -5110,7 +5259,7 @@ def _annotate_phase9a_video_audio_level_operation(
             "real_write_possible": True,
             "requires_confirm_token": True,
             "phase9a_video_audio_level_candidate": True,
-            "planned_only_reason": "video_audio_levels_require_confirm_token",
+            "planned_only_reason": _phase9_audio_level_reason(item, "levels_require_confirm_token"),
             "future_gate_requirements": [
                 "phase9a_video_audio_level_confirm_token",
                 "single_cue_single_property",
@@ -5119,7 +5268,11 @@ def _annotate_phase9a_video_audio_level_operation(
                 "fresh_sliderLevels_baseline",
                 "exact_channel_readback",
                 "manual_rollback_plan",
-                "embedded_audio_evidence",
+                *(
+                    ("embedded_audio_evidence",)
+                    if _phase9_audio_level_requires_embedded_evidence(item)
+                    else ()
+                ),
             ],
         }
     )
@@ -5142,31 +5295,33 @@ def _validate_phase9a_video_audio_level_real_write(
     before: dict[str, Any] | None,
 ) -> dict[str, str]:
     operation = _phase9a_video_audio_level_operation(item)
+    label = _phase9_audio_level_label(item, "9A")
+    cue_type = _phase9_audio_level_cue_type(item)
     if operation is None or not isinstance(before, dict):
-        return {"sliderLevel": "Phase 9A Video audio level preflight is incomplete."}
-    if before.get("type") != "Video" or item.get("profile") != "video_basic":
-        return {"sliderLevel": "Phase 9A Video audio level real writes require a Video cue with video_basic profile."}
+        return {"sliderLevel": f"{label} preflight is incomplete."}
+    if cue_type is None or before.get("type") != cue_type:
+        return {"sliderLevel": f"{label} real writes require matching cue type/profile."}
     if before.get("isBroken") is True or before.get("isWarning") is True:
-        return {"sliderLevel": "Phase 9A Video audio level real writes require a healthy cue without warnings."}
+        return {"sliderLevel": f"{label} real writes require a healthy cue without warnings."}
     if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
-        return {"sliderLevel": "Phase 9A Video audio level real writes require an inactive cue."}
+        return {"sliderLevel": f"{label} real writes require an inactive cue."}
     cue_id = _resolved_cue_id(before)
     channel, requested = _phase9a_audio_level_values(operation)
     baseline = _phase9a_audio_level_baseline(before, channel)
     if cue_id != item.get("cue_ref"):
         return {"sliderLevel": "Phase 9A fresh read uniqueID does not exactly match requested cue UUID."}
     if not isinstance(channel, int) or isinstance(channel, bool):
-        return {"sliderLevel": "Phase 9A Video audio level requires integer channel."}
+        return {"sliderLevel": f"{label} requires integer channel."}
     if baseline is None or not _phase9a_audio_level_value_valid(baseline):
-        return {"sliderLevel": "Phase 9A Video audio level requires readable sliderLevels baseline for channel."}
+        return {"sliderLevel": f"{label} requires readable sliderLevels baseline for channel."}
     if not _phase9a_audio_level_value_valid(requested):
-        return {"sliderLevel": "Phase 9A Video audio level requested decibel must be a finite number."}
-    if not _phase9a_audio_level_has_embedded_audio_evidence(before):
-        return {"sliderLevel": "Phase 9A Video audio level requires readable embedded-audio evidence."}
+        return {"sliderLevel": f"{label} requested decibel must be a finite number."}
+    if _phase9_audio_level_requires_embedded_evidence(item) and not _phase9a_audio_level_has_embedded_audio_evidence(before):
+        return {"sliderLevel": f"{label} requires readable embedded-audio evidence."}
     token = item["confirm_gates"][0]
     payload, token_error = _decode_phase9a_video_audio_level_confirm_token(token)
     if token_error or payload is None:
-        return {"sliderLevel": token_error or "Phase 9A Video audio level confirm_token is invalid."}
+        return {"sliderLevel": token_error or f"{label} confirm_token is invalid."}
     expected = _phase9a_video_audio_level_token_payload(
         workspace_id=workspace_id,
         cue_ref=item["cue_ref"],
@@ -5183,22 +5338,28 @@ def _validate_phase9a_video_audio_level_real_write(
         if payload.get(key) != value:
             return {
                 "sliderLevel": (
-                    "Phase 9A Video audio level confirm_token does not match this workspace, cue, "
+                    f"{label} confirm_token does not match this workspace, cue, "
                     "property, value, channel, or risk context."
                 )
             }
     if payload.get("baseline_sha256") != expected["baseline_sha256"] or payload.get("baseline") != expected["baseline"]:
+        stale_prefix = (
+            "stale_video_audio_level_baseline"
+            if _phase9_audio_level_cue_type(item) == "Video"
+            else "stale_audio_level_baseline"
+        )
         return {
             "sliderLevel": (
-                "stale_video_audio_level_baseline: current sliderLevels channel no longer matches "
+                f"{stale_prefix}: current sliderLevels channel no longer matches "
                 "the reviewed dry-run baseline."
             )
         }
+    operation["read_key"] = "sliderLevels"
     return {}
 
 
 def _phase9b_video_audio_matrix_operation(item: dict[str, Any]) -> dict[str, Any] | None:
-    if item.get("profile") != "video_basic":
+    if _phase9_audio_level_cue_type(item) is None:
         return None
     return next(
         (
@@ -5212,20 +5373,20 @@ def _phase9b_video_audio_matrix_operation(item: dict[str, Any]) -> dict[str, Any
 
 def _phase9b_video_audio_matrix_call_structure_error(items: list[dict[str, Any]]) -> str | None:
     if len(items) != 1:
-        return "Phase 9B Video audio matrix writes require exactly one cue update."
+        return "Phase 9B audio matrix writes require exactly one cue update."
     item = items[0]
     operations = item.get("operations") or []
-    if item.get("profile") != "video_basic":
-        return "Phase 9B Video audio matrix writes require video_basic profile."
+    if _phase9_audio_level_cue_type(item) is None:
+        return "Phase 9B audio matrix writes require video_basic, audio_basic, or mic_basic profile."
     if len(operations) != 1:
-        return "Phase 9B Video audio matrix writes require exactly one property."
+        return "Phase 9B audio matrix writes require exactly one property."
     operation = operations[0]
     if operation.get("property") != "level" or not str(operation.get("path", "")).startswith("level/"):
-        return "Phase 9B Video audio matrix writes allow only level/{inChannel}/{outChannel} saved writes."
+        return "Phase 9B audio matrix writes allow only level/{inChannel}/{outChannel} saved writes."
     if operation.get("mode") != "saved":
-        return "Phase 9B Video audio matrix writes require saved mode."
+        return "Phase 9B audio matrix writes require saved mode."
     if not _is_exact_cue_uuid(item.get("cue_ref")):
-        return "Phase 9B Video audio matrix writes require exact cue UUID as cue_ref; cue numbers are rejected."
+        return "Phase 9B audio matrix writes require exact cue UUID as cue_ref; cue numbers are rejected."
     return None
 
 
@@ -5284,7 +5445,7 @@ def _phase9b_video_audio_matrix_token_payload(
         "workspace_id": workspace_id,
         "cue_ref": cue_ref,
         "cue_id": cue_id,
-        "cue_type": "Video",
+        "cue_type": _phase9_audio_level_cue_type(item),
         "profile": item["profile"],
         "property": operation["property"],
         "path": operation["path"],
@@ -5334,23 +5495,29 @@ def _decode_phase9b_video_audio_matrix_confirm_token(token: str) -> tuple[dict[s
     return payload, None
 
 
-def _phase9b_video_audio_matrix_preflight_error(before: dict[str, Any], operation: dict[str, Any]) -> str | None:
+def _phase9b_video_audio_matrix_preflight_error(
+    before: dict[str, Any],
+    operation: dict[str, Any],
+    *,
+    item: dict[str, Any],
+) -> str | None:
+    label = _phase9_audio_level_label(item, "9B").replace("level", "matrix")
     in_channel, out_channel, requested = _phase9b_audio_matrix_values(operation)
     baseline = _phase9b_audio_matrix_baseline(before, in_channel, out_channel)
     if not isinstance(in_channel, int) or isinstance(in_channel, bool):
-        return "Phase 9B Video audio matrix requires integer inChannel."
+        return f"{label} requires integer inChannel."
     if in_channel <= 0:
-        return "Phase 9B Video audio matrix row 0 is blocked; use Phase 9A sliderLevel."
+        return f"{label} row 0 is blocked; use Phase 9A sliderLevel."
     if not isinstance(out_channel, int) or isinstance(out_channel, bool):
-        return "Phase 9B Video audio matrix requires integer outChannel."
+        return f"{label} requires integer outChannel."
     if not _phase9a_audio_level_value_valid(requested):
-        return "Phase 9B Video audio matrix requested decibel must be a finite number."
-    if not _phase9a_audio_level_has_embedded_audio_evidence(before):
-        return "Phase 9B Video audio matrix requires readable embedded-audio evidence."
+        return f"{label} requested decibel must be a finite number."
+    if _phase9_audio_level_requires_embedded_evidence(item) and not _phase9a_audio_level_has_embedded_audio_evidence(before):
+        return f"{label} requires readable embedded-audio evidence."
     if not _phase9b_audio_matrix_in_channel_allowed(before, in_channel):
-        return "Phase 9B Video audio matrix requires inChannel within numChannelsIn."
+        return f"{label} requires inChannel within numChannelsIn."
     if baseline is None or not _phase9a_audio_level_value_valid(baseline):
-        return "Phase 9B Video audio matrix requires readable levels baseline for crosspoint."
+        return f"{label} requires readable levels baseline for crosspoint."
     return None
 
 
@@ -5359,9 +5526,12 @@ def _phase9b_video_audio_matrix_dry_run_errors(
     before: dict[str, Any] | None,
 ) -> dict[str, str]:
     operation = _phase9b_video_audio_matrix_operation(item)
-    if operation is None or item.get("profile") != "video_basic" or not isinstance(before, dict) or before.get("type") != "Video":
+    cue_type = _phase9_audio_level_cue_type(item)
+    if operation is None or cue_type is None or not isinstance(before, dict) or before.get("type") != cue_type:
         return {}
-    error = _phase9b_video_audio_matrix_preflight_error(before, operation)
+    if item.get("profile") != "video_basic":
+        return {}
+    error = _phase9b_video_audio_matrix_preflight_error(before, operation, item=item)
     return {"level": error} if error else {}
 
 
@@ -5373,7 +5543,8 @@ def _annotate_phase9b_video_audio_matrix_operation(
     candidate_shape: bool,
 ) -> list[str]:
     operation = _phase9b_video_audio_matrix_operation(item)
-    if operation is None or item.get("profile") != "video_basic":
+    cue_type = _phase9_audio_level_cue_type(item)
+    if operation is None or cue_type is None:
         return []
     cue_id = _resolved_cue_id(before)
     in_channel, out_channel, requested = _phase9b_audio_matrix_values(operation)
@@ -5381,12 +5552,13 @@ def _annotate_phase9b_video_audio_matrix_operation(
     candidate = (
         candidate_shape
         and isinstance(before, dict)
-        and before.get("type") == "Video"
+        and before.get("type") == cue_type
         and cue_id == item.get("cue_ref")
-        and _phase9b_video_audio_matrix_preflight_error(before, operation) is None
+        and _phase9b_video_audio_matrix_preflight_error(before, operation, item=item) is None
     )
     if not candidate:
-        operation.pop("confirm_token", None)
+        if item.get("profile") == "video_basic":
+            operation.pop("confirm_token", None)
         return []
     operation.update(
         {
@@ -5395,7 +5567,7 @@ def _annotate_phase9b_video_audio_matrix_operation(
             "real_write_possible": True,
             "requires_confirm_token": True,
             "phase9b_video_audio_matrix_candidate": True,
-            "planned_only_reason": "video_audio_matrix_requires_confirm_token",
+            "planned_only_reason": _phase9_audio_level_reason(item, "matrix_requires_confirm_token"),
             "future_gate_requirements": [
                 "phase9b_video_audio_matrix_confirm_token",
                 "single_cue_single_property",
@@ -5404,7 +5576,11 @@ def _annotate_phase9b_video_audio_matrix_operation(
                 "fresh_levels_baseline",
                 "exact_crosspoint_readback",
                 "manual_rollback_plan",
-                "embedded_audio_evidence",
+                *(
+                    ("embedded_audio_evidence",)
+                    if _phase9_audio_level_requires_embedded_evidence(item)
+                    else ()
+                ),
                 "row_zero_blocked",
             ],
         }
@@ -5429,26 +5605,28 @@ def _validate_phase9b_video_audio_matrix_real_write(
     before: dict[str, Any] | None,
 ) -> dict[str, str]:
     operation = _phase9b_video_audio_matrix_operation(item)
+    label = _phase9_audio_level_label(item, "9B").replace("level", "matrix")
+    cue_type = _phase9_audio_level_cue_type(item)
     if operation is None or not isinstance(before, dict):
-        return {"level": "Phase 9B Video audio matrix preflight is incomplete."}
-    if before.get("type") != "Video" or item.get("profile") != "video_basic":
-        return {"level": "Phase 9B Video audio matrix real writes require a Video cue with video_basic profile."}
+        return {"level": f"{label} preflight is incomplete."}
+    if cue_type is None or before.get("type") != cue_type:
+        return {"level": f"{label} real writes require matching cue type/profile."}
     if before.get("isBroken") is True or before.get("isWarning") is True:
-        return {"level": "Phase 9B Video audio matrix real writes require a healthy cue without warnings."}
+        return {"level": f"{label} real writes require a healthy cue without warnings."}
     if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
-        return {"level": "Phase 9B Video audio matrix real writes require an inactive cue."}
+        return {"level": f"{label} real writes require an inactive cue."}
     cue_id = _resolved_cue_id(before)
     in_channel, out_channel, requested = _phase9b_audio_matrix_values(operation)
     baseline = _phase9b_audio_matrix_baseline(before, in_channel, out_channel)
     if cue_id != item.get("cue_ref"):
         return {"level": "Phase 9B fresh read uniqueID does not exactly match requested cue UUID."}
-    preflight_error = _phase9b_video_audio_matrix_preflight_error(before, operation)
+    preflight_error = _phase9b_video_audio_matrix_preflight_error(before, operation, item=item)
     if preflight_error:
         return {"level": preflight_error}
     token = item["confirm_gates"][0]
     payload, token_error = _decode_phase9b_video_audio_matrix_confirm_token(token)
     if token_error or payload is None:
-        return {"level": token_error or "Phase 9B Video audio matrix confirm_token is invalid."}
+        return {"level": token_error or f"{label} confirm_token is invalid."}
     expected = _phase9b_video_audio_matrix_token_payload(
         workspace_id=workspace_id,
         cue_ref=item["cue_ref"],
@@ -5466,22 +5644,41 @@ def _validate_phase9b_video_audio_matrix_real_write(
         if payload.get(key) != value:
             return {
                 "level": (
-                    "Phase 9B Video audio matrix confirm_token does not match this workspace, cue, "
+                    f"{label} confirm_token does not match this workspace, cue, "
                     "property, value, channel, or risk context."
                 )
             }
     if payload.get("baseline_sha256") != expected["baseline_sha256"] or payload.get("baseline") != expected["baseline"]:
+        stale_prefix = (
+            "stale_video_audio_matrix_baseline"
+            if _phase9_audio_level_cue_type(item) == "Video"
+            else "stale_audio_matrix_baseline"
+        )
         return {
             "level": (
-                "stale_video_audio_matrix_baseline: current levels crosspoint no longer matches "
+                f"{stale_prefix}: current levels crosspoint no longer matches "
                 "the reviewed dry-run baseline."
             )
         }
+    operation["read_key"] = "levels"
     return {}
 
 
 def _phase9_video_audio_operation(item: dict[str, Any], properties: frozenset[str]) -> dict[str, Any] | None:
     if item.get("profile") != "video_basic":
+        return None
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in properties
+        ),
+        None,
+    )
+
+
+def _phase9_audio_level_operation(item: dict[str, Any], properties: frozenset[str]) -> dict[str, Any] | None:
+    if _phase9_audio_level_cue_type(item) is None:
         return None
     return next(
         (
@@ -5519,7 +5716,7 @@ def _phase9_audio_common_call_structure_error(
 
 
 def _phase9c_video_audio_level_meta_operation(item: dict[str, Any]) -> dict[str, Any] | None:
-    return _phase9_video_audio_operation(item, VIDEO_PHASE9C_AUDIO_LEVEL_META_PROPERTIES)
+    return _phase9_audio_level_operation(item, VIDEO_PHASE9C_AUDIO_LEVEL_META_PROPERTIES)
 
 
 def _video_clock_type_operation(item: dict[str, Any]) -> dict[str, Any] | None:
@@ -5539,12 +5736,22 @@ def _phase9e_video_audio_level_bulk_operation(item: dict[str, Any]) -> dict[str,
 
 
 def _phase9c_video_audio_level_meta_call_structure_error(items: list[dict[str, Any]]) -> str | None:
-    return _phase9_audio_common_call_structure_error(
-        items,
-        phase="Phase 9C",
-        properties=VIDEO_PHASE9C_AUDIO_LEVEL_META_PROPERTIES,
-        noun="level metadata",
-    )
+    if len(items) != 1:
+        return "Phase 9C audio level metadata writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if _phase9_audio_level_cue_type(item) is None:
+        return "Phase 9C audio level metadata writes require video_basic, audio_basic, or mic_basic profile."
+    if len(operations) != 1:
+        return "Phase 9C audio level metadata writes require exactly one operation."
+    operation = operations[0]
+    if operation.get("property") not in VIDEO_PHASE9C_AUDIO_LEVEL_META_PROPERTIES:
+        return "Phase 9C audio level metadata writes allow only inputChannelName or gang."
+    if operation.get("mode") != "saved":
+        return "Phase 9C audio level metadata writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Phase 9C audio level metadata writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
 
 
 def _video_clock_type_call_structure_error(items: list[dict[str, Any]]) -> str | None:
@@ -5697,7 +5904,7 @@ def _phase9c_audio_level_meta_preflight_error(before: dict[str, Any], operation:
     first, second, requested = _phase9_meta_values(operation)
     read_key = _phase9_dynamic_read_key(operation)
     baseline = before.get(read_key) if read_key else None
-    if not _phase9a_audio_level_has_embedded_audio_evidence(before):
+    if before.get("type") == "Video" and not _phase9a_audio_level_has_embedded_audio_evidence(before):
         return "Phase 9C Video audio level metadata requires readable embedded-audio evidence."
     if prop == "inputChannelName":
         if not isinstance(first, int) or isinstance(first, bool):
@@ -5726,6 +5933,20 @@ def _phase9c_audio_level_meta_preflight_error(before: dict[str, Any], operation:
             return "Phase 9C gang requires a string up to 64 characters without control characters."
         return None
     return "Phase 9C operation is not supported."
+
+
+def _phase9c_audio_level_meta_dry_run_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, str]:
+    operation = _phase9c_video_audio_level_meta_operation(item)
+    cue_type = _phase9_audio_level_cue_type(item)
+    if operation is None or cue_type is None or not isinstance(before, dict) or before.get("type") != cue_type:
+        return {}
+    error = _phase9c_audio_level_meta_preflight_error(before, operation)
+    if error:
+        operation.pop("confirm_token", None)
+    return {operation["property"]: error} if error else {}
 
 
 def _phase9d_audio_mute_solo_preflight_error(before: dict[str, Any], operation: dict[str, Any]) -> str | None:
@@ -5792,7 +6013,7 @@ def _phase9_token_payload(
         "workspace_id": workspace_id,
         "cue_ref": cue_ref,
         "cue_id": cue_id,
-        "cue_type": "Video",
+        "cue_type": _phase9_audio_level_cue_type(item),
         "profile": item["profile"],
         "property": operation["property"],
         "path": operation["path"],
@@ -5898,10 +6119,15 @@ def _phase9_audio_annotate_operation(
     requirements: list[str],
 ) -> list[str]:
     operation = operation_getter(item)
-    if operation is None or item.get("profile") != "video_basic":
+    cue_type = _phase9_audio_level_cue_type(item)
+    if operation is None or cue_type is None:
         return []
     cue_id = _resolved_cue_id(before)
-    valid = isinstance(before, dict) and preflight(before, operation) is None
+    valid = (
+        isinstance(before, dict)
+        and before.get("type") == cue_type
+        and preflight(before, operation) is None
+    )
     read_key, baseline, requested, expected = expected_getter(operation, before) if isinstance(before, dict) else (None, None, None, None)
     candidate = candidate_shape and valid and cue_id == item.get("cue_ref") and read_key is not None
     if not candidate:
@@ -5952,10 +6178,11 @@ def _phase9_audio_validate_real_write(
 ) -> dict[str, str]:
     operation = operation_getter(item)
     property_name = operation.get("property") if operation else label
+    cue_type = _phase9_audio_level_cue_type(item)
     if operation is None or not isinstance(before, dict):
         return {property_name: f"{label} preflight is incomplete."}
-    if before.get("type") != "Video" or item.get("profile") != "video_basic":
-        return {property_name: f"{label} real writes require a Video cue with video_basic profile."}
+    if cue_type is None or before.get("type") != cue_type:
+        return {property_name: f"{label} real writes require matching cue type/profile."}
     if before.get("isBroken") is True or (
         before.get("isWarning") is True and not _phase9_mute_solo_warning_recovery_allowed(item, before)
     ):
@@ -8129,16 +8356,7 @@ def _mark_phase8_video_io_real_operation(item: dict[str, Any]) -> None:
             "real_write_possible": True,
             "requires_confirm_token": True,
             "phase8_video_io_candidate": True,
-            "future_gate_requirements": [
-                "phase8_video_io_confirm_token",
-                "single_cue_single_property",
-                "uuid_cue_ref",
-                "saved_mode",
-                "fresh_baseline",
-                "exact_readback",
-                "manual_rollback_plan",
-                "workspace_id_list_validation_future",
-            ],
+            "future_gate_requirements": _phase8_video_io_gate_requirements(item),
         }
     )
     operation.pop("planned_only_reason", None)
@@ -8273,7 +8491,7 @@ def _mark_phase9a_video_audio_level_real_operation(item: dict[str, Any]) -> None
 def _label_phase9a_video_audio_level_rejection(item: dict[str, Any]) -> None:
     operation = _phase9a_video_audio_level_operation(item)
     if operation is not None:
-        operation["planned_only_reason"] = "video_audio_levels_require_confirm_token"
+        operation["planned_only_reason"] = _phase9_audio_level_reason(item, "levels_require_confirm_token")
 
 
 def _refresh_phase9a_video_audio_level_real_result(
@@ -8300,8 +8518,9 @@ def _refresh_phase9a_video_audio_level_real_result(
             planned.pop("planned_only_reason", None)
     plan = result.get("updateq_plan")
     if isinstance(plan, dict):
+        cue_type = (result.get("before") or {}).get("type") or "Audio/Mic"
         plan["status"] = result.get("status")
-        plan["intent"] = f"Executed saved sliderLevel channel {channel} change on Video cue."
+        plan["intent"] = f"Executed saved sliderLevel channel {channel} change on {cue_type} cue."
         plan["real_write_enabled"] = True
         plan["real_write_possible"] = True
         plan["requires_confirm_token"] = True
@@ -8330,7 +8549,7 @@ def _mark_phase9b_video_audio_matrix_real_operation(item: dict[str, Any]) -> Non
 def _label_phase9b_video_audio_matrix_rejection(item: dict[str, Any]) -> None:
     operation = _phase9b_video_audio_matrix_operation(item)
     if operation is not None:
-        operation["planned_only_reason"] = "video_audio_matrix_requires_confirm_token"
+        operation["planned_only_reason"] = _phase9_audio_level_reason(item, "matrix_requires_confirm_token")
 
 
 def _refresh_phase9b_video_audio_matrix_real_result(
@@ -8357,8 +8576,9 @@ def _refresh_phase9b_video_audio_matrix_real_result(
             planned.pop("planned_only_reason", None)
     plan = result.get("updateq_plan")
     if isinstance(plan, dict):
+        cue_type = (result.get("before") or {}).get("type") or "Audio/Mic"
         plan["status"] = result.get("status")
-        plan["intent"] = f"Executed saved level matrix crosspoint {in_channel}/{out_channel} change on Video cue."
+        plan["intent"] = f"Executed saved level matrix crosspoint {in_channel}/{out_channel} change on {cue_type} cue."
         plan["real_write_enabled"] = True
         plan["real_write_possible"] = True
         plan["requires_confirm_token"] = True
@@ -8401,8 +8621,13 @@ def _refresh_phase9_audio_real_result(
             planned.pop("planned_only_reason", None)
     plan = result.get("updateq_plan")
     if isinstance(plan, dict):
+        cue_type = (result.get("before") or {}).get("type")
         plan["status"] = result.get("status")
-        plan["intent"] = f"Executed saved {property_name} Video audio Levels change."
+        plan["intent"] = (
+            f"Executed saved {property_name} Video audio Levels change."
+            if cue_type == "Video"
+            else f"Executed saved {property_name} {cue_type or 'Audio/Mic'} Levels change."
+        )
         plan["real_write_enabled"] = True
         plan["real_write_possible"] = True
         plan["requires_confirm_token"] = True
@@ -8767,8 +8992,25 @@ def _video_phase2_updateq_plan(
 ) -> dict[str, Any] | None:
     property_names = list(dict.fromkeys(item.get("requested_property_names") or ()))
     operations = {str(operation.get("property", "")): operation for operation in item.get("operations") or []}
-    if item.get("profile") not in VIDEO_PHASE2_PROFILES or not any(
-        _is_video_phase2_property(name, operations.get(name)) for name in property_names
+    phase8_cue_io = _phase8_video_io_operation(item) is not None
+    phase9_operation = (
+        _phase9a_video_audio_level_operation(item)
+        or _phase9b_video_audio_matrix_operation(item)
+        or _phase9c_video_audio_level_meta_operation(item)
+    )
+    phase9_audio_levels = (
+        len(property_names) == 1
+        and len(item.get("operations") or []) == 1
+        and phase9_operation is not None
+        and phase9_operation.get("mode") == "saved"
+    )
+    if not (
+        (
+            item.get("profile") in VIDEO_PHASE2_PROFILES
+            and any(_is_video_phase2_property(name, operations.get(name)) for name in property_names)
+        )
+        or phase8_cue_io
+        or phase9_audio_levels
     ):
         return None
 
@@ -8799,7 +9041,7 @@ def _video_phase2_updateq_plan(
         reason = reason or next(iter(errors.values()))
         return {
             "status": "rejected",
-            "intent": f"Reject {property_name or 'requested'} Video-family change.",
+            "intent": f"Reject {property_name or 'requested'} cue change.",
             "cue": cue,
             "property": property_name,
             "profile": item["profile"],
@@ -8813,6 +9055,9 @@ def _video_phase2_updateq_plan(
             "suggestion": _video_phase2_updateq_suggestion(property_name, reason),
             "safety": safety,
         }
+
+    if property_name is None:
+        return None
 
     fx_operation = _video_fx_dry_run_operation(item)
     if fx_operation is not None:
@@ -8844,7 +9089,11 @@ def _video_phase2_updateq_plan(
             "safety": safety,
         }
 
-    if property_name not in VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES:
+    if (
+        property_name not in VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES
+        and not phase8_cue_io
+        and not phase9_audio_levels
+    ):
         return None
     operation = operations[property_name]
     property_diff = diff.get(property_name, {})

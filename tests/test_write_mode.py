@@ -783,6 +783,8 @@ def _dry_run_only_property_cases() -> list[Any]:
     cases = []
     for profile, spec in profile_catalog().items():
         for prop_name, prop in spec["properties"].items():
+            if profile in {"target_basic", "reset_basic"} and prop_name == "cueTargetID":
+                continue
             if not prop["real_write_enabled"]:
                 cases.append(
                     pytest.param(
@@ -3068,16 +3070,184 @@ def test_update_cues_real_blocks_target_refs_before_osc() -> None:
     assert client.requests == []
 
 
+@pytest.mark.parametrize(
+    ("profile", "cue_type"),
+    [
+        ("target_basic", cue_type)
+        for cue_type in ("Start", "Stop", "Pause", "Load", "Goto", "GoTo", "Arm", "Disarm")
+    ]
+    + [("reset_basic", "Reset")],
+)
+def test_update_cues_utility_target_uuid_gate_writes_and_rolls_back(
+    profile: str, cue_type: str
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            source_id: {
+                "type": cue_type,
+                "cueTargetID": "",
+                "hasCueTargets": True,
+                "isBroken": False,
+                "isWarning": False,
+                "isRunning": False,
+                "isPaused": False,
+                "isAuditioning": False,
+            },
+            target_id: {
+                "type": "Memo",
+                "isBroken": False,
+                "isWarning": False,
+                "isRunning": False,
+                "isPaused": False,
+                "isAuditioning": False,
+            },
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    request = {"cue_ref": source_id, "profile": profile, "properties": {"cueTargetID": target_id}}
+
+    dry = reader.update_cues("ws-1", [request], dry_run=True)
+    operation = planned_setters(dry["results"][0])["cueTargetID"]
+    token = operation["confirm_token"]
+    payload, error = write_operations._decode_utility_target_confirm_token(token)
+    assert error is None
+    assert payload is not None
+    assert {key: payload[key] for key in ("workspace_id", "cue_id", "cue_type", "profile", "property", "baseline", "requested")} == {
+        "workspace_id": "ws-1",
+        "cue_id": source_id,
+        "cue_type": cue_type,
+        "profile": profile,
+        "property": "cueTargetID",
+        "baseline": "",
+        "requested": target_id,
+    }
+
+    written = reader.update_cues(
+        "ws-1", [{**request, "confirm_gates": [token]}], dry_run=False
+    )
+    assert written["status"] == "updated"
+    assert written["results"][0]["after"]["cueTargetID"] == target_id
+
+    rollback_dry = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": profile, "properties": {"cueTargetID": ""}}],
+        dry_run=True,
+    )
+    rollback_token = planned_setters(rollback_dry["results"][0])["cueTargetID"]["confirm_token"]
+    rollback = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": profile, "properties": {"cueTargetID": ""}, "confirm_gates": [rollback_token]}],
+        dry_run=False,
+    )
+    assert rollback["status"] == "updated"
+    assert rollback["results"][0]["after"]["cueTargetID"] == ""
+
+
+def test_update_cues_utility_target_gate_rejects_batch_multi_property_and_wrong_type() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            source_id: {"type": "Start", "cueTargetID": "", "hasCueTargets": True},
+            target_id: {"type": "Memo"},
+        },
+        cue_numbers={"1": source_id},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    base = {"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": target_id}}
+    dry = reader.update_cues("ws-1", [base], dry_run=True)
+    token = planned_setters(dry["results"][0])["cueTargetID"]["confirm_token"]
+
+    batch = reader.update_cues("ws-1", [{**base, "confirm_gates": [token]}, {**base, "confirm_gates": [token]}], dry_run=False)
+    multi = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": target_id, "name": "No"}, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    wrong = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": target_id, "profile": "target_basic", "properties": {"cueTargetID": source_id}, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    cue_number = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": "1", "profile": "target_basic", "properties": {"cueTargetID": target_id}, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    target_number = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetNumber": "1"}, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    assert batch["status"] == multi["status"] == wrong["status"] == cue_number["status"] == target_number["status"] == "preflight_failed"
+    assert all(not address.endswith("/cueTargetID") for address, _, _ in client.requests)
+
+
+def test_update_cues_utility_target_gate_rejects_fake_wrong_and_stale_tokens() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    other_target_id = "33333333-3333-4333-8333-333333333333"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            source_id: {"type": "Start", "cueTargetID": "", "hasCueTargets": True},
+            target_id: {"type": "Memo"},
+            other_target_id: {"type": "Memo"},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    request = {"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": target_id}}
+    dry = reader.update_cues("ws-1", [request], dry_run=True)
+    token = planned_setters(dry["results"][0])["cueTargetID"]["confirm_token"]
+
+    fake = reader.update_cues("ws-1", [{**request, "confirm_gates": ["confirm:utilityTarget:v1:fake:fake"]}], dry_run=False)
+    wrong = reader.update_cues("ws-1", [{**request, "confirm_gates": ["confirm:videoIO:v1:fake:fake"]}], dry_run=False)
+    client.cues[source_id]["cueTargetID"] = other_target_id
+    stale = reader.update_cues("ws-1", [{**request, "confirm_gates": [token]}], dry_run=False)
+
+    assert fake["status"] == wrong["status"] == stale["status"] == "preflight_failed"
+    assert "confirm_token" in fake["results"][0]["errors"]["cueTargetID"]
+    assert "confirm_token" in wrong["results"][0]["errors"]["cueTargetID"]
+    assert "confirm_token does not match" in stale["results"][0]["errors"]["cueTargetID"]
+    assert all(not address.endswith("/cueTargetID") for address, _, _ in client.requests)
+
+
+def test_update_cues_utility_target_gate_rejects_live_mode_without_osc() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={source_id: {"type": "Start", "cueTargetID": "", "hasCueTargets": True}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{
+            "cue_ref": source_id,
+            "profile": "target_basic",
+            "operations": [{"property": "cueTargetID", "args": {"value": "22222222-2222-4222-8222-222222222222"}, "mode": "live"}],
+        }],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "saved" in result["results"][0]["errors"]["validation"]
+    assert all(not address.endswith("/cueTargetID") for address, _, _ in client.requests)
+
+
 def test_update_cues_real_blocks_unresolved_target_ref_with_gate_before_setter() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     target_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
-        cues={cue_id: {"type": "Start", "cueTargetID": ""}, target_id: {"type": "Memo"}},
+        cues={cue_id: {"type": "Start", "cueTargetID": "", "hasCueTargets": True}, target_id: {"type": "Memo"}},
         missing_refs={target_id},
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
-    token = confirm_token_for(reader, cue_id, {"profile": "target_basic", "properties": {"cueTargetID": target_id}})
 
     result = reader.update_cues(
         "ws-1",
@@ -3086,7 +3256,7 @@ def test_update_cues_real_blocks_unresolved_target_ref_with_gate_before_setter()
                 "cue_ref": cue_id,
                 "profile": "target_basic",
                 "properties": {"cueTargetID": target_id},
-                "confirm_gates": [token],
+                "confirm_gates": ["confirm:utilityTarget:v1:fake:fake"],
             }
         ],
         dry_run=False,
@@ -3102,10 +3272,9 @@ def test_update_cues_real_blocks_self_target_ref_with_gate_before_setter() -> No
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
-        cues={cue_id: {"type": "Start", "cueTargetID": ""}},
+        cues={cue_id: {"type": "Start", "cueTargetID": "", "hasCueTargets": True}},
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
-    token = confirm_token_for(reader, cue_id, {"profile": "target_basic", "properties": {"cueTargetID": cue_id}})
 
     result = reader.update_cues(
         "ws-1",
@@ -3114,7 +3283,7 @@ def test_update_cues_real_blocks_self_target_ref_with_gate_before_setter() -> No
                 "cue_ref": cue_id,
                 "profile": "target_basic",
                 "properties": {"cueTargetID": cue_id},
-                "confirm_gates": [token],
+                "confirm_gates": ["confirm:utilityTarget:v1:fake:fake"],
             }
         ],
         dry_run=False,
@@ -3131,7 +3300,7 @@ def test_update_cues_real_allows_resolved_target_ref_with_gate() -> None:
     target_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
-        cues={cue_id: {"type": "Start", "cueTargetID": ""}, target_id: {"type": "Memo"}},
+        cues={cue_id: {"type": "Start", "cueTargetID": "", "hasCueTargets": True}, target_id: {"type": "Memo"}},
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     token = confirm_token_for(reader, cue_id, {"profile": "target_basic", "properties": {"cueTargetID": target_id}})
@@ -3181,7 +3350,7 @@ def test_update_cues_real_blocks_target_name_resolution_with_gate_before_setter(
     assert result["ok"] is False
     assert result["status"] == "preflight_failed"
     assert result["results"][0]["errors"] == {
-        "cueTargetName": "cueTargetName real writes require cueTargetID or cueTargetNumber; name resolution is not supported."
+        "cueTargetName": "cueTargetName is gated or dry-run only outside the specialized single-cue saved cueTargetID gate."
     }
     assert all(not request[0].endswith("/cueTargetName") for request in client.requests)
 

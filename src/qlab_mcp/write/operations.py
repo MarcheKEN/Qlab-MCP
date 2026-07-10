@@ -211,6 +211,9 @@ PHASE7F_VIDEO_GEOMETRY_TOKEN_VERSION = 4
 PHASE7E_VIDEO_GEOMETRY_RESET_TOKEN_VERSION = 1
 PHASE8_VIDEO_IO_OPERATION_KIND = "video_phase8_io_write"
 PHASE8_VIDEO_IO_TOKEN_VERSION = 1
+UTILITY_TARGET_OPERATION_KIND = "utility_cue_target_write"
+UTILITY_TARGET_TOKEN_VERSION = 1
+UTILITY_TARGET_CUE_TYPES = frozenset({"Start", "Stop", "Pause", "Load", "Reset", "Goto", "GoTo", "Arm", "Disarm"})
 VIDEO_PHASE8B_AUDIO_TIME_PROPERTIES = frozenset(
     {
         "startTime",
@@ -577,6 +580,9 @@ class QLabWriteMixin:
         phase8_video_io_call = any(
             _phase8_video_io_operation(item) is not None for item in items
         )
+        utility_target_call = any(
+            _utility_target_operation(item) is not None for item in items
+        )
         phase8b_video_audio_time_call = any(
             _phase8b_video_audio_time_operation(item) is not None for item in items
         )
@@ -626,6 +632,10 @@ class QLabWriteMixin:
                 or _phase8_video_io_operation(item) is not None
             ) and item.get("operations"):
                 item["read_keys"] = list(dict.fromkeys([*item["read_keys"], *VIDEO_PHASE2_HEALTH_READ_KEYS]))
+            if _utility_target_operation(item) is not None:
+                item["read_keys"] = list(
+                    dict.fromkeys([*item["read_keys"], "hasCueTargets", "cueTargetID", *VIDEO_PHASE2_HEALTH_READ_KEYS])
+                )
             if _phase8b_video_audio_time_operation(item) is not None:
                 item["read_keys"] = list(dict.fromkeys([*item["read_keys"], *VIDEO_PHASE8B_AUDIO_TIME_EVIDENCE_KEYS]))
             if _video_clock_type_operation(item) is not None or _video_integrated_fade_operation(item) is not None:
@@ -792,6 +802,11 @@ class QLabWriteMixin:
                 if phase8_video_io_call
                 else None
             )
+            utility_target_structure_error = (
+                _utility_target_call_structure_error(items)
+                if utility_target_call
+                else None
+            )
             phase8b_audio_time_structure_error = (
                 _phase8b_video_audio_time_call_structure_error(items)
                 if phase8b_video_audio_time_call
@@ -925,6 +940,15 @@ class QLabWriteMixin:
                         errors[property_name] = (
                             f"{property_name} is gated or dry-run only without exactly one reviewed "
                             "Phase 8A confirm_token."
+                        )
+                elif not errors and utility_target_call:
+                    property_name = item["operations"][0]["property"]
+                    if utility_target_structure_error:
+                        errors[property_name] = utility_target_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            "cueTargetID is gated or dry-run only without exactly one reviewed "
+                            "utility target confirm_token."
                         )
                 elif not errors and phase8b_video_audio_time_call:
                     property_name = item["operations"][0]["property"]
@@ -1156,6 +1180,7 @@ class QLabWriteMixin:
                 and not phase8c_video_slice_call
                 and _phase8_video_io_call_structure_error(items) is None
             )
+            utility_target_candidate_shape = _utility_target_call_structure_error(items) is None
             phase8b_audio_time_candidate_shape = (
                 phase8b_video_audio_time_call
                 and not phase4_light_call
@@ -1367,6 +1392,15 @@ class QLabWriteMixin:
                             candidate_shape=phase8_io_candidate_shape,
                         )
                     )
+                    errors.update(
+                        _utility_target_dry_run_errors(
+                            item,
+                            before,
+                            workspace_id=workspace,
+                            reader=self,
+                            candidate_shape=utility_target_candidate_shape,
+                        )
+                    )
                     errors.update(_phase8b_video_audio_time_dry_run_errors(item, before))
                     errors.update(
                         _phase9_audio_dry_run_errors(
@@ -1482,6 +1516,33 @@ class QLabWriteMixin:
                             reader=self,
                             before=before,
                             candidate_shape=phase8_io_candidate_shape,
+                        )
+                    )
+                if not errors and _utility_target_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_utility_target_operation(
+                            item,
+                            workspace_id=workspace,
+                            reader=self,
+                            before=before,
+                            candidate_shape=utility_target_candidate_shape,
+                        )
+                    )
+                # The utility gate is deliberately re-checked from the normalized item
+                # after fresh readback. This avoids coupling its token emission to other
+                # phase-family detectors while retaining the one-cue/one-property shape.
+                if (
+                    not errors
+                    and len(items) == 1
+                    and _utility_target_call_structure_error(items) is None
+                ):
+                    warnings.extend(
+                        _annotate_utility_target_operation(
+                            item,
+                            workspace_id=workspace,
+                            reader=self,
+                            before=before,
+                            candidate_shape=True,
                         )
                     )
                 if not errors and _phase8b_video_audio_time_operation(item) is not None:
@@ -1812,6 +1873,10 @@ class QLabWriteMixin:
                 errors.update(_validate_phase8_video_io_real_write(workspace, item, before, reader=self))
                 if not errors:
                     _mark_phase8_video_io_real_operation(item)
+            elif not errors and utility_target_call:
+                errors.update(_validate_utility_target_real_write(workspace, item, before, reader=self))
+                if not errors:
+                    _mark_utility_target_real_operation(item)
             elif not errors and phase8b_video_audio_time_call:
                 errors.update(_validate_phase8b_video_audio_time_real_write(workspace, item, before))
                 if not errors:
@@ -1940,6 +2005,8 @@ class QLabWriteMixin:
                     _label_phase7_video_geometry_rejection(item)
                 if phase8_video_io_call:
                     _label_phase8_video_io_rejection(item)
+                if utility_target_call:
+                    _label_utility_target_rejection(item)
                 if phase8b_video_audio_time_call:
                     _label_phase8b_video_audio_time_rejection(item)
                 if video_clock_type_call:
@@ -2136,6 +2203,7 @@ class QLabWriteMixin:
                         or _phase3_video_appearance_operation(item) is not None
                         or _phase7_video_geometry_operation(item) is not None
                         or _phase8_video_io_operation(item) is not None
+                        or _utility_target_operation(item) is not None
                         or _phase8b_video_audio_time_operation(item) is not None
                         or _video_clock_type_operation(item) is not None
                         or _video_integrated_fade_operation(item) is not None
@@ -2169,6 +2237,7 @@ class QLabWriteMixin:
                 or _phase3_video_appearance_operation(item) is not None
                 or _phase7_video_geometry_operation(item) is not None
                 or _phase8_video_io_operation(item) is not None
+                or _utility_target_operation(item) is not None
                 or _phase8b_video_audio_time_operation(item) is not None
                 or _video_clock_type_operation(item) is not None
                 or _video_integrated_fade_operation(item) is not None
@@ -4352,6 +4421,263 @@ def _phase8_video_io_operation(item: dict[str, Any]) -> dict[str, Any] | None:
         ),
         None,
     )
+
+
+def _utility_target_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") not in {"target_basic", "reset_basic"}:
+        return None
+    return next(
+        (operation for operation in item.get("operations", []) if operation.get("property") == "cueTargetID"),
+        None,
+    )
+
+
+def _utility_target_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Utility cue target real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") not in {"target_basic", "reset_basic"}:
+        return "Utility cue target real writes require target_basic or reset_basic profile."
+    if len(operations) != 1:
+        return "Utility cue target real writes require exactly one property."
+    operation = operations[0]
+    if operation.get("property") != "cueTargetID" or operation.get("path") != "cueTargetID":
+        return "Utility cue target real writes allow only cueTargetID."
+    if operation.get("mode") != "saved":
+        return "Utility cue target real writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Utility cue target real writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _utility_target_requested_value(operation: dict[str, Any]) -> Any:
+    return operation["args"][0] if operation.get("args") else None
+
+
+def _utility_target_value_valid(value: Any, *, allow_empty: bool = False) -> bool:
+    if not isinstance(value, str):
+        return False
+    return (allow_empty and value == "") or (
+        bool(value.strip()) and value.strip().casefold() != "none"
+    )
+
+
+def _utility_target_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    cue_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    source_type: str,
+    baseline: str,
+    requested: str,
+) -> dict[str, Any]:
+    return {
+        "version": UTILITY_TARGET_TOKEN_VERSION,
+        "operation_kind": UTILITY_TARGET_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": cue_id,
+        "cue_type": source_type,
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": baseline,
+        "baseline_sha256": _video_io_sha256(baseline),
+        "requested": requested,
+        "requested_sha256": _video_io_sha256(requested),
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "workspace_validation": "source_and_target_fresh_readback_required",
+        "mcp_secret_version": 1,
+    }
+
+
+def _utility_target_confirm_token(**payload_args: Any) -> str:
+    payload = _utility_target_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:utilityTarget:v{payload['version']}:{encoded}:{signature}"
+
+
+def _decode_utility_target_confirm_token(token: str) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    if (
+        len(parts) != 5
+        or parts[:3] != ["confirm", "utilityTarget", f"v{UTILITY_TARGET_TOKEN_VERSION}"]
+    ):
+        return None, "Utility cue target confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Utility cue target confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Utility cue target confirm_token payload is invalid."
+    return (payload, None) if isinstance(payload, dict) else (None, "Utility cue target confirm_token payload is invalid.")
+
+
+def _utility_target_source_error(before: dict[str, Any], item: dict[str, Any]) -> str | None:
+    source_type = before.get("type")
+    if source_type not in UTILITY_TARGET_CUE_TYPES:
+        return "Utility cue target real writes require Start, Stop, Pause, Load, Reset, Goto, Arm, or Disarm."
+    if item.get("profile") == "target_basic" and source_type == "Reset":
+        return "Reset cue target writes require reset_basic profile."
+    if item.get("profile") == "reset_basic" and source_type != "Reset":
+        return "reset_basic requires a Reset cue."
+    if source_type != "Reset" and item.get("profile") != "target_basic":
+        return "Utility transport cue target writes require target_basic profile."
+    if before.get("hasCueTargets") is not True:
+        return "Utility cue target real writes require a source cue with cue targets."
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return "Utility cue target real writes require a healthy source cue without warnings."
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return "Utility cue target real writes require an inactive source cue."
+    return None
+
+
+def _utility_target_lookup_error(reader: Any, workspace_id: str, target_id: str, source_id: str) -> str | None:
+    if target_id == source_id:
+        return "cueTargetID target cannot be the cue being updated."
+    target, errors = _try_read_update_values(reader, workspace_id, target_id, ["uniqueID", *VIDEO_PHASE2_HEALTH_READ_KEYS])
+    if errors or not isinstance(target, dict) or _resolved_cue_id(target) != target_id:
+        return "cueTargetID target UUID could not be resolved in the current workspace."
+    if target.get("isBroken") is True or target.get("isWarning") is True:
+        return "cueTargetID target must be healthy without warnings."
+    if any(target.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return "cueTargetID target must be inactive."
+    return None
+
+
+def _utility_target_dry_run_errors(
+    item: dict[str, Any], before: dict[str, Any] | None, *, workspace_id: str, reader: Any, candidate_shape: bool
+) -> dict[str, str]:
+    operation = _utility_target_operation(item)
+    if operation is None or not isinstance(before, dict):
+        return {}
+    if not candidate_shape:
+        return {}
+    property_name = operation["property"]
+    source_error = _utility_target_source_error(before, item)
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name)
+    requested = _utility_target_requested_value(operation)
+    if source_error:
+        return {property_name: source_error}
+    if cue_id != item.get("cue_ref"):
+        return {property_name: "Utility cue target requires a fresh source UUID baseline."}
+    if not isinstance(baseline, str):
+        return {property_name: "cueTargetID requires a readable baseline."}
+    if not _utility_target_value_valid(requested, allow_empty=bool(baseline)):
+        return {property_name: "cueTargetID requires an existing target UUID, or an empty rollback from a non-empty baseline."}
+    if requested == baseline:
+        return {property_name: "cueTargetID requested target must differ from the current baseline."}
+    target_error = None if requested == "" else _utility_target_lookup_error(reader, workspace_id, requested, cue_id)
+    return {property_name: target_error} if target_error else {}
+
+
+def _annotate_utility_target_operation(
+    item: dict[str, Any], *, workspace_id: str, reader: Any, before: dict[str, Any] | None, candidate_shape: bool
+) -> list[str]:
+    operation = _utility_target_operation(item)
+    if operation is None or not isinstance(before, dict) or not candidate_shape:
+        return []
+    errors = _utility_target_dry_run_errors(item, before, workspace_id=workspace_id, reader=reader, candidate_shape=candidate_shape)
+    if errors:
+        operation.pop("confirm_token", None)
+        return []
+    cue_id = _resolved_cue_id(before)
+    baseline = before["cueTargetID"]
+    requested = _utility_target_requested_value(operation)
+    operation.update(
+        {
+            "risk_tier": "high",
+            "real_write_enabled": False,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "utility_target_candidate": True,
+            "planned_only_reason": "utility_target_requires_confirm_token",
+            "future_gate_requirements": [
+                "utility_target_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_source_and_target_baselines",
+                "exact_target_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation["confirm_token"] = _utility_target_confirm_token(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        source_type=before["type"],
+        baseline=baseline,
+        requested=requested,
+    )
+    return []
+
+
+def _validate_utility_target_real_write(
+    workspace_id: str, item: dict[str, Any], before: dict[str, Any] | None, *, reader: Any
+) -> dict[str, str]:
+    operation = _utility_target_operation(item)
+    property_name = operation.get("property") if operation else "cueTargetID"
+    if operation is None or not isinstance(before, dict):
+        return {property_name: "Utility cue target preflight is incomplete."}
+    source_error = _utility_target_source_error(before, item)
+    cue_id = _resolved_cue_id(before)
+    baseline = before.get(property_name)
+    requested = _utility_target_requested_value(operation)
+    if source_error:
+        return {property_name: source_error}
+    if cue_id != item.get("cue_ref") or not isinstance(baseline, str):
+        return {property_name: "Utility cue target requires a fresh readable source baseline."}
+    if not _utility_target_value_valid(requested, allow_empty=bool(baseline)) or requested == baseline:
+        return {property_name: "cueTargetID must be a non-baseline target UUID."}
+    target_error = None if requested == "" else _utility_target_lookup_error(reader, workspace_id, requested, cue_id)
+    if target_error:
+        return {property_name: target_error}
+    payload, token_error = _decode_utility_target_confirm_token(item["confirm_gates"][0])
+    if token_error or payload is None:
+        return {property_name: token_error or "Utility cue target confirm_token is invalid."}
+    expected = _utility_target_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        cue_id=cue_id,
+        item=item,
+        operation=operation,
+        source_type=before["type"],
+        baseline=baseline,
+        requested=requested,
+    )
+    if any(payload.get(key) != value for key, value in expected.items()):
+        return {property_name: "Utility cue target confirm_token does not match workspace, source, target, profile, or baseline."}
+    return {}
+
+
+def _mark_utility_target_real_operation(item: dict[str, Any]) -> None:
+    operation = _utility_target_operation(item)
+    if operation is None:
+        return
+    operation.update(real_write_enabled=True, real_write_possible=True, requires_confirm_token=True, utility_target_candidate=True)
+    operation.pop("planned_only_reason", None)
+
+
+def _label_utility_target_rejection(item: dict[str, Any]) -> None:
+    operation = _utility_target_operation(item)
+    if operation is not None:
+        operation["planned_only_reason"] = "utility_target_requires_confirm_token"
 
 
 def _phase8_video_io_call_structure_error(items: list[dict[str, Any]]) -> str | None:
@@ -9422,6 +9748,7 @@ def _is_readback_confirmable_gated_item(item: dict[str, Any]) -> bool:
         or _phase3_video_appearance_operation(item) is not None
         or _phase7_video_geometry_operation(item) is not None
         or _phase8_video_io_operation(item) is not None
+        or _utility_target_operation(item) is not None
         or _phase8b_video_audio_time_operation(item) is not None
         or _phase9a_video_audio_level_operation(item) is not None
         or _phase9b_video_audio_matrix_operation(item) is not None

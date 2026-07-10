@@ -13,5 +13,6 @@ Current status-audit candidates:
 - `020_video_embedded_audio_research.md`
 - `021_video_audio_time_loops.md`
 - `022_slice_markers_audio_video.md`
+- `024_utility_cue_safe_editing.md`
 
 Do not delete workorders in cleanup passes. Move with `git mv` and update links.

@@ -1341,7 +1341,7 @@ TIMECODE_CATALOG_PROPERTIES = (
 
 TARGET_CATALOG_PROPERTIES = (
     _planned_prop("cueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
-    _planned_prop("cueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetID", "cue_target_id", reason="utility_target_requires_confirm_token", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("cueTargetName", "non_empty_string", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_name_resolution_unsupported",)),
     _planned_prop("tempCueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("tempCueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
@@ -1350,7 +1350,7 @@ TARGET_CATALOG_PROPERTIES = (
 
 RESET_CATALOG_PROPERTIES = (
     _planned_prop("cueTargetNumber", "cue_target_number", reason="reset_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
-    _planned_prop("cueTargetID", "cue_target_id", reason="reset_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetID", "cue_target_id", reason="utility_target_requires_confirm_token", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("patchTargetID", "target_id", reason="reset_targets_need_validation"),
     _planned_prop("audioMapTargetID", "target_id", reason="reset_targets_need_validation"),
     _planned_prop("targetMode", "target_mode", reason="reset_targets_need_validation"),
@@ -1426,7 +1426,7 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
     "midi_basic": UpdateProfileSpec("midi_basic", ("MIDI",), (*COMMON_PROPERTIES, *MIDI_CATALOG_PROPERTIES), "high", True, "MIDI profile; MIDI messages remain dry-run only."),
     "midi_file_basic": UpdateProfileSpec("midi_file_basic", ("MIDI File",), (*COMMON_PROPERTIES, *MIDI_FILE_CATALOG_PROPERTIES), "medium", True, "MIDI File profile with playback metadata writes."),
     "timecode_basic": UpdateProfileSpec("timecode_basic", ("Timecode",), (*COMMON_PROPERTIES, *TIMECODE_CATALOG_PROPERTIES), "medium", True, "Timecode profile with basic metadata writes."),
-    "target_basic": UpdateProfileSpec("target_basic", ("Start", "Stop", "Pause", "Load", "Goto", "Target", "Arm", "Disarm"), (*COMMON_PROPERTIES, *TARGET_CATALOG_PROPERTIES), "high", True, "Target cue profile; target refs remain dry-run only."),
+    "target_basic": UpdateProfileSpec("target_basic", ("Start", "Stop", "Pause", "Load", "Goto", "GoTo", "Target", "Arm", "Disarm"), (*COMMON_PROPERTIES, *TARGET_CATALOG_PROPERTIES), "high", True, "Target cue profile; target refs remain dry-run only."),
     "reset_basic": UpdateProfileSpec("reset_basic", ("Reset",), (*COMMON_PROPERTIES, *RESET_CATALOG_PROPERTIES), "high", True, "Reset profile; reset targets remain dry-run only."),
     "devamp_basic": UpdateProfileSpec("devamp_basic", ("Devamp",), (*COMMON_PROPERTIES, *DEVAMP_CATALOG_PROPERTIES), "high", True, "Devamp profile; devamp targets remain dry-run only."),
     "script_basic": UpdateProfileSpec("script_basic", ("Script",), (*COMMON_PROPERTIES, *SCRIPT_CATALOG_PROPERTIES), "high", True, "Script profile; script source remains dry-run only."),
@@ -1722,6 +1722,20 @@ def real_write_permission_errors(
     errors: dict[str, str] = {}
     for operation in operations:
         prop = str(operation["property"])
+        if profile in {"target_basic", "reset_basic"} and prop in {
+            "cueTargetID",
+            "cueTargetNumber",
+            "cueTargetName",
+            "tempCueTargetID",
+            "tempCueTargetNumber",
+            "patchTargetID",
+            "audioMapTargetID",
+            "targetMode",
+        }:
+            errors[prop] = (
+                f"{prop} is gated or dry-run only outside the specialized single-cue saved cueTargetID gate."
+            )
+            continue
         if profile == "light_basic" and prop == "lightCommandText":
             errors[prop] = (
                 "lightCommandText is gated or dry-run only outside the specialized "

@@ -150,6 +150,19 @@ playback, `/live`, save, commit, or unrelated mutation was used.
 
 ## Local implementation or runtime validation pending
 
+Utility cue editing:
+
+- local `cueTargetID` gate for `Start`, `Stop`, `Pause`, `Load`, `Reset`,
+  `Goto`, `Arm`, and `Disarm`, using `confirm:utilityTarget:v1:`
+- exact source/target UUIDs only; one healthy inactive source and target; saved
+  mode; fresh baseline/readback; fresh-token rollback
+- Wait and Memo remain Basics-only
+- target names/numbers, temporary targets, Reset patch/map targets, target
+  mode, actions, `/live`, playback, raw OSC, batch/multi-property writes, and
+  save remain blocked
+- local tests pass; dedicated QLab runtime validation is still required before
+  closure
+
 Video Phase 3F — Text Style:
 
 - blocked after QLab 5.5.10 runtime validation did not return reliable fresh

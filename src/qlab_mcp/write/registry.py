@@ -352,22 +352,28 @@ COMMON_CATALOG_PROPERTIES = (
     _planned_prop("timecodeTrigger/text", "string", reason="timecode_trigger_changes_show_control_behavior"),
 )
 
-AUDIO_SAFE_PROPERTIES = (
-    _prop("rate", "rate", real_write_enabled=True),
-    _prop("startTime", "non_negative_number", real_write_enabled=True),
-    _prop("endTime", "non_negative_number", real_write_enabled=True),
-    _prop("playCount", "positive_int", real_write_enabled=True),
-    _prop("infiniteLoop", "boolean", real_write_enabled=True),
-    _prop("preservePitch", "boolean", real_write_enabled=True),
+_AUDIO_TIME_ROUTE_VALIDATORS = (
+    ("rate", "rate"),
+    ("startTime", "non_negative_number"),
+    ("endTime", "non_negative_number"),
+    ("playCount", "positive_int"),
+    ("infiniteLoop", "boolean"),
+    ("preservePitch", "boolean"),
 )
 
-VIDEO_AUDIO_TIME_PROPERTIES = (
-    _planned_prop("rate", "rate", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
-    _planned_prop("startTime", "non_negative_number", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
-    _planned_prop("endTime", "non_negative_number", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
-    _planned_prop("playCount", "positive_int", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
-    _planned_prop("infiniteLoop", "boolean", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
-    _planned_prop("preservePitch", "boolean", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
+AUDIO_SAFE_PROPERTIES = tuple(
+    _prop(name, validator, real_write_enabled=True)
+    for name, validator in _AUDIO_TIME_ROUTE_VALIDATORS
+)
+
+VIDEO_AUDIO_TIME_PROPERTIES = tuple(
+    _planned_prop(
+        name,
+        validator,
+        reason="video_audio_time_requires_confirm_token",
+        capability_gate="audio_output",
+    )
+    for name, validator in _AUDIO_TIME_ROUTE_VALIDATORS
 )
 
 VIDEO_AUDIO_LEVEL_PROPERTIES = (

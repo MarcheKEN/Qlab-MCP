@@ -26,7 +26,7 @@ Current behavior:
 - real write rejects before any setter;
 - `executed_operations=[]`;
 - Phase 3E Text Basics have since been expanded locally; see
-  `023_text_cue_safe_editing.md`.
+  `completed/023_text_cue_safe_editing.md`.
 
 ## Phase 3F deferred properties
 

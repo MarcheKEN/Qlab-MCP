@@ -41,6 +41,37 @@ def test_update_registry_has_specs_for_all_mutating_cue_osc_routes() -> None:
     }
 
 
+def test_audio_time_route_metadata_keeps_profile_specific_policies() -> None:
+    catalog = profile_catalog()
+    routes = (
+        ("rate", "rate"),
+        ("startTime", "non_negative_number"),
+        ("endTime", "non_negative_number"),
+        ("playCount", "positive_int"),
+        ("infiniteLoop", "boolean"),
+        ("preservePitch", "boolean"),
+    )
+    policies = (
+        ("audio_basic", "safe", True, None, None),
+        ("video_basic", "high", False, "video_audio_time_requires_confirm_token", "audio_output"),
+    )
+
+    for profile, risk_tier, real_write_enabled, planned_only_reason, capability_gate in policies:
+        properties = catalog[profile]["properties"]
+        for name, validator in routes:
+            property_spec = properties[name]
+            assert property_spec["path"] == name
+            assert property_spec["args"] == [{"name": "value", "validator": validator}]
+            assert property_spec["read_key"] == name
+            assert property_spec["modes"] == ["saved"]
+            assert property_spec["risk_tier"] == risk_tier
+            assert property_spec["real_write_enabled"] is real_write_enabled
+            assert property_spec["planned_only_reason"] == planned_only_reason
+            assert property_spec["capability_gate"] == capability_gate
+            assert property_spec["readback"] == "value"
+            assert property_spec["contextual_requirements"] == []
+
+
 def test_updateq_coverage_snapshot_doc_matches_summary() -> None:
     inventory = extract_cue_osc_inventory(DICTIONARY_PATH.read_text())
     summary = coverage_summary(registry_coverage(inventory, profile_catalog()))

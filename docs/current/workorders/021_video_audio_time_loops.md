@@ -114,18 +114,19 @@ warning-visible (`setter_timeout_but_readback_matched` or
 `setter_error_but_readback_matched`). No mutating retry is allowed, and errors
 without matching readback remain failures.
 
-## Blocked / Future Only
+## Outside Phase 8B scope
 
 - Linear Curve: no isolated safe OSC scalar was confirmed for the Time & Loops
   checkbox/curve behavior.
 - `doFade` and `lockFadeToCue` are no longer blocked in this workorder; they
   moved to separate saved Video Integrated Fade token gates and remain runtime
   pending.
-- `sliceMarker/*`, `addSliceMarker`, `deleteSliceMarker*`: slice editing is
-  multi-route/indexed and can change loop/vamp/devamp semantics.
-- Levels matrix, `sliderLevel`, `level`, `gang`, `setDefaultLevels`,
-  `setSilentLevels`, mute/solo, Objects, Audio FX, Trim, fileTarget, stage/patch
-  definitions, `/live`, raw OSC, playback/show-control.
+- Slice editing is covered separately by Phase 8C; only its documented
+  Video-only candidates may be considered.
+- Levels, matrix, metadata, and channel mute/solo candidates are covered by
+  Phases 9A–9E; this workorder does not classify their current support.
+- Objects, Audio FX, Trim, fileTarget, stage/patch definitions, `/live`, raw
+  OSC, playback, and show-control remain outside this phase.
 
 ## Runtime Validation Plan
 

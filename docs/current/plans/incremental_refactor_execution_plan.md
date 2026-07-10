@@ -11,6 +11,15 @@ This plan converts the Deep Research report into small, reviewable work for this
 - Do not add GO, playback, stop, panic, delete, or raw OSC tools.
 - Do not allow write targets that use ambiguous refs such as `selected`, `active`, `playhead`, or `playbackPosition`.
 
+## Static metadata extraction
+
+- Audio Time & Loops route definitions are shared declaratively inside the
+  registry; the Audio and Video profiles retain their separate write policies.
+- This does not add edit capability or change tokens, validators, OSC paths,
+  readback, profile catalog output, or Create Cue behavior.
+- No QLab runtime validation is performed for structural refactors. Runtime
+  validation remains pending until the user manually restarts the MCP server.
+
 ## Verified Hotspots
 
 - `src/qlab_mcp/server.py`: FastMCP entrypoint and public tool contract.

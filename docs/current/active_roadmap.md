@@ -1,6 +1,6 @@
 # Active Roadmap
 
-Status: 2026-07-08
+Status: 2026-07-10
 
 ## Closed
 
@@ -19,6 +19,9 @@ Status: 2026-07-08
   and `Text`: `blendMode` and `preserveAspectRatio`.
 - Video Phase 3E — saved Text Basics real writes for `Text` cues:
   `text`, `text/format/fontSize`, and `text/format/alignment`.
+- Text cue expansion — runtime-confirmed `text`, `fixedWidth`, alignment,
+  `fontName`, `fontSize`, `lineSpacing`, and `text/format/color` saved writes
+  for exact-UUID `Text` cues; the remaining RGBA routes stay planned-only.
 - Video Phase 4C — saved Video FX scalar real write for `Video` cues only:
   exact cue UUID only, `videoEffectIndex/0/parameter/inputRadius`, finite
   numeric scalar, saved mode only.
@@ -145,7 +148,7 @@ tokens, executed exactly one `/resetRotation`, and ended with reset quaternion
 readback. Final workspace running/paused/auditioning was `0/0/0`; no raw OSC,
 playback, `/live`, save, commit, or unrelated mutation was used.
 
-## In local validation
+## Local implementation or runtime validation pending
 
 Video Phase 3F — Text Style:
 
@@ -154,25 +157,6 @@ Video Phase 3F — Text Style:
   `shadowOffset/height`, `underlineStyle`, or `strikethroughStyle`
 - no `confirm:textStyle:v1:` tokens emitted
 - no Text Style setters enabled
-
-Text cue expansion — runtime validation closed:
-
-- expands `confirm:textBasic:v1:` saved writes for `Text` cues only
-- runtime-confirmed real-write routes: `text`, `fixedWidth`,
-  `text/format/alignment`, `text/format/fontName`, `text/format/fontSize`,
-  `text/format/lineSpacing`, and `text/format/color`
-- planned-only/runtime-blocked routes: `text/format/backgroundColor`,
-  `text/format/shadowColor`, `text/format/strikethroughColor`, and
-  `text/format/underlineColor`; QLab runtime did not expose reliable readable
-  baseline/readback on the safe Text cue, so these routes do not emit
-  `confirm:textBasic:v1:` tokens and are not real-write enabled
-- exact cue UUID only, one cue, one property/operation, saved mode only,
-  healthy inactive Text cue, readable baseline, fresh token, exact readback,
-  and rollback required
-- `/live`, batch, multi-property, wrong cue types, cue numbers,
-  selected/playhead/active refs, fake/wrong/stale tokens, full `text/format`
-  JSON, substring/range/word formatting, `fontFamilyAndStyle`, output-size
-  writes, Stage Editor, Video FX, raw OSC, playback, and save remain blocked
 
 Video Phase 4A/4B — Video FX read model and dry-run planner:
 
@@ -331,6 +315,25 @@ Video clock type and Integrated Fade:
   Audio/Camera/Text promotion, wrong token families, fake/stale tokens, and
   Video cues without embedded audio remain blocked for Integrated Fade only
 
+Video Phase 9D/9E — local Video audio mute/solo candidates:
+
+- `mute/channel` and `solo/channel` use `confirm:videoAudioMuteSolo:v1:`;
+  `mute/channel/clear` and `solo/channel/clear` use
+  `confirm:videoAudioLevelBulk:v1:`.
+- These saved, exact-UUID, one-cue, one-operation candidates require embedded
+  audio evidence, fresh channel baseline/readback, and a fresh-token rollback.
+- Automated contract tests cover the real-write and rollback flows; QLab runtime
+  validation is still pending.
+
+Light cue token-gated editing:
+
+- `lightCommandText` is a real-write candidate only after valid safe Light Patch
+  analysis; `alwaysCollate` and `subcontroller` are separate saved-mode
+  candidates.
+- All require one exact-UUID Light cue, one property, saved mode, a fresh
+  baseline, a reviewed confirm token, and fresh readback. Automated contract
+  tests pass; QLab runtime validation is not recorded here.
+
 Video Phase 9F — Video embedded-audio Levels reset actions:
 
 - `/cue/{cue_number}/setDefaultLevels` and
@@ -440,8 +443,8 @@ Keep blocked:
 - Audio/Camera slice marker real writes, combined slice marker updates,
   last-slice routes, vamps/devamps, and slice marker `/live` writes outside
   Phase 8C
-- rich text format, font name, text/background/shadow colors, aggregate shadow
-  offset, `doOpacity`, and clock-type real writes
+- rich text format other than the closed Text Basics routes, aggregate shadow
+  offset, `doOpacity`, and unvalidated rich-text color routes
 - batch and multi-property Video-family real writes
 
 Phase 6 is closed only for the exact `inputIntensity` scalar path above. It

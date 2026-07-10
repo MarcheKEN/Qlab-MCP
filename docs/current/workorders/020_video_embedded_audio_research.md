@@ -109,7 +109,8 @@ the Audio/Video internal Integrated Fade envelope.
 | gangs | `/cue/{cue_number}/gang/{inChannel}/{outChannel} {gang}` | string | yes | `confirm:videoAudioLevelMeta:v1:` | Runtime validated for one saved crosspoint |
 | set defaults | `/cue/{cue_number}/setDefaultLevels` | action | indirect | planned-only | Block |
 | set silent | `/cue/{cue_number}/setSilentLevels` | action | indirect | planned-only | Block |
-| mute/solo | `/mute*`, `/solo*` | boolean/actions | partial | planned-only | Block |
+| mute/solo channel | `/mute/channel/{output}`, `/solo/channel/{output}` | boolean | channel-list readback | `confirm:videoAudioMuteSolo:v1:` | Local token-gated candidate; runtime pending |
+| clear mute/solo channels | `/mute/channel/clear`, `/solo/channel/clear` | action | channel-list readback | `confirm:videoAudioLevelBulk:v1:` | Local token-gated candidate; runtime pending |
 
 `-inf` is documented for level and sliderLevel. Any string is coerced by QLab
 to `-inf`, so Phase 9A and planned Phase 9B intentionally reject strings,
@@ -299,7 +300,7 @@ Token must not authorize:
   considered
 - `setDefaultLevels`
 - `setSilentLevels`
-- `mute` / `solo`
+- broad or unscoped mute/solo writes outside the local channel candidates
 - slice creation/deletion/editing
 - object audio position/spread/levels
 - audio maps and map-object editing

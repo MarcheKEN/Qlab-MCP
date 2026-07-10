@@ -41,6 +41,21 @@ def test_update_registry_has_specs_for_all_mutating_cue_osc_routes() -> None:
     }
 
 
+def test_devamp_and_network_catalog_routes_remain_gated_until_specialized_evidence() -> None:
+    catalog = profile_catalog()
+    devamp = catalog["devamp_basic"]["properties"]
+    network = catalog["network_basic"]["properties"]
+
+    for property_name in ("cueTargetID", "devampType", "startNextCueWhenSliceEnds", "stopTargetWhenSliceEnds"):
+        assert devamp[property_name]["real_write_enabled"] is False
+    assert devamp["cueTargetID"]["planned_only_reason"] == "devamp_target_requires_confirm_token"
+    assert devamp["devampType"]["planned_only_reason"] == "devamp_settings_require_confirm_token"
+    assert network["customString"]["real_write_enabled"] is False
+    assert network["customString"]["planned_only_reason"] == "network_osc_message_requires_patch_type_validation"
+    assert network["networkPatchID"]["planned_only_reason"] == "network_osc_message_requires_patch_type_validation"
+    assert network["fadeEntries"]["planned_only_reason"] == "network_fade_routes_require_deterministic_readback"
+
+
 def test_audio_time_route_metadata_keeps_profile_specific_policies() -> None:
     catalog = profile_catalog()
     routes = (

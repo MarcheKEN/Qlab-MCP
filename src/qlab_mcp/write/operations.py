@@ -214,6 +214,18 @@ PHASE8_VIDEO_IO_TOKEN_VERSION = 1
 UTILITY_TARGET_OPERATION_KIND = "utility_cue_target_write"
 UTILITY_TARGET_TOKEN_VERSION = 1
 UTILITY_TARGET_CUE_TYPES = frozenset({"Start", "Stop", "Pause", "Load", "Reset", "Goto", "GoTo", "Arm", "Disarm"})
+DEVAMP_PROPERTIES = frozenset(
+    {
+        "cueTargetID",
+        "devampType",
+        "startNextCueWhenSliceEnds",
+        "stopTargetWhenSliceEnds",
+    }
+)
+DEVAMP_BOOLEAN_PROPERTIES = frozenset({"startNextCueWhenSliceEnds", "stopTargetWhenSliceEnds"})
+DEVAMP_TARGET_TYPES = frozenset({"Audio", "Video"})
+DEVAMP_OPERATION_KIND = "devamp_saved_configuration_write"
+DEVAMP_TOKEN_VERSION = 1
 VIDEO_PHASE8B_AUDIO_TIME_PROPERTIES = frozenset(
     {
         "startTime",
@@ -583,6 +595,7 @@ class QLabWriteMixin:
         utility_target_call = any(
             _utility_target_operation(item) is not None for item in items
         )
+        devamp_call = any(_devamp_operation(item) is not None for item in items)
         phase8b_video_audio_time_call = any(
             _phase8b_video_audio_time_operation(item) is not None for item in items
         )
@@ -621,6 +634,9 @@ class QLabWriteMixin:
         )
         for item in items:
             _strip_video_phase2_confirm_tokens(item)
+            if item.get("profile") == "network_basic":
+                for operation in item.get("operations") or []:
+                    operation.pop("confirm_token", None)
             phase8_io_operation = _phase8_video_io_operation(item)
             if phase8_io_operation is not None and item.get("profile") not in VIDEO_PHASE2_PROFILES:
                 phase8_io_operation.pop("confirm_token", None)
@@ -635,6 +651,19 @@ class QLabWriteMixin:
             if _utility_target_operation(item) is not None:
                 item["read_keys"] = list(
                     dict.fromkeys([*item["read_keys"], "hasCueTargets", "cueTargetID", *VIDEO_PHASE2_HEALTH_READ_KEYS])
+                )
+            if _devamp_operation(item) is not None:
+                item["read_keys"] = list(
+                    dict.fromkeys(
+                        [
+                            *item["read_keys"],
+                            "hasCueTargets",
+                            "cueTargetID",
+                            "startNextCueWhenSliceEnds",
+                            "stopTargetWhenSliceEnds",
+                            *VIDEO_PHASE2_HEALTH_READ_KEYS,
+                        ]
+                    )
                 )
             if _phase8b_video_audio_time_operation(item) is not None:
                 item["read_keys"] = list(dict.fromkeys([*item["read_keys"], *VIDEO_PHASE8B_AUDIO_TIME_EVIDENCE_KEYS]))
@@ -807,6 +836,7 @@ class QLabWriteMixin:
                 if utility_target_call
                 else None
             )
+            devamp_structure_error = _devamp_call_structure_error(items) if devamp_call else None
             phase8b_audio_time_structure_error = (
                 _phase8b_video_audio_time_call_structure_error(items)
                 if phase8b_video_audio_time_call
@@ -949,6 +979,15 @@ class QLabWriteMixin:
                         errors[property_name] = (
                             "cueTargetID is gated or dry-run only without exactly one reviewed "
                             "utility target confirm_token."
+                        )
+                elif not errors and devamp_call:
+                    property_name = item["operations"][0]["property"]
+                    if devamp_structure_error:
+                        errors[property_name] = devamp_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Devamp confirm_token."
                         )
                 elif not errors and phase8b_video_audio_time_call:
                     property_name = item["operations"][0]["property"]
@@ -1181,6 +1220,7 @@ class QLabWriteMixin:
                 and _phase8_video_io_call_structure_error(items) is None
             )
             utility_target_candidate_shape = _utility_target_call_structure_error(items) is None
+            devamp_candidate_shape = _devamp_call_structure_error(items) is None
             phase8b_audio_time_candidate_shape = (
                 phase8b_video_audio_time_call
                 and not phase4_light_call
@@ -1401,6 +1441,15 @@ class QLabWriteMixin:
                             candidate_shape=utility_target_candidate_shape,
                         )
                     )
+                    errors.update(
+                        _devamp_dry_run_errors(
+                            item,
+                            before,
+                            workspace_id=workspace,
+                            reader=self,
+                            candidate_shape=devamp_candidate_shape,
+                        )
+                    )
                     errors.update(_phase8b_video_audio_time_dry_run_errors(item, before))
                     errors.update(
                         _phase9_audio_dry_run_errors(
@@ -1528,6 +1577,16 @@ class QLabWriteMixin:
                             candidate_shape=utility_target_candidate_shape,
                         )
                     )
+                if not errors and _devamp_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_devamp_operation(
+                            item,
+                            workspace_id=workspace,
+                            reader=self,
+                            before=before,
+                            candidate_shape=devamp_candidate_shape,
+                        )
+                    )
                 # The utility gate is deliberately re-checked from the normalized item
                 # after fresh readback. This avoids coupling its token emission to other
                 # phase-family detectors while retaining the one-cue/one-property shape.
@@ -1538,6 +1597,16 @@ class QLabWriteMixin:
                 ):
                     warnings.extend(
                         _annotate_utility_target_operation(
+                            item,
+                            workspace_id=workspace,
+                            reader=self,
+                            before=before,
+                            candidate_shape=True,
+                        )
+                    )
+                if not errors and len(items) == 1 and _devamp_call_structure_error(items) is None:
+                    warnings.extend(
+                        _annotate_devamp_operation(
                             item,
                             workspace_id=workspace,
                             reader=self,
@@ -1877,6 +1946,10 @@ class QLabWriteMixin:
                 errors.update(_validate_utility_target_real_write(workspace, item, before, reader=self))
                 if not errors:
                     _mark_utility_target_real_operation(item)
+            elif not errors and devamp_call:
+                errors.update(_validate_devamp_real_write(workspace, item, before, reader=self))
+                if not errors:
+                    _mark_devamp_real_operation(item)
             elif not errors and phase8b_video_audio_time_call:
                 errors.update(_validate_phase8b_video_audio_time_real_write(workspace, item, before))
                 if not errors:
@@ -2007,6 +2080,8 @@ class QLabWriteMixin:
                     _label_phase8_video_io_rejection(item)
                 if utility_target_call:
                     _label_utility_target_rejection(item)
+                if devamp_call:
+                    _label_devamp_rejection(item)
                 if phase8b_video_audio_time_call:
                     _label_phase8b_video_audio_time_rejection(item)
                 if video_clock_type_call:
@@ -2204,6 +2279,7 @@ class QLabWriteMixin:
                         or _phase7_video_geometry_operation(item) is not None
                         or _phase8_video_io_operation(item) is not None
                         or _utility_target_operation(item) is not None
+                        or _devamp_operation(item) is not None
                         or _phase8b_video_audio_time_operation(item) is not None
                         or _video_clock_type_operation(item) is not None
                         or _video_integrated_fade_operation(item) is not None
@@ -2238,6 +2314,7 @@ class QLabWriteMixin:
                 or _phase7_video_geometry_operation(item) is not None
                 or _phase8_video_io_operation(item) is not None
                 or _utility_target_operation(item) is not None
+                or _devamp_operation(item) is not None
                 or _phase8b_video_audio_time_operation(item) is not None
                 or _video_clock_type_operation(item) is not None
                 or _video_integrated_fade_operation(item) is not None
@@ -4678,6 +4755,322 @@ def _label_utility_target_rejection(item: dict[str, Any]) -> None:
     operation = _utility_target_operation(item)
     if operation is not None:
         operation["planned_only_reason"] = "utility_target_requires_confirm_token"
+
+
+def _devamp_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") != "devamp_basic":
+        return None
+    return next(
+        (operation for operation in item.get("operations", []) if operation.get("property") in DEVAMP_PROPERTIES),
+        None,
+    )
+
+
+def _devamp_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Devamp real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") != "devamp_basic":
+        return "Devamp real writes require devamp_basic profile."
+    if len(operations) != 1:
+        return "Devamp real writes require exactly one property."
+    operation = operations[0]
+    if operation.get("property") not in DEVAMP_PROPERTIES or operation.get("path") != operation.get("property"):
+        return "Devamp real writes allow only cueTargetID, devampType, startNextCueWhenSliceEnds, or stopTargetWhenSliceEnds."
+    if operation.get("mode") != "saved":
+        return "Devamp real writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Devamp real writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _devamp_boolean(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and not isinstance(value, bool) and value in {0, 1}:
+        return bool(value)
+    return None
+
+
+def _devamp_value(property_name: str, value: Any) -> Any | None:
+    if property_name == "cueTargetID":
+        return value if _is_exact_cue_uuid(value) else None
+    if property_name in DEVAMP_BOOLEAN_PROPERTIES:
+        return _devamp_boolean(value)
+    if property_name == "devampType" and isinstance(value, int) and not isinstance(value, bool) and value in {1, 2}:
+        return value
+    return None
+
+
+def _devamp_reason(operation: dict[str, Any]) -> str:
+    return "devamp_target_requires_confirm_token" if operation.get("property") == "cueTargetID" else "devamp_settings_require_confirm_token"
+
+
+def _devamp_source_error(before: dict[str, Any]) -> str | None:
+    if before.get("type") != "Devamp":
+        return "Devamp real writes require a Devamp cue."
+    if before.get("hasCueTargets") is not True:
+        return "Devamp real writes require a source cue with a cue target."
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return "Devamp real writes require a healthy source cue without warnings."
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return "Devamp real writes require an inactive source cue."
+    return None
+
+
+def _devamp_target_info(
+    reader: Any,
+    workspace_id: str,
+    target_id: str,
+    source_id: str,
+) -> tuple[dict[str, str] | None, str | None]:
+    if not _is_exact_cue_uuid(target_id):
+        return None, "Devamp cueTargetID requires an exact existing target UUID."
+    if target_id.casefold() == source_id.casefold():
+        return None, "Devamp cueTargetID target cannot be the cue being updated."
+    target, errors = _try_read_update_values(reader, workspace_id, target_id, ["uniqueID", "type", *VIDEO_PHASE2_HEALTH_READ_KEYS])
+    if errors or not isinstance(target, dict) or _resolved_cue_id(target) != target_id:
+        return None, "Devamp cueTargetID target UUID could not be resolved in the current workspace."
+    target_type = target.get("type")
+    if target_type not in DEVAMP_TARGET_TYPES:
+        return None, "Devamp cueTargetID target must be an Audio or Video cue."
+    if target.get("isBroken") is True or target.get("isWarning") is True:
+        return None, "Devamp cueTargetID target must be healthy without warnings."
+    if any(target.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return None, "Devamp cueTargetID target must be inactive."
+    return {"uuid": target_id, "type": target_type}, None
+
+
+def _devamp_preflight(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+    *,
+    reader: Any,
+) -> tuple[dict[str, Any] | None, str | None]:
+    operation = _devamp_operation(item)
+    if operation is None or not isinstance(before, dict):
+        return None, "Devamp preflight is incomplete."
+    source_error = _devamp_source_error(before)
+    if source_error:
+        return None, source_error
+    cue_id = _resolved_cue_id(before)
+    if cue_id != item.get("cue_ref"):
+        return None, "Devamp real writes require a fresh source UUID baseline."
+    property_name = operation["property"]
+    baseline = _devamp_value(property_name, before.get(property_name))
+    requested = _devamp_value(property_name, operation["args"][0] if operation.get("args") else None)
+    if baseline is None:
+        return None, f"Devamp {property_name} requires a readable baseline."
+    if requested is None:
+        return None, f"Devamp {property_name} has an invalid requested value."
+    if property_name == "cueTargetID":
+        if requested.casefold() == baseline.casefold():
+            return None, "Devamp cueTargetID requested target must differ from the current baseline."
+    elif requested == baseline:
+        return None, f"Devamp {property_name} requested value must differ from the current baseline."
+
+    current_target_id = before.get("cueTargetID")
+    if not isinstance(current_target_id, str):
+        return None, "Devamp real writes require a readable current target UUID."
+    current_target, target_error = _devamp_target_info(reader, workspace_id, current_target_id, cue_id)
+    if target_error or current_target is None:
+        return None, target_error or "Devamp real writes require a readable current Audio or Video target."
+
+    start_next = _devamp_boolean(before.get("startNextCueWhenSliceEnds"))
+    stop_target = _devamp_boolean(before.get("stopTargetWhenSliceEnds"))
+    if start_next is None or stop_target is None:
+        return None, "Devamp real writes require readable Start next and Stop target baselines."
+    if property_name == "stopTargetWhenSliceEnds" and start_next is not True:
+        return None, "Devamp stopTargetWhenSliceEnds requires startNextCueWhenSliceEnds=true."
+    if property_name == "startNextCueWhenSliceEnds" and requested is False and stop_target is True:
+        return None, "Devamp cannot disable startNextCueWhenSliceEnds while stopTargetWhenSliceEnds is true."
+
+    target = current_target
+    if property_name == "cueTargetID":
+        target, target_error = _devamp_target_info(reader, workspace_id, requested, cue_id)
+        if target_error or target is None:
+            return None, target_error or "Devamp cueTargetID target could not be resolved."
+    return {
+        "cue_id": cue_id,
+        "baseline": baseline,
+        "requested": requested,
+        "current_target": current_target,
+        "target": target,
+        "start_next": start_next,
+        "stop_target": stop_target,
+    }, None
+
+
+def _devamp_token_payload(
+    *,
+    workspace_id: str,
+    cue_ref: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    preflight: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "version": DEVAMP_TOKEN_VERSION,
+        "operation_kind": DEVAMP_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": preflight["cue_id"],
+        "cue_type": "Devamp",
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": preflight["baseline"],
+        "baseline_sha256": _video_io_sha256(preflight["baseline"]),
+        "requested": preflight["requested"],
+        "requested_sha256": _video_io_sha256(preflight["requested"]),
+        "current_target_uuid": preflight["current_target"]["uuid"],
+        "current_target_type": preflight["current_target"]["type"],
+        "target_uuid": preflight["target"]["uuid"],
+        "target_type": preflight["target"]["type"],
+        "start_next": preflight["start_next"],
+        "stop_target": preflight["stop_target"],
+        "risk_tier": operation["risk_tier"],
+        "capability_gate": operation.get("capability_gate"),
+        "workspace_validation": "fresh_source_and_audio_or_video_target_readback_required",
+        "mcp_secret_version": 1,
+    }
+
+
+def _devamp_confirm_token(**payload_args: Any) -> str:
+    payload = _devamp_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:devamp:v{DEVAMP_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _decode_devamp_confirm_token(token: str) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    if len(parts) != 5 or parts[:3] != ["confirm", "devamp", f"v{DEVAMP_TOKEN_VERSION}"]:
+        return None, "Devamp confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, "Devamp confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, "Devamp confirm_token payload is invalid."
+    return (payload, None) if isinstance(payload, dict) else (None, "Devamp confirm_token payload is invalid.")
+
+
+def _devamp_dry_run_errors(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+    *,
+    workspace_id: str,
+    reader: Any,
+    candidate_shape: bool,
+) -> dict[str, str]:
+    operation = _devamp_operation(item)
+    if operation is None or not candidate_shape:
+        return {}
+    _, error = _devamp_preflight(workspace_id, item, before, reader=reader)
+    return {operation["property"]: error} if error else {}
+
+
+def _annotate_devamp_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    reader: Any,
+    before: dict[str, Any] | None,
+    candidate_shape: bool,
+) -> list[str]:
+    operation = _devamp_operation(item)
+    if operation is None or not candidate_shape:
+        return []
+    preflight, error = _devamp_preflight(workspace_id, item, before, reader=reader)
+    if error or preflight is None:
+        operation.pop("confirm_token", None)
+        return []
+    operation.update(
+        {
+            "real_write_enabled": False,
+            "real_write_possible": True,
+            "requires_confirm_token": True,
+            "devamp_candidate": True,
+            "planned_only_reason": _devamp_reason(operation),
+            "future_gate_requirements": [
+                "devamp_confirm_token",
+                "single_cue_single_property",
+                "uuid_cue_ref",
+                "saved_mode",
+                "fresh_source_and_target_baselines",
+                "audio_or_video_target_only",
+                "exact_target_readback",
+                "manual_rollback_plan",
+            ],
+        }
+    )
+    operation["confirm_token"] = _devamp_confirm_token(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        item=item,
+        operation=operation,
+        preflight=preflight,
+    )
+    return []
+
+
+def _validate_devamp_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+    *,
+    reader: Any,
+) -> dict[str, str]:
+    operation = _devamp_operation(item)
+    property_name = operation.get("property") if operation else "devamp"
+    if operation is None:
+        return {property_name: "Devamp preflight is incomplete."}
+    preflight, error = _devamp_preflight(workspace_id, item, before, reader=reader)
+    if error or preflight is None:
+        return {property_name: error or "Devamp preflight is incomplete."}
+    payload, token_error = _decode_devamp_confirm_token(item["confirm_gates"][0])
+    if token_error or payload is None:
+        return {property_name: token_error or "Devamp confirm_token is invalid."}
+    expected = _devamp_token_payload(
+        workspace_id=workspace_id,
+        cue_ref=item["cue_ref"],
+        item=item,
+        operation=operation,
+        preflight=preflight,
+    )
+    if payload.get("baseline_sha256") != expected["baseline_sha256"] or payload.get("baseline") != expected["baseline"]:
+        return {property_name: f"stale_devamp_baseline: current {property_name} no longer matches the reviewed dry-run baseline."}
+    if any(payload.get(key) != value for key, value in expected.items()):
+        return {
+            property_name: (
+                "Devamp confirm_token does not match this workspace, source, target, profile, property, "
+                "or dependent setting."
+            )
+        }
+    return {}
+
+
+def _mark_devamp_real_operation(item: dict[str, Any]) -> None:
+    operation = _devamp_operation(item)
+    if operation is None:
+        return
+    operation.update(real_write_enabled=True, real_write_possible=True, requires_confirm_token=True, devamp_candidate=True)
+    operation.pop("planned_only_reason", None)
+
+
+def _label_devamp_rejection(item: dict[str, Any]) -> None:
+    operation = _devamp_operation(item)
+    if operation is not None:
+        operation["planned_only_reason"] = _devamp_reason(operation)
 
 
 def _phase8_video_io_call_structure_error(items: list[dict[str, Any]]) -> str | None:
@@ -9749,6 +10142,7 @@ def _is_readback_confirmable_gated_item(item: dict[str, Any]) -> bool:
         or _phase7_video_geometry_operation(item) is not None
         or _phase8_video_io_operation(item) is not None
         or _utility_target_operation(item) is not None
+        or _devamp_operation(item) is not None
         or _phase8b_video_audio_time_operation(item) is not None
         or _phase9a_video_audio_level_operation(item) is not None
         or _phase9b_video_audio_matrix_operation(item) is not None
@@ -9910,6 +10304,8 @@ def _comparison_value(key: str, value: Any) -> Any:
         return _continue_mode_comparison_value(value)
     if key == "preservePitch":
         return _video_audio_time_canonical_value(key, value)
+    if key in DEVAMP_BOOLEAN_PROPERTIES:
+        return _devamp_boolean(value)
     if key in CASEFOLD_COMPARISON_KEYS and isinstance(value, str):
         return value.strip().casefold()
     return value

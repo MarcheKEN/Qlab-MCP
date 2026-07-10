@@ -163,6 +163,25 @@ Utility cue editing:
 - local tests pass; dedicated QLab runtime validation is still required before
   closure
 
+Devamp saved configuration:
+
+- local `confirm:devamp:v1:` gate for exact-UUID, saved, one-property
+  `cueTargetID`, `devampType`, `startNextCueWhenSliceEnds`, and
+  `stopTargetWhenSliceEnds` updates
+- source and resolved target must be healthy/inactive; targets are exact
+  existing `Audio` or `Video` cue UUIDs only
+- Stop target requires Start next already enabled; Start next cannot be disabled
+  while Stop target is true, avoiding an implicit multi-property change
+- fresh baseline/readback and fresh-token rollback are required; runtime
+  validation remains pending
+
+Network OSC Message:
+
+- `customString`, `networkPatchID`, fades, and device-description parameters
+  remain planned-only because documented network patch readback does not prove
+  `OSC Message` mode
+- no patch definitions, destination settings, raw OSC, playback, or save
+
 Video Phase 3F — Text Style:
 
 - blocked after QLab 5.5.10 runtime validation did not return reliable fresh
@@ -242,7 +261,8 @@ Video Phase 8B — Video embedded-audio Time & Loops:
   is normalized internally for baseline, verification, and rollback
 - setter timeout or QLab setter error is accepted only when fresh readback
   matches, and remains warning-visible
-- Linear Curve, slices/vamps/devamps, levels, objects, Audio FX, Trim, `/live`,
+- Linear Curve, Audio/Video slice/vamp/devamp routes outside the dedicated
+  Devamp saved-configuration gate, levels, objects, Audio FX, Trim, `/live`,
   raw OSC, playback, batch, multi-property, and save remain blocked for
   Phase 8B. `doFade` and `lockFadeToCue` moved to their own local
   token-gated implementation, with runtime validation pending.
@@ -439,7 +459,8 @@ Video Phase 8C — Slice Markers for Audio/Video:
 - exact-time copy is the selected future V5/V8 model; no proportional timing
   copy is implemented
 - Audio/Camera real writes, combined `/sliceMarker/{index}`,
-  `lastSliceInfiniteLoop`, vamps/devamps, `/live`, batch, multi-property, raw
+  `lastSliceInfiniteLoop`, Audio/Video vamps/devamps outside the dedicated
+  Devamp saved-configuration gate, `/live`, batch, multi-property, raw
   OSC, playback, and save remain blocked
 - runtime validation is required before closure
 

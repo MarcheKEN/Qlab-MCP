@@ -33,7 +33,8 @@ The only promoted target route is saved
 
 - `cueTargetNumber`, `cueTargetName`, temporary targets
 - Reset `patchTargetID`, `audioMapTargetID`, and `targetMode`
-- `Target` and `Devamp` cue target writes
+- `Target` cue target writes; Devamp saved configuration is tracked in
+  `025_devamp_network_osc_safe_editing.md`
 - actions such as `/start`, `/stop`, `/pause`, `/load`, `/go`, `/reset`
 - `/live`, batch/multi-property real writes, raw OSC, playback, and save
 

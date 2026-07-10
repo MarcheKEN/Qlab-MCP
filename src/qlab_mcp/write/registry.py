@@ -1242,27 +1242,29 @@ FADE_CATALOG_PROPERTIES = (
 )
 
 NETWORK_CATALOG_PROPERTIES = (
-    *_planned_patch_refs("networkPatch", validator="patch_ref"),
-    _planned_prop("customString", "string", reason="network_messages_can_trigger_external_systems"),
-    _planned_prop("fadeEntries", "list_or_json_string", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("fadeFrom", "number", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("fadeNumberType", "fade_number_type", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("fadeTo", "number", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("fadeType", "network_fade_type", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("fps", "network_fps", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("pathHeight", "positive_number", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("pathWidth", "positive_number", reason="network_fade_shape_can_trigger_external_systems"),
+    _planned_prop("networkPatchName", "string", reason="network_osc_message_requires_patch_type_validation", capability_gate="patch_routing"),
+    _planned_prop("networkPatchNumber", "non_negative_int", reason="network_osc_message_requires_patch_type_validation", capability_gate="patch_routing"),
+    _planned_prop("networkPatchID", "string", reason="network_osc_message_requires_patch_type_validation", capability_gate="patch_routing"),
+    _planned_prop("customString", "string", reason="network_osc_message_requires_patch_type_validation"),
+    _planned_prop("fadeEntries", "list_or_json_string", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("fadeFrom", "number", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("fadeNumberType", "fade_number_type", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("fadeTo", "number", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("fadeType", "network_fade_type", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("fps", "network_fps", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("pathHeight", "positive_number", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("pathWidth", "positive_number", reason="network_fade_routes_require_deterministic_readback"),
     _planned_prop("patch", "non_negative_int", reason="deprecated_use_networkPatchNumber"),
-    _op("parameterFadeEnabled", (("parameter", "non_empty_string"), ("value", "boolean")), path="parameterFadeEnabled/{parameter}", risk_tier="high", planned_only_reason="network_parameter_values_can_trigger_external_systems"),
-    _planned_prop("parameterFadesEnabled", "list", reason="network_parameter_values_can_trigger_external_systems"),
+    _op("parameterFadeEnabled", (("parameter", "non_empty_string"), ("value", "boolean")), path="parameterFadeEnabled/{parameter}", risk_tier="high", planned_only_reason="network_device_description_parameters_out_of_scope"),
+    _planned_prop("parameterFadesEnabled", "list", reason="network_device_description_parameters_out_of_scope"),
     _op(
         "parameterValue",
         (("parameter", "non_empty_string"), ("value", "json_value")),
         path="parameterValue/{parameter}",
         risk_tier="high",
-        planned_only_reason="network_parameter_values_can_trigger_external_systems",
+        planned_only_reason="network_device_description_parameters_out_of_scope",
     ),
-    _planned_prop("parameterValues", "list", reason="network_parameter_values_can_trigger_external_systems"),
+    _planned_prop("parameterValues", "list", reason="network_device_description_parameters_out_of_scope"),
 )
 
 MIDI_CATALOG_PROPERTIES = (
@@ -1357,15 +1359,15 @@ RESET_CATALOG_PROPERTIES = (
 )
 
 DEVAMP_CATALOG_PROPERTIES = (
-    _planned_prop("cueTargetNumber", "cue_target_number", reason="devamp_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
-    _planned_prop("cueTargetID", "cue_target_id", reason="devamp_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
-    _planned_prop("cueTargetName", "non_empty_string", reason="devamp_targets_need_validation", contextual_requirements=("target_name_resolution_unsupported",)),
-    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="devamp_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
-    _planned_prop("tempCueTargetID", "cue_target_id", reason="devamp_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
-    _planned_prop("targetMode", "target_mode", reason="devamp_targets_need_validation"),
-    _planned_prop("devampType", "devamp_type", reason="devamp_targets_need_validation"),
-    _planned_prop("startNextCueWhenSliceEnds", "boolean", reason="devamp_targets_need_validation"),
-    _planned_prop("stopTargetWhenSliceEnds", "boolean", reason="devamp_targets_need_validation"),
+    _planned_prop("cueTargetNumber", "cue_target_number", reason="devamp_target_uuid_only", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetID", "cue_target_id", reason="devamp_target_requires_confirm_token", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetName", "non_empty_string", reason="devamp_target_uuid_only", contextual_requirements=("target_name_resolution_unsupported",)),
+    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="devamp_target_uuid_only", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("tempCueTargetID", "cue_target_id", reason="devamp_target_uuid_only", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("targetMode", "target_mode", reason="devamp_target_mode_out_of_scope"),
+    _planned_prop("devampType", "devamp_type", reason="devamp_settings_require_confirm_token"),
+    _planned_prop("startNextCueWhenSliceEnds", "boolean", reason="devamp_settings_require_confirm_token"),
+    _planned_prop("stopTargetWhenSliceEnds", "boolean", reason="devamp_settings_require_confirm_token"),
 )
 
 SCRIPT_CATALOG_PROPERTIES = (
@@ -1422,13 +1424,13 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
     ),
     "light_basic": UpdateProfileSpec("light_basic", ("Light",), (*COMMON_PROPERTIES, *LIGHT_CATALOG_PROPERTIES), "high", True, "Light profile; lightCommandText and saved behavior flags use specialized confirmation gates."),
     "fade_basic": UpdateProfileSpec("fade_basic", ("Fade",), (*COMMON_PROPERTIES, *FADE_CATALOG_PROPERTIES), "high", True, "Fade profile; fade targets remain dry-run only."),
-    "network_basic": UpdateProfileSpec("network_basic", ("Network",), (*COMMON_PROPERTIES, *NETWORK_CATALOG_PROPERTIES), "high", True, "Network profile; network messages remain dry-run only."),
+    "network_basic": UpdateProfileSpec("network_basic", ("Network",), (*COMMON_PROPERTIES, *NETWORK_CATALOG_PROPERTIES), "high", True, "Network profile; OSC Message mode cannot be proven from documented patch readback, so network output remains dry-run only."),
     "midi_basic": UpdateProfileSpec("midi_basic", ("MIDI",), (*COMMON_PROPERTIES, *MIDI_CATALOG_PROPERTIES), "high", True, "MIDI profile; MIDI messages remain dry-run only."),
     "midi_file_basic": UpdateProfileSpec("midi_file_basic", ("MIDI File",), (*COMMON_PROPERTIES, *MIDI_FILE_CATALOG_PROPERTIES), "medium", True, "MIDI File profile with playback metadata writes."),
     "timecode_basic": UpdateProfileSpec("timecode_basic", ("Timecode",), (*COMMON_PROPERTIES, *TIMECODE_CATALOG_PROPERTIES), "medium", True, "Timecode profile with basic metadata writes."),
     "target_basic": UpdateProfileSpec("target_basic", ("Start", "Stop", "Pause", "Load", "Goto", "GoTo", "Target", "Arm", "Disarm"), (*COMMON_PROPERTIES, *TARGET_CATALOG_PROPERTIES), "high", True, "Target cue profile; target refs remain dry-run only."),
     "reset_basic": UpdateProfileSpec("reset_basic", ("Reset",), (*COMMON_PROPERTIES, *RESET_CATALOG_PROPERTIES), "high", True, "Reset profile; reset targets remain dry-run only."),
-    "devamp_basic": UpdateProfileSpec("devamp_basic", ("Devamp",), (*COMMON_PROPERTIES, *DEVAMP_CATALOG_PROPERTIES), "high", True, "Devamp profile; devamp targets remain dry-run only."),
+    "devamp_basic": UpdateProfileSpec("devamp_basic", ("Devamp",), (*COMMON_PROPERTIES, *DEVAMP_CATALOG_PROPERTIES), "high", True, "Devamp target and settings use a specialized exact-UUID confirmation gate; name, number, temporary, and mode targets remain dry-run only."),
     "script_basic": UpdateProfileSpec("script_basic", ("Script",), (*COMMON_PROPERTIES, *SCRIPT_CATALOG_PROPERTIES), "high", True, "Script profile; script source remains dry-run only."),
 }
 
@@ -1734,6 +1736,16 @@ def real_write_permission_errors(
         }:
             errors[prop] = (
                 f"{prop} is gated or dry-run only outside the specialized single-cue saved cueTargetID gate."
+            )
+            continue
+        if profile == "devamp_basic" and prop in {
+            "cueTargetID",
+            "devampType",
+            "startNextCueWhenSliceEnds",
+            "stopTargetWhenSliceEnds",
+        }:
+            errors[prop] = (
+                f"{prop} is gated or dry-run only outside the specialized single-cue saved Devamp gate."
             )
             continue
         if profile == "light_basic" and prop == "lightCommandText":

@@ -10,7 +10,7 @@ import pytest
 
 from qlab_mcp.config import QLabConfig
 from qlab_mcp.errors import OscTimeoutError, QLabReplyError, UnsafeWriteOperationError
-from qlab_mcp.models import CreateCueResult, UpdateCuesResult, WriteReadinessResult
+from qlab_mcp.models import CreateCueResult, CueUpdateInput, UpdateCuesResult, WriteReadinessResult
 from qlab_mcp.qlab import QLabReader
 from qlab_mcp.runtime.read_cache import shared_read_cache
 import qlab_mcp.write.operations as write_operations
@@ -449,6 +449,40 @@ def confirm_token_for(reader: QLabReader, cue_ref: str, update: dict[str, Any], 
     return setters[next(iter(setters))]["confirm_token"]
 
 
+def devamp_fixture_cues(
+    source_id: str,
+    target_id: str,
+    *,
+    target_type: str = "Audio",
+    devamp_type: int = 1,
+    start_next: bool = False,
+    stop_target: bool = False,
+) -> dict[str, dict[str, Any]]:
+    return {
+        source_id: {
+            "type": "Devamp",
+            "cueTargetID": target_id,
+            "hasCueTargets": True,
+            "devampType": devamp_type,
+            "startNextCueWhenSliceEnds": start_next,
+            "stopTargetWhenSliceEnds": stop_target,
+            "isBroken": False,
+            "isWarning": False,
+            "isRunning": False,
+            "isPaused": False,
+            "isAuditioning": False,
+        },
+        target_id: {
+            "type": target_type,
+            "isBroken": False,
+            "isWarning": False,
+            "isRunning": False,
+            "isPaused": False,
+            "isAuditioning": False,
+        },
+    }
+
+
 PROFILE_TEST_CUE_TYPES = {
     "common": "Memo",
     "memo_basic": "Memo",
@@ -783,7 +817,12 @@ def _dry_run_only_property_cases() -> list[Any]:
     cases = []
     for profile, spec in profile_catalog().items():
         for prop_name, prop in spec["properties"].items():
-            if profile in {"target_basic", "reset_basic"} and prop_name == "cueTargetID":
+            if (
+                profile in {"target_basic", "reset_basic"} and prop_name == "cueTargetID"
+            ) or (
+                profile == "devamp_basic"
+                and prop_name in {"cueTargetID", "devampType", "startNextCueWhenSliceEnds", "stopTargetWhenSliceEnds"}
+            ):
                 continue
             if not prop["real_write_enabled"]:
                 cases.append(
@@ -981,7 +1020,9 @@ def _assert_media_profile_catalog(catalog: dict[str, Any]) -> None:
 
 def _assert_show_control_profile_catalog(catalog: dict[str, Any]) -> None:
     assert catalog["midi_file_basic"]["properties"]["rate"]["real_write_enabled"] is True
-    assert catalog["network_basic"]["properties"]["customString"]["planned_only_reason"]
+    assert catalog["network_basic"]["properties"]["customString"]["planned_only_reason"] == "network_osc_message_requires_patch_type_validation"
+    assert catalog["network_basic"]["properties"]["networkPatchID"]["planned_only_reason"] == "network_osc_message_requires_patch_type_validation"
+    assert catalog["network_basic"]["properties"]["fadeType"]["planned_only_reason"] == "network_fade_routes_require_deterministic_readback"
     assert catalog["network_basic"]["properties"]["parameterValue"]["planned_only_reason"]
     assert catalog["network_basic"]["properties"]["parameterValue"]["path"] == "parameterValue/{parameter}"
     assert catalog["network_basic"]["properties"]["parameterValues"]["args"][0]["validator"] == "list"
@@ -1034,6 +1075,8 @@ def _assert_show_control_profile_catalog(catalog: dict[str, Any]) -> None:
         ),
     )
     assert catalog["devamp_basic"]["properties"]["devampType"]["args"][0]["validator"] == "devamp_type"
+    assert catalog["devamp_basic"]["properties"]["cueTargetID"]["planned_only_reason"] == "devamp_target_requires_confirm_token"
+    assert catalog["devamp_basic"]["properties"]["stopTargetWhenSliceEnds"]["planned_only_reason"] == "devamp_settings_require_confirm_token"
 
 
 def _assert_light_profile_catalog(catalog: dict[str, Any]) -> None:
@@ -3379,6 +3422,201 @@ def test_update_cues_real_blocks_missing_cue_before_any_setter() -> None:
     assert result["status"] == "preflight_failed"
     assert result["results"][1]["status"] == "preflight_failed"
     assert f"/workspace/ws-1/cue_id/{cue_id}/name" not in addresses
+
+
+@pytest.mark.parametrize(
+    ("property_name", "requested", "start_next", "stop_target", "expected_target_id", "expected_target_type"),
+    [
+        ("cueTargetID", "33333333-3333-4333-8333-333333333333", False, False, "33333333-3333-4333-8333-333333333333", "Video"),
+        ("devampType", 2, False, False, "22222222-2222-4222-8222-222222222222", "Audio"),
+        ("startNextCueWhenSliceEnds", True, False, False, "22222222-2222-4222-8222-222222222222", "Audio"),
+        ("stopTargetWhenSliceEnds", True, True, False, "22222222-2222-4222-8222-222222222222", "Audio"),
+    ],
+)
+def test_update_cues_devamp_gate_writes_reads_back_and_rolls_back(
+    property_name: str,
+    requested: Any,
+    start_next: bool,
+    stop_target: bool,
+    expected_target_id: str,
+    expected_target_type: str,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    audio_id = "22222222-2222-4222-8222-222222222222"
+    video_id = "33333333-3333-4333-8333-333333333333"
+    cues = devamp_fixture_cues(source_id, audio_id, start_next=start_next, stop_target=stop_target)
+    cues[video_id] = {"type": "Video", "isBroken": False, "isWarning": False, "isRunning": False}
+    client = BatchFakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"), cues=cues)
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    baseline = client.cues[source_id][property_name]
+    request = {"cue_ref": source_id, "profile": "devamp_basic", "properties": {property_name: requested}}
+
+    dry = reader.update_cues("ws-1", [request], dry_run=True)
+    setter = planned_setters(dry["results"][0])[property_name]
+    token = setter["confirm_token"]
+    payload, error = write_operations._decode_devamp_confirm_token(token)
+
+    assert dry["status"] == "dry_run"
+    assert error is None
+    assert payload is not None
+    assert payload["workspace_id"] == "ws-1"
+    assert payload["cue_id"] == source_id
+    assert payload["cue_type"] == "Devamp"
+    assert payload["profile"] == "devamp_basic"
+    assert payload["property"] == property_name
+    assert payload["baseline"] == baseline
+    assert payload["requested"] == requested
+    assert payload["target_uuid"] == expected_target_id
+    assert payload["target_type"] == expected_target_type
+
+    updated = reader.update_cues("ws-1", [{**request, "confirm_gates": [token]}], dry_run=False)
+    assert updated["status"] == "updated"
+    assert updated["results"][0]["after"][property_name] == requested
+
+    rollback_request = {"cue_ref": source_id, "profile": "devamp_basic", "properties": {property_name: baseline}}
+    rollback_dry = reader.update_cues("ws-1", [rollback_request], dry_run=True)
+    rollback_token = planned_setters(rollback_dry["results"][0])[property_name]["confirm_token"]
+    rollback = reader.update_cues(
+        "ws-1", [{**rollback_request, "confirm_gates": [rollback_token]}], dry_run=False
+    )
+    assert rollback["status"] == "updated"
+    assert rollback["results"][0]["after"][property_name] == baseline
+
+
+def test_update_cues_devamp_type_mcp_input_dry_run_returns_devamp_token() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    audio_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=devamp_fixture_cues(source_id, audio_id),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = CueUpdateInput(
+        cue_ref=source_id,
+        profile="devamp_basic",
+        properties={"devampType": 2},
+    ).model_dump()
+
+    result = reader.update_cues("ws-1", [update], dry_run=True)
+    setter = planned_setters(result["results"][0])["devampType"]
+
+    assert setter["confirm_token"].startswith("confirm:devamp:v1:")
+    assert result["results"][0]["executed_operations"] == []
+    assert client.cues[source_id]["devampType"] == 1
+
+
+@pytest.mark.parametrize("target_type", ["Memo", "Light"])
+def test_update_cues_devamp_target_requires_existing_audio_or_video(target_type: str) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    audio_id = "22222222-2222-4222-8222-222222222222"
+    target_id = "33333333-3333-4333-8333-333333333333"
+    cues = devamp_fixture_cues(source_id, audio_id)
+    cues[target_id] = {"type": target_type, "isBroken": False, "isWarning": False, "isRunning": False}
+    client = BatchFakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"), cues=cues)
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "devamp_basic", "properties": {"cueTargetID": target_id}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"] == {"cueTargetID": "Devamp cueTargetID target must be an Audio or Video cue."}
+    assert all(not address.endswith("/cueTargetID") for address, _, _ in client.requests)
+
+
+def test_update_cues_devamp_gate_rejects_missing_self_fake_wrong_and_stale_tokens() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    audio_id = "22222222-2222-4222-8222-222222222222"
+    missing_id = "33333333-3333-4333-8333-333333333333"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=devamp_fixture_cues(source_id, audio_id),
+        missing_refs={missing_id},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    target_request = {"cue_ref": source_id, "profile": "devamp_basic", "properties": {"cueTargetID": missing_id}}
+    missing = reader.update_cues("ws-1", [target_request], dry_run=True)
+    self_target = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "devamp_basic", "properties": {"cueTargetID": source_id}}],
+        dry_run=True,
+    )
+    settings_request = {"cue_ref": source_id, "profile": "devamp_basic", "properties": {"devampType": 2}}
+    dry = reader.update_cues("ws-1", [settings_request], dry_run=True)
+    token = planned_setters(dry["results"][0])["devampType"]["confirm_token"]
+    fake = reader.update_cues(
+        "ws-1", [{**settings_request, "confirm_gates": ["confirm:devamp:v1:fake:fake"]}], dry_run=False
+    )
+    wrong = reader.update_cues(
+        "ws-1", [{**settings_request, "confirm_gates": ["confirm:utilityTarget:v1:fake:fake"]}], dry_run=False
+    )
+    client.cues[source_id]["startNextCueWhenSliceEnds"] = True
+    stale = reader.update_cues("ws-1", [{**settings_request, "confirm_gates": [token]}], dry_run=False)
+
+    assert missing["status"] == self_target["status"] == "preflight_failed"
+    assert "could not be resolved" in missing["results"][0]["errors"]["cueTargetID"]
+    assert "cannot be the cue" in self_target["results"][0]["errors"]["cueTargetID"]
+    assert fake["status"] == wrong["status"] == stale["status"] == "preflight_failed"
+    assert "confirm_token" in fake["results"][0]["errors"]["devampType"]
+    assert "confirm_token" in wrong["results"][0]["errors"]["devampType"]
+    assert "confirm_token does not match" in stale["results"][0]["errors"]["devampType"]
+    assert all(not address.endswith("/cueTargetID") and not address.endswith("/devampType") for address, _, _ in client.requests)
+
+
+def test_update_cues_devamp_gate_rejects_batch_multi_live_wrong_type_and_flag_dependencies() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    audio_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=devamp_fixture_cues(source_id, audio_id),
+        cue_numbers={"1": source_id},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    base = {"cue_ref": source_id, "profile": "devamp_basic", "properties": {"devampType": 2}}
+    token = planned_setters(reader.update_cues("ws-1", [base], dry_run=True)["results"][0])["devampType"]["confirm_token"]
+    batch = reader.update_cues("ws-1", [{**base, "confirm_gates": [token]}, {**base, "confirm_gates": [token]}], dry_run=False)
+    multi = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "devamp_basic", "properties": {"devampType": 2, "startNextCueWhenSliceEnds": True}, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    cue_number = reader.update_cues(
+        "ws-1", [{**base, "cue_ref": "1", "confirm_gates": [token]}], dry_run=False
+    )
+    live = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "devamp_basic", "operations": [{"property": "devampType", "args": {"value": 2}, "mode": "live"}]}],
+        dry_run=True,
+    )
+    wrong_type_client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={source_id: {"type": "Memo", "devampType": 1}},
+    )
+    wrong_type = QLabReader(wrong_type_client).update_cues(  # type: ignore[arg-type]
+        "ws-1", [base], dry_run=True
+    )
+    stop_without_start = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "devamp_basic", "properties": {"stopTargetWhenSliceEnds": True}}],
+        dry_run=True,
+    )
+    client.cues[source_id]["startNextCueWhenSliceEnds"] = True
+    client.cues[source_id]["stopTargetWhenSliceEnds"] = True
+    disable_start = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "devamp_basic", "properties": {"startNextCueWhenSliceEnds": False}}],
+        dry_run=True,
+    )
+
+    assert batch["status"] == multi["status"] == cue_number["status"] == "preflight_failed"
+    assert live["status"] == wrong_type["status"] == stop_without_start["status"] == disable_start["status"] == "preflight_failed"
+    assert "saved" in live["results"][0]["errors"]["validation"]
+    assert "requires a Devamp cue" in wrong_type["results"][0]["errors"]["profile"]
+    assert "requires startNextCueWhenSliceEnds=true" in stop_without_start["results"][0]["errors"]["stopTargetWhenSliceEnds"]
+    assert "cannot disable" in disable_start["results"][0]["errors"]["startNextCueWhenSliceEnds"]
+    assert all(not address.endswith("/devampType") for address, _, _ in client.requests)
 
 
 def test_update_cues_real_timeout_confirmed_by_after_read() -> None:
@@ -11704,7 +11942,13 @@ def test_update_cues_network_basic_dry_run_plans_documented_non_ambiguous_fields
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
-        cues={cue_id: {"type": "Network", "customString": "/cue/1/start"}},
+        cues={
+            cue_id: {
+                "type": "Network",
+                "customString": "/cue/1/start",
+                "networkPatchType": "OSC Message",  # synthetic fixture data is not a documented safety signal.
+            }
+        },
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
@@ -11717,6 +11961,7 @@ def test_update_cues_network_basic_dry_run_plans_documented_non_ambiguous_fields
                 "properties": {
                     "customString": "/eos/cue/1/fire",
                     "networkPatchID": "net-patch",
+                    "fadeType": 1,
                     "parameterValues": [1, "go"],
                 },
                 "operations": [{"property": "parameterValue", "args": {"parameter": "cueName", "value": "Intro"}}],
@@ -11729,9 +11974,21 @@ def test_update_cues_network_basic_dry_run_plans_documented_non_ambiguous_fields
     setters = planned_setters(result["results"][0])
     assert setters["parameterValue"]["address"] == f"/workspace/ws-1/cue_id/{cue_id}/parameterValue/cueName"
     assert setters["parameterValue"]["args"] == ["Intro"]
+    assert setters["customString"]["planned_only_reason"] == "network_osc_message_requires_patch_type_validation"
+    assert setters["networkPatchID"]["planned_only_reason"] == "network_osc_message_requires_patch_type_validation"
+    assert setters["fadeType"]["planned_only_reason"] == "network_fade_routes_require_deterministic_readback"
     for setter in setters.values():
         assert setter["real_write_enabled"] is False
         assert setter["planned_only_reason"]
+    assert_no_confirm_token(result)
+
+    real = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "network_basic", "properties": {"customString": "/eos/cue/2/fire"}}],
+        dry_run=False,
+    )
+    assert real["status"] == "preflight_failed"
+    assert all(not address.endswith("/customString") for address, _, _ in client.requests)
 
 
 def test_update_cues_rejects_slash_in_path_template_arg() -> None:

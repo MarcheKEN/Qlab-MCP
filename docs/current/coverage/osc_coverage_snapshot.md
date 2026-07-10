@@ -15,7 +15,8 @@ Phase 7D local `quaternion` candidate, the Phase 7E local `resetRotation`
 action candidate, the Phase 7F local `smooth` candidate, and the Phase 8A local
 cue I/O ID candidates, and the Phase 8B local Video embedded-audio Time & Loops
 candidates, the local Audio/Mic Phase 9A slider, Phase 9B matrix, and Phase 9C
-metadata candidates, and the Phase 8C local Video slice marker candidates.
+metadata candidates, the Phase 8C local Video slice marker candidates, and the
+local Devamp saved-configuration candidate.
 Those
 exceptions are listed in Current Invariants.
 
@@ -48,6 +49,17 @@ exceptions are listed in Current Invariants.
 - `playlist/*` real writes require Group mode `6` (Playlist mode).
 - `cueTargetID`, `cueTargetNumber`, and temporary target refs require target resolution before real writes.
 - `cueTargetName` remains blocked for real writes; callers must use `cueTargetID` or `cueTargetNumber`.
+- Devamp local saved configuration emits `confirm:devamp:v1:` only for exact
+  UUID, one-cue, one-property saved `cueTargetID`, `devampType`,
+  `startNextCueWhenSliceEnds`, or `stopTargetWhenSliceEnds` writes. Source and
+  resolved target must be healthy/inactive; targets are exact existing `Audio`
+  or `Video` UUIDs. Stop target requires Start next already enabled, and Start
+  next cannot be disabled while Stop target is true. Runtime validation remains
+  pending.
+- Network `customString`, `networkPatchID`, fades, and device-description
+  parameters remain planned-only: documented `network/patchList` readback does
+  not prove that a patch uses `OSC Message`, while `customString` also writes
+  Plain Text cues.
 - `Mic.channelOffset` and `Mic.channels` are gated by `patch_routing` until input
   patch bounds validation exists. `settings/mic/patchList` exposes only ID/name;
   cue `numChannelsIn`, `channelOffset`, and `channels` do not expose the selected
@@ -217,7 +229,8 @@ exceptions are listed in Current Invariants.
   baseline, verification, and rollback. `NaN`, infinity, strings,
   wrong token families, cue name/number real writes, `/live`, batch,
   multi-property, raw OSC, playback/show-control, Integrated Fade, Linear
-  Curve, slices/vamps/devamps, levels, objects, Audio FX, Trim, fileTarget, and
+  Curve, Audio/Video slices/vamps/devamps outside the dedicated Devamp gate,
+  levels, objects, Audio FX, Trim, fileTarget, and
   save remain blocked. Setter timeout or QLab setter error is warning-confirmed
   success only when fresh readback matches. Runtime validation is required
   before Phase 8B closure.
@@ -292,7 +305,8 @@ exceptions are listed in Current Invariants.
   `-1`; `0`, floats, strings, booleans, null, lists, and dictionaries are
   rejected. Marker times must be finite, in known cue bounds, and at least
   `0.05s` from other markers. Audio/Camera real writes, combined
-  `/sliceMarker/{index}`, `lastSliceInfiniteLoop`, vamps/devamps, `/live`,
+  `/sliceMarker/{index}`, `lastSliceInfiniteLoop`, Audio/Video vamps/devamps
+  outside the dedicated Devamp gate, `/live`,
   batch, multi-property, raw OSC, playback/show-control, and save remain
   blocked. Exact-time copy is the selected future V5/V8 model; proportional
   timing copy is not implemented. Runtime validation is required before Phase

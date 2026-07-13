@@ -50,6 +50,7 @@ from .timeouts import (
     client_config_timeout as _timeout_client_config_timeout,
     setter_reply_timeout as _timeout_setter_reply_timeout,
 )
+from .network_patch_types import classify_network_patch_type, valid_osc_message_text
 
 
 MAX_BATCH_UPDATES = 50
@@ -226,6 +227,11 @@ DEVAMP_BOOLEAN_PROPERTIES = frozenset({"startNextCueWhenSliceEnds", "stopTargetW
 DEVAMP_TARGET_TYPES = frozenset({"Audio", "Video"})
 DEVAMP_OPERATION_KIND = "devamp_saved_configuration_write"
 DEVAMP_TOKEN_VERSION = 1
+NETWORK_REPAIR_PROPERTIES = frozenset({"customString", "networkPatchID"})
+NETWORK_OSC_MESSAGE_OPERATION_KIND = "network_osc_message_write"
+NETWORK_OSC_MESSAGE_TOKEN_VERSION = 1
+NETWORK_REPAIR_OPERATION_KIND = "network_repair_write"
+NETWORK_REPAIR_TOKEN_VERSION = 1
 VIDEO_PHASE8B_AUDIO_TIME_PROPERTIES = frozenset(
     {
         "startTime",
@@ -596,6 +602,7 @@ class QLabWriteMixin:
             _utility_target_operation(item) is not None for item in items
         )
         devamp_call = any(_devamp_operation(item) is not None for item in items)
+        network_call = any(_network_operation(item) is not None for item in items)
         phase8b_video_audio_time_call = any(
             _phase8b_video_audio_time_operation(item) is not None for item in items
         )
@@ -661,6 +668,22 @@ class QLabWriteMixin:
                             "cueTargetID",
                             "startNextCueWhenSliceEnds",
                             "stopTargetWhenSliceEnds",
+                            *VIDEO_PHASE2_HEALTH_READ_KEYS,
+                        ]
+                    )
+                )
+            if _network_operation(item) is not None:
+                item["read_keys"] = list(
+                    dict.fromkeys(
+                        [
+                            *item["read_keys"],
+                            "type",
+                            "networkPatchID",
+                            "networkPatchName",
+                            "networkPatchNumber",
+                            "customString",
+                            "message",
+                            "messageError",
                             *VIDEO_PHASE2_HEALTH_READ_KEYS,
                         ]
                     )
@@ -837,6 +860,7 @@ class QLabWriteMixin:
                 else None
             )
             devamp_structure_error = _devamp_call_structure_error(items) if devamp_call else None
+            network_structure_error = _network_call_structure_error(items) if network_call else None
             phase8b_audio_time_structure_error = (
                 _phase8b_video_audio_time_call_structure_error(items)
                 if phase8b_video_audio_time_call
@@ -988,6 +1012,15 @@ class QLabWriteMixin:
                         errors[property_name] = (
                             f"{property_name} is gated or dry-run only without exactly one reviewed "
                             "Devamp confirm_token."
+                        )
+                elif not errors and network_call:
+                    property_name = item["operations"][0]["property"]
+                    if network_structure_error:
+                        errors[property_name] = network_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Network OSC Message confirm_token."
                         )
                 elif not errors and phase8b_video_audio_time_call:
                     property_name = item["operations"][0]["property"]
@@ -1221,6 +1254,7 @@ class QLabWriteMixin:
             )
             utility_target_candidate_shape = _utility_target_call_structure_error(items) is None
             devamp_candidate_shape = _devamp_call_structure_error(items) is None
+            network_candidate_shape = _network_call_structure_error(items) is None
             phase8b_audio_time_candidate_shape = (
                 phase8b_video_audio_time_call
                 and not phase4_light_call
@@ -1450,6 +1484,14 @@ class QLabWriteMixin:
                             candidate_shape=devamp_candidate_shape,
                         )
                     )
+                    for key, value in _network_dry_run_errors(
+                        item,
+                        before,
+                        workspace_id=workspace,
+                        reader=self,
+                        candidate_shape=network_candidate_shape,
+                    ).items():
+                        errors.setdefault(key, value)
                     errors.update(_phase8b_video_audio_time_dry_run_errors(item, before))
                     errors.update(
                         _phase9_audio_dry_run_errors(
@@ -1587,6 +1629,16 @@ class QLabWriteMixin:
                             candidate_shape=devamp_candidate_shape,
                         )
                     )
+                if not errors and _network_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_network_operation(
+                            item,
+                            workspace_id=workspace,
+                            reader=self,
+                            before=before,
+                            candidate_shape=network_candidate_shape,
+                        )
+                    )
                 # The utility gate is deliberately re-checked from the normalized item
                 # after fresh readback. This avoids coupling its token emission to other
                 # phase-family detectors while retaining the one-cue/one-property shape.
@@ -1607,6 +1659,16 @@ class QLabWriteMixin:
                 if not errors and len(items) == 1 and _devamp_call_structure_error(items) is None:
                     warnings.extend(
                         _annotate_devamp_operation(
+                            item,
+                            workspace_id=workspace,
+                            reader=self,
+                            before=before,
+                            candidate_shape=True,
+                        )
+                    )
+                if not errors and len(items) == 1 and _network_call_structure_error(items) is None:
+                    warnings.extend(
+                        _annotate_network_operation(
                             item,
                             workspace_id=workspace,
                             reader=self,
@@ -1950,6 +2012,10 @@ class QLabWriteMixin:
                 errors.update(_validate_devamp_real_write(workspace, item, before, reader=self))
                 if not errors:
                     _mark_devamp_real_operation(item)
+            elif not errors and network_call:
+                errors.update(_validate_network_real_write(workspace, item, before, reader=self))
+                if not errors:
+                    _mark_network_real_operation(item)
             elif not errors and phase8b_video_audio_time_call:
                 errors.update(_validate_phase8b_video_audio_time_real_write(workspace, item, before))
                 if not errors:
@@ -2082,6 +2148,8 @@ class QLabWriteMixin:
                     _label_utility_target_rejection(item)
                 if devamp_call:
                     _label_devamp_rejection(item)
+                if network_call:
+                    _label_network_rejection(item)
                 if phase8b_video_audio_time_call:
                     _label_phase8b_video_audio_time_rejection(item)
                 if video_clock_type_call:
@@ -2280,6 +2348,7 @@ class QLabWriteMixin:
                         or _phase8_video_io_operation(item) is not None
                         or _utility_target_operation(item) is not None
                         or _devamp_operation(item) is not None
+                        or _network_operation(item) is not None
                         or _phase8b_video_audio_time_operation(item) is not None
                         or _video_clock_type_operation(item) is not None
                         or _video_integrated_fade_operation(item) is not None
@@ -2315,6 +2384,7 @@ class QLabWriteMixin:
                 or _phase8_video_io_operation(item) is not None
                 or _utility_target_operation(item) is not None
                 or _devamp_operation(item) is not None
+                or _network_operation(item) is not None
                 or _phase8b_video_audio_time_operation(item) is not None
                 or _video_clock_type_operation(item) is not None
                 or _video_integrated_fade_operation(item) is not None
@@ -2342,6 +2412,8 @@ class QLabWriteMixin:
                     "warnings": warnings,
                 }
             )
+            _refresh_network_repair_real_result(self, workspace, result, item)
+            status = result["status"]
             _refresh_phase3_video_opacity_real_result(result, item)
             _refresh_phase3_video_translation_real_result(result, item)
             _refresh_phase3_video_scalar_real_result(result, item)
@@ -4755,6 +4827,387 @@ def _label_utility_target_rejection(item: dict[str, Any]) -> None:
     operation = _utility_target_operation(item)
     if operation is not None:
         operation["planned_only_reason"] = "utility_target_requires_confirm_token"
+
+
+def _network_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") != "network_basic":
+        return None
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in NETWORK_REPAIR_PROPERTIES
+        ),
+        None,
+    )
+
+
+def _network_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Network OSC Message real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") != "network_basic":
+        return "Network OSC Message real writes require network_basic profile."
+    if len(operations) != 1:
+        return "Network OSC Message real writes require exactly one property."
+    operation = operations[0]
+    if operation.get("property") not in NETWORK_REPAIR_PROPERTIES or operation.get("path") != operation.get("property"):
+        return "Network real writes allow only customString or networkPatchID."
+    if operation.get("mode") != "saved":
+        return "Network OSC Message real writes require saved mode."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Network OSC Message real writes require exact cue UUID as cue_ref."
+    return None
+
+
+def _network_source_error(before: dict[str, Any]) -> str | None:
+    if before.get("type") != "Network":
+        return "Network OSC Message real writes require a Network cue."
+    if before.get("isBroken") is True or before.get("isWarning") is True:
+        return "Network OSC Message real writes require a healthy source cue without warnings."
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return "Network OSC Message real writes require an inactive source cue."
+    return None
+
+
+def _network_patch_catalog(reader: Any, workspace_id: str) -> tuple[dict[str, dict[str, Any]], str | None]:
+    try:
+        reply = reader.client.request(_workspace_address(workspace_id, "settings/network/patchList"))
+        patches = _collection_items(reply.data)
+    except Exception:
+        return {}, "Network patch list could not be read; refusing an unverified patch type."
+    catalog: dict[str, dict[str, Any]] = {}
+    for patch in patches:
+        if not isinstance(patch, dict):
+            continue
+        patch_id = next((patch.get(key) for key in ("uniqueID", "id", "patchID") if patch.get(key)), None)
+        complete_name = next((patch.get(key) for key in ("name", "displayName", "patchName") if patch.get(key)), None)
+        if isinstance(patch_id, str) and isinstance(complete_name, str):
+            catalog[patch_id] = {
+                "uuid": patch_id,
+                "name": complete_name,
+                "type": classify_network_patch_type(complete_name),
+            }
+    return catalog, None
+
+
+def _network_preflight(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+    *,
+    reader: Any,
+) -> tuple[dict[str, Any] | None, str | None]:
+    operation = _network_operation(item)
+    if operation is None or not isinstance(before, dict):
+        return None, "Network OSC Message preflight is incomplete."
+    source_error = _network_source_error(before)
+    if source_error:
+        return None, source_error
+    cue_id = _resolved_cue_id(before)
+    if cue_id != item.get("cue_ref"):
+        return None, "Network OSC Message real writes require a fresh source UUID baseline."
+    current_id = before.get("networkPatchID")
+    if not isinstance(current_id, str) or not current_id:
+        return None, "Network OSC Message real writes require a readable current networkPatchID."
+    patches, error = _network_patch_catalog(reader, workspace_id)
+    if error:
+        return None, error
+    current = patches.get(current_id)
+    if current is None:
+        return None, "Current networkPatchID is not present in the fresh network patch list."
+    if current["type"] != "OSC Message":
+        return None, "Current Network cue patch is not classified as OSC Message."
+    requested = operation.get("args", [None])[0]
+    baseline = before.get(operation["property"])
+    if not isinstance(baseline, str) or not isinstance(requested, str) or requested == baseline:
+        return None, "Network customString requires a changed readable string baseline."
+    return {
+        "cue_id": cue_id,
+        "baseline": baseline,
+        "requested": requested,
+        "current_patch": current,
+        "target_patch": current,
+    }, None
+
+
+def _network_repair_source_error(workspace_id: str, item: dict[str, Any], before: dict[str, Any]) -> str | None:
+    if not _is_exact_cue_uuid(workspace_id):
+        return "Network repair requires an exact workspace UUID."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Network repair requires an exact cue UUID."
+    if before.get("type") != "Network" or before.get("isBroken") is not True:
+        return "Network repair requires a broken Network cue."
+    if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
+        return "Network repair requires an inactive cue."
+    return None
+
+
+def _network_repair_preflight(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+    *,
+    reader: Any,
+) -> tuple[dict[str, Any] | None, str | None]:
+    operation = _network_operation(item)
+    if operation is None or not isinstance(before, dict):
+        return None, "Network repair preflight is incomplete."
+    source_error = _network_repair_source_error(workspace_id, item, before)
+    if source_error:
+        return None, source_error
+    cue_id = _resolved_cue_id(before)
+    if cue_id != item.get("cue_ref"):
+        return None, "Network repair requires a fresh source UUID baseline."
+    current_id = before.get("networkPatchID")
+    if not isinstance(current_id, str) or not current_id:
+        return None, "Network repair requires a readable current networkPatchID."
+    patches, error = _network_patch_catalog(reader, workspace_id)
+    if error:
+        return None, error
+    current = patches.get(current_id)
+    requested = operation.get("args", [None])[0]
+    baseline = before.get(operation["property"])
+    if operation["property"] == "customString":
+        if current is None or current["type"] != "OSC Message":
+            return None, "customString repair requires a current patch classified as OSC Message."
+        if requested == baseline or not valid_osc_message_text(requested):
+            return None, "customString repair requires a changed valid OSC address/message."
+        target = current
+    else:
+        if not isinstance(requested, str) or requested == current_id:
+            return None, "networkPatchID repair requires a changed exact patch UUID."
+        target = patches.get(requested)
+        if target is None:
+            return None, "Requested networkPatchID is not present in the fresh network patch list."
+        if target["type"] != "OSC Message":
+            return None, "Requested networkPatchID is not classified as OSC Message."
+    current_for_token = current or {"uuid": current_id, "name": None, "type": None}
+    return {
+        "cue_id": cue_id,
+        "baseline": baseline,
+        "requested": requested,
+        "current_patch": current_for_token,
+        "target_patch": target,
+    }, None
+
+
+def _network_token_payload(*, workspace_id: str, cue_ref: str, item: dict[str, Any], operation: dict[str, Any], preflight: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "version": NETWORK_OSC_MESSAGE_TOKEN_VERSION,
+        "operation_kind": NETWORK_OSC_MESSAGE_OPERATION_KIND,
+        "workspace_id": workspace_id,
+        "cue_ref": cue_ref,
+        "cue_id": preflight["cue_id"],
+        "cue_type": "Network",
+        "profile": item["profile"],
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": preflight["baseline"],
+        "requested": preflight["requested"],
+        "current_patch_uuid": preflight["current_patch"]["uuid"],
+        "current_patch_name": preflight["current_patch"]["name"],
+        "current_patch_type": preflight["current_patch"]["type"],
+        "target_patch_uuid": preflight["target_patch"]["uuid"],
+        "target_patch_name": preflight["target_patch"]["name"],
+        "target_patch_type": preflight["target_patch"]["type"],
+    }
+
+
+def _network_confirm_token(**payload_args: Any) -> str:
+    payload = _network_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).decode().rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode(), hashlib.sha256).hexdigest()
+    return f"confirm:networkOscMessage:v{NETWORK_OSC_MESSAGE_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _network_repair_token_payload(**payload_args: Any) -> dict[str, Any]:
+    payload = _network_token_payload(**payload_args)
+    payload.update(
+        version=NETWORK_REPAIR_TOKEN_VERSION,
+        operation_kind=NETWORK_REPAIR_OPERATION_KIND,
+        baseline_is_broken=True,
+    )
+    return payload
+
+
+def _network_repair_confirm_token(**payload_args: Any) -> str:
+    payload = _network_repair_token_payload(**payload_args)
+    encoded = base64.urlsafe_b64encode(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).decode().rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode(), hashlib.sha256).hexdigest()
+    return f"confirm:networkRepair:v{NETWORK_REPAIR_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _network_dry_run_errors(item: dict[str, Any], before: dict[str, Any] | None, *, workspace_id: str, reader: Any, candidate_shape: bool) -> dict[str, str]:
+    operation = _network_operation(item)
+    if operation is None or not candidate_shape:
+        return {}
+    if not isinstance(before, dict) or not before.get("networkPatchID"):
+        return {"read_before": "Network OSC Message requires a readable current networkPatchID."}
+    if before.get("isBroken") is True:
+        _, error = _network_repair_preflight(workspace_id, item, before, reader=reader)
+    elif operation["property"] == "customString":
+        _, error = _network_preflight(workspace_id, item, before, reader=reader)
+    else:
+        return {}
+    return {operation["property"]: error} if error else {}
+
+
+def _annotate_network_operation(item: dict[str, Any], *, workspace_id: str, reader: Any, before: dict[str, Any] | None, candidate_shape: bool) -> list[str]:
+    operation = _network_operation(item)
+    if operation is None or not candidate_shape:
+        return []
+    repair = isinstance(before, dict) and before.get("isBroken") is True
+    if repair:
+        preflight, error = _network_repair_preflight(workspace_id, item, before, reader=reader)
+    elif operation["property"] == "customString":
+        preflight, error = _network_preflight(workspace_id, item, before, reader=reader)
+    else:
+        operation.pop("confirm_token", None)
+        return []
+    if error or preflight is None:
+        operation.pop("confirm_token", None)
+        return []
+    operation.update(
+        real_write_enabled=False,
+        real_write_possible=True,
+        requires_confirm_token=True,
+        network_osc_message_candidate=not repair,
+        network_repair_candidate=repair,
+        planned_only_reason="network_osc_message_requires_patch_type_validation",
+        confirm_token=(_network_repair_confirm_token if repair else _network_confirm_token)(
+            workspace_id=workspace_id,
+            cue_ref=item["cue_ref"],
+            item=item,
+            operation=operation,
+            preflight=preflight,
+        ),
+    )
+    return []
+
+
+def _validate_network_real_write(workspace_id: str, item: dict[str, Any], before: dict[str, Any] | None, *, reader: Any) -> dict[str, str]:
+    operation = _network_operation(item)
+    property_name = operation.get("property") if operation else "network"
+    if operation is None:
+        return {property_name: "Network OSC Message preflight is incomplete."}
+    repair = isinstance(before, dict) and before.get("isBroken") is True
+    if repair:
+        preflight, error = _network_repair_preflight(workspace_id, item, before, reader=reader)
+        family = "networkRepair"
+        version = NETWORK_REPAIR_TOKEN_VERSION
+        payload_builder = _network_repair_token_payload
+    elif operation["property"] == "customString":
+        preflight, error = _network_preflight(workspace_id, item, before, reader=reader)
+        family = "networkOscMessage"
+        version = NETWORK_OSC_MESSAGE_TOKEN_VERSION
+        payload_builder = _network_token_payload
+    else:
+        return {property_name: "networkPatchID real writes are allowed only as broken Network cue repair."}
+    if error or preflight is None:
+        return {property_name: error or "Network OSC Message preflight is incomplete."}
+    token = item["confirm_gates"][0]
+    parts = token.split(":", 4)
+    if len(parts) != 5 or parts[:3] != ["confirm", family, f"v{version}"]:
+        return {property_name: "Network confirm_token is malformed or from the wrong family."}
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return {property_name: "Network OSC Message confirm_token signature is invalid."}
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)).decode())
+    except Exception:
+        return {property_name: "Network OSC Message confirm_token payload is invalid."}
+    expected = payload_builder(workspace_id=workspace_id, cue_ref=item["cue_ref"], item=item, operation=operation, preflight=preflight)
+    if not isinstance(payload, dict) or any(payload.get(key) != value for key, value in expected.items()):
+        return {property_name: "Network OSC Message confirm_token does not match the fresh patch classification or baseline."}
+    operation.update(network_repair_candidate=repair, network_osc_message_candidate=not repair)
+    return {}
+
+
+def _mark_network_real_operation(item: dict[str, Any]) -> None:
+    operation = _network_operation(item)
+    if operation is not None:
+        operation.update(real_write_enabled=True, real_write_possible=True, requires_confirm_token=True)
+        operation.pop("planned_only_reason", None)
+
+
+def _label_network_rejection(item: dict[str, Any]) -> None:
+    operation = _network_operation(item)
+    if operation is not None:
+        operation["planned_only_reason"] = "network_osc_message_requires_patch_type_validation"
+
+
+def _network_repair_is_healthy(values: dict[str, Any] | None) -> bool:
+    return bool(
+        isinstance(values, dict)
+        and values.get("isBroken") is False
+        and values.get("isWarning") is not True
+        and not values.get("messageError")
+    )
+
+
+def _refresh_network_repair_real_result(
+    reader: Any,
+    workspace_id: str,
+    result: dict[str, Any],
+    item: dict[str, Any],
+) -> None:
+    operation = _network_operation(item)
+    if operation is None or operation.get("network_repair_candidate") is not True or not result.get("executed_operations"):
+        return
+    property_name = operation["property"]
+    requested = operation.get("args", [None])[0]
+    after = result.get("after")
+    if _network_repair_is_healthy(after):
+        result.setdefault("notices", []).append("network_repair_succeeded")
+        return
+    errors = dict(result.get("errors") or {})
+    errors["networkRepair"] = "Network repair write matched, but the cue remains broken or warning."
+    result["status"] = "verification_failed"
+    if property_name != "networkPatchID" or not _properties_match(after, {property_name: requested}):
+        result["errors"] = errors
+        return
+    baseline = (result.get("before") or {}).get("networkPatchID")
+    cue_id = result.get("cue_id")
+    if not isinstance(baseline, str) or not _is_exact_cue_uuid(cue_id):
+        errors["networkRepairRecovery"] = "Original networkPatchID baseline is unavailable; automatic recovery was not sent."
+        result["status"] = "partial_failed"
+        result["errors"] = errors
+        return
+    address = _cue_id_address(workspace_id, cue_id, "networkPatchID")
+    recovery_error = None
+    try:
+        reply = reader.client.request(address, baseline)
+        recovery_status = reply.status
+    except Exception as exc:
+        recovery_error = str(exc)
+        recovery_status = "error_pending_verification"
+    result["executed_operations"].append(
+        {
+            "operation": "recovery_set_property",
+            "property": "networkPatchID",
+            "address": address,
+            "args": [baseline],
+            "mode": "saved",
+            "status": recovery_status,
+            **({"error": recovery_error} if recovery_error else {}),
+        }
+    )
+    shared_read_cache().clear()
+    recovered, read_errors = _try_read_update_values(reader, workspace_id, cue_id, item["read_keys"])
+    result["after"] = recovered
+    result["diff"] = _diff_properties(result.get("before"), {"networkPatchID": baseline}, recovered)
+    if read_errors or not _properties_match(recovered, {"networkPatchID": baseline}):
+        errors["networkRepairRecovery"] = "Automatic networkPatchID recovery could not confirm the original baseline."
+        errors.update(read_errors)
+        result["status"] = "partial_failed"
+    else:
+        errors["networkRepair"] = "Network repair failed; original networkPatchID baseline was restored."
+        result.setdefault("warnings", []).append("network_repair_failed_baseline_restored")
+    result["errors"] = errors
 
 
 def _devamp_operation(item: dict[str, Any]) -> dict[str, Any] | None:
@@ -10143,6 +10596,7 @@ def _is_readback_confirmable_gated_item(item: dict[str, Any]) -> bool:
         or _phase8_video_io_operation(item) is not None
         or _utility_target_operation(item) is not None
         or _devamp_operation(item) is not None
+        or _network_operation(item) is not None
         or _phase8b_video_audio_time_operation(item) is not None
         or _phase9a_video_audio_level_operation(item) is not None
         or _phase9b_video_audio_matrix_operation(item) is not None

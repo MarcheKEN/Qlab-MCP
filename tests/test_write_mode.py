@@ -15,6 +15,7 @@ from qlab_mcp.qlab import QLabReader
 from qlab_mcp.runtime.read_cache import shared_read_cache
 import qlab_mcp.write.operations as write_operations
 from qlab_mcp.write.registry import QLAB_BLEND_MODES, UPDATE_PROFILE_NAMES, profile_catalog
+from qlab_mcp.write.network_patch_types import classify_network_patch_type
 
 
 class FakeWriteClient:
@@ -159,6 +160,8 @@ class BatchFakeWriteClient:
         video_stage_regions: dict[str, list[dict[str, Any]]] | None = None,
         audio_output_patches: list[dict[str, Any]] | None = None,
         audio_input_patches: list[dict[str, Any]] | None = None,
+        network_patches: list[dict[str, Any]] | None = None,
+        network_repair_outcomes: dict[tuple[str, str, Any], dict[str, Any]] | None = None,
         broken_stage_ids: set[str] | None = None,
         numeric_bool_readback_properties: set[str] | None = None,
         omit_slice_markers_after_delete: bool = False,
@@ -187,6 +190,8 @@ class BatchFakeWriteClient:
         self.video_stage_regions = video_stage_regions or {}
         self.audio_output_patches = audio_output_patches or []
         self.audio_input_patches = audio_input_patches or []
+        self.network_patches = network_patches or []
+        self.network_repair_outcomes = network_repair_outcomes or {}
         self.broken_stage_ids = broken_stage_ids or set()
         self.numeric_bool_readback_properties = numeric_bool_readback_properties or set()
         self.omit_slice_markers_after_delete = omit_slice_markers_after_delete
@@ -214,6 +219,8 @@ class BatchFakeWriteClient:
             return SimpleNamespace(data=self.audio_output_patches, status="ok")
         if address == f"/workspace/{self.workspace_id}/settings/mic/patchList":
             return SimpleNamespace(data=self.audio_input_patches, status="ok")
+        if address == f"/workspace/{self.workspace_id}/settings/network/patchList":
+            return SimpleNamespace(data=self.network_patches, status="ok")
         if address == f"/workspace/{self.workspace_id}/settings/light/patch":
             if self.light_patch_error:
                 raise QLabReplyError("error", "Light Patch unavailable", address)
@@ -251,7 +258,10 @@ class BatchFakeWriteClient:
             raise OscTimeoutError(f"Timed out waiting for QLab reply to {address}")
         if self.ignore_set_property == (cue_id, prop):
             return SimpleNamespace(data=None, status="ok")
-        self._set_property(cue_id, prop, self._request_value(prop, args))
+        value = self._request_value(prop, args)
+        self._set_property(cue_id, prop, value)
+        if prop in {"customString", "networkPatchID"} and isinstance(value, str):
+            self.cues[cue_id].update(self.network_repair_outcomes.get((cue_id, prop, value), {}))
         if (cue_id, prop) in self.error_after_apply_properties:
             raise QLabReplyError("error", f"Failed setting {prop}", address)
         return SimpleNamespace(data=None, status="ok")
@@ -11989,6 +11999,310 @@ def test_update_cues_network_basic_dry_run_plans_documented_non_ambiguous_fields
     )
     assert real["status"] == "preflight_failed"
     assert all(not address.endswith("/customString") for address, _, _ in client.requests)
+
+
+def test_network_patch_type_classifier_is_exact_and_fail_closed() -> None:
+    assert classify_network_patch_type("OSC Message - Main OSC") == "OSC Message"
+    assert classify_network_patch_type("Plain Text - Console") == "Plain Text"
+    assert classify_network_patch_type("Hex Codes - Device") == "Hex Codes"
+    assert classify_network_patch_type("QLab 5 - Go") == "QLab 5"
+    assert classify_network_patch_type("Go Button 3 - Cue") == "Go Button 3"
+    assert classify_network_patch_type("d&b DS100 - Matrix") == "d&b DS100"
+    assert classify_network_patch_type("OSC Message - ") is None
+    assert classify_network_patch_type("osc message - Main OSC") is None
+    assert classify_network_patch_type("OSC Message Main OSC") is None
+    assert classify_network_patch_type("OSC Message - Plain Text - Imitation") is None
+
+
+def test_update_cues_network_osc_message_gate_tokens_and_patch_classification() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    osc_one = "22222222-2222-4222-8222-222222222222"
+    osc_two = "33333333-3333-4333-8333-333333333333"
+    plain = "44444444-4444-4444-8444-444444444444"
+    patches = [
+        {"uniqueID": osc_one, "name": "OSC Message - One"},
+        {"uniqueID": osc_two, "name": "OSC Message - Two"},
+        {"uniqueID": plain, "name": "Plain Text - Plain"},
+    ]
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            source_id: {
+                "type": "Network",
+                "networkPatchID": osc_one,
+                "networkPatchName": "One",
+                "customString": "/cue/1/start",
+                "isBroken": False,
+                "isWarning": False,
+                "isRunning": False,
+                "isPaused": False,
+                "isAuditioning": False,
+            }
+        },
+        network_patches=patches,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    request = {"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "/cue/1/stop"}}
+    dry = reader.update_cues("ws-1", [request], dry_run=True)
+    token = planned_setters(dry["results"][0])["customString"]["confirm_token"]
+    assert token.startswith("confirm:networkOscMessage:v1:")
+    assert dry["results"][0]["executed_operations"] == []
+    real = reader.update_cues("ws-1", [{**request, "confirm_gates": [token]}], dry_run=False)
+    assert real["status"] == "updated"
+    assert client.cues[source_id]["customString"] == "/cue/1/stop"
+
+    rollback_request = {"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "/cue/1/start"}}
+    rollback_dry = reader.update_cues("ws-1", [rollback_request], dry_run=True)
+    rollback_token = planned_setters(rollback_dry["results"][0])["customString"]["confirm_token"]
+    rollback = reader.update_cues("ws-1", [{**rollback_request, "confirm_gates": [rollback_token]}], dry_run=False)
+    assert rollback["status"] == "updated"
+    assert client.cues[source_id]["customString"] == "/cue/1/start"
+
+    patch_request = {"cue_ref": source_id, "profile": "network_basic", "properties": {"networkPatchID": osc_two}}
+    patch_dry = reader.update_cues("ws-1", [patch_request], dry_run=True)
+    patch_setter = planned_setters(patch_dry["results"][0])["networkPatchID"]
+    assert patch_setter["real_write_enabled"] is False
+    assert "confirm_token" not in patch_setter
+    patch_real = reader.update_cues(
+        "ws-1", [{**patch_request, "confirm_gates": ["confirm:networkOscMessage:v1:fake:fake"]}], dry_run=False
+    )
+    assert patch_real["status"] == "preflight_failed"
+    assert client.cues[source_id]["networkPatchID"] == osc_one
+    assert all(not address.endswith("/networkPatchID") for address, _, _ in client.requests)
+
+
+def test_network_osc_message_gate_rejects_negative_shapes_and_tokens() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    osc_id = "22222222-2222-4222-8222-222222222222"
+    plain_id = "33333333-3333-4333-8333-333333333333"
+    cue = {
+        "type": "Network",
+        "networkPatchID": osc_id,
+        "customString": "/cue/1/start",
+        "isBroken": False,
+        "isWarning": False,
+        "isRunning": False,
+        "isPaused": False,
+        "isAuditioning": False,
+    }
+    patches = [
+        {"uniqueID": osc_id, "name": "OSC Message - One"},
+        {"uniqueID": plain_id, "name": "Plain Text - Plain"},
+    ]
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={source_id: cue},
+        network_patches=patches,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    base = {"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "/cue/1/stop"}}
+    token = planned_setters(reader.update_cues("ws-1", [base], dry_run=True)["results"][0])["customString"]["confirm_token"]
+    fake = reader.update_cues("ws-1", [{**base, "confirm_gates": ["confirm:networkOscMessage:v1:fake:fake"]}], dry_run=False)
+    wrong = reader.update_cues("ws-1", [{**base, "confirm_gates": ["confirm:devamp:v1:fake:fake"]}], dry_run=False)
+    client.network_patches[0]["name"] = "Plain Text - Changed"
+    stale = reader.update_cues("ws-1", [{**base, "confirm_gates": [token]}], dry_run=False)
+    assert fake["status"] == wrong["status"] == stale["status"] == "preflight_failed"
+    assert fake["results"][0]["errors"]
+    assert wrong["results"][0]["errors"]
+    assert stale["results"][0]["errors"]
+    assert all(not address.endswith("/customString") for address, _, _ in client.requests)
+
+    batch = reader.update_cues("ws-1", [{**base, "confirm_gates": [token]}, {**base, "confirm_gates": [token]}], dry_run=False)
+    multi = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "/cue/1/a", "networkPatchID": osc_id}, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    live = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "network_basic", "operations": [{"property": "customString", "args": {"value": "/cue/1/a"}, "mode": "live"}]}],
+        dry_run=True,
+    )
+    assert batch["status"] == multi["status"] == live["status"] == "preflight_failed"
+    assert "exactly one cue update" in batch["results"][0]["errors"]["customString"]
+    assert "exactly one property" in multi["results"][0]["errors"]["customString"]
+    assert "does not support mode 'live'" in live["results"][0]["errors"]["validation"]
+
+
+def test_network_repair_custom_string_and_validation() -> None:
+    workspace_id = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"
+    source_id = "11111111-1111-4111-8111-111111111111"
+    osc_id = "22222222-2222-4222-8222-222222222222"
+    plain_id = "33333333-3333-4333-8333-333333333333"
+    requested = "/codex/network/test 13"
+    cue = {
+        "type": "Network",
+        "networkPatchID": osc_id,
+        "customString": "",
+        "message": "{custom}",
+        "messageError": "Message '{custom}' is not a legal OSC address.",
+        "isBroken": True,
+        "isWarning": False,
+        "isRunning": False,
+        "isPaused": False,
+        "isAuditioning": False,
+    }
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={source_id: cue},
+        workspace_id=workspace_id,
+        network_patches=[
+            {"uniqueID": osc_id, "name": "OSC Message - One"},
+            {"uniqueID": plain_id, "name": "Plain Text - Plain"},
+        ],
+        network_repair_outcomes={
+            (source_id, "customString", requested): {
+                "isBroken": False,
+                "isWarning": False,
+                "message": requested,
+                "messageError": "",
+            }
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    request = {"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": requested}}
+    dry = reader.update_cues(workspace_id, [request], dry_run=True)
+    token = planned_setters(dry["results"][0])["customString"]["confirm_token"]
+    assert token.startswith("confirm:networkRepair:v1:")
+    assert dry["results"][0]["executed_operations"] == []
+    real = reader.update_cues(workspace_id, [{**request, "confirm_gates": [token]}], dry_run=False)
+    assert real["status"] == "updated"
+    assert real["results"][0]["after"]["customString"] == requested
+    assert real["results"][0]["after"]["isBroken"] is False
+    assert real["results"][0]["after"]["messageError"] == ""
+    assert "network_repair_succeeded" in real["results"][0]["notices"]
+
+    client.cues[source_id].update(cue)
+    setter_count = len([address for address, _, _ in client.requests if address.endswith("/customString")])
+    invalid = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "{custom}"}}],
+        dry_run=True,
+    )
+    assert invalid["status"] == "preflight_failed"
+    assert invalid["results"][0]["executed_operations"] == []
+    assert "valid OSC address/message" in invalid["results"][0]["errors"]["customString"]
+    assert len([address for address, _, _ in client.requests if address.endswith("/customString")]) == setter_count
+
+    non_osc = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": source_id, "profile": "network_basic", "properties": {"networkPatchID": plain_id}}],
+        dry_run=True,
+    )
+    assert non_osc["status"] == "preflight_failed"
+    assert "not classified as OSC Message" in non_osc["results"][0]["errors"]["networkPatchID"]
+
+
+def test_network_patch_repair_success_and_automatic_recovery() -> None:
+    workspace_id = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"
+    source_id = "11111111-1111-4111-8111-111111111111"
+    baseline_id = "22222222-2222-4222-8222-222222222222"
+    target_id = "33333333-3333-4333-8333-333333333333"
+    patches = [
+        {"uniqueID": baseline_id, "name": "Plain Text - Broken"},
+        {"uniqueID": target_id, "name": "OSC Message - Repair"},
+    ]
+    cue = {
+        "type": "Network",
+        "networkPatchID": baseline_id,
+        "customString": "/repair/test",
+        "message": "",
+        "messageError": "",
+        "isBroken": True,
+        "isWarning": False,
+        "isRunning": False,
+        "isPaused": False,
+        "isAuditioning": False,
+    }
+    success_client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={source_id: cue},
+        workspace_id=workspace_id,
+        network_patches=patches,
+        network_repair_outcomes={
+            (source_id, "networkPatchID", target_id): {"isBroken": False, "isWarning": False, "messageError": ""}
+        },
+    )
+    success_reader = QLabReader(success_client)  # type: ignore[arg-type]
+    request = {"cue_ref": source_id, "profile": "network_basic", "properties": {"networkPatchID": target_id}}
+    dry = success_reader.update_cues(workspace_id, [request], dry_run=True)
+    token = planned_setters(dry["results"][0])["networkPatchID"]["confirm_token"]
+    assert token.startswith("confirm:networkRepair:v1:")
+    success = success_reader.update_cues(workspace_id, [{**request, "confirm_gates": [token]}], dry_run=False)
+    assert success["status"] == "updated"
+    assert success["results"][0]["after"]["networkPatchID"] == target_id
+    assert success["results"][0]["after"]["isBroken"] is False
+
+    recovery_client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={source_id: cue},
+        workspace_id=workspace_id,
+        network_patches=patches,
+    )
+    recovery_reader = QLabReader(recovery_client)  # type: ignore[arg-type]
+    recovery_dry = recovery_reader.update_cues(workspace_id, [request], dry_run=True)
+    recovery_token = planned_setters(recovery_dry["results"][0])["networkPatchID"]["confirm_token"]
+    failed = recovery_reader.update_cues(
+        workspace_id, [{**request, "confirm_gates": [recovery_token]}], dry_run=False
+    )
+    assert failed["status"] == "verification_failed"
+    assert failed["results"][0]["after"]["networkPatchID"] == baseline_id
+    assert "baseline was restored" in failed["results"][0]["errors"]["networkRepair"]
+    patch_setters = [args[0] for address, args, _ in recovery_client.requests if address.endswith("/networkPatchID")]
+    assert patch_setters == [target_id, baseline_id]
+
+
+def test_network_repair_rejects_tokens_shapes_live_and_active_without_setters() -> None:
+    workspace_id = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"
+    source_id = "11111111-1111-4111-8111-111111111111"
+    osc_id = "22222222-2222-4222-8222-222222222222"
+    cue = {
+        "type": "Network",
+        "networkPatchID": osc_id,
+        "customString": "",
+        "message": "{custom}",
+        "messageError": "bad message",
+        "isBroken": True,
+        "isWarning": False,
+        "isRunning": False,
+        "isPaused": False,
+        "isAuditioning": False,
+    }
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={source_id: cue},
+        workspace_id=workspace_id,
+        network_patches=[{"uniqueID": osc_id, "name": "OSC Message - One"}],
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    request = {"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "/repair/test"}}
+    token = planned_setters(reader.update_cues(workspace_id, [request], dry_run=True)["results"][0])["customString"]["confirm_token"]
+    rejected = [
+        reader.update_cues(workspace_id, [{**request, "confirm_gates": ["confirm:networkRepair:v1:fake:fake"]}], dry_run=False),
+        reader.update_cues(workspace_id, [{**request, "confirm_gates": ["confirm:networkOscMessage:v1:fake:fake"]}], dry_run=False),
+    ]
+    client.cues[source_id]["customString"] = "/stale/baseline"
+    rejected.append(reader.update_cues(workspace_id, [{**request, "confirm_gates": [token]}], dry_run=False))
+    client.cues[source_id]["customString"] = ""
+    rejected.extend(
+        [
+            reader.update_cues(workspace_id, [{**request, "confirm_gates": [token]}, {**request, "confirm_gates": [token]}], dry_run=False),
+            reader.update_cues(
+                workspace_id,
+                [{"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "/repair/test", "networkPatchID": osc_id}, "confirm_gates": [token]}],
+                dry_run=False,
+            ),
+            reader.update_cues(
+                workspace_id,
+                [{"cue_ref": source_id, "profile": "network_basic", "operations": [{"property": "customString", "args": {"value": "/repair/test"}, "mode": "live"}]}],
+                dry_run=True,
+            ),
+        ]
+    )
+    client.cues[source_id]["isRunning"] = True
+    rejected.append(reader.update_cues(workspace_id, [request], dry_run=True))
+    assert all(result["status"] == "preflight_failed" for result in rejected)
+    assert all(not address.endswith(("/customString", "/networkPatchID")) for address, _, _ in client.requests)
 
 
 def test_update_cues_rejects_slash_in_path_template_arg() -> None:

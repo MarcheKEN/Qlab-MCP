@@ -1,6 +1,6 @@
 # Fade cue safe editing research
 
-Status: 2026-07-13 — documented saved routes and dedicated local gates implemented; QLab runtime validation pending.
+Status: 2026-07-14 — exact Audio-targeting-Mic runtime subset validated; remaining routes stay gated.
 
 ## Sources checked
 
@@ -87,29 +87,28 @@ Generic tokens cannot authorize any `fade_basic` setter. Token families are:
 
 ## Property matrix
 
-Runtime result is `pending restart` until the live MCP server has loaded this
-implementation and the promoted family has completed write/readback/rollback.
+Table records local gates; closure section below records current runtime status.
 
 | UI control / property | OSC route | Type / valid values | Prerequisites | Target types | Token family | Readback | Runtime result | Status | Reason |
 |---|---|---|---|---|---|---|---|---|---|
-| shared Basics | same saved route | existing validators | healthy inactive Fade/target; cue mode; 1D | Group, Audio, Mic, Video, Camera, Text | `fadeBasic:v1` | same property plus health | pending restart | supported locally | saved metadata with Fade-specific gate |
-| Target cue | `cueTargetID` | exact UUID | same workspace; healthy inactive non-self direct cue | direct cue types above | `fadeTarget:v1` | UUID plus target fingerprint | pending restart | supported locally | deterministic cue resolution |
+| shared Basics | same saved route | existing validators | healthy inactive Fade/target; cue mode; 1D | Group, Audio, Mic, Video, Camera, Text | `fadeBasic:v1` | same property plus health | not run | supported locally | saved metadata with Fade-specific gate |
+| Target cue | `cueTargetID` | exact UUID | same workspace; healthy inactive non-self direct cue | direct cue types above | `fadeTarget:v1` | UUID plus target fingerprint | not run | supported locally | deterministic cue resolution |
 | Stop target when done | `stopTargetWhenDone` | boolean | valid direct target | direct cue types | `fadeBehavior:v1` | property plus health | passed | runtime-validated | live timeout; independent fresh readback confirmed requested value |
-| Levels mode | `levelsMode` | `0` absolute, `1` relative | fresh matrices and proven target audio | Audio, Mic, Video/Camera with audio | `fadeAudio:v1` | mode and matrix fingerprints | pending restart | supported locally | deterministic scalar |
-| Active crosspoint | `doLevel/{row}/{column}` | integer indexes; boolean | cell exists in source/target; cannot disable last parameter | audio-capable direct cues | `fadeAudio:v1`, setup/recovery | exact `doLevel` cell | pending restart | supported locally | documented activation matrix |
-| Level crosspoint | `level/{input}/{output}` | finite dB; exact `-inf` only absolute | matching `doLevel=true`; existing cell; fresh Audio `minVolume` for silence | audio-capable direct cues | `fadeAudio:v1` | exact `levels` cell; `-inf` maps to `minVolume` | fix pending restart | supported locally | live QLab returned `-60` for `-inf`, matching current workspace minimum |
-| Output slider | `sliderLevel/{channel}` | finite dB; exact `-inf` only absolute | matching row-0 `doLevel=true`; existing output | audio-capable direct cues | `fadeAudio:v1` | exact `sliderLevels` element | pending restart | supported locally | documented row-0 alias |
-| Input channel label | `inputChannelName/{number}` | input `1..N`; safe string 1–64 chars | input exists in source/target | audio-capable direct cues | `fadeAudio:v1` | exact dynamic route | pending restart | supported locally | deterministic Levels metadata |
-| Crosspoint gang | `gang/{input}/{output}` | non-Main input; existing output; safe string 0–64 chars | cell exists in source/target | audio-capable direct cues | `fadeAudio:v1` | exact dynamic route | pending restart | supported locally | one gang cell per call |
-| Geometry mode | `geoMode` | `0` absolute, `1` relative | active geometry parameter | Video, Camera, Text | `fadeGeometry:v1` | same property | pending restart | supported locally | deterministic scalar |
-| Opacity | `doOpacity`, `opacity` | boolean; `0..1` | value requires active flag | Video, Camera, Text | `fadeGeometry:v1`, setup/recovery | same properties/health | pending restart | supported locally | absolute value or relative multiplier |
-| Rate activation/value | `doRate`, `rate` | boolean; finite positive rate | value requires active flag; value write requires `geoMode=0` | Audio, Video | `fadeGeometry:v1`, setup/recovery | same properties/health | pending restart | supported locally in absolute mode | relative operator is undocumented |
-| Translation X/Y | `doTranslation`, `translation/x`, `translation/y` | boolean; finite numbers | value requires active flag | Video, Camera, Text | `fadeGeometry:v1`, setup/recovery | same properties/health | pending restart | supported locally | absolute value or relative delta |
-| Scale X/Y | `doScale`, `scale/x`, `scale/y` | boolean; finite numbers | value requires active flag | Video, Camera, Text | `fadeGeometry:v1`, setup/recovery | same properties/health | pending restart | supported locally | absolute value or relative multiplier |
-| X/Y/Z rotation | `doRotation`, `rotationType`, `rotation` | boolean; type `1/2/3`; finite degrees | active single-axis rotation | Video, Camera, Text | `fadeGeometry:v1`, setup/recovery | type/angle and health | pending restart | supported locally | deterministic single-axis readback |
+| Levels mode | `levelsMode` | `0` absolute, `1` relative | fresh matrices and proven target audio | Audio, Mic, Video/Camera with audio | `fadeAudio:v1` | mode and matrix fingerprints | validated for Audio-targeting-Mic | runtime-validated subset | deterministic scalar |
+| Active crosspoint | `doLevel/{row}/{column}` | integer indexes; boolean | cell exists in source/target; cannot disable last parameter | audio-capable direct cues | `fadeAudio:v1`, setup/recovery | exact `doLevel` cell | validated for Audio-targeting-Mic | runtime-validated subset | documented activation matrix |
+| Level crosspoint | `level/{input}/{output}` | finite dB; exact `-inf` only absolute | matching `doLevel=true`; existing cell; fresh Audio `minVolume` for silence | audio-capable direct cues | `fadeAudio:v1` | exact `levels` cell; `-inf` maps to `minVolume` | validated for Audio-targeting-Mic | runtime-validated subset | live QLab returned `-60` for `-inf`, matching current workspace minimum |
+| Output slider | `sliderLevel/{channel}` | finite dB; exact `-inf` only absolute | matching row-0 `doLevel=true`; existing output | audio-capable direct cues | `fadeAudio:v1` | exact `sliderLevels` element | validated for Audio-targeting-Mic | runtime-validated subset | documented row-0 alias |
+| Input channel label | `inputChannelName/{number}` | input `1..N`; safe string 1–64 chars | input exists in source/target | audio-capable direct cues | `fadeAudio:v1` | exact dynamic route | not run | supported locally | deterministic Levels metadata |
+| Crosspoint gang | `gang/{input}/{output}` | non-Main input; existing output; safe string 0–64 chars | cell exists in source/target | audio-capable direct cues | `fadeAudio:v1` | exact dynamic route | not run | supported locally | one gang cell per call |
+| Geometry mode | `geoMode` | `0` absolute, `1` relative | active geometry parameter | Video, Camera, Text | `fadeGeometry:v1` | same property | not run | supported locally | deterministic scalar |
+| Opacity | `doOpacity`, `opacity` | boolean; `0..1` | value requires active flag | Video, Camera, Text | `fadeGeometry:v1`, setup/recovery | same properties/health | not run | supported locally | absolute value or relative multiplier |
+| Rate activation/value | `doRate`, `rate` | boolean; finite positive rate | value requires active flag; value write requires `geoMode=0` | Audio, Video | `fadeGeometry:v1`, setup/recovery | same properties/health | not run | supported locally in absolute mode | relative operator is undocumented |
+| Translation X/Y | `doTranslation`, `translation/x`, `translation/y` | boolean; finite numbers | value requires active flag | Video, Camera, Text | `fadeGeometry:v1`, setup/recovery | same properties/health | not run | supported locally | absolute value or relative delta |
+| Scale X/Y | `doScale`, `scale/x`, `scale/y` | boolean; finite numbers | value requires active flag | Video, Camera, Text | `fadeGeometry:v1`, setup/recovery | same properties/health | not run | supported locally | absolute value or relative multiplier |
+| X/Y/Z rotation | `doRotation`, `rotationType`, `rotation` | boolean; type `1/2/3`; finite degrees | active single-axis rotation | Video, Camera, Text | `fadeGeometry:v1`, setup/recovery | type/angle and health | not run | supported locally | deterministic single-axis readback |
 | Target mode | `targetMode` | `0` cues, `1` patches | must already be `0` | mixed | none | same route | not run | planned-only | never switch silently to patch target |
 | Fade type | `fadeType` | `1` Curve, `2` Path | must already be `1` | mixed | none | same route | not run | planned-only | switch can invalidate coupled state |
-| 3D rotation | `quaternion`, `rotationType=0` | four finite components | active rotation; `geoMode=0` | Video, Camera, Text | `fadeGeometry:v1`, setup/recovery | exact four-component quaternion | pending restart | supported locally in absolute mode | relative 3D semantics remain unsafe |
+| 3D rotation | `quaternion`, `rotationType=0` | four finite components | active rotation; `geoMode=0` | Video, Camera, Text | `fadeGeometry:v1`, setup/recovery | exact four-component quaternion | not run | supported locally in absolute mode | relative 3D semantics remain unsafe |
 | Z translation/scale | no documented Fade route | unavailable | unavailable | visual | none | unavailable | not run | planned-only | route is not exposed |
 | 2D Path | QLab 5.5: `pathWidth`, `pathHeight`; no points/merge routes | positive scalars | `fadeType=2` | visual | none | incomplete | not run | planned-only | no deterministic full path model; 5.6 additions are outside the 5.5 contract |
 | Curve controls | no deterministic documented Fade route | unavailable | unavailable | all | none | unavailable | not run | planned-only | UI is not an OSC contract |
@@ -172,4 +171,8 @@ The Fade Audio setup then assigned the exact Video target and enabled
 minimum is `-60`, so this was already the semantic silence baseline. Local
 preflight and verification now read and bind `/settings/audio/minVolume`,
 reject a silence no-op, and compare `-inf` writes against the numeric minimum.
-Runtime continuation requires an MCP restart.
+Runtime validation later completed for exact Mic targeting, absolute/relative
+Levels, `doLevel`, `level`, `sliderLevel`, semantic `-inf`/workspace minimum,
+`stopTargetWhenDone`, fresh readback, and `0.001 dB` tolerance. Final activity
+was `0/0/0`. No claim extends to `inputChannelName`, gangs, visual Geometry,
+setup/recovery, special resets, Curve internals, Path, Objects, FX, or fanout.

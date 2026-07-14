@@ -1,6 +1,6 @@
 # 026 — Fade cue safe editing
 
-Status: local implementation complete; runtime validation pending
+Status: runtime validated and closed for exact Audio-targeting-Mic subset.
 
 ## Implemented gates
 
@@ -89,9 +89,10 @@ immediate rollback. Then configure `pruebas-fade` without executing it:
 Final requirements: all cues healthy/inactive, running/paused/auditioning
 `0/0/0`, no playback, no `/live`, no raw OSC, no save, no commit.
 
-Runtime status: `fadeBehavior` passed with timeout-confirmed readback. The
-broken audio Fade accepted its exact target and first `doLevel` setup and
-became healthy. QLab represents a saved `-inf` destination in `/levels` as the
-workspace Audio minimum (`-60` in the fixture), so the verifier now binds that
-fresh minimum. Restart MCP before continuing duration, stop behavior, and the
-auto-continue chain.
+Runtime status: validated for exact Mic targeting, absolute/relative Levels,
+`doLevel`, `level`, `sliderLevel`, semantic `-inf` mapped to workspace minimum,
+`stopTargetWhenDone`, fresh readback, and `0.001 dB` tolerance. Source and
+target were healthy/inactive; final activity was `0/0/0`. No validation claimed
+for `inputChannelName`, gangs, visual Geometry, setup/recovery, or special
+reset actions. Curve internals, Path, Objects, FX, patch/map/fanout targets
+remain blocked or out of scope.

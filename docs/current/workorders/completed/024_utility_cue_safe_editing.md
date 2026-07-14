@@ -1,6 +1,6 @@
 # Utility Cue Safe Editing
 
-Status: locally implemented; runtime validation pending.
+Status: runtime validated and closed for exact `cueTargetID` on listed utility cues.
 
 ## Scope
 
@@ -44,5 +44,7 @@ Research matrix: `docs/current/research/utility_cue_editing.md`.
 
 Local tests cover profile/type mismatch, source/target validation, token
 binding and rejection, batch/multi-property rejection, saved-mode enforcement,
-fresh readback, and fresh-token rollback. Runtime validation has not yet been
-performed for this family.
+fresh readback, and fresh-token rollback. Runtime validation passed for exact
+source/target assignment and final `0/0/0` activity. Names, numbers, temporary
+targets, Reset patch/map targets, actions, `/live`, batches, and unsupported
+families remain blocked.

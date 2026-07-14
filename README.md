@@ -260,10 +260,11 @@ workspace Audio minimum on readback. Dedicated token families are
 `confirm:fadeSetup:v1:`, and `confirm:fadeRecovery:v1:`. Promoted writes require
 fresh readback, health/activity gates, one setter, and fresh verification.
 
-Local tests cover Fade Audio/Mic targeting, absolute/relative Levels, `doLevel`,
-`level`, `sliderLevel`, semantic `-inf`, `stopTargetWhenDone`, and `0.001 dB`
-tolerance. Live MCP/QLab validation remains pending where the research record
-says so; no runtime claim is made for listed out-of-scope features.
+Runtime validation covers Fade Audio targeting Mic, absolute/relative Levels,
+`doLevel`, `level`, `sliderLevel`, semantic `-inf` mapped to workspace minimum,
+`stopTargetWhenDone`, fresh readback, and `0.001 dB` tolerance. No runtime
+claim is made for `inputChannelName`, gangs, visual Geometry, setup/recovery,
+special resets, or listed out-of-scope features.
 
 ### Move cues
 
@@ -279,7 +280,9 @@ timeout, and indeterminate outcomes.
 QLab may acknowledge a move before readable tree update. Convergence polls at
 approximately 0, 250, 500 ms, 1, 2, 4, 6, 8, and 10 seconds; next move waits
 for prior convergence. Cue Cart fields are schema-supported, but real Cart
-execution remains runtime-blocked pending disposable-workspace validation.
+execution remains runtime-blocked. Linear List/Group movement is runtime
+validated; QLab tree convergence can take approximately 4–10 seconds, so moves
+are sequential and not atomic.
 Large batches can take several seconds per cue. Local tests cover same-parent
 up/down, List/Group transfers, nested Groups, first/last/before/after, batches
 of 2 and 10, and structural/property preservation.

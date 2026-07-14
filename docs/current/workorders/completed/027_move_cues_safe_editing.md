@@ -1,6 +1,6 @@
 # 027 — Move cues safe editing
 
-Status: local implementation complete; runtime semantics pending
+Status: runtime validated and closed for linear List/Group movement; Cue Cart blocked.
 
 ## Public boundary
 
@@ -45,14 +45,12 @@ The QLab 5.5.10 disposable workspace must establish before promotion:
    one or two routes;
 4. Cart-to-List/Group restoration and top-level Cue List behavior.
 
-Until this matrix is recorded, real Cue Cart writes remain explicitly
-`runtime_blocked`. Runtime trials use only fresh harmless dummy cues in Edit
-Mode with readiness and activity `0 / 0 / 0`; no GO, playback, audition,
-`/live`, raw OSC interface, or workspace save.
+Cue Cart movement remains explicitly `runtime_blocked`. Validation covered
+same-parent up/down, List/Group transfers, nested Groups, all linear placement
+selectors, batches of 2 and 10, order/property preservation, delayed 4–10
+second convergence, bounded polling, and controlled stop on unresolved failure.
+QLab replies are provisional; Move is neither atomic nor assumed fast. Final
+activity was `0/0/0`; no GO, playback, audition, `/live`, raw OSC, or save.
 
-Current runtime fixture: `MCP_MOVE_RUNTIME_GROUP` plus Memo cues `A`, `B`, and
-`C` in `mcp_prueba.qlab5`. The first dry-run exposed an unlabelled structural
-read error before any move setter: QLab requires the uppercase UUID spelling it
-returned in OSC cue paths. The reader now compares UUIDs canonically while
-preserving QLab's original spelling in every OSC route/parent argument; reload
-MCP before retrying it.
+Automatic rollback is not claimed. Large sequential batches may be slow;
+indeterminate results stop further mutation.

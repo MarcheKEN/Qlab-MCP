@@ -148,9 +148,9 @@ tokens, executed exactly one `/resetRotation`, and ended with reset quaternion
 readback. Final workspace running/paused/auditioning was `0/0/0`; no raw OSC,
 playback, `/live`, save, commit, or unrelated mutation was used.
 
-## Local implementation or runtime validation pending
+## Runtime-validated additions and remaining boundaries
 
-Utility cue editing:
+Utility cue editing (runtime validated and closed):
 
 - local `cueTargetID` gate for `Start`, `Stop`, `Pause`, `Load`, `Reset`,
   `Goto`, `Arm`, and `Disarm`, using `confirm:utilityTarget:v1:`
@@ -160,10 +160,11 @@ Utility cue editing:
 - target names/numbers, temporary targets, Reset patch/map targets, target
   mode, actions, `/live`, playback, raw OSC, batch/multi-property writes, and
   save remain blocked
-- local tests pass; dedicated QLab runtime validation is still required before
-  closure
+- exact target assignment, fresh readback, fresh-token rollback, and final
+  `0/0/0` activity passed; names/numbers/actions and unsupported targets remain
+  blocked
 
-Devamp saved configuration:
+Devamp saved configuration (runtime validated and closed for listed properties):
 
 - local `confirm:devamp:v1:` gate for exact-UUID, saved, one-property
   `cueTargetID`, `devampType`, `startNextCueWhenSliceEnds`, and
@@ -172,8 +173,8 @@ Devamp saved configuration:
   existing `Audio` or `Video` cue UUIDs only
 - Stop target requires Start next already enabled; Start next cannot be disabled
   while Stop target is true, avoiding an implicit multi-property change
-- fresh baseline/readback and fresh-token rollback are required; runtime
-  validation remains pending
+- fresh baseline/readback and fresh-token rollback passed; slices and actions
+  remain blocked
 
 Network OSC Message:
 

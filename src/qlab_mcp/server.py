@@ -197,7 +197,7 @@ Use these tools to read QLab 5 workspace and cue information over OSC.
 The seven inspector tools are read-only and intentionally avoid playback, editing, deletion, and raw OSC.
 Write mode is a separate gated preface: it is disabled unless QLAB_ENABLE_WRITE=true and defaults to dry-run.
 When write mode is ready, all update profiles may exist; safe properties can execute as real writes, while dangerous or high-risk properties require explicit per-item confirm_gates.
-Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect, and currently only supports basic cue creation plus gated batch cue updates.
+Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect. It supports gated cue creation, cue editing, structural cue moves, and leaf-only cue deletion.
 
 Start with qlab_check_connection to verify QLab, workspace candidates, passcode, and read access.
 
@@ -211,7 +211,7 @@ Use qlab_get_workspace_settings(mode="details", requests=[...]) after settings w
 
 Use qlab_query_cues for filtered cue searches across up to 500 cues by default, or up to 5000 cues when a caller explicitly raises the scan limit, then qlab_get_cue_details for one cue that needs deeper inspection.
 
-For write preflight, call qlab_check_write_readiness with an explicit workspace_id. Only call qlab_create_cue or qlab_update_cues after reviewing dry_run output. This server does not expose GO, stop, panic, raw OSC, or playback control.
+For write preflight, call qlab_check_write_readiness with an explicit workspace_id. Always dry-run first, review the plan, and use the dedicated confirmation token returned by qlab_create_cue, qlab_edit_cues, qlab_move_cues, or qlab_delete_cues. Restarting the MCP invalidates previously issued Move and Delete tokens. This server does not expose GO, stop, panic, raw OSC, or playback control.
 """,
 )
 

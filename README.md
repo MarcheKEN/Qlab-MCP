@@ -22,7 +22,7 @@ dry-run-first.
 ## What It Does Not Do
 
 - No GO, playback, stop, or panic controls.
-- No deletion tools.
+- No ungated deletion, container deletion, or cascade deletion.
 - No raw OSC tool.
 - No ambiguous selected, active, playhead, or playback-position edits.
 - No ungated high-risk writes. High-risk families require dry-run review plus
@@ -304,6 +304,12 @@ over bounded 0–10 second window. Result states include `deleted_immediately`,
 Permanent container/descendant deletion remains out of scope. Local tests cover
 leaf/batch deletion, neighbor preservation, stale and wrong-family tokens,
 container guards, and no cascade.
+
+Runtime validation covers individual and sequential batch leaf deletion,
+approximately 4–10 second convergence, neighbor preservation, stale-token and
+wrong-family token rejection, and container/cascade blocking. Move and Delete
+confirmation tokens are process-bound; restarting the MCP invalidates tokens
+issued by the previous process.
 
 ## Privacy Profiles
 

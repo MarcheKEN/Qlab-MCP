@@ -15,5 +15,7 @@ Current status-audit candidates:
 - `022_slice_markers_audio_video.md`
 - `024_utility_cue_safe_editing.md`
 - `025_devamp_network_osc_safe_editing.md`
+- `026_fade_cue_safe_editing.md`
+- `027_move_cues_safe_editing.md`
 
 Do not delete workorders in cleanup passes. Move with `git mv` and update links.

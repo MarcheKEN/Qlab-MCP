@@ -140,6 +140,32 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "input_schema_hash": "d5202803e7b8b5bf7a07bc3693b27b3c86715258957fa8283284656cd6b280f6",
         "output_schema_hash": "853257a5192b69f070e159611c4aa2151bc998d905a789cca4b93eaea37b7e61",
     },
+    "qlab_move_cues": {
+        "title": "Move QLab Cues",
+        "timeout": UPDATE_CUES_TIMEOUT,
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+        "tags": ["cue-move", "gated-write", "qlab", "write-mode"],
+        "input_schema_hash": "fec08910a4b5a41d443c26ce52701c570879db1328dcddd09aec5fdb0c9c47f6",
+        "output_schema_hash": "6077de39ee5fc10c022c1da360c5d3dda0b69bece497b2608f1f4af39f849a3c",
+    },
+    "qlab_delete_cues": {
+        "title": "Delete QLab Cues",
+        "timeout": 180.0,
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+        "tags": ["cue-delete", "gated-write", "qlab", "write-mode"],
+        "input_schema_hash": "8a629659d575ba24e69f9280ead889b593ea510ef24cd7b147d4ccfcb2a01701",
+        "output_schema_hash": "9e0c11dd1fa9e530ca8d3c70737d9bd743c6ceac834487facb435d7d95a1ab8d",
+    },
 }
 EXPECTED_DESCRIPTION_PHRASES = {
     "qlab_check_connection": ("passcode", "/connect permission scopes"),
@@ -153,6 +179,8 @@ EXPECTED_DESCRIPTION_PHRASES = {
     "qlab_create_cue": ("dry-run plan", "Dry-run planning never sends mutating OSC"),
     "qlab_edit_cues": ("Dry-run planning never sends mutating OSC", "High-risk profiles"),
     "qlab_update_cues": ("Compatibility alias", "qlab_edit_cues"),
+    "qlab_move_cues": ("sequential QLab cue moves", "never claims atomicity"),
+    "qlab_delete_cues": ("sequential deletions", "not atomic"),
 }
 
 
@@ -218,6 +246,120 @@ def test_fastmcp_tool_contract_snapshot_matches_current_public_surface() -> None
     assert asyncio.run(_tool_contract_snapshot()) == EXPECTED_FASTMCP_TOOL_CONTRACTS
 
 
+def test_move_cues_fastmcp_schema_limits_and_nested_model() -> None:
+    async def get_tool_schema() -> dict[str, Any]:
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+        return next(tool.inputSchema for tool in tools if tool.name == "qlab_move_cues")
+
+    schema = asyncio.run(get_tool_schema())
+    moves = schema["properties"]["moves"]
+
+    assert moves["minItems"] == 1
+    assert moves["maxItems"] == 10
+    assert moves["items"]["required"] == ["cue_id"]
+    assert moves["items"]["properties"]["cue_id"]["format"] == "uuid"
+
+
+def test_move_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
+    class FakeReader:
+        def move_cues(self, workspace_id, moves, dry_run, confirm_token):
+            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            assert moves == [{"cue_id": "11111111-1111-4111-8111-111111111111", "position": "last"}]
+            assert dry_run is True
+            assert confirm_token is None
+            return {
+                "ok": True,
+                "status": "planned",
+                "workspace_id": workspace_id,
+                "dry_run": True,
+                "requested_count": 1,
+                "planned_count": 1,
+                "moved_count": 0,
+                "failed_count": 0,
+                "results": [{"cue_id": moves[0]["cue_id"], "position": "last"}],
+                "confirm_token": "confirm:moveCues:v1:payload:signature",
+                "rollback": None,
+                "errors": None,
+                "warnings": ["Dry run only."],
+                "message": "Cue move batch planned.",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_move_cues",
+                {
+                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "moves": [{"cue_id": "11111111-1111-4111-8111-111111111111", "position": "last"}],
+                    "dry_run": True,
+                },
+            )
+
+    result = asyncio.run(call_tool())
+    assert result.structured_content["status"] == "planned"
+    assert result.structured_content["confirm_token"].startswith("confirm:moveCues:v1:")
+
+
+def test_delete_cues_fastmcp_schema_limits_and_nested_uuid_model() -> None:
+    async def get_tool_schema() -> dict[str, Any]:
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+        return next(tool.inputSchema for tool in tools if tool.name == "qlab_delete_cues")
+
+    schema = asyncio.run(get_tool_schema())
+    cue_ids = schema["properties"]["cue_ids"]
+
+    assert cue_ids["minItems"] == 1
+    assert cue_ids["maxItems"] == 10
+    assert cue_ids["items"]["format"] == "uuid"
+    assert "confirm_token" in schema["properties"]
+
+
+def test_delete_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
+    class FakeReader:
+        def delete_cues(self, workspace_id, cue_ids, dry_run, confirm_token):
+            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            assert cue_ids == ["11111111-1111-4111-8111-111111111111"]
+            assert dry_run is True
+            assert confirm_token is None
+            return {
+                "ok": True,
+                "status": "planned",
+                "workspace_id": workspace_id,
+                "dry_run": True,
+                "requested_count": 1,
+                "planned_count": 1,
+                "deleted_count": 0,
+                "failed_count": 0,
+                "timeout_confirmed_count": 0,
+                "results": [{"cue_id": cue_ids[0]}],
+                "confirm_token": "confirm:deleteCues:v1:payload:signature",
+                "errors": None,
+                "warnings": ["Dry run only."],
+                "message": "Cue delete batch planned.",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_delete_cues",
+                {
+                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "cue_ids": ["11111111-1111-4111-8111-111111111111"],
+                    "dry_run": True,
+                },
+            )
+
+    result = asyncio.run(call_tool())
+    assert result.structured_content["status"] == "planned"
+    assert result.structured_content["confirm_token"].startswith("confirm:deleteCues:v1:")
+
+
 def test_fastmcp_tool_descriptions_keep_agent_safety_phrases() -> None:
     async def list_tools():
         async with Client(mcp) as client:
@@ -237,17 +379,21 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    write_tools = {"qlab_create_cue", "qlab_edit_cues", "qlab_update_cues"}
+    write_tools = {"qlab_create_cue", "qlab_edit_cues", "qlab_update_cues", "qlab_move_cues", "qlab_delete_cues"}
     read_only_tools = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) - write_tools
 
     for tool_name in read_only_tools:
         assert tools[tool_name].annotations.readOnlyHint is True, f"{tool_name} lost readOnlyHint"
-        assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
+        if tool_name != "qlab_delete_cues":
+            assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
         assert tools[tool_name].outputSchema, f"{tool_name} lost outputSchema"
 
     for tool_name in write_tools:
         assert tools[tool_name].annotations.readOnlyHint is False, f"{tool_name} was marked read-only"
-        assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
+        if tool_name == "qlab_delete_cues":
+            assert tools[tool_name].annotations.destructiveHint is True
+        else:
+            assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
         assert tools[tool_name].annotations.idempotentHint is False, f"{tool_name} was marked idempotent"
         assert tools[tool_name].outputSchema, f"{tool_name} lost outputSchema"
 
@@ -288,6 +434,78 @@ def test_update_cues_fastmcp_schema_keeps_batch_contract() -> None:
     assert "updateq_plan" in update_output["properties"]["results"]["items"]["properties"]
 
 
+def test_qlab_edit_cues_fastmcp_response_keeps_fade_basic_token(monkeypatch) -> None:
+    token = "confirm:fadeBasic:v1:test-payload:test-signature"
+
+    class FakeReader:
+        def edit_cues(self, workspace_id, updates, dry_run):
+            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            assert dry_run is True
+            assert updates == [
+                {
+                    "cue_ref": "11111111-1111-4111-8111-111111111111",
+                    "profile": "fade_basic",
+                    "properties": {"name": "Renamed Fade"},
+                    "operations": None,
+                    "confirm_gates": None,
+                }
+            ]
+            return {
+                "ok": True,
+                "status": "dry_run",
+                "workspace_id": workspace_id,
+                "dry_run": True,
+                "requested_count": 1,
+                "planned_count": 1,
+                "updated_count": 0,
+                "failed_count": 0,
+                "timeout_confirmed_count": 0,
+                "results": [
+                    {
+                        "cue_ref": updates[0]["cue_ref"],
+                        "cue_id": updates[0]["cue_ref"],
+                        "profile": "fade_basic",
+                        "status": "dry_run",
+                        "properties": updates[0]["properties"],
+                        "planned_operations": [
+                            {
+                                "operation": "set_property",
+                                "property": "name",
+                                "confirm_token": token,
+                            }
+                        ],
+                        "executed_operations": [],
+                    }
+                ],
+                "message": "Dry run succeeded.",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_edit_cues",
+                {
+                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "updates": [
+                        {
+                            "cue_ref": "11111111-1111-4111-8111-111111111111",
+                            "profile": "fade_basic",
+                            "properties": {"name": "Renamed Fade"},
+                        }
+                    ],
+                    "dry_run": True,
+                },
+            )
+
+    result = asyncio.run(call_tool())
+    planned = result.structured_content["results"][0]["planned_operations"]
+
+    assert planned[0]["confirm_token"].startswith("confirm:fadeBasic:v1:")
+    assert result.structured_content["results"][0]["executed_operations"] == []
+
+
 def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -> None:
     async def list_tools():
         async with Client(mcp) as client:
@@ -306,6 +524,8 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_create_cue",
         "qlab_edit_cues",
         "qlab_update_cues",
+        "qlab_move_cues",
+        "qlab_delete_cues",
     }
 
     check = tools["qlab_check_connection"]
@@ -466,6 +686,18 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     result_item = update.outputSchema["properties"]["results"]["items"]["properties"]
     assert "dry_run_preflight_failed" in result_item["status"]["enum"]
     assert "QLAB_UPDATE_DEBUG" in result_item["debug"]["description"]
+
+    delete = tools["qlab_delete_cues"]
+    assert delete.title == "Delete QLab Cues"
+    assert "explicit leaf cues" in delete.description
+    assert delete.annotations.readOnlyHint is False
+    assert delete.annotations.destructiveHint is True
+    assert delete.annotations.idempotentHint is False
+    assert delete.inputSchema["properties"]["cue_ids"]["minItems"] == 1
+    assert delete.inputSchema["properties"]["cue_ids"]["maxItems"] == 10
+    assert delete.inputSchema["properties"]["cue_ids"]["items"]["format"] == "uuid"
+    assert "confirm:deleteCues:v1:" in delete.inputSchema["properties"]["confirm_token"]["description"]
+    assert "verification_failed" in delete.outputSchema["properties"]["status"]["enum"]
 
 
 def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:

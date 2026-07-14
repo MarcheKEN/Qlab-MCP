@@ -5,6 +5,7 @@ from pathlib import Path
 import time
 from types import SimpleNamespace
 from typing import Any
+from uuid import UUID
 
 import pytest
 
@@ -14,8 +15,331 @@ from qlab_mcp.models import CreateCueResult, CueUpdateInput, UpdateCuesResult, W
 from qlab_mcp.qlab import QLabReader
 from qlab_mcp.runtime.read_cache import shared_read_cache
 import qlab_mcp.write.operations as write_operations
+import qlab_mcp.write.moves as move_helpers
+from qlab_mcp.write.moves import _build_plan, move_cues, simulate_move_batch
 from qlab_mcp.write.registry import QLAB_BLEND_MODES, UPDATE_PROFILE_NAMES, profile_catalog
 from qlab_mcp.write.network_patch_types import classify_network_patch_type
+
+
+def test_simulate_move_batch_applies_moves_in_input_order() -> None:
+    list_id = "11111111-1111-4111-8111-111111111111"
+    group_id = "22222222-2222-4222-8222-222222222222"
+    first_id = "33333333-3333-4333-8333-333333333333"
+    second_id = "44444444-4444-4444-8444-444444444444"
+    third_id = "55555555-5555-4555-8555-555555555555"
+
+    result = simulate_move_batch(
+        {list_id: [first_id, second_id, third_id], group_id: []},
+        [
+            {"cue_id": first_id, "destination_parent_id": list_id, "position": "last"},
+            {"cue_id": second_id, "destination_parent_id": group_id, "position": "first"},
+        ],
+    )
+
+    assert result["children_by_parent"] == {
+        list_id: [third_id, first_id],
+        group_id: [second_id],
+    }
+
+
+class MovePlanReader:
+    def __init__(self) -> None:
+        self.client = SimpleNamespace(config=SimpleNamespace(write_dry_run_default=True))
+        self.workspace_id = "11111111-1111-4111-8111-111111111111"
+        self.list_id = "22222222-2222-4222-8222-222222222222"
+        self.first_id = "33333333-3333-4333-8333-333333333333"
+        self.second_id = "44444444-4444-4444-8444-444444444444"
+
+    def _resolve_workspace_id_strict(self, workspace_id: str) -> str:
+        assert workspace_id == self.workspace_id
+        return workspace_id
+
+    def get_cue_lists(self, *_: Any, **__: Any) -> dict[str, Any]:
+        return {"cue_lists": [{"uniqueID": self.list_id, "type": "Cue List"}]}
+
+    def get_cue_children(self, _: str, cue_id: str, **__: Any) -> dict[str, Any]:
+        assert cue_id == self.list_id
+        return {
+            "children": [
+                {"uniqueID": self.first_id, "type": "Memo"},
+                {"uniqueID": self.second_id, "type": "Memo"},
+            ]
+        }
+
+    def get_running_cues(self, *_: Any, **__: Any) -> dict[str, Any]:
+        return {"running_cues": []}
+
+
+def test_move_cues_dry_run_issues_reusable_dedicated_token() -> None:
+    reader = MovePlanReader()
+    first = move_cues(
+        reader,
+        reader.workspace_id,
+        [{"cue_id": reader.first_id, "position": "last"}],
+        dry_run=True,
+    )
+    second = move_cues(
+        reader,
+        reader.workspace_id,
+        [{"cue_id": reader.first_id, "position": "last"}],
+        dry_run=True,
+    )
+
+    assert first["status"] == "planned"
+    assert first["results"][0]["destination_index"] == 1
+    assert first["confirm_token"].startswith("confirm:moveCues:v1:")
+    assert second["confirm_token"] != first["confirm_token"]
+
+
+def test_move_cues_executes_linear_move_and_confirms_fresh_readback(monkeypatch: pytest.MonkeyPatch) -> None:
+    reader = MovePlanReader()
+    reader.client.config.write_dry_run_default = False
+
+    def request(address: str, *args: Any, **_: Any) -> Any:
+        assert address == f"/workspace/{reader.workspace_id}/move/{reader.first_id}"
+        assert args == (1,)
+        children = reader.get_cue_children(reader.workspace_id, reader.list_id)["children"]
+        moving = children.pop(0)
+        children.insert(1, moving)
+        reader.get_cue_children = lambda *_args, **_kwargs: {"children": children}  # type: ignore[method-assign]
+        return SimpleNamespace(data={"parent_cue_id": reader.list_id, "index": 1}, status="ok")
+
+    reader.client.request = request
+    monkeypatch.setattr("qlab_mcp.write.moves.ensure_write_ready", lambda *_: reader.workspace_id)
+    planned = move_cues(
+        reader,
+        reader.workspace_id,
+        [{"cue_id": reader.first_id, "position": "last"}],
+        dry_run=True,
+    )
+    result = move_cues(
+        reader,
+        reader.workspace_id,
+        [{"cue_id": reader.first_id, "position": "last"}],
+        dry_run=False,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["status"] == "moved"
+    assert result["moved_count"] == 1
+    assert result["results"][0]["readback"]["index"] == 1
+
+
+def test_move_cues_polls_stale_readback_until_convergence(monkeypatch: pytest.MonkeyPatch) -> None:
+    reader = MovePlanReader()
+    reader.client.config.write_dry_run_default = False
+    original_children = [reader.first_id, reader.second_id]
+    reader.snapshot_reads = 0
+    reader.after_set = False
+
+    def children(_: str, cue_id: str, **kwargs: Any) -> dict[str, Any]:
+        del cue_id, kwargs
+        reader.snapshot_reads += 1
+        current = [reader.second_id, reader.first_id] if reader.after_set and reader.snapshot_reads >= 4 else original_children
+        return {"children": [{"uniqueID": cue_id, "type": "Memo"} for cue_id in current]}
+
+    def request(_: str, *__: Any, **___: Any) -> Any:
+        reader.after_set = True
+        return SimpleNamespace(data={"parent_cue_id": reader.list_id, "index": 1}, status="ok")
+
+    reader.get_cue_children = children  # type: ignore[method-assign]
+    reader.client.request = request
+    clock = [0.0]
+    monkeypatch.setattr(move_helpers.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(move_helpers.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    monkeypatch.setattr("qlab_mcp.write.moves.ensure_write_ready", lambda *_: reader.workspace_id)
+    planned = move_cues(reader, reader.workspace_id, [{"cue_id": reader.first_id, "position": "last"}], dry_run=True)
+
+    result = move_cues(
+        reader,
+        reader.workspace_id,
+        [{"cue_id": reader.first_id, "position": "last"}],
+        dry_run=False,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["status"] == "moved_after_convergence"
+    assert result["results"][0]["verification_status"] == "confirmed_after_convergence"
+    assert result["results"][0]["readback"] == {"parent_id": reader.list_id, "index": 1}
+
+
+def test_move_cues_rejects_reference_to_a_cue_moved_in_same_batch() -> None:
+    reader = MovePlanReader()
+
+    result = move_cues(
+        reader,
+        reader.workspace_id,
+        [
+            {"cue_id": reader.first_id, "before_cue_id": reader.second_id},
+            {"cue_id": reader.second_id, "position": "last"},
+        ],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "same batch" in result["errors"]["batch"]
+
+
+def test_move_plan_uses_each_step_resolved_index_not_the_final_index() -> None:
+    list_id = "11111111-1111-4111-8111-111111111111"
+    first_id = "22222222-2222-4222-8222-222222222222"
+    second_id = "33333333-3333-4333-8333-333333333333"
+    third_id = "44444444-4444-4444-8444-444444444444"
+    snapshot = {
+        "nodes": {
+            list_id: {"uniqueID": list_id, "type": "Cue List"},
+            **{cue_id: {"uniqueID": cue_id, "type": "Memo"} for cue_id in (first_id, second_id, third_id)},
+        },
+        "children_by_parent": {list_id: [first_id, second_id, third_id]},
+        "parent_by_child": {first_id: list_id, second_id: list_id, third_id: list_id},
+    }
+    moves = [
+        {"cue_id": first_id, "source_parent_id": list_id, "destination_parent_id": list_id, "position": "last", "kind": "linear"},
+        {"cue_id": second_id, "source_parent_id": list_id, "destination_parent_id": list_id, "position": "last", "kind": "linear"},
+    ]
+
+    plan = _build_plan(snapshot, moves)
+
+    assert [item["destination_index"] for item in plan] == [2, 2]
+
+
+def test_move_plan_preserves_qlab_uuid_casing_in_osc_address_and_parent_arg() -> None:
+    list_id = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"
+    group_id = "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB"
+    cue_id = "CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC"
+    snapshot = {
+        "nodes": {
+            str(UUID(list_id)): {"uniqueID": list_id, "type": "Cue List"},
+            str(UUID(group_id)): {"uniqueID": group_id, "type": "Group"},
+            str(UUID(cue_id)): {"uniqueID": cue_id, "type": "Memo"},
+        },
+        "children_by_parent": {str(UUID(list_id)): [str(UUID(cue_id))], str(UUID(group_id)): []},
+        "parent_by_child": {str(UUID(cue_id)): str(UUID(list_id))},
+    }
+    plan = _build_plan(
+        snapshot,
+        [
+            {
+                "cue_id": str(UUID(cue_id)),
+                "source_parent_id": str(UUID(list_id)),
+                "destination_parent_id": str(UUID(group_id)),
+                "position": "first",
+                "kind": "linear",
+            }
+        ],
+    )
+
+    assert plan[0]["address"].endswith(f"/{cue_id}")
+    assert plan[0]["args"] == [0, group_id]
+
+
+def test_move_cues_dry_run_plans_cart_coordinates_without_linear_index() -> None:
+    reader = MovePlanReader()
+    cart_id = "55555555-5555-4555-8555-555555555555"
+    reader.get_cue_lists = lambda *_args, **_kwargs: {"cue_lists": [{"uniqueID": cart_id, "type": "Cue Cart"}]}  # type: ignore[method-assign]
+    reader.get_cue_children = lambda *_args, **_kwargs: {  # type: ignore[method-assign]
+        "children": [{"uniqueID": reader.first_id, "type": "Memo"}]
+    }
+
+    result = move_cues(
+        reader,
+        reader.workspace_id,
+        [
+            {
+                "cue_id": reader.first_id,
+                "destination_parent_id": cart_id,
+                "cart_row": 2,
+                "cart_column": 3,
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["status"] == "planned"
+    assert result["results"][0]["args"] == [2, 3]
+    assert "destination_index" not in result["results"][0]
+
+
+def test_move_cues_stops_on_second_failure_and_returns_fresh_rollback_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reader = MovePlanReader()
+    reader.client.config.write_dry_run_default = False
+    children = [
+        {"uniqueID": reader.first_id, "type": "Memo"},
+        {"uniqueID": reader.second_id, "type": "Memo"},
+    ]
+    reader.get_cue_children = lambda *_args, **_kwargs: {"children": children}  # type: ignore[method-assign]
+    calls = 0
+
+    def request(address: str, *args: Any, **_: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            assert address == f"/workspace/{reader.workspace_id}/move/{reader.first_id}"
+            assert args == (1,)
+            children[:] = [children[1], children[0]]
+            return SimpleNamespace(data={"parent_cue_id": reader.list_id, "index": 1}, status="ok")
+        raise QLabReplyError("error", "second move rejected", address)
+
+    reader.client.request = request
+    monkeypatch.setattr("qlab_mcp.write.moves.ensure_write_ready", lambda *_: reader.workspace_id)
+    moves = [
+        {"cue_id": reader.first_id, "position": "last"},
+        {"cue_id": reader.second_id, "position": "last"},
+    ]
+    planned = move_cues(reader, reader.workspace_id, moves, dry_run=True)
+    result = move_cues(reader, reader.workspace_id, moves, dry_run=False, confirm_token=planned["confirm_token"])
+
+    assert result["status"] == "partial_failed"
+    assert result["moved_count"] == 1
+    assert result["rollback"]["status"] == "fresh_confirmation_required"
+    assert result["rollback"]["moves"] == [
+        {
+            "cue_id": reader.first_id,
+            "destination_parent_id": reader.list_id,
+            "destination_index": 0,
+        }
+    ]
+
+
+def test_move_cues_confirms_timeout_only_after_fresh_readback(monkeypatch: pytest.MonkeyPatch) -> None:
+    reader = MovePlanReader()
+    reader.client.config.write_dry_run_default = False
+    children = [
+        {"uniqueID": reader.first_id, "type": "Memo"},
+        {"uniqueID": reader.second_id, "type": "Memo"},
+    ]
+    reader.get_cue_children = lambda *_args, **_kwargs: {"children": children}  # type: ignore[method-assign]
+
+    def request(_: str, *__: Any, **___: Any) -> Any:
+        children[:] = [children[1], children[0]]
+        raise OscTimeoutError("move reply timed out")
+
+    reader.client.request = request
+    monkeypatch.setattr("qlab_mcp.write.moves.ensure_write_ready", lambda *_: reader.workspace_id)
+    planned = move_cues(reader, reader.workspace_id, [{"cue_id": reader.first_id, "position": "last"}], dry_run=True)
+    result = move_cues(
+        reader,
+        reader.workspace_id,
+        [{"cue_id": reader.first_id, "position": "last"}],
+        dry_run=False,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["status"] == "moved_with_confirmed_timeout"
+    assert result["timeout_confirmed_count"] == 1
+
+
+def test_move_token_rejects_wrong_family_signature_and_expiry(monkeypatch: pytest.MonkeyPatch) -> None:
+    plan = [{"cue_id": "11111111-1111-4111-8111-111111111111", "destination_index": 0}]
+    monkeypatch.setattr(move_helpers.time, "time", lambda: 1000)
+    token = move_helpers._encode_token("22222222-2222-4222-8222-222222222222", plan)
+
+    assert move_helpers._decode_token("confirm:update:v1:not-a-move-token")[1]
+    assert move_helpers._decode_token(f"{token[:-1]}x")[1] == "move confirmation token signature is invalid."
+    monkeypatch.setattr(move_helpers.time, "time", lambda: 1000 + move_helpers.MOVE_TOKEN_TTL_SECONDS + 1)
+    assert move_helpers._decode_token(token)[1] == "move confirmation token has expired."
 
 
 class FakeWriteClient:
@@ -162,9 +486,12 @@ class BatchFakeWriteClient:
         audio_input_patches: list[dict[str, Any]] | None = None,
         network_patches: list[dict[str, Any]] | None = None,
         network_repair_outcomes: dict[tuple[str, str, Any], dict[str, Any]] | None = None,
+        property_outcomes: dict[tuple[str, str, Any], dict[str, Any]] | None = None,
         broken_stage_ids: set[str] | None = None,
         numeric_bool_readback_properties: set[str] | None = None,
         omit_slice_markers_after_delete: bool = False,
+        audio_min_volume: float = -60.0,
+        qlab_silence_readback: bool = False,
     ):
         self.config = config
         self.cues = {cue_id: dict(values, uniqueID=cue_id) for cue_id, values in cues.items()}
@@ -192,9 +519,12 @@ class BatchFakeWriteClient:
         self.audio_input_patches = audio_input_patches or []
         self.network_patches = network_patches or []
         self.network_repair_outcomes = network_repair_outcomes or {}
+        self.property_outcomes = property_outcomes or {}
         self.broken_stage_ids = broken_stage_ids or set()
         self.numeric_bool_readback_properties = numeric_bool_readback_properties or set()
         self.omit_slice_markers_after_delete = omit_slice_markers_after_delete
+        self.audio_min_volume = audio_min_volume
+        self.qlab_silence_readback = qlab_silence_readback
         self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
         self.reply_timeouts: list[float | None] = []
 
@@ -217,6 +547,8 @@ class BatchFakeWriteClient:
             return SimpleNamespace(data=self.show_mode_data, status="ok")
         if address == f"/workspace/{self.workspace_id}/settings/audio/patchList":
             return SimpleNamespace(data=self.audio_output_patches, status="ok")
+        if address == f"/workspace/{self.workspace_id}/settings/audio/minVolume":
+            return SimpleNamespace(data=self.audio_min_volume, status="ok")
         if address == f"/workspace/{self.workspace_id}/settings/mic/patchList":
             return SimpleNamespace(data=self.audio_input_patches, status="ok")
         if address == f"/workspace/{self.workspace_id}/settings/network/patchList":
@@ -260,8 +592,13 @@ class BatchFakeWriteClient:
             return SimpleNamespace(data=None, status="ok")
         value = self._request_value(prop, args)
         self._set_property(cue_id, prop, value)
+        outcome = None
         if prop in {"customString", "networkPatchID"} and isinstance(value, str):
-            self.cues[cue_id].update(self.network_repair_outcomes.get((cue_id, prop, value), {}))
+            outcome = self.network_repair_outcomes.get((cue_id, prop, value))
+        if isinstance(value, (str, int, float, bool, type(None))):
+            outcome = self.property_outcomes.get((cue_id, prop, value), outcome)
+        if outcome:
+            self.cues[cue_id].update(outcome)
         if (cue_id, prop) in self.error_after_apply_properties:
             raise QLabReplyError("error", f"Failed setting {prop}", address)
         return SimpleNamespace(data=None, status="ok")
@@ -313,6 +650,8 @@ class BatchFakeWriteClient:
         if prop in self.numeric_bool_readback_properties and isinstance(value, bool):
             value = int(value)
         if prop.startswith("sliderLevel/"):
+            if value == "-inf" and self.qlab_silence_readback:
+                value = self.audio_min_volume
             channel = int(prop.split("/")[1])
             levels = list(self.cues[cue_id].setdefault("sliderLevels", []))
             while len(levels) <= channel:
@@ -321,6 +660,8 @@ class BatchFakeWriteClient:
             self.cues[cue_id]["sliderLevels"] = levels
             return
         if prop.startswith("level/"):
+            if value == "-inf" and self.qlab_silence_readback:
+                value = self.audio_min_volume
             _, in_channel_text, out_channel_text = prop.split("/", 2)
             in_channel = int(in_channel_text)
             out_channel = int(out_channel_text)
@@ -333,6 +674,23 @@ class BatchFakeWriteClient:
             row[out_channel] = value
             matrix[in_channel] = row
             self.cues[cue_id]["levels"] = matrix
+            return
+        if prop.startswith("doLevel/"):
+            _, row_text, column_text = prop.split("/", 2)
+            row_index = int(row_text)
+            column_index = int(column_text)
+            matrix = [
+                list(row) if isinstance(row, list) else []
+                for row in self.cues[cue_id].setdefault("doLevel", [])
+            ]
+            while len(matrix) <= row_index:
+                matrix.append([])
+            row = list(matrix[row_index])
+            while len(row) <= column_index:
+                row.append(False)
+            row[column_index] = value
+            matrix[row_index] = row
+            self.cues[cue_id]["doLevel"] = matrix
             return
         if prop.startswith("inputChannelName/"):
             self.cues[cue_id][prop] = value
@@ -477,6 +835,63 @@ def devamp_fixture_cues(
             "startNextCueWhenSliceEnds": start_next,
             "stopTargetWhenSliceEnds": stop_target,
             "isBroken": False,
+            "isWarning": False,
+            "isRunning": False,
+            "isPaused": False,
+            "isAuditioning": False,
+        },
+        target_id: {
+            "type": target_type,
+            "isBroken": False,
+            "isWarning": False,
+            "isRunning": False,
+            "isPaused": False,
+            "isAuditioning": False,
+        },
+    }
+
+
+def fade_fixture_cues(
+    source_id: str,
+    target_id: str,
+    *,
+    target_type: str = "Video",
+    target_id_value: str | None = None,
+    broken: bool = False,
+    do_opacity: bool = True,
+    do_scale: bool = False,
+) -> dict[str, dict[str, Any]]:
+    return {
+        source_id: {
+            "type": "Fade",
+            "hasCueTargets": True,
+            "cueTargetID": target_id if target_id_value is None else target_id_value,
+            "targetMode": 0,
+            "fadeType": 1,
+            "geoMode": 0,
+            "doOpacity": do_opacity,
+            "doRate": False,
+            "doRotation": False,
+            "doScale": do_scale,
+            "doTranslation": False,
+            "opacity": 0.5,
+            "name": "Fade fixture",
+            "number": "1",
+            "notes": "",
+            "armed": True,
+            "flagged": False,
+            "colorName": "none",
+            "preWait": 0,
+            "postWait": 0,
+            "duration": 0,
+            "tempDuration": 0,
+            "allowsEditingDuration": True,
+            "continueMode": 0,
+            "skipIfDisarmed": False,
+            "autoLoad": False,
+            "secondColorName": "none",
+            "useSecondColor": False,
+            "isBroken": broken,
             "isWarning": False,
             "isRunning": False,
             "isPaused": False,
@@ -832,6 +1247,8 @@ def _dry_run_only_property_cases() -> list[Any]:
             ) or (
                 profile == "devamp_basic"
                 and prop_name in {"cueTargetID", "devampType", "startNextCueWhenSliceEnds", "stopTargetWhenSliceEnds"}
+            ) or (
+                profile == "fade_basic" and prop_name in write_operations.FADE_PHASE1_PROPERTIES
             ):
                 continue
             if not prop["real_write_enabled"]:
@@ -1154,6 +1571,7 @@ def _assert_fade_script_profile_catalog(catalog: dict[str, Any]) -> None:
             "rotation",
             "rotationType",
             "doOpacity",
+            "opacity",
             "doRate",
             "doRotation",
             "doScale",
@@ -1169,7 +1587,7 @@ def _assert_fade_script_profile_catalog(catalog: dict[str, Any]) -> None:
     assert catalog["fade_basic"]["properties"]["targetMode"]["args"][0]["validator"] == "target_mode"
     assert catalog["fade_basic"]["properties"]["levelsMode"]["args"][0]["validator"] == "fade_mode"
     assert catalog["fade_basic"]["properties"]["geoMode"]["args"][0]["validator"] == "fade_mode"
-    assert catalog["fade_basic"]["properties"]["mode"]["path"] == "geoMode"
+    assert catalog["fade_basic"]["properties"]["mode"]["path"] == "levelsMode"
     assert catalog["fade_basic"]["properties"]["mode"]["args"][0]["validator"] == "fade_mode"
     assert catalog["fade_basic"]["properties"]["fadeType"]["args"][0]["validator"] == "fade_type"
     assert catalog["fade_basic"]["properties"]["rotationType"]["args"][0]["validator"] == "rotation_type"
@@ -1211,7 +1629,9 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
 def test_update_cues_dry_run_contract_covers_every_profile(profile: str) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     cue_type = PROFILE_TEST_CUE_TYPES[profile]
-    prop_name, prop = next(iter(profile_catalog()[profile]["properties"].items()))
+    properties = profile_catalog()[profile]["properties"]
+    prop_name = "targetMode" if profile == "fade_basic" else next(iter(properties))
+    prop = properties[prop_name]
     client = FakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
         existing_cue_id=cue_id,
@@ -1477,7 +1897,7 @@ def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_os
         cue_values=cue_values,
     )
     real_reader = QLabReader(real_client)  # type: ignore[arg-type]
-    if profile == "text_basic" and prop_name in PHASE3F_TEXT_STYLE_VALUES:
+    if (profile == "text_basic" and prop_name in PHASE3F_TEXT_STYLE_VALUES) or profile == "fade_basic":
         real_result = real_reader.update_cue(
             "ws-1",
             cue_id,
@@ -2784,24 +3204,14 @@ def test_update_cues_fade_basic_dry_run_plans_documented_fade_fields() -> None:
                 "profile": "fade_basic",
                 "properties": {
                     "targetMode": 1,
-                    "levelsMode": 1,
                     "mode": 0,
                     "fadeType": 2,
-                    "stopTargetWhenDone": True,
                     "pathHeight": 1.5,
                     "pathWidth": 2.5,
-                    "rotation": 15,
-                    "rotationType": 3,
-                    "doOpacity": True,
-                    "doRate": True,
-                    "doRotation": True,
-                    "doScale": True,
-                    "doTranslation": True,
                     "audioMapTargetID": "map-1",
                     "patchTargetID": "patch-1",
                 },
                 "operations": [
-                    {"property": "doLevel", "args": {"row": 1, "column": 1, "value": True}},
                     {"property": "doObjectLevel", "args": {"row": 1, "object": "object-a", "value": True}},
                     {"property": "doObjectIDLevel", "args": {"row": 1, "objectID": "object-id", "value": True}},
                     {"property": "setGeometryFromTarget", "args": {}},
@@ -2820,14 +3230,12 @@ def test_update_cues_fade_basic_dry_run_plans_documented_fade_fields() -> None:
     assert "updateq_plan" not in result["results"][0]
     setters = [op for op in result["results"][0]["planned_operations"] if op["operation"] == "set_property"]
     setter_by_property = {setter["property"]: setter for setter in setters}
-    assert setter_by_property["mode"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/geoMode"
-    assert setter_by_property["doLevel"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/doLevel/1/1"
+    assert setter_by_property["mode"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/levelsMode"
     assert setter_by_property["doObjectLevel"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/doObjectLevel/1/object-a"
     assert setter_by_property["doObjectIDLevel"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/doObjectIDLevel/1/object-id"
     assert setter_by_property["setGeometryFromTarget"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/setGeometryFromTarget"
     assert setter_by_property["setLevelsFromTarget"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/setLevelsFromTarget"
     assert setter_by_property["willFade"]["address"] == f"/workspace/ws-1/cue_id/{fade_id}/willFade/1/1"
-    assert setter_by_property["doLevel"]["args"] == [True]
     assert setter_by_property["setGeometryFromTarget"]["args"] == []
     assert all(setter["real_write_enabled"] is False for setter in setters)
     assert all(setter["planned_only_reason"] for setter in setters)
@@ -2885,7 +3293,7 @@ def test_update_cues_fade_basic_validators_fail_without_plan() -> None:
     assert result["results"][0]["errors"]["validation"] == "targetMode must be 0 for cue target or 1 for patch target"
     assert result["results"][1]["errors"]["validation"] == "levelsMode must be 0 or 1"
     assert result["results"][2]["errors"]["validation"] == "geoMode must be 0 or 1"
-    assert result["results"][3]["errors"]["validation"] == "fadeType must be 1 for absolute or 2 for relative"
+    assert result["results"][3]["errors"]["validation"] == "fadeType must be 1 for 1D Curve or 2 for 2D Path"
     assert result["results"][4]["errors"]["validation"] == "rotationType must be an integer from 0 to 3"
     assert result["results"][5]["errors"]["validation"] == "pathHeight must be a positive number"
     assert result["results"][6]["errors"]["validation"] == "pathWidth must be a positive number"
@@ -2896,6 +3304,1726 @@ def test_update_cues_fade_basic_validators_fail_without_plan() -> None:
     )
     assert result["results"][10]["errors"]["validation"] == "doObjectLevel.object must be a non-empty object name or ID"
     assert client.requests == []
+
+
+FADE_WORKSPACE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+
+
+def _fade_plan(
+    reader: QLabReader,
+    source_id: str,
+    property_name: str,
+    value: Any,
+    *,
+    mode: str = "saved",
+) -> tuple[dict[str, Any], str | None]:
+    operation: dict[str, Any] = {"property": property_name, "args": {"value": value}}
+    if mode != "saved":
+        operation["mode"] = mode
+    result = reader.update_cues(
+        FADE_WORKSPACE_ID,
+        [{"cue_ref": source_id, "profile": "fade_basic", "operations": [operation]}],
+        dry_run=True,
+    )
+    setters = planned_setters(result["results"][0])
+    token = setters.get(property_name, {}).get("confirm_token")
+    return result, token
+
+
+def _fade_write(
+    reader: QLabReader,
+    source_id: str,
+    property_name: str,
+    value: Any,
+    token: str,
+) -> dict[str, Any]:
+    return reader.update_cues(
+        FADE_WORKSPACE_ID,
+        [
+            {
+                "cue_ref": source_id,
+                "profile": "fade_basic",
+                "properties": {property_name: value},
+                "confirm_gates": [token],
+            }
+        ],
+        dry_run=False,
+    )
+
+
+def fade_audio_fixture_cues(
+    source_id: str,
+    target_id: str,
+    *,
+    target_type: str = "Video",
+    broken: bool = False,
+    levels_mode: int = 0,
+    do_level: bool = False,
+) -> dict[str, dict[str, Any]]:
+    cues = fade_fixture_cues(
+        source_id,
+        target_id,
+        target_type=target_type,
+        broken=broken,
+        do_opacity=not broken,
+    )
+    matrix = [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
+    cues[source_id].update(
+        {
+            "levelsMode": levels_mode,
+            "numChannelsIn": 2,
+            "levels": [list(row) for row in matrix],
+            "sliderLevels": [0.0, 0.0],
+            "doLevel": [[do_level, False], [False, False], [False, False]],
+            "inputChannelName/1": "L",
+            "inputChannelName/2": "R",
+            "gang/1/0": "",
+            "stopTargetWhenDone": False,
+        }
+    )
+    cues[target_id].update(
+        {
+            "numChannelsIn": 2,
+            "audioTrackFormats": [{"channels": 2, "format": "AAC"}],
+            "levels": [list(row) for row in matrix],
+            "sliderLevels": [0.0, 0.0],
+        }
+    )
+    return cues
+
+
+def _fade_operation_plan(
+    reader: QLabReader,
+    source_id: str,
+    property_name: str,
+    args: dict[str, Any],
+    *,
+    mode: str = "saved",
+) -> tuple[dict[str, Any], str | None]:
+    operation: dict[str, Any] = {"property": property_name, "args": args}
+    if mode != "saved":
+        operation["mode"] = mode
+    result = reader.update_cues(
+        FADE_WORKSPACE_ID,
+        [{"cue_ref": source_id, "profile": "fade_basic", "operations": [operation]}],
+        dry_run=True,
+    )
+    token = planned_setters(result["results"][0]).get(property_name, {}).get("confirm_token")
+    return result, token
+
+
+def _fade_operation_write(
+    reader: QLabReader,
+    source_id: str,
+    property_name: str,
+    args: dict[str, Any],
+    token: str,
+) -> dict[str, Any]:
+    return reader.update_cues(
+        FADE_WORKSPACE_ID,
+        [
+            {
+                "cue_ref": source_id,
+                "profile": "fade_basic",
+                "operations": [{"property": property_name, "args": args}],
+                "confirm_gates": [token],
+            }
+        ],
+        dry_run=False,
+    )
+
+
+def test_qlab_edit_cues_fade_basic_properties_shape_emits_fade_basic_token() -> None:
+    """Mirror the MCP tool's model_dump shape, not the lower-level operations form."""
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+
+    class SingleTargetReadClient(BatchFakeWriteClient):
+        target_reads = 0
+
+        def request(
+            self,
+            address: str,
+            *args: Any,
+            workspace_id: str | None = None,
+            reply_timeout: float | None = None,
+        ) -> Any:
+            if address == f"/workspace/{FADE_WORKSPACE_ID}/cue_id/{target_id}/valuesForKeys":
+                self.target_reads += 1
+                if self.target_reads > 1:
+                    raise OscTimeoutError("duplicate Fade target preflight read")
+            return super().request(
+                address,
+                *args,
+                workspace_id=workspace_id,
+                reply_timeout=reply_timeout,
+            )
+
+    client = SingleTargetReadClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_fixture_cues(source_id, target_id),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = CueUpdateInput(
+        cue_ref=source_id,
+        profile="fade_basic",
+        properties={"name": "Renamed Fade"},
+    ).model_dump()
+
+    result = reader.edit_cues(FADE_WORKSPACE_ID, [update], dry_run=True)
+    planned = planned_setters(result["results"][0])
+
+    assert result["status"] == "dry_run"
+    assert result["results"][0]["executed_operations"] == []
+    assert planned["name"]["confirm_token"].startswith("confirm:fadeBasic:v1:")
+    assert client.target_reads == 1
+
+
+@pytest.mark.parametrize(
+    ("property_name", "requested"),
+    [
+        ("name", "Renamed"),
+        ("number", "2"),
+        ("notes", "note"),
+        ("armed", False),
+        ("flagged", True),
+        ("colorName", "blue"),
+        ("preWait", 1),
+        ("postWait", 1),
+        ("duration", 1),
+        ("tempDuration", 1),
+        ("continueMode", "auto_continue"),
+        ("skipIfDisarmed", True),
+        ("autoLoad", True),
+        ("secondColorName", "red"),
+        ("useSecondColor", True),
+    ],
+)
+def test_fade_phase1_all_shared_basics_emit_only_fade_basic_token(
+    property_name: str, requested: Any
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_fixture_cues(source_id, target_id),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, property_name, requested)
+
+    assert plan["status"] == "dry_run"
+    assert token and token.startswith("confirm:fadeBasic:v1:")
+    assert plan["results"][0]["executed_operations"] == []
+    expected = planned_setters(plan["results"][0])[property_name]["args"][0]
+    written = _fade_write(reader, source_id, property_name, requested, token)
+    assert written["status"] == "updated", written
+    assert written["results"][0]["after"][property_name] == expected
+
+
+@pytest.mark.parametrize(
+    ("property_name", "baseline", "requested", "prefix", "do_opacity", "do_scale"),
+    [
+        ("name", "Fade fixture", "Renamed Fade", "confirm:fadeBasic:v1:", True, False),
+        ("geoMode", 0, 1, "confirm:fadeGeometry:v1:", True, False),
+        ("opacity", 0.5, 0.75, "confirm:fadeGeometry:v1:", True, False),
+        ("doOpacity", False, True, "confirm:fadeGeometry:v1:", False, True),
+    ],
+)
+def test_fade_phase1_property_writes_and_rolls_back_with_fresh_tokens(
+    property_name: str,
+    baseline: Any,
+    requested: Any,
+    prefix: str,
+    do_opacity: bool,
+    do_scale: bool,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_fixture_cues(source_id, target_id, do_opacity=do_opacity, do_scale=do_scale)
+    cues[source_id][property_name] = baseline
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, property_name, requested)
+    assert plan["status"] == "dry_run"
+    assert token and token.startswith(prefix)
+    assert plan["results"][0]["executed_operations"] == []
+    written = _fade_write(reader, source_id, property_name, requested, token)
+    assert written["status"] == "updated", written
+    assert written["results"][0]["after"][property_name] == requested
+
+    rollback_plan, rollback_token = _fade_plan(reader, source_id, property_name, baseline)
+    assert rollback_plan["status"] == "dry_run"
+    assert rollback_token and rollback_token.startswith(prefix)
+    assert rollback_token != token
+    rolled_back = _fade_write(reader, source_id, property_name, baseline, rollback_token)
+    assert rolled_back["status"] == "updated"
+    assert rolled_back["results"][0]["after"][property_name] == baseline
+    assert [address for address, _, _ in client.requests].count(
+        f"/workspace/{FADE_WORKSPACE_ID}/cue_id/{source_id}/{property_name}"
+    ) == 2
+
+
+@pytest.mark.parametrize(
+    ("property_name", "baseline", "requested", "flag"),
+    [
+        ("doRate", False, True, None),
+        ("rate", 1.0, 0.5, "doRate"),
+        ("translation/x", 0.0, 100.0, "doTranslation"),
+        ("translation/y", 0.0, -50.0, "doTranslation"),
+        ("scale/x", 1.0, 0.5, "doScale"),
+        ("scale/y", 1.0, 1.5, "doScale"),
+        ("rotationType", 1, 3, "doRotation"),
+        ("rotation", 0.0, 45.0, "doRotation"),
+    ],
+)
+def test_fade_geometry_documented_scalar_routes_use_geometry_token(
+    property_name: str,
+    baseline: Any,
+    requested: Any,
+    flag: str | None,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_fixture_cues(source_id, target_id)
+    cues[source_id].update(
+        {
+            "rate": 1.0,
+            "translation/x": 0.0,
+            "translation/y": 0.0,
+            "scale/x": 1.0,
+            "scale/y": 1.0,
+            "rotationType": 1,
+            "rotation": 0.0,
+        }
+    )
+    cues[source_id][property_name] = baseline
+    if flag:
+        cues[source_id][flag] = True
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, property_name, requested)
+    assert plan["status"] == "dry_run", plan
+    assert token and token.startswith("confirm:fadeGeometry:v1:")
+    result = _fade_write(reader, source_id, property_name, requested, token)
+
+    assert result["status"] == "updated", result
+    assert result["results"][0]["after"][property_name] == requested
+
+
+@pytest.mark.parametrize(
+    "property_name",
+    ["doOpacity", "doRate", "doRotation", "doScale", "doTranslation"],
+)
+def test_fade_geometry_all_activation_flags_have_exact_write_readback(
+    property_name: str,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_fixture_cues(source_id, target_id, do_opacity=property_name != "doOpacity")
+    cues[source_id][property_name] = False
+    if property_name == "doOpacity":
+        cues[source_id]["doScale"] = True
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, property_name, True)
+    assert plan["status"] == "dry_run", plan
+    assert token and token.startswith("confirm:fadeGeometry:v1:")
+    written = _fade_write(reader, source_id, property_name, True, token)
+
+    assert written["status"] == "updated", written
+    assert written["results"][0]["after"][property_name] is True
+
+
+@pytest.mark.parametrize("geo_mode", [0, 1])
+def test_fade_geometry_opacity_supports_absolute_and_relative_modes(geo_mode: int) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_fixture_cues(source_id, target_id)
+    cues[source_id].update({"geoMode": geo_mode, "doOpacity": True, "opacity": 1.0})
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, "opacity", 0.5)
+    assert plan["status"] == "dry_run", plan
+    assert token and token.startswith("confirm:fadeGeometry:v1:")
+    result = _fade_write(reader, source_id, "opacity", 0.5, token)
+    assert result["status"] == "updated", result
+    assert result["results"][0]["after"]["opacity"] == 0.5
+
+
+@pytest.mark.parametrize("rotation_type", [1, 2, 3])
+def test_fade_geometry_rotation_supports_x_y_and_z_axes(rotation_type: int) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_fixture_cues(source_id, target_id)
+    cues[source_id].update(
+        {"doRotation": True, "rotationType": rotation_type, "rotation": 0.0}
+    )
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, "rotation", 30.0)
+    assert plan["status"] == "dry_run", plan
+    assert token and token.startswith("confirm:fadeGeometry:v1:")
+    result = _fade_write(reader, source_id, "rotation", 30.0, token)
+    assert result["status"] == "updated", result
+    assert result["results"][0]["after"]["rotation"] == 30.0
+
+
+def test_fade_geometry_absolute_3d_quaternion_uses_geometry_token() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_fixture_cues(source_id, target_id)
+    cues[source_id].update(
+        {
+            "geoMode": 0,
+            "doOpacity": False,
+            "doRotation": True,
+            "rotationType": 0,
+            "quaternion": [0, 0, 0, 1],
+        }
+    )
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    requested = [0, 0, 0.1, 0.995]
+
+    plan, token = _fade_plan(reader, source_id, "quaternion", requested)
+    assert plan["status"] == "dry_run", plan
+    assert token and token.startswith("confirm:fadeGeometry:v1:")
+    result = _fade_write(reader, source_id, "quaternion", requested, token)
+
+    assert result["status"] == "updated", result
+    assert result["results"][0]["after"]["quaternion"] == requested
+    assert result["results"][0]["executed_operations"][0]["args"] == requested
+
+
+@pytest.mark.parametrize(
+    ("change", "property_name", "requested", "expected"),
+    [
+        ({"geoMode": 1, "rotationType": 0}, "quaternion", [0, 0, 0.1, 0.995], "absolute"),
+        ({"geoMode": 0, "rotationType": 1}, "quaternion", [0, 0, 0.1, 0.995], "3D"),
+        ({"geoMode": 1, "doRate": True}, "rate", 0.5, "relative rate"),
+    ],
+)
+def test_fade_geometry_rejects_undocumented_relative_3d_and_rate_semantics(
+    change: dict[str, Any],
+    property_name: str,
+    requested: Any,
+    expected: str,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    target_type = "Audio" if property_name == "rate" else "Video"
+    cues = fade_fixture_cues(source_id, target_id, target_type=target_type)
+    cues[source_id].update(
+        {
+            "doOpacity": False,
+            "doRotation": property_name == "quaternion",
+            "rate": 1.0,
+            "quaternion": [0, 0, 0, 1],
+            **change,
+        }
+    )
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, property_name, requested)
+
+    assert plan["status"] == "preflight_failed"
+    assert token is None
+    assert expected in plan["results"][0]["errors"][property_name]
+    assert plan["results"][0]["executed_operations"] == []
+
+
+@pytest.mark.parametrize(
+    ("property_name", "requested", "change", "expected"),
+    [
+        ("translation/x", 10.0, {"doTranslation": False}, "doTranslation=true"),
+        ("scale/x", 0.5, {"doScale": False}, "doScale=true"),
+        ("rotation", 45.0, {"doRotation": True, "rotationType": 0}, "single-axis"),
+        ("rotationType", 0, {"doRotation": True, "rotationType": 1}, "3D rotation remains planned-only"),
+    ],
+)
+def test_fade_geometry_rejects_missing_flags_and_unpromoted_3d_mode(
+    property_name: str,
+    requested: Any,
+    change: dict[str, Any],
+    expected: str,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_fixture_cues(source_id, target_id)
+    cues[source_id].update(
+        {
+            "translation/x": 0.0,
+            "scale/x": 1.0,
+            "rotation": 0.0,
+            "rotationType": 1,
+            **change,
+        }
+    )
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result, token = _fade_plan(reader, source_id, property_name, requested)
+
+    assert result["status"] == "preflight_failed"
+    assert token is None
+    assert expected in result["results"][0]["errors"][property_name]
+    assert result["results"][0]["executed_operations"] == []
+
+
+@pytest.mark.parametrize(("baseline", "requested"), [(1, 0), (0, 1)])
+@pytest.mark.parametrize("target_type", ["Audio", "Mic", "Video", "Camera"])
+def test_fade_audio_levels_mode_has_dedicated_token_and_exact_readback(
+    baseline: int,
+    requested: int,
+    target_type: str,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_audio_fixture_cues(
+        source_id,
+        target_id,
+        levels_mode=baseline,
+        target_type=target_type,
+        do_level=True,
+    )
+    if target_type in {"Audio", "Mic"}:
+        cues[source_id]["doOpacity"] = False
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, "levelsMode", requested)
+    assert plan["status"] == "dry_run"
+    assert token and token.startswith("confirm:fadeAudio:v1:")
+    assert plan["results"][0]["executed_operations"] == []
+    result = _fade_write(reader, source_id, "levelsMode", requested, token)
+
+    assert result["status"] == "updated", result
+    assert result["results"][0]["after"]["levelsMode"] == requested
+    assert [address for address, _, _ in client.requests].count(
+        f"/workspace/{FADE_WORKSPACE_ID}/cue_id/{source_id}/levelsMode"
+    ) == 1
+
+
+def test_fade_behavior_stop_target_when_done_has_dedicated_token() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_audio_fixture_cues(source_id, target_id, do_level=True),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, "stopTargetWhenDone", True)
+    assert plan["status"] == "dry_run"
+    assert token and token.startswith("confirm:fadeBehavior:v1:")
+    result = _fade_write(reader, source_id, "stopTargetWhenDone", True, token)
+
+    assert result["status"] == "updated", result
+    assert result["results"][0]["after"]["stopTargetWhenDone"] is True
+
+
+def test_fade_behavior_properties_shape_matches_live_mcp_request() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_audio_fixture_cues(source_id, target_id, do_level=True)
+    cues[source_id].update(
+        {
+            "doOpacity": True,
+            "levelsMode": 1,
+            "stopTargetWhenDone": True,
+        }
+    )
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan = reader.update_cues(
+        FADE_WORKSPACE_ID,
+        [
+            {
+                "cue_ref": source_id,
+                "profile": "fade_basic",
+                "properties": {"stopTargetWhenDone": False},
+            }
+        ],
+        dry_run=True,
+    )
+    token = planned_setters(plan["results"][0])["stopTargetWhenDone"]["confirm_token"]
+    result = reader.update_cues(
+        FADE_WORKSPACE_ID,
+        [
+            {
+                "cue_ref": source_id,
+                "profile": "fade_basic",
+                "properties": {"stopTargetWhenDone": False},
+                "confirm_gates": [token],
+            }
+        ],
+        dry_run=False,
+    )
+
+    assert token.startswith("confirm:fadeBehavior:v1:")
+    assert result["status"] == "updated", result
+    assert result["results"][0]["after"]["stopTargetWhenDone"] is False
+
+
+def test_fade_audio_do_level_and_level_use_matrix_bound_tokens() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_audio_fixture_cues(source_id, target_id),
+        workspace_id=FADE_WORKSPACE_ID,
+        qlab_silence_readback=True,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    do_args = {"row": 0, "column": 0, "value": True}
+    do_plan, do_token = _fade_operation_plan(reader, source_id, "doLevel", do_args)
+    assert do_plan["status"] == "dry_run", do_plan
+    assert do_token and do_token.startswith("confirm:fadeAudio:v1:")
+    activated = _fade_operation_write(reader, source_id, "doLevel", do_args, do_token)
+    assert activated["status"] == "updated", activated
+    assert activated["results"][0]["after"]["doLevel"][0][0] is True
+
+    level_args = {"inChannel": 0, "outChannel": 0, "decibel": "-inf"}
+    level_plan, level_token = _fade_operation_plan(reader, source_id, "level", level_args)
+    assert level_plan["status"] == "dry_run", level_plan
+    assert level_token and level_token.startswith("confirm:fadeAudio:v1:")
+    silenced = _fade_operation_write(reader, source_id, "level", level_args, level_token)
+    assert silenced["status"] == "updated", silenced
+    assert silenced["results"][0]["after"]["levels"][0][0] == -60.0
+    assert [address for address, _, _ in client.requests].count(
+        f"/workspace/{FADE_WORKSPACE_ID}/cue_id/{source_id}/doLevel/0/0"
+    ) == 1
+    assert [address for address, _, _ in client.requests].count(
+        f"/workspace/{FADE_WORKSPACE_ID}/cue_id/{source_id}/level/0/0"
+    ) == 1
+
+
+def test_fade_audio_silence_matches_workspace_minimum_readback() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_audio_fixture_cues(source_id, target_id, do_level=True),
+        workspace_id=FADE_WORKSPACE_ID,
+        audio_min_volume=-60.0,
+        qlab_silence_readback=True,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    args = {"inChannel": 0, "outChannel": 0, "decibel": "-inf"}
+
+    plan, token = _fade_operation_plan(reader, source_id, "level", args)
+    assert plan["status"] == "dry_run", plan
+    assert token and token.startswith("confirm:fadeAudio:v1:")
+    result = _fade_operation_write(reader, source_id, "level", args, token)
+
+    assert result["status"] == "updated", result
+    assert result["results"][0]["after"]["levels"][0][0] == -60.0
+
+    rollback_args = {"inChannel": 0, "outChannel": 0, "decibel": 0.0}
+    rollback_plan, rollback_token = _fade_operation_plan(
+        reader,
+        source_id,
+        "level",
+        rollback_args,
+    )
+    assert rollback_plan["status"] == "dry_run", rollback_plan
+    assert rollback_token and rollback_token.startswith("confirm:fadeAudio:v1:")
+    rollback = _fade_operation_write(
+        reader,
+        source_id,
+        "level",
+        rollback_args,
+        rollback_token,
+    )
+    assert rollback["status"] == "updated", rollback
+    assert rollback["results"][0]["after"]["levels"][0][0] == 0.0
+
+
+def test_fade_audio_silence_rejects_workspace_minimum_noop() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_audio_fixture_cues(source_id, target_id, do_level=True)
+    cues[source_id]["levels"][0][0] = -60.0
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+        audio_min_volume=-60.0,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_operation_plan(
+        reader,
+        source_id,
+        "level",
+        {"inChannel": 0, "outChannel": 0, "decibel": "-inf"},
+    )
+
+    assert plan["status"] == "preflight_failed"
+    assert token is None
+    assert "must differ from the baseline" in plan["results"][0]["errors"]["level"]
+
+
+@pytest.mark.parametrize(
+    ("actual", "expected"),
+    [
+        (-5.9999519405, -6.0),
+        (-11.9999528486, -12.0),
+        (-18.0001752149, -18.0),
+        (-12.0009999, -12.0),
+    ],
+)
+def test_fade_audio_db_readback_uses_explicit_tolerance(actual: float, expected: float) -> None:
+    requested = {
+        "__fade_audio_matrix_level__": True,
+        "row": 0,
+        "column": 0,
+        "decibel": expected,
+    }
+    assert write_operations._property_values_match("levels", [[actual]], requested) is (abs(actual - expected) <= 0.001)
+
+
+def test_fade_audio_db_readback_rejects_value_outside_tolerance() -> None:
+    requested = {
+        "__fade_audio_matrix_level__": True,
+        "row": 0,
+        "column": 0,
+        "decibel": -12.0,
+    }
+    assert not write_operations._property_values_match("levels", [[-11.9989]], requested)
+
+
+def test_fade_audio_relative_level_uses_finite_delta_and_individual_crosspoint() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_audio_fixture_cues(source_id, target_id, levels_mode=1)
+    cues[source_id]["doLevel"][2][1] = True
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    args = {"inChannel": 2, "outChannel": 1, "decibel": -6.0}
+
+    plan, token = _fade_operation_plan(reader, source_id, "level", args)
+    assert plan["status"] == "dry_run", plan
+    assert token and token.startswith("confirm:fadeAudio:v1:")
+    result = _fade_operation_write(reader, source_id, "level", args, token)
+
+    assert result["status"] == "updated", result
+    assert result["results"][0]["after"]["levels"][2][1] == -6.0
+
+
+def test_fade_audio_validates_larger_fresh_matrix_dimensions() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_audio_fixture_cues(source_id, target_id, do_level=False)
+    matrix = [[0.0 for _ in range(4)] for _ in range(5)]
+    active = [[False for _ in range(4)] for _ in range(5)]
+    active[4][3] = True
+    cues[source_id].update(
+        {
+            "doOpacity": False,
+            "numChannelsIn": 4,
+            "levels": [list(row) for row in matrix],
+            "sliderLevels": list(matrix[0]),
+            "doLevel": active,
+        }
+    )
+    cues[target_id].update(
+        {
+            "numChannelsIn": 4,
+            "audioTrackFormats": [{"channels": 4, "format": "PCM"}],
+            "levels": [list(row) for row in matrix],
+            "sliderLevels": list(matrix[0]),
+        }
+    )
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    args = {"inChannel": 4, "outChannel": 3, "decibel": -12.0}
+
+    plan, token = _fade_operation_plan(reader, source_id, "level", args)
+    assert plan["status"] == "dry_run", plan
+    assert token and token.startswith("confirm:fadeAudio:v1:")
+    written = _fade_operation_write(reader, source_id, "level", args, token)
+
+    assert written["status"] == "updated", written
+    assert written["results"][0]["after"]["levels"][4][3] == -12.0
+
+
+@pytest.mark.parametrize(
+    ("levels_mode", "channel", "requested"),
+    [(0, 0, "-inf"), (1, 1, -6.0)],
+)
+def test_fade_audio_slider_level_uses_matrix_bound_token_and_rolls_back(
+    levels_mode: int,
+    channel: int,
+    requested: Any,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_audio_fixture_cues(source_id, target_id, levels_mode=levels_mode)
+    cues[source_id]["doLevel"][0][channel] = True
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+        qlab_silence_readback=True,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    args = {"channel": channel, "decibel": requested}
+
+    plan, token = _fade_operation_plan(reader, source_id, "sliderLevel", args)
+    assert plan["status"] == "dry_run", plan
+    assert token and token.startswith("confirm:fadeAudio:v1:")
+    written = _fade_operation_write(reader, source_id, "sliderLevel", args, token)
+    assert written["status"] == "updated", written
+    expected = -60.0 if requested == "-inf" else requested
+    assert written["results"][0]["after"]["sliderLevels"][channel] == expected
+
+    rollback_args = {"channel": channel, "decibel": 0.0}
+    _, rollback_token = _fade_operation_plan(reader, source_id, "sliderLevel", rollback_args)
+    assert rollback_token and rollback_token.startswith("confirm:fadeAudio:v1:")
+    rolled_back = _fade_operation_write(reader, source_id, "sliderLevel", rollback_args, rollback_token)
+    assert rolled_back["status"] == "updated", rolled_back
+    assert rolled_back["results"][0]["after"]["sliderLevels"][channel] == 0.0
+
+
+@pytest.mark.parametrize(
+    ("property_name", "args", "read_key", "requested", "rollback_args", "baseline"),
+    [
+        (
+            "inputChannelName",
+            {"number": 1, "name": "Dialogue"},
+            "inputChannelName/1",
+            "Dialogue",
+            {"number": 1, "name": "L"},
+            "L",
+        ),
+        (
+            "gang",
+            {"inChannel": 1, "outChannel": 0, "gang": "music"},
+            "gang/1/0",
+            "music",
+            {"inChannel": 1, "outChannel": 0, "gang": ""},
+            "",
+        ),
+    ],
+)
+def test_fade_audio_level_metadata_uses_dynamic_readback_and_rolls_back(
+    property_name: str,
+    args: dict[str, Any],
+    read_key: str,
+    requested: str,
+    rollback_args: dict[str, Any],
+    baseline: str,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_audio_fixture_cues(source_id, target_id),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_operation_plan(reader, source_id, property_name, args)
+    assert plan["status"] == "dry_run", plan
+    assert token and token.startswith("confirm:fadeAudio:v1:")
+    written = _fade_operation_write(reader, source_id, property_name, args, token)
+    assert written["status"] == "updated", written
+    assert written["results"][0]["after"][read_key] == requested
+
+    _, rollback_token = _fade_operation_plan(reader, source_id, property_name, rollback_args)
+    assert rollback_token and rollback_token.startswith("confirm:fadeAudio:v1:")
+    rolled_back = _fade_operation_write(reader, source_id, property_name, rollback_args, rollback_token)
+    assert rolled_back["status"] == "updated", rolled_back
+    assert rolled_back["results"][0]["after"][read_key] == baseline
+
+
+def test_fade_audio_slider_level_requires_active_crosspoint_without_setter() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_audio_fixture_cues(source_id, target_id),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    args = {"channel": 0, "decibel": -6.0}
+
+    result, token = _fade_operation_plan(reader, source_id, "sliderLevel", args)
+
+    assert result["status"] == "preflight_failed"
+    assert token is None
+    assert "matching doLevel" in result["results"][0]["errors"]["sliderLevel"]
+    assert result["results"][0]["executed_operations"] == []
+    assert not any("/sliderLevel/" in address for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize(
+    ("property_name", "args", "source_change", "expected"),
+    [
+        (
+            "inputChannelName",
+            {"number": 3, "name": "Extra"},
+            {"inputChannelName/3": "Old"},
+            "must exist in both",
+        ),
+        (
+            "gang",
+            {"inChannel": 0, "outChannel": 0, "gang": "main"},
+            {"gang/0/0": ""},
+            "row 0 is blocked",
+        ),
+    ],
+)
+def test_fade_audio_level_metadata_rejects_unsafe_coordinates_without_setter(
+    property_name: str,
+    args: dict[str, Any],
+    source_change: dict[str, Any],
+    expected: str,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_audio_fixture_cues(source_id, target_id)
+    cues[source_id].update(source_change)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result, token = _fade_operation_plan(reader, source_id, property_name, args)
+
+    assert result["status"] == "preflight_failed"
+    assert token is None
+    assert expected in result["results"][0]["errors"][property_name]
+    assert result["results"][0]["executed_operations"] == []
+    assert not any(f"/{property_name}/" in address for address, _, _ in client.requests)
+
+
+def test_fade_audio_level_metadata_rejects_stale_dynamic_baseline_without_setter() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_audio_fixture_cues(source_id, target_id),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    args = {"number": 1, "name": "Dialogue"}
+    _, token = _fade_operation_plan(reader, source_id, "inputChannelName", args)
+    assert token
+    client.cues[source_id]["inputChannelName/1"] = "Changed externally"
+    client.requests.clear()
+
+    result = _fade_operation_write(reader, source_id, "inputChannelName", args, token)
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert not any("/inputChannelName/" in address for address, _, _ in client.requests)
+
+
+def test_fade_audio_setup_first_level_cell_repairs_broken_fade() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_audio_fixture_cues(source_id, target_id, broken=True),
+        workspace_id=FADE_WORKSPACE_ID,
+        property_outcomes={
+            (source_id, "doLevel/0/0", True): {"isBroken": False},
+            (source_id, "doLevel/0/0", False): {"isBroken": True},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    args = {"row": 0, "column": 0, "value": True}
+
+    plan, token = _fade_operation_plan(reader, source_id, "doLevel", args)
+    assert plan["status"] == "dry_run", plan
+    assert token and token.startswith("confirm:fadeSetup:v1:")
+    result = _fade_operation_write(reader, source_id, "doLevel", args, token)
+
+    assert result["status"] == "updated", result
+    assert result["results"][0]["after"]["isBroken"] is False
+    assert "fade_setup_succeeded" in result["results"][0]["notices"]
+
+    rollback_args = {"row": 0, "column": 0, "value": False}
+    _, rollback_token = _fade_operation_plan(reader, source_id, "doLevel", rollback_args)
+    assert rollback_token and rollback_token.startswith("confirm:fadeRecovery:v1:")
+    rollback = _fade_operation_write(reader, source_id, "doLevel", rollback_args, rollback_token)
+    assert rollback["status"] == "updated", rollback
+    assert rollback["results"][0]["after"]["doLevel"][0][0] is False
+
+
+@pytest.mark.parametrize(
+    ("levels_mode", "args", "expected_error"),
+    [
+        (1, {"inChannel": 0, "outChannel": 0, "decibel": "-inf"}, "absolute Levels mode"),
+        (0, {"inChannel": 3, "outChannel": 0, "decibel": -3.0}, "readable baseline"),
+        (0, {"inChannel": 0, "outChannel": 3, "decibel": -3.0}, "readable baseline"),
+    ],
+)
+def test_fade_audio_rejects_unsafe_silence_and_matrix_indexes_without_token(
+    levels_mode: int,
+    args: dict[str, Any],
+    expected_error: str,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_audio_fixture_cues(source_id, target_id, levels_mode=levels_mode, do_level=True),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result, token = _fade_operation_plan(reader, source_id, "level", args)
+
+    assert result["status"] == "preflight_failed"
+    assert token is None
+    assert expected_error in result["results"][0]["errors"]["level"]
+    assert result["results"][0]["executed_operations"] == []
+    assert not any("/level/" in address for address, _, _ in client.requests)
+
+
+def test_fade_audio_stale_matrix_token_rejected_without_setter() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_audio_fixture_cues(source_id, target_id, do_level=True),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    args = {"inChannel": 0, "outChannel": 0, "decibel": -6.0}
+    _, token = _fade_operation_plan(reader, source_id, "level", args)
+    assert token
+    client.cues[source_id]["levels"][0][1] = -1.0
+    client.requests.clear()
+
+    result = _fade_operation_write(reader, source_id, "level", args, token)
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert not any("/level/" in address for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize(
+    ("target_change", "expected"),
+    [
+        ({"type": "Text"}, "must be one of"),
+        ({"numChannelsIn": 0, "audioTrackFormats": []}, "proven readable audio channels"),
+        ({"isBroken": True}, "healthy"),
+        ({"isWarning": True}, "healthy"),
+        ({"isRunning": True}, "inactive"),
+    ],
+)
+def test_fade_audio_rejects_incompatible_or_unhealthy_target_without_token(
+    target_change: dict[str, Any],
+    expected: str,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_audio_fixture_cues(source_id, target_id)
+    cues[target_id].update(target_change)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result, token = _fade_plan(reader, source_id, "levelsMode", 1)
+
+    assert result["status"] == "preflight_failed"
+    assert token is None
+    assert expected in result["results"][0]["errors"]["levelsMode"]
+    assert result["results"][0]["executed_operations"] == []
+
+
+def test_fade_audio_mic_target_uses_fresh_levels_matrix_evidence() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_audio_fixture_cues(source_id, target_id, target_type="Mic")
+    cues[source_id]["doOpacity"] = False
+    # Mic/Audio Levels do not require Video's embedded-track metadata.
+    cues[target_id].pop("numChannelsIn", None)
+    cues[target_id].pop("audioTrackFormats", None)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result, token = _fade_plan(reader, source_id, "levelsMode", 1)
+
+    assert result["status"] == "dry_run"
+    assert token and token.startswith("confirm:fadeAudio:v1:")
+    assert result["results"][0]["executed_operations"] == []
+
+
+def test_fade_audio_rejects_generic_wrong_family_and_target_drift_without_setter() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    other_target = "33333333-3333-4333-8333-333333333333"
+    cues = fade_audio_fixture_cues(source_id, target_id)
+    cues[other_target] = dict(cues[target_id])
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    _, token = _fade_plan(reader, source_id, "levelsMode", 1)
+    assert token
+
+    for bad_token in ("confirm:levelsMode:1", "confirm:fadeGeometry:v1:bad:bad"):
+        result = _fade_write(reader, source_id, "levelsMode", 1, bad_token)
+        assert result["status"] == "preflight_failed"
+        assert result["results"][0]["executed_operations"] == []
+
+    client.cues[source_id]["cueTargetID"] = other_target
+    client.requests.clear()
+    drift = _fade_write(reader, source_id, "levelsMode", 1, token)
+    assert drift["status"] == "preflight_failed"
+    assert drift["results"][0]["executed_operations"] == []
+    assert not any(address.endswith("/levelsMode") for address, _, _ in client.requests)
+
+
+def test_fade_phase1_exact_visual_target_writes_and_rolls_back() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    old_target = "22222222-2222-4222-8222-222222222222"
+    new_target = "33333333-3333-4333-8333-333333333333"
+    cues = fade_fixture_cues(source_id, old_target)
+    cues[new_target] = {
+        "type": "Text",
+        "isBroken": False,
+        "isWarning": False,
+        "isRunning": False,
+        "isPaused": False,
+        "isAuditioning": False,
+    }
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"), cues=cues, workspace_id=FADE_WORKSPACE_ID
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, "cueTargetID", new_target)
+    assert token and token.startswith("confirm:fadeTarget:v1:")
+    assert _fade_write(reader, source_id, "cueTargetID", new_target, token)["status"] == "updated"
+    rollback_plan, rollback_token = _fade_plan(reader, source_id, "cueTargetID", old_target)
+    assert rollback_plan["status"] == "dry_run"
+    assert rollback_token and rollback_token.startswith("confirm:fadeTarget:v1:")
+    result = _fade_write(reader, source_id, "cueTargetID", old_target, rollback_token)
+    assert result["results"][0]["after"]["cueTargetID"] == old_target
+
+
+def test_fade_target_rejects_target_incompatible_with_active_parameters() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    visual_target = "22222222-2222-4222-8222-222222222222"
+    audio_target = "33333333-3333-4333-8333-333333333333"
+    cues = fade_fixture_cues(source_id, visual_target, do_opacity=True)
+    cues[audio_target] = {
+        "type": "Audio",
+        "numChannelsIn": 2,
+        "audioTrackFormats": [{"channels": 2}],
+        "levels": [[0.0], [0.0], [0.0]],
+        "sliderLevels": [0.0],
+        "isBroken": False,
+        "isWarning": False,
+        "isRunning": False,
+        "isPaused": False,
+        "isAuditioning": False,
+    }
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, "cueTargetID", audio_target)
+
+    assert plan["status"] == "preflight_failed"
+    assert token is None
+    assert "active Fade parameters" in plan["results"][0]["errors"]["cueTargetID"]
+    assert plan["results"][0]["executed_operations"] == []
+
+
+def test_fade_target_can_leave_existing_group_but_does_not_assign_unvalidated_fanout() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    group_target = "22222222-2222-4222-8222-222222222222"
+    visual_target = "33333333-3333-4333-8333-333333333333"
+    cues = fade_fixture_cues(source_id, group_target, target_type="Group", do_opacity=True)
+    cues[visual_target] = {
+        "type": "Video",
+        "isBroken": False,
+        "isWarning": False,
+        "isRunning": False,
+        "isPaused": False,
+        "isAuditioning": False,
+    }
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    leave_plan, leave_token = _fade_plan(reader, source_id, "cueTargetID", visual_target)
+    assert leave_plan["status"] == "dry_run", leave_plan
+    assert leave_token and leave_token.startswith("confirm:fadeTarget:v1:")
+
+    client.cues[source_id]["cueTargetID"] = visual_target
+    assign_plan, assign_token = _fade_plan(reader, source_id, "cueTargetID", group_target)
+    assert assign_plan["status"] == "preflight_failed"
+    assert assign_token is None
+    assert assign_plan["results"][0]["executed_operations"] == []
+
+
+def test_fade_geometry_rejects_flag_that_makes_existing_target_incompatible() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_fixture_cues(source_id, target_id, target_type="Audio", do_opacity=True)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, "doRate", True)
+
+    assert plan["status"] == "preflight_failed"
+    assert token is None
+    assert "compatible" in plan["results"][0]["errors"]["doRate"]
+    assert plan["results"][0]["executed_operations"] == []
+
+
+@pytest.mark.parametrize(
+    ("property_name", "requested"),
+    [
+        ("fadeType", 2),
+        ("targetMode", 1),
+        ("pathWidth", 200),
+        ("pathHeight", 100),
+        ("cueTargetNumber", "99"),
+        ("tempCueTargetID", "33333333-3333-4333-8333-333333333333"),
+        ("patchTargetID", "33333333-3333-4333-8333-333333333333"),
+        ("audioMapTargetID", "33333333-3333-4333-8333-333333333333"),
+    ],
+)
+def test_fade_unpromoted_properties_never_accept_generic_tokens_or_emit_setters(
+    property_name: str,
+    requested: Any,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_fixture_cues(source_id, target_id),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    request = {
+        "cue_ref": source_id,
+        "profile": "fade_basic",
+        "properties": {property_name: requested},
+        "confirm_gates": [f"confirm:{property_name}:test"],
+    }
+
+    result = reader.update_cues(FADE_WORKSPACE_ID, [request], dry_run=False)
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert_no_confirm_token(result)
+    assert not any(address.endswith(f"/{property_name}") for address, _, _ in client.requests)
+
+
+def test_fade_curve_and_path_unsupported_controls_never_emit_setters() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_fixture_cues(source_id, target_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    path = reader.update_cues(
+        FADE_WORKSPACE_ID,
+        [{"cue_ref": source_id, "profile": "fade_basic", "properties": {"pathWidth": 200}}],
+        dry_run=True,
+    )
+    cues[source_id]["fadeType"] = 2
+    curve = reader.update_cues(
+        FADE_WORKSPACE_ID,
+        [{"cue_ref": source_id, "profile": "fade_basic", "properties": {"curveType": "S-Curve"}}],
+        dry_run=True,
+    )
+
+    assert path["results"][0]["executed_operations"] == []
+    assert curve["results"][0]["executed_operations"] == []
+    assert_no_confirm_token(path)
+    assert_no_confirm_token(curve)
+    assert not any(address.endswith(("/pathWidth", "/curveType")) for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize(
+    ("property_name", "args"),
+    [
+        ("doObjectLevel", {"row": 1, "object": "A", "value": True}),
+        ("doObjectIDLevel", {"row": 1, "objectID": "object-id", "value": True}),
+        ("setGeometryFromTarget", {}),
+        ("setLevelsFromTarget", {}),
+        ("audioEffect/0/parameter", {"value": 0.5}),
+        ("videoEffect/0/parameter", {"value": 0.5}),
+    ],
+)
+def test_fade_objects_copy_actions_and_fx_remain_planned_only_without_setter(
+    property_name: str,
+    args: dict[str, Any],
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_fixture_cues(source_id, target_id),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        FADE_WORKSPACE_ID,
+        [
+            {
+                "cue_ref": source_id,
+                "profile": "fade_basic",
+                "operations": [{"property": property_name, "args": args}],
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["status"] in {"dry_run", "preflight_failed"}
+    assert result["results"][0]["executed_operations"] == []
+    assert_no_confirm_token(result)
+    assert not any(property_name.split("/")[0] in address for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize("bad_token", ["fake", "confirm:fadeTarget:v1:bad:bad", "confirm:name:new"])
+def test_fade_phase1_rejects_fake_and_wrong_family_tokens_without_setter(bad_token: str) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_fixture_cues(source_id, target_id),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = _fade_write(reader, source_id, "name", "Renamed", bad_token)
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert not any(address.endswith("/name") for address, _, _ in client.requests)
+
+
+def test_fade_phase1_rejects_stale_token_without_setter() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_fixture_cues(source_id, target_id),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    _, token = _fade_plan(reader, source_id, "name", "Renamed")
+    assert token
+    client.cues[source_id]["name"] = "Changed externally"
+    client.requests.clear()
+
+    result = _fade_write(reader, source_id, "name", "Renamed", token)
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["executed_operations"] == []
+    assert not any(address.endswith("/name") for address, _, _ in client.requests)
+
+
+def test_fade_setup_missing_target_and_exact_recovery() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_fixture_cues(
+        source_id, target_id, target_id_value="", broken=True, do_opacity=False
+    )
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    _, token = _fade_plan(reader, source_id, "cueTargetID", target_id)
+    assert token and token.startswith("confirm:fadeSetup:v1:")
+    setup = _fade_write(reader, source_id, "cueTargetID", target_id, token)
+    assert setup["status"] == "updated"
+    assert "fade_setup_progressed_missing_parameter" in setup["results"][0]["notices"]
+
+    _, recovery_token = _fade_plan(reader, source_id, "cueTargetID", "")
+    assert recovery_token and recovery_token.startswith("confirm:fadeRecovery:v1:")
+    recovery = _fade_write(reader, source_id, "cueTargetID", "", recovery_token)
+    assert recovery["status"] == "updated"
+    assert recovery["results"][0]["after"]["cueTargetID"] == ""
+    assert "fade_recovery_succeeded" in recovery["results"][0]["notices"]
+
+
+def test_fade_setup_does_not_replace_valid_target_when_parameter_is_missing() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    current_target = "22222222-2222-4222-8222-222222222222"
+    other_target = "33333333-3333-4333-8333-333333333333"
+    cues = fade_fixture_cues(
+        source_id,
+        current_target,
+        broken=True,
+        do_opacity=False,
+    )
+    cues[other_target] = {
+        "type": "Text",
+        "isBroken": False,
+        "isWarning": False,
+        "isRunning": False,
+        "isPaused": False,
+        "isAuditioning": False,
+    }
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    plan, token = _fade_plan(reader, source_id, "cueTargetID", other_target)
+
+    assert plan["status"] == "preflight_failed"
+    assert token is None
+    assert "current target is valid" in plan["results"][0]["errors"]["cueTargetID"]
+    assert plan["results"][0]["executed_operations"] == []
+
+
+def test_fade_recovery_rejects_target_drift_after_setup() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    other_target = "33333333-3333-4333-8333-333333333333"
+    cues = fade_fixture_cues(source_id, target_id, broken=True, do_opacity=False)
+    cues[other_target] = {
+        "type": "Video",
+        "isBroken": False,
+        "isWarning": False,
+        "isRunning": False,
+        "isPaused": False,
+        "isAuditioning": False,
+    }
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+        property_outcomes={(source_id, "doOpacity", True): {"isBroken": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    _, token = _fade_plan(reader, source_id, "doOpacity", True)
+    assert token and token.startswith("confirm:fadeSetup:v1:")
+    assert _fade_write(reader, source_id, "doOpacity", True, token)["status"] == "updated"
+    client.cues[source_id]["cueTargetID"] = other_target
+    client.requests.clear()
+
+    recovery_plan, recovery_token = _fade_plan(reader, source_id, "doOpacity", False)
+
+    assert recovery_plan["status"] == "preflight_failed"
+    assert recovery_token is None
+    assert "target changed" in recovery_plan["results"][0]["errors"]["doOpacity"]
+    assert recovery_plan["results"][0]["executed_operations"] == []
+    assert not any(address.endswith("/doOpacity") for address, _, _ in client.requests)
+
+
+def test_fade_recovery_rejects_same_target_matrix_drift_after_audio_setup() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_audio_fixture_cues(source_id, target_id, broken=True, do_level=False)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+        property_outcomes={(source_id, "doLevel/0/0", True): {"isBroken": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    enable = {"row": 0, "column": 0, "value": True}
+
+    _, token = _fade_operation_plan(reader, source_id, "doLevel", enable)
+    assert token and token.startswith("confirm:fadeSetup:v1:")
+    assert _fade_operation_write(reader, source_id, "doLevel", enable, token)["status"] == "updated"
+    client.cues[target_id]["levels"][0][0] = -1.0
+    client.requests.clear()
+
+    disable = {"row": 0, "column": 0, "value": False}
+    recovery_plan, recovery_token = _fade_operation_plan(reader, source_id, "doLevel", disable)
+
+    assert recovery_plan["status"] == "preflight_failed"
+    assert recovery_token is None
+    assert "target changed" in recovery_plan["results"][0]["errors"]["doLevel"]
+    assert recovery_plan["results"][0]["executed_operations"] == []
+
+
+def test_fade_setup_replaces_invalid_direct_target_and_recovers_exact_baseline() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    invalid_target_id = "33333333-3333-4333-8333-333333333333"
+    cues = fade_fixture_cues(
+        source_id,
+        target_id,
+        target_id_value=invalid_target_id,
+        broken=True,
+        do_opacity=True,
+    )
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+        property_outcomes={
+            (source_id, "cueTargetID", target_id): {"isBroken": False},
+            (source_id, "cueTargetID", invalid_target_id): {"isBroken": True},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    _, token = _fade_plan(reader, source_id, "cueTargetID", target_id)
+    assert token and token.startswith("confirm:fadeSetup:v1:")
+    setup = _fade_write(reader, source_id, "cueTargetID", target_id, token)
+    assert setup["status"] == "updated", setup
+    assert setup["results"][0]["after"]["isBroken"] is False
+
+    _, recovery_token = _fade_plan(reader, source_id, "cueTargetID", invalid_target_id)
+    assert recovery_token and recovery_token.startswith("confirm:fadeRecovery:v1:")
+    recovery = _fade_write(reader, source_id, "cueTargetID", invalid_target_id, recovery_token)
+    assert recovery["results"][0]["errors"] is None, recovery["results"][0]["errors"]
+    assert recovery["status"] == "updated", recovery["results"][0]
+    assert recovery["results"][0]["after"]["cueTargetID"] == invalid_target_id
+    assert recovery["results"][0]["after"]["isBroken"] is True
+
+
+def test_fade_setup_disables_invalid_audio_matrix_selection_and_recovers() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_audio_fixture_cues(source_id, target_id, broken=True)
+    cues[source_id]["doLevel"][2][1] = True
+    cues[target_id]["levels"] = cues[target_id]["levels"][:2]
+    cues[target_id]["numChannelsIn"] = 1
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        workspace_id=FADE_WORKSPACE_ID,
+        property_outcomes={
+            (source_id, "doLevel/2/1", False): {"isBroken": False},
+            (source_id, "doLevel/2/1", True): {"isBroken": True},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    disable = {"row": 2, "column": 1, "value": False}
+
+    _, token = _fade_operation_plan(reader, source_id, "doLevel", disable)
+    assert token and token.startswith("confirm:fadeSetup:v1:")
+    setup = _fade_operation_write(reader, source_id, "doLevel", disable, token)
+    assert setup["status"] == "updated", setup
+    assert setup["results"][0]["after"]["doLevel"][2][1] is False
+    assert setup["results"][0]["after"]["isBroken"] is False
+
+    restore = {"row": 2, "column": 1, "value": True}
+    _, recovery_token = _fade_operation_plan(reader, source_id, "doLevel", restore)
+    assert recovery_token and recovery_token.startswith("confirm:fadeRecovery:v1:")
+    recovery = _fade_operation_write(reader, source_id, "doLevel", restore, recovery_token)
+    assert recovery["status"] == "updated", recovery
+    assert recovery["results"][0]["after"]["doLevel"][2][1] is True
+    assert recovery["results"][0]["after"]["isBroken"] is True
+
+
+def test_fade_setup_missing_parameter_and_exact_recovery() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_fixture_cues(source_id, target_id, broken=True, do_opacity=False),
+        workspace_id=FADE_WORKSPACE_ID,
+        property_outcomes={
+            (source_id, "doOpacity", True): {"isBroken": False},
+            (source_id, "doOpacity", False): {"isBroken": True},
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    _, token = _fade_plan(reader, source_id, "doOpacity", True)
+    assert token and token.startswith("confirm:fadeSetup:v1:")
+    assert _fade_write(reader, source_id, "doOpacity", True, token)["status"] == "updated"
+
+    _, recovery_token = _fade_plan(reader, source_id, "doOpacity", False)
+    assert recovery_token and recovery_token.startswith("confirm:fadeRecovery:v1:")
+    recovery = _fade_write(reader, source_id, "doOpacity", False, recovery_token)
+    assert recovery["status"] == "updated"
+    assert recovery["results"][0]["after"]["doOpacity"] is False
+
+
+def test_fade_setup_failure_requires_recovery_and_other_broken_writes_stay_blocked() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=fade_fixture_cues(source_id, target_id, broken=True, do_opacity=False),
+        workspace_id=FADE_WORKSPACE_ID,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    blocked, blocked_token = _fade_plan(reader, source_id, "opacity", 0.75)
+    assert blocked["status"] == "preflight_failed"
+    assert blocked_token is None
+    _, token = _fade_plan(reader, source_id, "doOpacity", True)
+    assert token and token.startswith("confirm:fadeSetup:v1:")
+    failed = _fade_write(reader, source_id, "doOpacity", True, token)
+    assert failed["status"] == "verification_failed"
+
+    _, recovery_token = _fade_plan(reader, source_id, "doOpacity", False)
+    assert recovery_token and recovery_token.startswith("confirm:fadeRecovery:v1:")
+    assert _fade_write(reader, source_id, "doOpacity", False, recovery_token)["status"] == "updated"
+
+
+def test_fade_phase1_rejects_batch_multi_property_live_and_active_source() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    other_fade = "33333333-3333-4333-8333-333333333333"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_fixture_cues(source_id, target_id)
+    cues[other_fade] = dict(cues[source_id], name="Other")
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"), cues=cues, workspace_id=FADE_WORKSPACE_ID
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    batch = reader.update_cues(
+        FADE_WORKSPACE_ID,
+        [
+            {"cue_ref": source_id, "profile": "fade_basic", "properties": {"name": "A"}},
+            {"cue_ref": other_fade, "profile": "fade_basic", "properties": {"name": "B"}},
+        ],
+        dry_run=True,
+    )
+    multi = reader.update_cues(
+        FADE_WORKSPACE_ID,
+        [{"cue_ref": source_id, "profile": "fade_basic", "properties": {"name": "A", "geoMode": 1}}],
+        dry_run=True,
+    )
+    live, live_token = _fade_plan(reader, source_id, "opacity", 0.75, mode="live")
+    client.cues[source_id]["isRunning"] = True
+    active, active_token = _fade_plan(reader, source_id, "opacity", 0.75)
+
+    assert batch["status"] == "preflight_failed"
+    assert multi["status"] == "preflight_failed"
+    assert live["status"] == "preflight_failed" and live_token is None
+    assert active["status"] == "preflight_failed" and active_token is None
+    assert all(item["executed_operations"] == [] for item in batch["results"] + multi["results"])
+    assert not any(address.endswith(("/name", "/geoMode", "/opacity")) for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize(
+    ("source_change", "target_change", "property_name", "requested"),
+    [
+        ({"targetMode": 1}, {}, "name", "Renamed"),
+        ({"fadeType": 2}, {}, "name", "Renamed"),
+        ({}, {"type": "Memo"}, "name", "Renamed"),
+        ({}, {"isBroken": True}, "name", "Renamed"),
+        ({}, {"isRunning": True}, "name", "Renamed"),
+        ({}, {}, "cueTargetID", "11111111-1111-4111-8111-111111111111"),
+    ],
+)
+def test_fade_phase1_rejects_wrong_modes_and_unsafe_targets_without_token(
+    source_change: dict[str, Any],
+    target_change: dict[str, Any],
+    property_name: str,
+    requested: Any,
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    cues = fade_fixture_cues(source_id, target_id)
+    cues[source_id].update(source_change)
+    cues[target_id].update(target_change)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"), cues=cues, workspace_id=FADE_WORKSPACE_ID
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result, token = _fade_plan(reader, source_id, property_name, requested)
+
+    assert result["status"] == "preflight_failed"
+    assert token is None
+    assert result["results"][0]["executed_operations"] == []
 
 
 def test_update_cues_fade_profile_type_mismatch_fails_cleanly_without_plan() -> None:
@@ -11480,7 +13608,6 @@ def test_update_cue_real_blocks_dry_run_only_profiles_and_properties_before_osc(
         ("network_basic", "Network", {"customString": "/eos/cue/1/fire"}),
         ("midi_basic", "MIDI", {"note": 64}),
         ("timecode_basic", "Timecode", {"timecodeString": "01:00:00:00"}),
-        ("fade_basic", "Fade", {"targetMode": 0}),
         ("script_basic", "Script", {"scriptSource": "display dialog \"blocked\""}),
     ):
         client = FakeWriteClient(
@@ -11492,6 +13619,17 @@ def test_update_cue_real_blocks_dry_run_only_profiles_and_properties_before_osc(
         with pytest.raises(UnsafeWriteOperationError, match="dry-run only"):
             reader.update_cue("ws-1", cue_id, properties, dry_run=False, profile=profile)
         assert client.requests == []
+
+    fade_client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        cue_values={"uniqueID": cue_id, "type": "Fade"},
+    )
+    fade = QLabReader(fade_client)  # type: ignore[arg-type]
+    fade_result = fade.update_cue("ws-1", cue_id, {"targetMode": 0}, dry_run=False, profile="fade_basic")
+    assert fade_result["status"] == "preflight_failed"
+    assert fade_result["executed_operations"] == []
+    assert not any(address.endswith("/targetMode") for address, _, _ in fade_client.requests)
 
     light_op_client = FakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -13490,7 +15628,6 @@ def test_create_cue_dry_run_reviews_supported_and_unsupported_non_light_types() 
         ("reset_basic", "Reset", {"name": "Reset cue renamed"}),
         ("devamp_basic", "Devamp", {"name": "Devamp cue renamed"}),
         ("light_basic", "Light", {"name": "Light cue renamed"}),
-        ("fade_basic", "Fade", {"name": "Fade cue renamed"}),
         ("network_basic", "Network", {"name": "Network cue renamed"}),
         ("midi_basic", "MIDI", {"name": "MIDI cue renamed"}),
         ("script_basic", "Script", {"name": "Script cue renamed"}),

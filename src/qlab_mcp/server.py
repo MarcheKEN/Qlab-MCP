@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Annotated, Any, Literal, TypeVar
+from uuid import UUID
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
@@ -13,10 +14,13 @@ from pydantic import Field
 from .errors import QLabMcpError
 from .models import (
     CreateCueResult,
+    DeleteCuesResult,
     CueDetailsBatchResult,
     CueDetailsResult,
     CueUpdateInput,
     CueQueryResult,
+    MoveCueInput,
+    MoveCuesResult,
     QlabConnectionCheckResult,
     WorkspaceStatusResult,
     WorkspaceSettingRequestInput,
@@ -163,6 +167,12 @@ GATED_CREATE_QLAB_TOOL = ToolAnnotations(
     idempotentHint=False,
     openWorldHint=True,
 )
+GATED_DELETE_QLAB_TOOL = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=True,
+    idempotentHint=False,
+    openWorldHint=True,
+)
 CHECK_CONNECTION_TIMEOUT = 6.0
 WORKSPACE_OVERVIEW_TIMEOUT = 45.0
 WORKSPACE_STATUS_TIMEOUT = 60.0
@@ -173,6 +183,7 @@ CUE_DETAILS_TIMEOUT = 20.0
 WRITE_READINESS_TIMEOUT = 6.0
 CREATE_CUE_TIMEOUT = 30.0
 UPDATE_CUES_TIMEOUT = 180.0
+DELETE_CUES_TIMEOUT = 180.0
 
 T = TypeVar("T")
 
@@ -1005,6 +1016,107 @@ def qlab_update_cues(
     Dry-run planning never sends mutating OSC. Prefer qlab_edit_cues for new work.
     """
     return qlab_edit_cues(workspace_id=workspace_id, updates=updates, dry_run=dry_run)
+
+
+@mcp.tool(
+    title="Move QLab Cues",
+    tags={"qlab", "write-mode", "cue-move", "gated-write"},
+    annotations=GATED_CREATE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_move_cues(
+    workspace_id: WorkspaceId,
+    moves: Annotated[
+        list[MoveCueInput],
+        Field(
+            min_length=1,
+            max_length=10,
+            description=(
+                "One to ten explicit UUID cue moves. List and Group placements use exactly one linear "
+                "placement field; Cue Cart placements use cart_row and cart_column only."
+            ),
+        ),
+    ],
+    dry_run: Annotated[
+        bool | None,
+        Field(
+            description=(
+                "When true, plan the sequential move batch but send no mutating commands. "
+                "When omitted, QLAB_WRITE_DRY_RUN_DEFAULT is used and defaults to true."
+            ),
+        ),
+    ] = None,
+    confirm_token: Annotated[
+        str | None,
+        Field(description="Exact confirm:moveCues:v1: token returned by a reviewed dry-run plan."),
+    ] = None,
+) -> MoveCuesResult:
+    """Plan or execute one to ten sequential QLab cue moves.
+
+    Real moves require write readiness, Edit Mode, inactive healthy cues, a fresh dedicated confirmation
+    token, stable structural dependencies, and independent readback. This tool never claims atomicity.
+    """
+    return _run_tool(
+        lambda: MoveCuesResult.model_validate(
+            _reader().move_cues(
+                workspace_id=workspace_id,
+                moves=[move.model_dump(mode="json", exclude_none=True) for move in moves],
+                dry_run=dry_run,
+                confirm_token=confirm_token,
+            )
+        )
+    )
+
+
+@mcp.tool(
+    title="Delete QLab Cues",
+    tags={"qlab", "write-mode", "cue-delete", "gated-write"},
+    annotations=GATED_DELETE_QLAB_TOOL,
+    timeout=DELETE_CUES_TIMEOUT,
+)
+def qlab_delete_cues(
+    workspace_id: WorkspaceId,
+    cue_ids: Annotated[
+        list[UUID],
+        Field(
+            min_length=1,
+            max_length=10,
+            description=(
+                "One to ten exact leaf cue UUIDs. Groups, Cue Lists, Cue Carts, cues with children, "
+                "and parent/descendant batches are blocked; deletion is not cascading."
+            ),
+        ),
+    ],
+    dry_run: Annotated[
+        bool | None,
+        Field(
+            description=(
+                "When true, plan the sequential leaf-cue deletion but send no mutating commands. "
+                "When omitted, QLAB_WRITE_DRY_RUN_DEFAULT is used and defaults to true."
+            ),
+        ),
+    ] = None,
+    confirm_token: Annotated[
+        str | None,
+        Field(description="Exact confirm:deleteCues:v1: token returned by a reviewed dry-run plan."),
+    ] = None,
+) -> DeleteCuesResult:
+    """Plan or execute one to ten sequential deletions of explicit leaf cues.
+
+    Real deletion requires write readiness, Edit Mode, zero activity, a fresh dedicated confirmation
+    token, leaf-only targets, and independent existence readback after every delete. Groups, Cue Lists,
+    Cue Carts, cascades, and ambiguous targets remain blocked. Deletion is sequential and not atomic.
+    """
+    return _run_tool(
+        lambda: DeleteCuesResult.model_validate(
+            _reader().delete_cues(
+                workspace_id=workspace_id,
+                cue_ids=[str(cue_id) for cue_id in cue_ids],
+                dry_run=dry_run,
+                confirm_token=confirm_token,
+            )
+        )
+    )
 
 
 def main() -> None:

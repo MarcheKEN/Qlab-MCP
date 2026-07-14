@@ -114,6 +114,8 @@ Cue edit flow:
 | `qlab_create_cue` | Dry-runs or creates one blank allowlisted cue with safe initial properties. |
 | `qlab_edit_cues` | Dry-runs or updates 1-50 concrete cues through the cue editing registry. |
 | `qlab_update_cues` | Compatibility alias for older prompts, tests, and clients. |
+| `qlab_move_cues` | Dry-runs or moves 1-10 exact UUID-addressed cues within or between Lists and Groups. |
+| `qlab_delete_cues` | Dry-runs or deletes 1-10 exact leaf-cue UUIDs; container and cascade deletion is blocked. |
 
 ## Read Model
 
@@ -241,6 +243,64 @@ If a setter times out but a fresh after-read confirms the requested value,
 `qlab_edit_cues` reports `updated_with_confirmed_timeouts` with a warning. If
 fresh verification cannot prove the requested value, the result is failed or
 inconclusive.
+
+### Fade cues
+
+`qlab_edit_cues` supports gated Fade Basics and duration, exact UUID cue targets,
+and promoted direct target types Audio, Mic, Video, Camera, and Text. Group and
+Cue List fanout, patches, maps, Objects, Audio FX, Video FX, Curve internals,
+Geometry Path, unsupported resets, and planned-only actions remain out of scope.
+
+Supported fields include absolute/relative `levelsMode`, `doLevel`, `level`,
+`sliderLevel`, `gang`, `inputChannelName`, `stopTargetWhenDone`, and supported
+visual Geometry fields. `-inf` is accepted only for absolute Levels and maps to
+workspace Audio minimum on readback. Dedicated token families are
+`confirm:fadeBasic:v1:`, `confirm:fadeTarget:v1:`, `confirm:fadeGeometry:v1:`,
+`confirm:fadeAudio:v1:`, `confirm:fadeBehavior:v1:`,
+`confirm:fadeSetup:v1:`, and `confirm:fadeRecovery:v1:`. Promoted writes require
+fresh readback, health/activity gates, one setter, and fresh verification.
+
+Local tests cover Fade Audio/Mic targeting, absolute/relative Levels, `doLevel`,
+`level`, `sliderLevel`, semantic `-inf`, `stopTargetWhenDone`, and `0.001 dB`
+tolerance. Live MCP/QLab validation remains pending where the research record
+says so; no runtime claim is made for listed out-of-scope features.
+
+### Move cues
+
+`qlab_move_cues` accepts one workspace UUID and 1–10 strict cue UUID moves.
+Linear placement uses exactly one of `destination_index`, `before_cue_id`,
+`after_cue_id`, `position="first"`, or `position="last"`, within or between
+Cue Lists and Groups. Execution is ordered and sequential. Dry-run returns
+`confirm:moveCues:v1:`; structural simulation binds parent/order fingerprints,
+rejects cycles and invalid parents, preserves UUIDs and cue properties, and
+never claims OSC atomicity. Results distinguish partial failure, verification,
+timeout, and indeterminate outcomes.
+
+QLab may acknowledge a move before readable tree update. Convergence polls at
+approximately 0, 250, 500 ms, 1, 2, 4, 6, 8, and 10 seconds; next move waits
+for prior convergence. Cue Cart fields are schema-supported, but real Cart
+execution remains runtime-blocked pending disposable-workspace validation.
+Large batches can take several seconds per cue. Local tests cover same-parent
+up/down, List/Group transfers, nested Groups, first/last/before/after, batches
+of 2 and 10, and structural/property preservation.
+
+### Delete cues
+
+`qlab_delete_cues` accepts one workspace UUID and 1–10 exact leaf-cue UUIDs.
+Dry-run returns `confirm:deleteCues:v1:`. Duplicate, invalid, active, container,
+parent/descendant, cascade, Group, Cue List, and Cue Cart requests are rejected.
+Deletes are sequential, stop on unresolved failure, use independent existence
+and neighbor readback, have no automatic rollback, and are destructive and
+non-idempotent.
+
+Tokens bind workspace, requested UUID order, cue type, parent, sibling index,
+previous/next neighbors, parent-order and deletion-impact fingerprints,
+readiness/activity, operation version, and expiry. Deletion convergence polls
+over bounded 0–10 second window. Result states include `deleted_immediately`,
+`deleted_after_convergence`, `indeterminate`, `failed`, and `partial_failed`.
+Permanent container/descendant deletion remains out of scope. Local tests cover
+leaf/batch deletion, neighbor preservation, stale and wrong-family tokens,
+container guards, and no cascade.
 
 ## Privacy Profiles
 
@@ -387,6 +447,8 @@ qlab_check_write_readiness(workspace_id)
 qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
 qlab_edit_cues(workspace_id, updates, dry_run=None)
 qlab_update_cues(workspace_id, updates, dry_run=None)  # compatibility alias
+qlab_move_cues(workspace_id, moves, dry_run=None, confirm_token=None)
+qlab_delete_cues(workspace_id, cue_ids, dry_run=None, confirm_token=None)
 ```
 
 `qlab_edit_cues` update items use this shape:
@@ -409,6 +471,28 @@ Structured update operations inside each item use this shape:
   "args": {"inChannel": 1, "outChannel": 1, "decibel": -6},
   "mode": "saved"
 }
+```
+
+Compact examples:
+
+```json
+{"workspace_id":"WORKSPACE_UUID","updates":[{"cue_ref":"FADE_UUID","profile":"fade_basic","operations":[{"property":"level","args":{"inChannel":0,"outChannel":0,"decibel":-6},"mode":"saved"}]}],"dry_run":true}
+```
+
+```json
+{"workspace_id":"WORKSPACE_UUID","moves":[{"cue_id":"CUE_UUID","destination_parent_id":"GROUP_UUID","position":"last"}],"dry_run":true}
+```
+
+```json
+{"workspace_id":"WORKSPACE_UUID","moves":[{"cue_id":"CUE_A_UUID","before_cue_id":"CUE_B_UUID"},{"cue_id":"CUE_C_UUID","position":"first"}],"dry_run":true}
+```
+
+```json
+{"workspace_id":"WORKSPACE_UUID","cue_ids":["LEAF_UUID"],"dry_run":true}
+```
+
+```json
+{"workspace_id":"WORKSPACE_UUID","cue_ids":["LEAF_UUID"],"dry_run":false,"confirm_token":"confirm:deleteCues:v1:RETURNED_TOKEN"}
 ```
 
 ## Development And References

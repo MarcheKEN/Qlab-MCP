@@ -327,6 +327,16 @@ COMMON_PROPERTIES = (
     _prop("useSecondColor", "boolean", real_write_enabled=True),
 )
 
+FADE_COMMON_PROPERTIES = tuple(
+    replace(
+        prop,
+        risk_tier="high",
+        real_write_enabled=False,
+        planned_only_reason="fade_basic_requires_confirm_token",
+    )
+    for prop in COMMON_PROPERTIES
+)
+
 COMMON_CATALOG_PROPERTIES = (
     _planned_prop("colorCondition", "color_condition", reason="deprecated_unsupported_in_current_qlab"),
     _planned_prop("duckLevel", "decibel", reason="ducking_changes_cue_behavior"),
@@ -1222,7 +1232,7 @@ FADE_CATALOG_PROPERTIES = (
     _planned_prop("targetMode", "target_mode", reason="target_behavior_needs_validation"),
     _planned_prop("levelsMode", "fade_mode", reason="fade_level_mode_needs_validation"),
     _planned_prop("geoMode", "fade_mode", reason="fade_geometry_mode_needs_validation"),
-    _planned_prop("mode", "fade_mode", path="geoMode", read_key="geoMode", reason="deprecated_use_geoMode"),
+    _planned_prop("mode", "fade_mode", path="levelsMode", read_key="levelsMode", reason="deprecated_use_levelsMode"),
     _planned_prop("fadeType", "fade_type", reason="fade_type_needs_validation"),
     _planned_prop("pathHeight", "positive_number", reason="fade_geometry_path_needs_validation"),
     _planned_prop("pathWidth", "positive_number", reason="fade_geometry_path_needs_validation"),
@@ -1233,7 +1243,44 @@ FADE_CATALOG_PROPERTIES = (
     _planned_prop("doRotation", "boolean", reason="fade_target_behavior_needs_validation"),
     _planned_prop("doScale", "boolean", reason="fade_target_behavior_needs_validation"),
     _planned_prop("doTranslation", "boolean", reason="fade_target_behavior_needs_validation"),
-    _op("doLevel", (("row", "audio_level_row"), ("column", "audio_output_ref"), ("value", "boolean")), path="doLevel/{row}/{column}", risk_tier="high", planned_only_reason="fade_level_targets_need_validation"),
+    _planned_prop("opacity", "opacity", reason="fade_geometry_requires_confirm_token"),
+    _planned_prop("rate", "rate", reason="fade_geometry_requires_confirm_token"),
+    _planned_prop("translation/x", "number", reason="fade_geometry_requires_confirm_token"),
+    _planned_prop("translation/y", "number", reason="fade_geometry_requires_confirm_token"),
+    _planned_prop("scale/x", "number", reason="fade_geometry_requires_confirm_token"),
+    _planned_prop("scale/y", "number", reason="fade_geometry_requires_confirm_token"),
+    _planned_prop("quaternion", "quaternion", reason="fade_geometry_requires_confirm_token"),
+    _op(
+        "sliderLevel",
+        (("channel", "audio_output_ref"), ("decibel", "decibel")),
+        path="sliderLevel/{channel}",
+        read_key="sliderLevels",
+        risk_tier="high",
+        planned_only_reason="fade_audio_levels_require_confirm_token",
+    ),
+    _op(
+        "level",
+        (("inChannel", "audio_level_row"), ("outChannel", "audio_output_ref"), ("decibel", "decibel")),
+        path="level/{inChannel}/{outChannel}",
+        read_key="levels",
+        risk_tier="high",
+        planned_only_reason="fade_audio_levels_require_confirm_token",
+    ),
+    _op("doLevel", (("row", "audio_level_row"), ("column", "audio_output_ref"), ("value", "boolean")), path="doLevel/{row}/{column}", read_key="doLevel", risk_tier="high", planned_only_reason="fade_level_targets_need_validation"),
+    _op(
+        "inputChannelName",
+        (("number", "positive_int"), ("name", "string")),
+        path="inputChannelName/{number}",
+        risk_tier="high",
+        planned_only_reason="fade_audio_level_meta_requires_confirm_token",
+    ),
+    _op(
+        "gang",
+        (("inChannel", "audio_level_row"), ("outChannel", "audio_output_ref"), ("gang", "string")),
+        path="gang/{inChannel}/{outChannel}",
+        risk_tier="high",
+        planned_only_reason="fade_audio_level_meta_requires_confirm_token",
+    ),
     _op("doObjectLevel", (("row", "audio_level_row"), ("object", "audio_object_ref"), ("value", "boolean")), path="doObjectLevel/{row}/{object}", risk_tier="high", planned_only_reason="fade_object_targets_need_validation"),
     _op("doObjectIDLevel", (("row", "audio_level_row"), ("objectID", "audio_object_ref"), ("value", "boolean")), path="doObjectIDLevel/{row}/{objectID}", risk_tier="high", planned_only_reason="fade_object_targets_need_validation"),
     _op("setGeometryFromTarget", (), path="setGeometryFromTarget", risk_tier="high", planned_only_reason="target_copy_actions_need_dedicated_validation"),
@@ -1423,7 +1470,7 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
         "Text visual properties and basic text content, font size, and alignment use specialized confirmation gates; rich formatting stays dry-run only.",
     ),
     "light_basic": UpdateProfileSpec("light_basic", ("Light",), (*COMMON_PROPERTIES, *LIGHT_CATALOG_PROPERTIES), "high", True, "Light profile; lightCommandText and saved behavior flags use specialized confirmation gates."),
-    "fade_basic": UpdateProfileSpec("fade_basic", ("Fade",), (*COMMON_PROPERTIES, *FADE_CATALOG_PROPERTIES), "high", True, "Fade profile; fade targets remain dry-run only."),
+    "fade_basic": UpdateProfileSpec("fade_basic", ("Fade",), (*FADE_COMMON_PROPERTIES, *FADE_CATALOG_PROPERTIES), "high", True, "Fade Basics, exact cue targets, 1D geometry, Levels matrices, and completion behavior use specialized confirmation gates; remaining Fade routes stay planned-only."),
     "network_basic": UpdateProfileSpec("network_basic", ("Network",), (*COMMON_PROPERTIES, *NETWORK_CATALOG_PROPERTIES), "high", True, "Network profile; OSC Message mode cannot be proven from documented patch readback, so network output remains dry-run only."),
     "midi_basic": UpdateProfileSpec("midi_basic", ("MIDI",), (*COMMON_PROPERTIES, *MIDI_CATALOG_PROPERTIES), "high", True, "MIDI profile; MIDI messages remain dry-run only."),
     "midi_file_basic": UpdateProfileSpec("midi_file_basic", ("MIDI File",), (*COMMON_PROPERTIES, *MIDI_FILE_CATALOG_PROPERTIES), "medium", True, "MIDI File profile with playback metadata writes."),
@@ -1724,6 +1771,11 @@ def real_write_permission_errors(
     errors: dict[str, str] = {}
     for operation in operations:
         prop = str(operation["property"])
+        if profile == "fade_basic":
+            errors[prop] = (
+                f"{prop} is gated or dry-run only outside the specialized single-cue Fade gate."
+            )
+            continue
         if profile in {"target_basic", "reset_basic"} and prop in {
             "cueTargetID",
             "cueTargetNumber",
@@ -1963,6 +2015,10 @@ def _normalize_args(spec: CuePropertySpec, raw_args: Any, *, source: str) -> dic
             raise UnsafeWriteOperationError(f"{spec.name} requires operations[] because it has structured arguments")
         return {"value": _validate_named_value(spec.name, spec.args[0][1], raw_args)}
     if spec.name == "quaternion" and len(spec.args) == 1 and spec.args[0][0] == "value":
+        if isinstance(raw_args, dict):
+            if set(raw_args) != {"value"}:
+                raise UnsafeWriteOperationError("quaternion args must contain only value")
+            raw_args = raw_args["value"]
         return {"value": _validate_named_value(spec.name, spec.args[0][1], raw_args)}
     if len(spec.args) == 1 and spec.args[0][0] == "value" and not isinstance(raw_args, dict):
         return {"value": _validate_named_value(spec.name, spec.args[0][1], raw_args)}
@@ -2103,7 +2159,7 @@ def _validate_value(validator: str, value: Any) -> Any:
     if validator == "fade_mode":
         return _int_range(value, 0, 1, "value must be 0 or 1")
     if validator == "fade_type":
-        return _int_range(value, 1, 2, "value must be 1 for absolute or 2 for relative")
+        return _int_range(value, 1, 2, "value must be 1 for 1D Curve or 2 for 2D Path")
     if validator == "network_fade_type":
         return _int_range(value, 0, 2, "value must be 0, 1, or 2")
     if validator == "fade_number_type":

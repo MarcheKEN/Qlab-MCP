@@ -15,8 +15,9 @@ Phase 7D local `quaternion` candidate, the Phase 7E local `resetRotation`
 action candidate, the Phase 7F local `smooth` candidate, and the Phase 8A local
 cue I/O ID candidates, and the Phase 8B local Video embedded-audio Time & Loops
 candidates, the local Audio/Mic Phase 9A slider, Phase 9B matrix, and Phase 9C
-metadata candidates, the Phase 8C local Video slice marker candidates, and the
-local Devamp saved-configuration candidate.
+metadata candidates, the Phase 8C local Video slice marker candidates, the
+local Devamp saved-configuration candidate, and the local Fade Basics,
+direct-target, geometry, Levels, behavior, and setup/recovery candidates.
 Those
 exceptions are listed in Current Invariants.
 
@@ -56,6 +57,11 @@ exceptions are listed in Current Invariants.
   or `Video` UUIDs. Stop target requires Start next already enabled, and Start
   next cannot be disabled while Stop target is true. Runtime validation remains
   pending.
+- Fade local saved configuration uses only dedicated `fadeBasic`, `fadeTarget`,
+  `fadeGeometry`, `fadeAudio`, `fadeBehavior`, `fadeSetup`, and `fadeRecovery`
+  token families. Generic tokens, patch/map targets, Path/Curve internals,
+  Objects, and FX emit no setter. Runtime validation remains pending; see
+  `docs/current/research/fade_cue_safe_editing.md`.
 - Network `customString`, `networkPatchID`, fades, and device-description
   parameters remain planned-only: documented `network/patchList` readback does
   not prove that a patch uses `OSC Message`, while `customString` also writes

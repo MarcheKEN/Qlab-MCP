@@ -264,6 +264,7 @@ EXHAUSTIVE_EXTRA_PROPERTIES = {
     "audioOutputPatch/cueOutputChannels",
     "audioOutputPatch/muteChannels",
     "audioOutputPatch/routing",
+    "doLevel",
     "levels",
     "muteChannels",
     "muteObjects",

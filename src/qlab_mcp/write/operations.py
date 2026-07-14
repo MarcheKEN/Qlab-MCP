@@ -51,11 +51,15 @@ from .timeouts import (
     setter_reply_timeout as _timeout_setter_reply_timeout,
 )
 from .network_patch_types import classify_network_patch_type, valid_osc_message_text
+from .moves import move_cues as _move_cues
+from .deletes import delete_cues as _delete_cues
 
 
 MAX_BATCH_UPDATES = 50
 UPDATE_NUMERIC_MATCH_ABS_TOLERANCE = 1e-5
 UPDATE_NUMERIC_MATCH_REL_TOLERANCE = 1e-6
+# QLab quantizes saved dB values slightly (for example, -12 -> -11.999952...).
+FADE_AUDIO_DB_MATCH_TOLERANCE = 1e-3
 CONTINUE_MODE_VALUES = {
     0: 0,
     1: 1,
@@ -232,6 +236,101 @@ NETWORK_OSC_MESSAGE_OPERATION_KIND = "network_osc_message_write"
 NETWORK_OSC_MESSAGE_TOKEN_VERSION = 1
 NETWORK_REPAIR_OPERATION_KIND = "network_repair_write"
 NETWORK_REPAIR_TOKEN_VERSION = 1
+FADE_BASIC_PROPERTIES = frozenset(
+    {
+        "name",
+        "number",
+        "notes",
+        "armed",
+        "flagged",
+        "colorName",
+        "preWait",
+        "postWait",
+        "duration",
+        "tempDuration",
+        "continueMode",
+        "skipIfDisarmed",
+        "autoLoad",
+        "secondColorName",
+        "useSecondColor",
+    }
+)
+FADE_GEOMETRY_PROPERTIES = frozenset(
+    {
+        "geoMode",
+        "doOpacity",
+        "opacity",
+        "doRate",
+        "rate",
+        "doTranslation",
+        "translation/x",
+        "translation/y",
+        "doScale",
+        "scale/x",
+        "scale/y",
+        "doRotation",
+        "rotationType",
+        "rotation",
+        "quaternion",
+    }
+)
+FADE_AUDIO_PROPERTIES = frozenset(
+    {"levelsMode", "doLevel", "level", "sliderLevel", "inputChannelName", "gang"}
+)
+FADE_BEHAVIOR_PROPERTIES = frozenset({"stopTargetWhenDone"})
+FADE_PHASE1_PROPERTIES = frozenset(
+    {
+        *FADE_BASIC_PROPERTIES,
+        "cueTargetID",
+        *FADE_GEOMETRY_PROPERTIES,
+        *FADE_AUDIO_PROPERTIES,
+        *FADE_BEHAVIOR_PROPERTIES,
+    }
+)
+FADE_VISUAL_TARGET_TYPES = frozenset({"Video", "Camera", "Text"})
+FADE_AUDIO_TARGET_TYPES = frozenset({"Audio", "Mic", "Video", "Camera"})
+FADE_RATE_TARGET_TYPES = frozenset({"Audio", "Video"})
+FADE_DIRECT_TARGET_TYPES = frozenset({"Group", *FADE_VISUAL_TARGET_TYPES, *FADE_AUDIO_TARGET_TYPES})
+FADE_CONFIGURABLE_TARGET_TYPES = frozenset(
+    {*FADE_VISUAL_TARGET_TYPES, *FADE_AUDIO_TARGET_TYPES, *FADE_RATE_TARGET_TYPES}
+)
+FADE_DEPENDENCY_READ_KEYS = (
+    "hasCueTargets",
+    "cueTargetID",
+    "targetMode",
+    "fadeType",
+    "geoMode",
+    "doOpacity",
+    "doRate",
+    "doRotation",
+    "doScale",
+    "doTranslation",
+    "opacity",
+    "rate",
+    "translation/x",
+    "translation/y",
+    "scale/x",
+    "scale/y",
+    "rotation",
+    "rotationType",
+    "quaternion",
+    "levelsMode",
+    "doLevel",
+    "levels",
+    "sliderLevels",
+    "numChannelsIn",
+)
+FADE_TOKEN_VERSION = 1
+FADE_TOKEN_KINDS = {
+    "fadeBasic": "fade_basic_write",
+    "fadeTarget": "fade_target_write",
+    "fadeGeometry": "fade_geometry_write",
+    "fadeAudio": "fade_audio_write",
+    "fadeBehavior": "fade_behavior_write",
+    "fadeSetup": "fade_setup_write",
+    "fadeRecovery": "fade_recovery_write",
+}
+_FADE_RECOVERY_RECORDS: dict[tuple[str, str, str], dict[str, Any]] = {}
 VIDEO_PHASE8B_AUDIO_TIME_PROPERTIES = frozenset(
     {
         "startTime",
@@ -348,6 +447,24 @@ def _write_workspace_resolution_error(
 class QLabWriteMixin:
     def check_write_readiness(self, workspace_id: str) -> dict[str, Any]:
         return check_write_readiness(self, workspace_id)
+
+    def move_cues(
+        self,
+        workspace_id: str,
+        moves: list[dict[str, Any]],
+        dry_run: bool | None = None,
+        confirm_token: str | None = None,
+    ) -> dict[str, Any]:
+        return _move_cues(self, workspace_id, moves, dry_run=dry_run, confirm_token=confirm_token)
+
+    def delete_cues(
+        self,
+        workspace_id: str,
+        cue_ids: list[str],
+        dry_run: bool | None = None,
+        confirm_token: str | None = None,
+    ) -> dict[str, Any]:
+        return _delete_cues(self, workspace_id, cue_ids, dry_run=dry_run, confirm_token=confirm_token)
 
     def create_cue(
         self,
@@ -603,6 +720,8 @@ class QLabWriteMixin:
         )
         devamp_call = any(_devamp_operation(item) is not None for item in items)
         network_call = any(_network_operation(item) is not None for item in items)
+        fade_profile_call = any(item.get("profile") == "fade_basic" and item.get("operations") for item in items)
+        fade_phase1_call = any(_fade_phase1_operation(item) is not None for item in items)
         phase8b_video_audio_time_call = any(
             _phase8b_video_audio_time_operation(item) is not None for item in items
         )
@@ -641,6 +760,10 @@ class QLabWriteMixin:
         )
         for item in items:
             _strip_video_phase2_confirm_tokens(item)
+            if item.get("profile") == "fade_basic":
+                for operation in item.get("operations") or []:
+                    if operation.get("property") not in FADE_PHASE1_PROPERTIES:
+                        operation.pop("confirm_token", None)
             if item.get("profile") == "network_basic":
                 for operation in item.get("operations") or []:
                     operation.pop("confirm_token", None)
@@ -684,6 +807,21 @@ class QLabWriteMixin:
                             "customString",
                             "message",
                             "messageError",
+                            *VIDEO_PHASE2_HEALTH_READ_KEYS,
+                        ]
+                    )
+                )
+            if item.get("profile") == "fade_basic" and item.get("operations"):
+                for operation in item.get("operations") or []:
+                    read_key = _phase9_dynamic_read_key(operation)
+                    if read_key:
+                        operation["read_key"] = read_key
+                        item["read_keys"] = list(dict.fromkeys([*item.get("read_keys", []), read_key]))
+                item["read_keys"] = list(
+                    dict.fromkeys(
+                        [
+                            *item["read_keys"],
+                            *FADE_DEPENDENCY_READ_KEYS,
                             *VIDEO_PHASE2_HEALTH_READ_KEYS,
                         ]
                     )
@@ -861,6 +999,7 @@ class QLabWriteMixin:
             )
             devamp_structure_error = _devamp_call_structure_error(items) if devamp_call else None
             network_structure_error = _network_call_structure_error(items) if network_call else None
+            fade_structure_error = _fade_call_structure_error(items) if fade_profile_call else None
             phase8b_audio_time_structure_error = (
                 _phase8b_video_audio_time_call_structure_error(items)
                 if phase8b_video_audio_time_call
@@ -1021,6 +1160,15 @@ class QLabWriteMixin:
                         errors[property_name] = (
                             f"{property_name} is gated or dry-run only without exactly one reviewed "
                             "Network OSC Message confirm_token."
+                        )
+                elif not errors and fade_profile_call:
+                    property_name = item["operations"][0]["property"] if item.get("operations") else "fade"
+                    if fade_structure_error:
+                        errors[property_name] = fade_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Fade confirm_token."
                         )
                 elif not errors and phase8b_video_audio_time_call:
                     property_name = item["operations"][0]["property"]
@@ -1255,6 +1403,7 @@ class QLabWriteMixin:
             utility_target_candidate_shape = _utility_target_call_structure_error(items) is None
             devamp_candidate_shape = _devamp_call_structure_error(items) is None
             network_candidate_shape = _network_call_structure_error(items) is None
+            fade_candidate_shape = fade_phase1_call and _fade_call_structure_error(items) is None
             phase8b_audio_time_candidate_shape = (
                 phase8b_video_audio_time_call
                 and not phase4_light_call
@@ -1446,6 +1595,7 @@ class QLabWriteMixin:
             for item in items:
                 errors = dict(item.get("errors") or {})
                 before = None
+                fade_preflight = None
                 warnings = ["Dry run only: no mutating OSC commands were sent to QLab."]
                 if not errors and item["cue_ref"]:
                     before, read_errors = _try_read_update_values(self, workspace, item["cue_ref"], item["read_keys"])
@@ -1492,6 +1642,19 @@ class QLabWriteMixin:
                         candidate_shape=network_candidate_shape,
                     ).items():
                         errors.setdefault(key, value)
+                    fade_preflight, fade_errors = _fade_dry_run_preflight(
+                        item,
+                        before,
+                        workspace_id=workspace,
+                        reader=self,
+                        candidate_shape=fade_candidate_shape,
+                        structure_error=(
+                            _fade_call_structure_error(items)
+                            if fade_phase1_call and not fade_candidate_shape
+                            else None
+                        ),
+                    )
+                    errors.update(fade_errors)
                     errors.update(_phase8b_video_audio_time_dry_run_errors(item, before))
                     errors.update(
                         _phase9_audio_dry_run_errors(
@@ -1637,6 +1800,15 @@ class QLabWriteMixin:
                             reader=self,
                             before=before,
                             candidate_shape=network_candidate_shape,
+                        )
+                    )
+                if not errors and _fade_phase1_operation(item) is not None:
+                    warnings.extend(
+                        _annotate_fade_operation(
+                            item,
+                            workspace_id=workspace,
+                            candidate_shape=fade_candidate_shape,
+                            preflight=fade_preflight,
                         )
                     )
                 # The utility gate is deliberately re-checked from the normalized item
@@ -2016,6 +2188,10 @@ class QLabWriteMixin:
                 errors.update(_validate_network_real_write(workspace, item, before, reader=self))
                 if not errors:
                     _mark_network_real_operation(item)
+            elif not errors and fade_profile_call:
+                errors.update(_validate_fade_real_write(workspace, item, before, reader=self))
+                if not errors:
+                    _mark_fade_real_operation(item)
             elif not errors and phase8b_video_audio_time_call:
                 errors.update(_validate_phase8b_video_audio_time_real_write(workspace, item, before))
                 if not errors:
@@ -2150,6 +2326,8 @@ class QLabWriteMixin:
                     _label_devamp_rejection(item)
                 if network_call:
                     _label_network_rejection(item)
+                if fade_profile_call:
+                    _label_fade_rejection(item)
                 if phase8b_video_audio_time_call:
                     _label_phase8b_video_audio_time_rejection(item)
                 if video_clock_type_call:
@@ -2385,6 +2563,7 @@ class QLabWriteMixin:
                 or _utility_target_operation(item) is not None
                 or _devamp_operation(item) is not None
                 or _network_operation(item) is not None
+                or _fade_phase1_operation(item) is not None
                 or _phase8b_video_audio_time_operation(item) is not None
                 or _video_clock_type_operation(item) is not None
                 or _video_integrated_fade_operation(item) is not None
@@ -2413,6 +2592,7 @@ class QLabWriteMixin:
                 }
             )
             _refresh_network_repair_real_result(self, workspace, result, item)
+            _refresh_fade_real_result(self, workspace, result, item)
             status = result["status"]
             _refresh_phase3_video_opacity_real_result(result, item)
             _refresh_phase3_video_translation_real_result(result, item)
@@ -3261,6 +3441,8 @@ def _phase4c_video_fx_after_value(after: Any, item: dict[str, Any]) -> Any:
 
 
 def _phase3_video_opacity_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") not in VIDEO_PHASE3_OPACITY_TYPES:
+        return None
     return next(
         (
             operation
@@ -3479,6 +3661,8 @@ def _validate_phase3_video_opacity_real_write(
 
 
 def _phase3_video_translation_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") not in VIDEO_PHASE3_TRANSLATION_TYPES:
+        return None
     return next(
         (
             operation
@@ -3729,6 +3913,8 @@ def _validate_phase3_video_translation_real_write(
 
 
 def _phase3_video_scalar_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") not in VIDEO_PHASE3_SCALAR_TYPES:
+        return None
     return next(
         (
             operation
@@ -4235,6 +4421,8 @@ def _validate_phase3_video_appearance_real_write(
 
 
 def _phase7_video_geometry_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") not in VIDEO_PHASE7_GEOMETRY_TYPES:
+        return None
     return next(
         (
             operation
@@ -4827,6 +5015,874 @@ def _label_utility_target_rejection(item: dict[str, Any]) -> None:
     operation = _utility_target_operation(item)
     if operation is not None:
         operation["planned_only_reason"] = "utility_target_requires_confirm_token"
+
+
+def _fade_phase1_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+    if item.get("profile") != "fade_basic":
+        return None
+    return next(
+        (
+            operation
+            for operation in item.get("operations", [])
+            if operation.get("property") in FADE_PHASE1_PROPERTIES
+        ),
+        None,
+    )
+
+
+def _fade_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+    if len(items) != 1:
+        return "Fade real writes require exactly one cue update."
+    item = items[0]
+    operations = item.get("operations") or []
+    if item.get("profile") != "fade_basic":
+        return "Fade real writes require fade_basic profile."
+    if len(operations) != 1:
+        return "Fade real writes require exactly one property."
+    operation = operations[0]
+    property_name = operation.get("property")
+    if property_name not in FADE_PHASE1_PROPERTIES:
+        return f"Fade property {property_name} remains planned-only."
+    path = str(operation.get("path") or "")
+    exact_path = property_name == path
+    dynamic_path = (
+        property_name == "doLevel" and path.startswith("doLevel/")
+    ) or (
+        property_name == "level" and path.startswith("level/")
+    ) or (
+        property_name == "sliderLevel" and path.startswith("sliderLevel/")
+    ) or (
+        property_name == "inputChannelName" and path.startswith("inputChannelName/")
+    ) or (
+        property_name == "gang" and path.startswith("gang/")
+    )
+    if not exact_path and not dynamic_path:
+        return "Fade real writes require the exact documented saved property path."
+    if operation.get("mode") != "saved":
+        return "Fade real writes require saved mode; /live is rejected."
+    if not _is_exact_cue_uuid(item.get("cue_ref")):
+        return "Fade real writes require exact cue UUID as cue_ref; cue numbers are rejected."
+    return None
+
+
+def _fade_requested_value(operation: dict[str, Any]) -> Any:
+    values = operation.get("arg_values") or {}
+    if operation.get("property") == "quaternion":
+        return list(operation.get("args") or [])
+    if operation.get("property") == "doLevel":
+        return values.get("value")
+    if operation.get("property") == "level":
+        return values.get("decibel")
+    if operation.get("property") == "sliderLevel":
+        return values.get("decibel")
+    if operation.get("property") == "inputChannelName":
+        return values.get("name")
+    if operation.get("property") == "gang":
+        return values.get("gang")
+    return operation["args"][0] if operation.get("args") else None
+
+
+def _fade_matrix_cell(matrix: Any, row: Any, column: Any) -> Any:
+    if (
+        not isinstance(matrix, list)
+        or not isinstance(row, int)
+        or isinstance(row, bool)
+        or not isinstance(column, int)
+        or isinstance(column, bool)
+        or row < 0
+        or column < 0
+        or row >= len(matrix)
+        or not isinstance(matrix[row], list)
+        or column >= len(matrix[row])
+    ):
+        return None
+    return matrix[row][column]
+
+
+def _fade_operation_coordinates(operation: dict[str, Any]) -> tuple[Any, Any]:
+    values = operation.get("arg_values") or {}
+    if operation.get("property") == "doLevel":
+        return values.get("row"), values.get("column")
+    if operation.get("property") == "level":
+        return values.get("inChannel"), values.get("outChannel")
+    if operation.get("property") == "sliderLevel":
+        return 0, values.get("channel")
+    if operation.get("property") == "inputChannelName":
+        return values.get("number"), None
+    if operation.get("property") == "gang":
+        return values.get("inChannel"), values.get("outChannel")
+    return None, None
+
+
+def _fade_baseline(before: dict[str, Any], operation: dict[str, Any]) -> Any:
+    property_name = operation["property"]
+    row, column = _fade_operation_coordinates(operation)
+    if property_name == "doLevel":
+        return _fade_matrix_cell(before.get("doLevel"), row, column)
+    if property_name == "level":
+        return _fade_matrix_cell(before.get("levels"), row, column)
+    if property_name == "sliderLevel":
+        return _fade_matrix_cell([before.get("sliderLevels")], row, column)
+    if property_name in {"inputChannelName", "gang"}:
+        return before.get(_fade_recovery_property_key(operation))
+    return before.get(property_name)
+
+
+def _fade_recovery_property_key(operation: dict[str, Any]) -> str:
+    return str(operation.get("path") or operation.get("property") or "fade")
+
+
+def _fade_audio_min_volume(reader: Any, workspace_id: str) -> tuple[float | None, str | None]:
+    errors: dict[str, str] = {}
+    value = reader._read_workspace_setting(
+        workspace_id,
+        "audio/minVolume",
+        errors,
+        "audio.minVolume",
+    )
+    if errors or not _is_plain_number(value) or not math.isfinite(float(value)):
+        return None, "Fade Audio silence requires fresh readable Workspace Audio minVolume."
+    return float(value), None
+
+
+def _fade_source_inactive(before: dict[str, Any]) -> bool:
+    return all(before.get(key) is False for key in ("isRunning", "isPaused", "isAuditioning"))
+
+
+def _fade_source_healthy(before: dict[str, Any]) -> bool:
+    return before.get("isBroken") is False and before.get("isWarning") is False
+
+
+def _fade_target_info(
+    reader: Any,
+    workspace_id: str,
+    target_id: str,
+    source_id: str,
+    *,
+    allowed_types: frozenset[str] = FADE_DIRECT_TARGET_TYPES,
+    require_audio: bool = False,
+) -> tuple[dict[str, Any] | None, str | None]:
+    if not _is_exact_cue_uuid(target_id):
+        return None, "Fade target requires an exact existing cue UUID."
+    if target_id.casefold() == source_id.casefold():
+        return None, "Fade target cannot be the Fade cue itself."
+    target, errors = _try_read_update_values(
+        reader,
+        workspace_id,
+        target_id,
+        [
+            "uniqueID",
+            "type",
+            "numChannelsIn",
+            "audioTrackFormats",
+            "levels",
+            "sliderLevels",
+            "audioOutputPatch/cueOutputChannels",
+            *VIDEO_PHASE2_HEALTH_READ_KEYS,
+        ],
+    )
+    if errors or not isinstance(target, dict) or _resolved_cue_id(target) != target_id:
+        return None, "Fade target UUID could not be resolved in the current workspace."
+    if target.get("type") not in allowed_types:
+        return None, f"Fade target must be one of: {', '.join(sorted(allowed_types))}."
+    if not _fade_source_healthy(target):
+        return None, "Fade target must be healthy without warnings."
+    if not _fade_source_inactive(target):
+        return None, "Fade target must be inactive."
+    channels = target.get("numChannelsIn")
+    audio_track_formats = target.get("audioTrackFormats")
+    has_embedded_audio = (
+        isinstance(channels, (int, float))
+        and not isinstance(channels, bool)
+        and math.isfinite(float(channels))
+        and int(channels) > 0
+    ) or bool(audio_track_formats)
+    # Audio/Mic targets use the direct Levels contract: a fresh readable
+    # matrix is sufficient evidence. Video/Camera retain the stricter
+    # embedded-audio proof because their Levels arrays can exist without
+    # an actual audio track.
+    has_levels_matrix = isinstance(target.get("levels"), list) and bool(target.get("levels"))
+    has_audio = has_levels_matrix if target.get("type") in {"Audio", "Mic"} else has_embedded_audio
+    if require_audio and not has_audio:
+        return None, "Fade Audio target requires proven readable audio channels."
+    return {
+        "uuid": target_id,
+        "type": target["type"],
+        "numChannelsIn": channels,
+        "audioTrackFormats": audio_track_formats,
+        "levels": target.get("levels"),
+        "sliderLevels": target.get("sliderLevels"),
+        "cueOutputChannels": target.get("audioOutputPatch/cueOutputChannels"),
+        "hasAudio": has_audio,
+    }, None
+
+
+def _fade_recovery_key(workspace_id: str, cue_id: str, property_name: str) -> tuple[str, str, str]:
+    return workspace_id, cue_id, property_name
+
+
+def _fade_missing_parameter_state(before: dict[str, Any]) -> bool:
+    visual_inactive = all(
+        before.get(property_name) is False
+        for property_name in ("doOpacity", "doRate", "doRotation", "doScale", "doTranslation")
+    )
+    do_level = before.get("doLevel")
+    audio_inactive = not isinstance(do_level, list) or not any(
+        value is True or value == 1
+        for row in do_level
+        if isinstance(row, list)
+        for value in row
+    )
+    return visual_inactive and audio_inactive
+
+
+def _fade_has_active_audio_parameter(before: dict[str, Any]) -> bool:
+    do_level = before.get("doLevel")
+    return isinstance(do_level, list) and any(
+        value is True or value == 1
+        for row in do_level
+        if isinstance(row, list)
+        for value in row
+    )
+
+
+def _fade_target_requirements(
+    before: dict[str, Any],
+    *,
+    for_assignment: bool = False,
+) -> tuple[frozenset[str], bool]:
+    constraints: list[frozenset[str]] = []
+    if any(
+        before.get(flag) is True
+        for flag in ("doOpacity", "doRotation", "doScale", "doTranslation")
+    ):
+        constraints.append(FADE_VISUAL_TARGET_TYPES)
+    if before.get("doRate") is True:
+        constraints.append(FADE_RATE_TARGET_TYPES)
+    audio_active = _fade_has_active_audio_parameter(before)
+    if audio_active:
+        constraints.append(FADE_AUDIO_TARGET_TYPES)
+    if not constraints:
+        return (
+            FADE_CONFIGURABLE_TARGET_TYPES if for_assignment else FADE_DIRECT_TARGET_TYPES,
+            False,
+        )
+    allowed = set(constraints[0])
+    for constraint in constraints[1:]:
+        allowed.intersection_update(constraint)
+    return frozenset(allowed), audio_active
+
+
+def _fade_target_fingerprint(target: dict[str, Any] | None) -> dict[str, Any]:
+    target = target or {}
+    return {
+        "target_uuid": target.get("uuid"),
+        "target_type": target.get("type"),
+        "target_num_channels_in": target.get("numChannelsIn"),
+        "target_levels_sha256": _video_io_sha256(target.get("levels")),
+        "target_slider_levels_sha256": _video_io_sha256(target.get("sliderLevels")),
+        "target_audio_evidence_sha256": _video_io_sha256(target.get("audioTrackFormats")),
+    }
+
+
+def _fade_family_for_property(property_name: str) -> str:
+    if property_name in FADE_BASIC_PROPERTIES:
+        return "fadeBasic"
+    if property_name == "cueTargetID":
+        return "fadeTarget"
+    if property_name in FADE_AUDIO_PROPERTIES:
+        return "fadeAudio"
+    if property_name in FADE_BEHAVIOR_PROPERTIES:
+        return "fadeBehavior"
+    return "fadeGeometry"
+
+
+def _fade_preflight(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+    *,
+    reader: Any,
+) -> tuple[dict[str, Any] | None, str | None]:
+    operation = _fade_phase1_operation(item)
+    if operation is None or not isinstance(before, dict):
+        return None, "Fade preflight is incomplete."
+    if not _is_exact_cue_uuid(workspace_id):
+        return None, "Fade real writes require an exact workspace UUID."
+    cue_id = _resolved_cue_id(before)
+    if cue_id != item.get("cue_ref") or before.get("type") != "Fade":
+        return None, "Fade real writes require a fresh exact Fade cue UUID baseline."
+    if before.get("hasCueTargets") is not True:
+        return None, "Fade real writes require a cue capable of saved cue targets."
+    if not _fade_source_inactive(before):
+        return None, "Fade real writes require an inactive source cue."
+    if before.get("targetMode") != 0:
+        return None, "Fade Phase 1 requires targetMode=0 for cue targeting."
+    if before.get("fadeType") != 1:
+        return None, "Fade Phase 1 requires fadeType=1 for 1D Curve."
+
+    property_name = operation["property"]
+    baseline = _fade_baseline(before, operation)
+    if baseline is None:
+        return None, f"Fade {operation['path']} requires a readable baseline."
+    requested = _fade_requested_value(operation)
+    audio_min_volume = None
+    if property_name in {"level", "sliderLevel"} and requested == "-inf":
+        audio_min_volume, min_volume_error = _fade_audio_min_volume(reader, workspace_id)
+        if min_volume_error:
+            return None, min_volume_error
+    comparison_value = audio_min_volume if requested == "-inf" else requested
+    if _property_values_match(property_name, baseline, comparison_value):
+        return None, f"Fade {property_name} requested value must differ from the baseline."
+
+    current_target_id = before.get("cueTargetID")
+    if not isinstance(current_target_id, str):
+        return None, "Fade real writes require readable cueTargetID."
+
+    recovery_property = _fade_recovery_property_key(operation)
+    record = _FADE_RECOVERY_RECORDS.get(_fade_recovery_key(workspace_id, cue_id, recovery_property))
+    recovery_shape = bool(
+        record
+        and _property_values_match(property_name, baseline, record.get("requested"))
+        and _property_values_match(property_name, requested, record.get("baseline"))
+        and before.get("targetMode") == record.get("targetMode")
+        and before.get("fadeType") == record.get("fadeType")
+    )
+    if recovery_shape and current_target_id != record.get("target_uuid"):
+        return None, "Fade recovery target changed after setup; request a new safe repair path."
+    recovery = recovery_shape
+
+    source_broken = before.get("isBroken") is True and before.get("isWarning") is False
+    setup_kind: str | None = None
+    if recovery:
+        family = "fadeRecovery"
+    elif source_broken and property_name == "cueTargetID":
+        if current_target_id == "":
+            setup_kind = "missing_target"
+        else:
+            current_allowed, current_requires_audio = _fade_target_requirements(
+                before,
+                for_assignment=True,
+            )
+            valid_current, _ = _fade_target_info(
+                reader,
+                workspace_id,
+                current_target_id,
+                cue_id,
+                allowed_types=current_allowed,
+                require_audio=current_requires_audio,
+            )
+            if valid_current is not None:
+                return None, (
+                    "Broken Fade current target is valid; repair the missing parameter or other "
+                    "documented fault instead of replacing the target."
+                )
+            setup_kind = "invalid_target"
+        family = "fadeSetup"
+    elif (
+        source_broken
+        and property_name in {"doOpacity", "doRate", "doRotation", "doScale", "doTranslation", "doLevel"}
+        and requested is True
+        and _fade_missing_parameter_state(before)
+        and current_target_id != ""
+    ):
+        setup_kind = "missing_parameter"
+        family = "fadeSetup"
+    elif (
+        source_broken
+        and property_name == "doLevel"
+        and requested is False
+        and current_target_id != ""
+    ):
+        setup_kind = "invalid_audio_matrix"
+        family = "fadeSetup"
+    elif _fade_source_healthy(before):
+        family = _fade_family_for_property(property_name)
+    else:
+        return None, "Broken Fade cue is outside the narrow missing-target or missing-parameter setup gate."
+
+    is_audio = property_name in FADE_AUDIO_PROPERTIES
+    is_geometry = property_name in FADE_GEOMETRY_PROPERTIES
+    row, column = _fade_operation_coordinates(operation)
+    target_requires_audio = is_audio
+    if property_name == "cueTargetID":
+        allowed_types, target_requires_audio = _fade_target_requirements(
+            before,
+            for_assignment=True,
+        )
+    elif property_name == "geoMode":
+        allowed_types, target_requires_audio = _fade_target_requirements(before)
+    elif is_audio or is_geometry:
+        prospective = dict(before)
+        if property_name in {"doOpacity", "doRate", "doRotation", "doScale", "doTranslation"}:
+            prospective[property_name] = requested
+        elif property_name == "doLevel" and isinstance(row, int) and isinstance(column, int):
+            do_level = before.get("doLevel")
+            if isinstance(do_level, list):
+                resulting = [list(matrix_row) if isinstance(matrix_row, list) else [] for matrix_row in do_level]
+                if _fade_matrix_cell(resulting, row, column) is not None:
+                    resulting[row][column] = requested
+                    prospective["doLevel"] = resulting
+        compatible_types, compatible_requires_audio = _fade_target_requirements(prospective)
+        operation_types = (
+            FADE_AUDIO_TARGET_TYPES
+            if is_audio
+            else FADE_RATE_TARGET_TYPES
+            if property_name in {"doRate", "rate"}
+            else FADE_VISUAL_TARGET_TYPES
+        )
+        allowed_types = frozenset(set(operation_types).intersection(compatible_types))
+        target_requires_audio = is_audio or compatible_requires_audio
+        if not allowed_types:
+            return None, "Fade operation is incompatible with the currently active Fade parameters."
+    else:
+        allowed_types = FADE_DIRECT_TARGET_TYPES
+    current_target = None
+    if current_target_id and not (property_name == "cueTargetID" and setup_kind == "invalid_target"):
+        current_allowed_types = FADE_DIRECT_TARGET_TYPES if property_name == "cueTargetID" else allowed_types
+        current_requires_audio = False if property_name == "cueTargetID" else target_requires_audio
+        current_target, target_error = _fade_target_info(
+            reader,
+            workspace_id,
+            current_target_id,
+            cue_id,
+            allowed_types=current_allowed_types,
+            require_audio=current_requires_audio,
+        )
+        if target_error or current_target is None:
+            return None, (
+                "Fade current target is not compatible with the active Fade parameters: "
+                f"{target_error or 'target validation failed.'}"
+            )
+
+    target = current_target
+    if property_name == "cueTargetID" and not recovery:
+        target, target_error = _fade_target_info(
+            reader,
+            workspace_id,
+            requested,
+            cue_id,
+            allowed_types=allowed_types,
+            require_audio=target_requires_audio,
+        )
+        if target_error or target is None:
+            return None, (
+                "Fade requested target is incompatible with the active Fade parameters: "
+                f"{target_error or 'target validation failed.'}"
+            )
+    elif property_name == "cueTargetID" and recovery:
+        # Exact recovery may intentionally restore a broken/invalid baseline.
+        # The signed recovery record, not target health, is the authority here.
+        target = current_target
+
+    if property_name != "cueTargetID" and target is None:
+        return None, "Fade write requires a resolved compatible direct cue target."
+    if recovery and current_target is not None:
+        fingerprint = _fade_target_fingerprint(current_target)
+        if any(record.get(key) != value for key, value in fingerprint.items()):
+            return None, "Fade recovery target changed after setup; request a new safe repair path."
+    active_geometry = {
+        "doOpacity": before.get("doOpacity") is True,
+        "doRate": before.get("doRate") is True,
+        "doRotation": before.get("doRotation") is True,
+        "doScale": before.get("doScale") is True,
+        "doTranslation": before.get("doTranslation") is True,
+    }
+    if property_name == "geoMode" and not any(active_geometry.values()):
+        return None, "Fade geoMode requires at least one active geometry parameter."
+    required_flag = {
+        "opacity": "doOpacity",
+        "rate": "doRate",
+        "translation/x": "doTranslation",
+        "translation/y": "doTranslation",
+        "scale/x": "doScale",
+        "scale/y": "doScale",
+        "rotation": "doRotation",
+        "rotationType": "doRotation",
+        "quaternion": "doRotation",
+    }.get(property_name)
+    if required_flag and before.get(required_flag) is not True:
+        return None, f"Fade {property_name} requires {required_flag}=true."
+    if property_name == "rotation" and before.get("rotationType") not in {1, 2, 3}:
+        return None, "Fade rotation requires single-axis rotationType X, Y, or Z."
+    if property_name == "rotationType" and requested == 0:
+        return None, "Fade 3D rotation remains planned-only until quaternion support is promoted."
+    if property_name == "quaternion":
+        if before.get("rotationType") != 0:
+            return None, "Fade quaternion requires existing 3D rotationType=0."
+        if before.get("geoMode") != 0:
+            return None, "Fade quaternion is supported only in absolute geometry mode."
+        if not _is_quaternion_value(baseline) or not _is_quaternion_value(requested):
+            return None, "Fade quaternion requires readable and requested four-number values."
+    if property_name == "rate" and before.get("geoMode") != 0:
+        return None, "Fade relative rate remains planned-only because its operator is undocumented."
+    if property_name.startswith("do") and property_name in active_geometry and not recovery and requested is False:
+        remaining_geometry = dict(active_geometry)
+        remaining_geometry[property_name] = False
+        do_level_active = not _fade_missing_parameter_state({**before, **remaining_geometry})
+        if not any(remaining_geometry.values()) and not do_level_active:
+            return None, f"Fade {property_name}=false could remove the last active parameter."
+
+    if is_audio:
+        source_levels = before.get("levels")
+        target_levels = target.get("levels") if isinstance(target, dict) else None
+        if not isinstance(source_levels, list) or not isinstance(target_levels, list):
+            return None, "Fade Audio requires fresh readable source and target level matrices."
+        recovery_setup_kind = record.get("setup_kind") if recovery and isinstance(record, dict) else None
+        invalid_audio_matrix = setup_kind == "invalid_audio_matrix" or recovery_setup_kind == "invalid_audio_matrix"
+        if property_name in {"doLevel", "level", "sliderLevel", "gang"} and not invalid_audio_matrix:
+            if not isinstance(row, int) or isinstance(row, bool) or not isinstance(column, int) or isinstance(column, bool):
+                return None, "Fade Audio matrix routes require integer row and column indexes."
+            if _fade_matrix_cell(source_levels, row, column) is None or _fade_matrix_cell(target_levels, row, column) is None:
+                return None, "Fade Audio row/column must exist in both fresh source and target matrices."
+        if property_name == "inputChannelName":
+            if not isinstance(row, int) or isinstance(row, bool) or row <= 0:
+                return None, "Fade inputChannelName requires a positive integer input number."
+            if _fade_matrix_cell(source_levels, row, 0) is None or _fade_matrix_cell(target_levels, row, 0) is None:
+                return None, "Fade inputChannelName input must exist in both fresh source and target matrices."
+            if not isinstance(baseline, str):
+                return None, "Fade inputChannelName requires a readable string baseline."
+            if not _phase9_safe_string(requested, allow_empty=False, max_length=64):
+                return None, "Fade inputChannelName requires a 1-64 character string without control characters."
+        if property_name == "doLevel":
+            do_level = before.get("doLevel")
+            if _fade_matrix_cell(do_level, row, column) is None:
+                return None, "Fade doLevel requires fresh readable activation-matrix baseline."
+            if invalid_audio_matrix:
+                source_level = _fade_matrix_cell(source_levels, row, column)
+                target_level = _fade_matrix_cell(target_levels, row, column)
+                if source_level is None or target_level is not None:
+                    return None, "Fade invalid-audio-matrix setup requires a source cell absent from the fresh target matrix."
+                if setup_kind == "invalid_audio_matrix" and baseline not in {True, 1}:
+                    return None, "Fade invalid-audio-matrix setup requires an active invalid doLevel cell."
+            if requested is False and not recovery and not invalid_audio_matrix:
+                resulting_do_level = [list(matrix_row) if isinstance(matrix_row, list) else [] for matrix_row in do_level]
+                resulting_do_level[row][column] = False
+                if _fade_missing_parameter_state({**before, "doLevel": resulting_do_level}):
+                    return None, "Fade doLevel=false could remove the last active parameter."
+        if property_name in {"level", "sliderLevel"}:
+            if _fade_matrix_cell(before.get("doLevel"), row, column) not in {True, 1}:
+                return None, f"Fade {property_name} requires the matching doLevel crosspoint to be active."
+            valid_level = _phase9a_audio_level_value_valid(requested) or requested == "-inf"
+            if not valid_level:
+                return None, f"Fade {property_name} must be a finite decibel number or the exact '-inf' sentinel."
+            if requested == "-inf" and before.get("levelsMode") != 0:
+                return None, "Fade '-inf' silence is allowed only in absolute Levels mode."
+        if property_name == "gang":
+            if row <= 0:
+                return None, "Fade gang row 0 is blocked; row 0 belongs to slider levels."
+            if not isinstance(baseline, str):
+                return None, "Fade gang requires a readable string baseline."
+            if not _phase9_safe_string(requested, allow_empty=True, max_length=64):
+                return None, "Fade gang requires a string up to 64 characters without control characters."
+
+    dependencies = {
+        key: before.get(key)
+        for key in (
+            "targetMode",
+            "fadeType",
+            "levelsMode",
+            "geoMode",
+            "doOpacity",
+            "doRate",
+            "doRotation",
+            "doScale",
+            "doTranslation",
+        )
+    }
+    return {
+        "cue_id": cue_id,
+        "baseline": baseline,
+        "requested": requested,
+        "family": family,
+        "setup_kind": setup_kind,
+        "recovery": recovery,
+        "record": record,
+        "current_target": current_target,
+        "target": target,
+        "dependencies": dependencies,
+        "coordinates": {"row": row, "column": column} if row is not None else None,
+        "source_levels_sha256": _video_io_sha256(before.get("levels")) if is_audio else None,
+        "source_do_level_sha256": _video_io_sha256(before.get("doLevel")) if is_audio else None,
+        "source_num_channels_in": before.get("numChannelsIn") if is_audio else None,
+        "audio_min_volume": audio_min_volume,
+    }, None
+
+
+def _fade_token_payload(
+    *,
+    workspace_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    preflight: dict[str, Any],
+) -> dict[str, Any]:
+    family = preflight["family"]
+    target = preflight.get("target") or {}
+    current_target = preflight.get("current_target") or {}
+    record = preflight.get("record") or {}
+    return {
+        "version": FADE_TOKEN_VERSION,
+        "operation_kind": FADE_TOKEN_KINDS[family],
+        "workspace_id": workspace_id,
+        "cue_ref": item["cue_ref"],
+        "cue_id": preflight["cue_id"],
+        "cue_type": "Fade",
+        "profile": "fade_basic",
+        "property": operation["property"],
+        "path": operation["path"],
+        "mode": operation["mode"],
+        "baseline": preflight["baseline"],
+        "baseline_sha256": _video_io_sha256(preflight["baseline"]),
+        "requested": preflight["requested"],
+        "requested_sha256": _video_io_sha256(preflight["requested"]),
+        "current_target_uuid": current_target.get("uuid"),
+        "current_target_type": current_target.get("type"),
+        "target_uuid": target.get("uuid"),
+        "target_type": target.get("type"),
+        "target_num_channels_in": target.get("numChannelsIn"),
+        "target_levels_sha256": _video_io_sha256(target.get("levels")),
+        "target_slider_levels_sha256": _video_io_sha256(target.get("sliderLevels")),
+        "target_audio_evidence_sha256": _video_io_sha256(target.get("audioTrackFormats")),
+        "coordinates": preflight.get("coordinates"),
+        "source_levels_sha256": preflight.get("source_levels_sha256"),
+        "source_do_level_sha256": preflight.get("source_do_level_sha256"),
+        "source_num_channels_in": preflight.get("source_num_channels_in"),
+        "audio_min_volume": preflight.get("audio_min_volume"),
+        "dependencies": preflight["dependencies"],
+        "setup_kind": preflight.get("setup_kind"),
+        "recovery": preflight.get("recovery") is True,
+        "forward_token_sha256": record.get("forward_token_sha256"),
+        "risk_tier": "high",
+        "capability_gate": "fade_targets",
+        "workspace_validation": "fresh_source_target_and_property_readback_required",
+        "mcp_secret_version": 1,
+    }
+
+
+def _fade_confirm_token(
+    *,
+    workspace_id: str,
+    item: dict[str, Any],
+    operation: dict[str, Any],
+    preflight: dict[str, Any],
+) -> str:
+    payload = _fade_token_payload(
+        workspace_id=workspace_id,
+        item=item,
+        operation=operation,
+        preflight=preflight,
+    )
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"confirm:{preflight['family']}:v{FADE_TOKEN_VERSION}:{encoded}:{signature}"
+
+
+def _decode_fade_confirm_token(token: str, family: str) -> tuple[dict[str, Any] | None, str | None]:
+    parts = token.split(":", 4)
+    if len(parts) != 5 or parts[:3] != ["confirm", family, f"v{FADE_TOKEN_VERSION}"]:
+        return None, f"{family} confirm_token is malformed or has an unsupported version."
+    encoded, signature = parts[3], parts[4]
+    expected_signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None, f"{family} confirm_token signature is invalid."
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
+    except Exception:
+        return None, f"{family} confirm_token payload is invalid."
+    return (payload, None) if isinstance(payload, dict) else (None, f"{family} confirm_token payload is invalid.")
+
+
+def _fade_dry_run_preflight(
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+    *,
+    workspace_id: str,
+    reader: Any,
+    candidate_shape: bool,
+    structure_error: str | None,
+) -> tuple[dict[str, Any] | None, dict[str, str]]:
+    operation = _fade_phase1_operation(item)
+    if operation is None:
+        return None, {}
+    if structure_error:
+        return None, {operation["property"]: structure_error}
+    if not candidate_shape:
+        return None, {}
+    preflight, error = _fade_preflight(workspace_id, item, before, reader=reader)
+    return preflight, ({operation["property"]: error} if error else {})
+
+
+def _annotate_fade_operation(
+    item: dict[str, Any],
+    *,
+    workspace_id: str,
+    candidate_shape: bool,
+    preflight: dict[str, Any] | None,
+) -> list[str]:
+    operation = _fade_phase1_operation(item)
+    if operation is None or not candidate_shape:
+        return []
+    if preflight is None:
+        operation.pop("confirm_token", None)
+        return []
+    operation.update(
+        risk_tier="high",
+        real_write_enabled=False,
+        real_write_possible=True,
+        requires_confirm_token=True,
+        fade_phase1_candidate=True,
+        fade_token_family=preflight["family"],
+        fade_setup_kind=preflight.get("setup_kind"),
+        planned_only_reason="fade_phase1_requires_confirm_token",
+        future_gate_requirements=[
+            "fade_confirm_token",
+            "single_cue_single_property",
+            "exact_workspace_and_cue_uuid",
+            "saved_mode",
+            "fresh_source_and_compatible_target_readback",
+            "exact_readback",
+            "fresh_token_rollback",
+        ],
+    )
+    operation["confirm_token"] = _fade_confirm_token(
+        workspace_id=workspace_id,
+        item=item,
+        operation=operation,
+        preflight=preflight,
+    )
+    return []
+
+
+def _validate_fade_real_write(
+    workspace_id: str,
+    item: dict[str, Any],
+    before: dict[str, Any] | None,
+    *,
+    reader: Any,
+) -> dict[str, str]:
+    operation = _fade_phase1_operation(item)
+    property_name = operation.get("property") if operation else "fade"
+    if operation is None:
+        return {property_name: "Fade property remains planned-only."}
+    preflight, error = _fade_preflight(workspace_id, item, before, reader=reader)
+    if error or preflight is None:
+        return {property_name: error or "Fade preflight failed."}
+    payload, token_error = _decode_fade_confirm_token(item["confirm_gates"][0], preflight["family"])
+    if token_error or payload is None:
+        return {property_name: token_error or "Fade confirm_token is invalid."}
+    expected = _fade_token_payload(
+        workspace_id=workspace_id,
+        item=item,
+        operation=operation,
+        preflight=preflight,
+    )
+    if any(payload.get(key) != value for key, value in expected.items()):
+        return {property_name: "Fade confirm_token does not match the fresh source, target, dependencies, or baseline."}
+    operation.update(
+        fade_phase1_candidate=True,
+        fade_token_family=preflight["family"],
+        fade_setup_kind=preflight.get("setup_kind"),
+        fade_recovery=preflight.get("recovery") is True,
+        fade_audio_min_volume=preflight.get("audio_min_volume"),
+    )
+    if preflight.get("setup_kind") and not preflight.get("recovery"):
+        target_fingerprint = _fade_target_fingerprint(preflight.get("target"))
+        _FADE_RECOVERY_RECORDS[
+            _fade_recovery_key(workspace_id, preflight["cue_id"], _fade_recovery_property_key(operation))
+        ] = {
+            "baseline": preflight["baseline"],
+            "requested": preflight["requested"],
+            "targetMode": preflight["dependencies"]["targetMode"],
+            "fadeType": preflight["dependencies"]["fadeType"],
+            "forward_token_sha256": hashlib.sha256(item["confirm_gates"][0].encode("utf-8")).hexdigest(),
+            "setup_kind": preflight.get("setup_kind"),
+            **target_fingerprint,
+        }
+    return {}
+
+
+def _mark_fade_real_operation(item: dict[str, Any]) -> None:
+    operation = _fade_phase1_operation(item)
+    if operation is None:
+        return
+    operation.update(real_write_enabled=True, real_write_possible=True, requires_confirm_token=True)
+    operation.pop("planned_only_reason", None)
+
+
+def _label_fade_rejection(item: dict[str, Any]) -> None:
+    for operation in item.get("operations") or []:
+        operation["planned_only_reason"] = "fade_phase1_requires_confirm_token"
+        operation.pop("confirm_token", None)
+
+
+def _refresh_fade_real_result(reader: Any, workspace_id: str, result: dict[str, Any], item: dict[str, Any]) -> None:
+    operation = _fade_phase1_operation(item)
+    if operation is None or not result.get("executed_operations"):
+        return
+    after = result.get("after")
+    property_name = operation["property"]
+    if not isinstance(after, dict):
+        return
+    errors = dict(result.get("errors") or {})
+    family = operation.get("fade_token_family")
+    cue_id = _resolved_cue_id(after) or str(item.get("cue_ref") or "")
+    target_id = after.get("cueTargetID")
+    if family != "fadeRecovery" and isinstance(target_id, str) and target_id:
+        require_audio = property_name in FADE_AUDIO_PROPERTIES
+        if property_name == "cueTargetID":
+            allowed_types, require_audio = _fade_target_requirements(after, for_assignment=True)
+        elif property_name == "geoMode":
+            allowed_types, require_audio = _fade_target_requirements(after)
+        else:
+            allowed_types = (
+                FADE_AUDIO_TARGET_TYPES
+                if require_audio
+                else FADE_RATE_TARGET_TYPES
+                if property_name in {"doRate", "rate"}
+                else FADE_VISUAL_TARGET_TYPES
+                if property_name in FADE_GEOMETRY_PROPERTIES
+                else FADE_DIRECT_TARGET_TYPES
+            )
+        _, target_error = _fade_target_info(
+            reader,
+            workspace_id,
+            target_id,
+            cue_id,
+            allowed_types=allowed_types,
+            require_audio=require_audio,
+        )
+        if target_error:
+            errors["fadeTarget"] = target_error
+
+    if family == "fadeRecovery":
+        record_key = _fade_recovery_key(workspace_id, cue_id, _fade_recovery_property_key(operation))
+        record = _FADE_RECOVERY_RECORDS.get(record_key)
+        if record and _property_values_match(property_name, _fade_baseline(after, operation), record.get("baseline")):
+            _FADE_RECOVERY_RECORDS.pop(record_key, None)
+            result.setdefault("notices", []).append("fade_recovery_succeeded")
+        else:
+            errors["fadeRecovery"] = "Fade recovery did not confirm the exact original baseline."
+    elif family == "fadeSetup" and operation.get("fade_setup_kind") in {"missing_target", "invalid_target"}:
+        if _fade_source_healthy(after):
+            result.setdefault("notices", []).append("fade_setup_succeeded")
+        elif after.get("isBroken") is True and after.get("isWarning") is False and _fade_missing_parameter_state(after):
+            result.setdefault("notices", []).append("fade_setup_progressed_missing_parameter")
+        else:
+            errors["fadeSetup"] = "Fade target setup left an unexpected broken or warning state; exact recovery is required."
+    elif family == "fadeSetup":
+        if _fade_source_healthy(after):
+            result.setdefault("notices", []).append("fade_setup_succeeded")
+        else:
+            errors["fadeSetup"] = "Fade parameter setup did not make the cue healthy; exact recovery is required."
+    elif not _fade_source_healthy(after):
+        errors["fadeHealth"] = "Fade Phase 1 write left the cue broken or warning."
+
+    if errors:
+        result["status"] = "verification_failed"
+        result["errors"] = errors
 
 
 def _network_operation(item: dict[str, Any]) -> dict[str, Any] | None:
@@ -8738,6 +9794,10 @@ def _validate_contextual_real_write(
         if prop in {"cueTargetName"}:
             errors[prop] = f"{prop} real writes require cueTargetID or cueTargetNumber; name resolution is not supported."
         if prop in {"cueTargetID", "cueTargetNumber", "tempCueTargetID", "tempCueTargetNumber"}:
+            if item.get("profile") == "fade_basic" and prop == "cueTargetID":
+                # The Fade gate performs stricter source/target validation and
+                # must also permit an exact signed recovery to an invalid baseline.
+                continue
             target_ref = operation["args"][0] if operation.get("args") else None
             if _is_empty_target_ref(target_ref):
                 continue
@@ -10597,6 +11657,7 @@ def _is_readback_confirmable_gated_item(item: dict[str, Any]) -> bool:
         or _utility_target_operation(item) is not None
         or _devamp_operation(item) is not None
         or _network_operation(item) is not None
+        or _fade_phase1_operation(item) is not None
         or _phase8b_video_audio_time_operation(item) is not None
         or _phase9a_video_audio_level_operation(item) is not None
         or _phase9b_video_audio_matrix_operation(item) is not None
@@ -10626,6 +11687,42 @@ def _verification_requested_values(item: dict[str, Any]) -> dict[str, Any]:
                 "parameterKey": values.get("parameterKey"),
                 "setting": values.get("setting"),
             }
+            continue
+        if item.get("profile") == "fade_basic" and operation.get("property") == "doLevel":
+            row, column = _fade_operation_coordinates(operation)
+            requested["doLevel"] = {
+                "__fade_do_level__": True,
+                "row": row,
+                "column": column,
+                "value": _fade_requested_value(operation),
+            }
+            continue
+        if item.get("profile") == "fade_basic" and operation.get("property") == "level":
+            row, column = _fade_operation_coordinates(operation)
+            decibel = _fade_requested_value(operation)
+            if decibel == "-inf":
+                decibel = operation.get("fade_audio_min_volume")
+            requested["levels"] = {
+                "__fade_audio_matrix_level__": True,
+                "row": row,
+                "column": column,
+                "decibel": decibel,
+            }
+            continue
+        if item.get("profile") == "fade_basic" and operation.get("property") == "sliderLevel":
+            _, column = _fade_operation_coordinates(operation)
+            decibel = _fade_requested_value(operation)
+            if decibel == "-inf":
+                decibel = operation.get("fade_audio_min_volume")
+            requested["sliderLevels"] = {
+                "__fade_audio_slider_level__": True,
+                "channel": column,
+                "decibel": decibel,
+            }
+            continue
+        if item.get("profile") == "fade_basic" and operation.get("property") in {"inputChannelName", "gang"}:
+            if read_key:
+                requested[str(read_key)] = _fade_requested_value(operation)
             continue
         if _phase9a_video_audio_level_operation(item) is operation:
             channel, decibel = _phase9a_audio_level_values(operation)
@@ -10713,6 +11810,15 @@ def _property_values_match(key: str, actual: Any, requested: Any) -> bool:
         if not isinstance(actual, list) or not isinstance(channel, int) or isinstance(channel, bool) or channel < 0 or channel >= len(actual):
             return False
         return _property_values_match("sliderLevel", actual[channel], requested.get("decibel"))
+    if key == "doLevel" and isinstance(requested, dict) and requested.get("__fade_do_level__") is True:
+        value = _fade_matrix_cell(actual, requested.get("row"), requested.get("column"))
+        return value is not None and _property_values_match("doLevel", value, requested.get("value"))
+    if key == "levels" and isinstance(requested, dict) and requested.get("__fade_audio_matrix_level__") is True:
+        value = _fade_matrix_cell(actual, requested.get("row"), requested.get("column"))
+        return value is not None and _fade_audio_db_values_match(value, requested.get("decibel"))
+    if key == "sliderLevels" and isinstance(requested, dict) and requested.get("__fade_audio_slider_level__") is True:
+        value = _fade_matrix_cell([actual], 0, requested.get("channel"))
+        return value is not None and _fade_audio_db_values_match(value, requested.get("decibel"))
     if key == "levels" and isinstance(requested, dict) and requested.get("__video_audio_matrix_level__") is True:
         in_channel = requested.get("inChannel")
         out_channel = requested.get("outChannel")
@@ -10751,6 +11857,13 @@ def _property_values_match(key: str, actual: Any, requested: Any) -> bool:
             for actual_item, requested_item in zip(actual_value, requested_value, strict=True)
         )
     return actual_value == requested_value
+
+
+def _fade_audio_db_values_match(actual: Any, requested: Any) -> bool:
+    """Match numeric Fade Audio dB readbacks without relaxing other fields."""
+    if not (_is_plain_number(actual) and _is_plain_number(requested)):
+        return actual == requested
+    return math.isclose(float(actual), float(requested), abs_tol=FADE_AUDIO_DB_MATCH_TOLERANCE, rel_tol=0.0)
 
 
 def _comparison_value(key: str, value: Any) -> Any:

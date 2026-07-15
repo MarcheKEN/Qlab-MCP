@@ -211,7 +211,7 @@ Use qlab_get_workspace_settings(mode="details", requests=[...]) after settings w
 
 Use qlab_query_cues for filtered cue searches across up to 500 cues by default, or up to 5000 cues when a caller explicitly raises the scan limit, then qlab_get_cue_details for one cue that needs deeper inspection.
 
-For write preflight, call qlab_check_write_readiness with an explicit workspace_id. Always dry-run first, review the plan, and use the dedicated confirmation token returned by qlab_create_cue, qlab_edit_cues, qlab_move_cues, or qlab_delete_cues. Restarting the MCP invalidates previously issued Move and Delete tokens. This server does not expose GO, stop, panic, raw OSC, or playback control.
+For write preflight, call qlab_check_write_readiness with an explicit workspace_id and always review a dry-run first. qlab_create_cue accepts no confirm_token; real creation still requires write readiness, an explicit workspace_id, a configured passcode, edit permission, and Edit Mode. qlab_edit_cues may return confirmation tokens for individual planned high-risk operations; copy the exact relevant planned_operations[].confirm_token values into that update item's confirm_gates, not one tool-level token. qlab_move_cues returns a dedicated tool-level confirm_token bound to the reviewed workspace structure and planned move batch, and real execution must receive that exact token. qlab_delete_cues returns a dedicated tool-level confirm_token bound to the reviewed deletion plan and fresh workspace structure, and real execution must receive that exact token. Move and Delete tokens are process-bound, so restarting the MCP invalidates tokens issued by the previous process. This server does not expose GO, stop, panic, raw OSC, or playback control.
 """,
 )
 

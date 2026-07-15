@@ -8,7 +8,7 @@ This plan converts the Deep Research report into small, reviewable work for this
 - Do not rename tools, rename public parameters, change Pydantic response models, or change schema hashes without an explicit public-contract reason.
 - Never update contract snapshots or schema hashes just to make tests pass. If a hash changes, explain exactly what changed in the public contract and get approval unless that public change was explicitly requested.
 - Keep write mode disabled-by-default, gated, and dry-run-first.
-- Do not add GO, playback, stop, panic, delete, or raw OSC tools.
+- Do not add GO, playback, stop, panic, raw OSC, ungated deletion, ambiguous deletion, container deletion, or cascade deletion tools. Preserve the existing exact-UUID, dry-run-first, token-gated, leaf-only `qlab_delete_cues` boundary unless an explicit public-contract change is separately approved.
 - Do not allow write targets that use ambiguous refs such as `selected`, `active`, `playhead`, or `playbackPosition`.
 
 ## Static metadata extraction

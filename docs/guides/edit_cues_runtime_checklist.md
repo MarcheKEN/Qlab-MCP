@@ -20,6 +20,17 @@ Hard limits:
   the intended test media root.
 - Run `dry_run=true` before any `dry_run=false` write.
 
+Public write-tool confirmation boundaries:
+
+- `qlab_create_cue`: review dry-run first; there is no `confirm_token`
+  argument.
+- `qlab_edit_cues`: copy exact relevant
+  `planned_operations[].confirm_token` values into the same update item's
+  `confirm_gates`; there is no tool-level Edit token.
+- `qlab_move_cues` and `qlab_delete_cues`: after an eligible reviewed dry-run,
+  pass its exact dedicated tool-level `confirm_token`. Restarting the MCP
+  invalidates previously issued Move and Delete tokens.
+
 Preflight:
 
 1. `qlab_check_connection(require_read_access=true)`.
@@ -149,7 +160,30 @@ Target resolution smoke:
 7. Repeat with `cueTargetName`.
 8. Expected block:
    - no `/cueTargetName` setter is sent
-   - error says name resolution is unsupported; use `cueTargetID` or `cueTargetNumber`
+   - Utility real writes allow only `cueTargetID`; `cueTargetName` and
+     `cueTargetNumber` remain blocked
+   - both source `cue_ref` and requested target must be exact UUIDs
+
+Network OSC Message smoke:
+
+1. Pick one disposable, healthy, inactive Network cue whose current patch is
+   freshly classified as `OSC Message`.
+2. Run `qlab_edit_cues(..., dry_run=true)` for one saved `customString` change.
+3. Copy its exact `confirm:networkOscMessage:v1:` token into that update item's
+   `confirm_gates`, run `dry_run=false`, and verify fresh readback.
+4. Roll back through a new dry-run and fresh token, then verify final readback.
+5. Treat `networkPatchID` reassignment as blocked/planned-only. Do not execute
+   it: the tested reassignment left the cue broken.
+
+`QLAB_UPDATE_DEBUG` diagnostics:
+
+- Default is `false`. Set `QLAB_UPDATE_DEBUG=true` before starting the MCP only
+  for deliberate Edit diagnostics.
+- Real `qlab_edit_cues` result items then include `debug` data such as requested
+  properties/values, readback values, match state, timeouts, and errors.
+- Treat debug output as potentially sensitive. Disable it after diagnosis.
+- This flag changes result diagnostics only; it does not weaken readiness,
+  confirmation, health, activity, or readback gates.
 
 Capability gate smoke:
 

@@ -150,9 +150,18 @@ playback, `/live`, save, commit, or unrelated mutation was used.
 
 ## Runtime-validated additions and remaining boundaries
 
+Public write-tool confirmation boundaries:
+
+- Create is dry-run-first and has no `confirm_token` argument.
+- Edit uses exact per-operation dry-run tokens copied into each update item's
+  `confirm_gates`; it has no tool-level token.
+- Eligible reviewed Move and Delete dry-runs each return a dedicated tool-level
+  `confirm_token`; real execution requires that exact token. Their tokens are
+  process-bound and become invalid after an MCP restart.
+
 Utility cue editing (runtime validated and closed):
 
-- local `cueTargetID` gate for `Start`, `Stop`, `Pause`, `Load`, `Reset`,
+- only the local `cueTargetID` gate for `Start`, `Stop`, `Pause`, `Load`, `Reset`,
   `Goto`, `Arm`, and `Disarm`, using `confirm:utilityTarget:v1:`
 - exact source/target UUIDs only; one healthy inactive source and target; saved
   mode; fresh baseline/readback; fresh-token rollback
@@ -178,9 +187,12 @@ Devamp saved configuration (runtime validated and closed for listed properties):
 
 Network OSC Message:
 
-- `customString`, `networkPatchID`, fades, and device-description parameters
-  remain planned-only because documented network patch readback does not prove
-  `OSC Message` mode
+- saved `customString` is runtime validated for an exact healthy inactive cue
+  after a fresh patch-list read classifies its current patch as `OSC Message`;
+  it uses `confirm:networkOscMessage:v1:` with fresh readback and rollback
+- `networkPatchID` reassignment remains blocked/planned-only because the tested
+  reassignment read back but left the cue broken
+- fades and device-description parameters remain planned-only
 - no patch definitions, destination settings, raw OSC, playback, or save
 
 Video Phase 3F — Text Style:

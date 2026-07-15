@@ -16,8 +16,8 @@ dry-run-first.
   target presence, timing, and health; inspect one cue or a batch of up to 50.
 - Workspace settings diagnostics: compact settings summaries plus focused
   patch, route, stage, audio, video, network, MIDI, and light details.
-- Optional gated write tools: dry-run-first blank cue creation and batch cue
-  updates through an allowlisted editing registry.
+- Optional gated write tools: dry-run-first blank cue creation, allowlisted cue
+  editing, structural List/Group moves, and exact-UUID leaf deletion.
 
 ## What It Does Not Do
 
@@ -143,6 +143,8 @@ report `truncated`, `truncation_reasons`, `scanned_all_cues`, and
 
 Write mode is deliberately gated:
 
+- Pass an explicit `workspace_id` and run `qlab_check_write_readiness` before
+  every real write session.
 - `QLAB_ENABLE_WRITE=true` is required before real write commands can run.
 - `QLAB_PASSCODE` is a server-side credential only. It is never a tool argument.
 - `dry_run=true` is the default through `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
@@ -155,8 +157,18 @@ Write mode is deliberately gated:
 - Once real setters start, batch writes are not transactional. Later failures
   are reported per item and require normal readback or manual review.
 - Real writes bypass and clear the read cache before fresh verification.
-- Real high-risk writes require the exact `planned_operations[].confirm_token`
-  from the reviewed dry-run.
+- `qlab_create_cue` has no `confirm_token` argument. Review its dry-run before
+  real creation.
+- `qlab_edit_cues` may return tokens for individual planned high-risk
+  operations. Copy each exact relevant `planned_operations[].confirm_token`
+  into that update item's `confirm_gates`; there is no tool-level Edit token.
+- An eligible reviewed dry-run for `qlab_move_cues` or `qlab_delete_cues`
+  returns one dedicated tool-level `confirm_token`. Real execution must receive
+  that exact token.
+- Move tokens bind the reviewed workspace structure and move batch. Delete
+  tokens bind the reviewed deletion plan and fresh workspace structure.
+- Move and Delete tokens are process-bound; restarting the MCP invalidates
+  tokens issued by the previous process.
 - Broad capability gate names are discovery labels, not real-write approval
   tokens.
 - Operations without deterministic readback must be blocked or reported
@@ -243,6 +255,20 @@ If a setter times out but a fresh after-read confirms the requested value,
 `qlab_edit_cues` reports `updated_with_confirmed_timeouts` with a warning. If
 fresh verification cannot prove the requested value, the result is failed or
 inconclusive.
+
+### Utility and Network cues
+
+Utility real writes support only saved `cueTargetID` assignment for exact-UUID
+source and target cues through `confirm:utilityTarget:v1:`. `cueTargetNumber`,
+`cueTargetName`, temporary targets, Reset patch/map targets, and target actions
+remain blocked.
+
+Network OSC Message `customString` is runtime validated for an exact healthy,
+inactive cue whose current patch is freshly classified as `OSC Message`. It
+uses the item-level `confirm:networkOscMessage:v1:` Edit flow.
+`networkPatchID` reassignment remains blocked/planned-only: the tested
+reassignment read back but left the cue broken. Patch definitions,
+destinations, fades, device descriptions, raw OSC, and `/live` remain blocked.
 
 ### Fade cues
 
@@ -401,6 +427,7 @@ QLAB_CACHE_TTL=10.0
 QLAB_PASSCODE=
 QLAB_ENABLE_WRITE=false
 QLAB_WRITE_DRY_RUN_DEFAULT=true
+QLAB_UPDATE_DEBUG=false
 QLAB_ALLOWED_FILE_ROOTS=
 ```
 
@@ -415,6 +442,10 @@ Notes:
   `isOverridden`, or `isAuditioning` bypass the cache.
 - Sensitive `technical`, `full_sensitive`, and `exhaustive` reads bypass the
   cache.
+- `QLAB_UPDATE_DEBUG=true` adds per-item diagnostics to real
+  `qlab_edit_cues`/`qlab_update_cues` results, including requested and readback
+  values. It is off by default, requires an MCP restart after changing the
+  environment, and does not weaken write gates or verification.
 
 ## Diagnostic Limits
 

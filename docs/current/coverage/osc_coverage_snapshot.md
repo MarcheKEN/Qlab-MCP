@@ -8,7 +8,8 @@ Generated view: `extract_cue_osc_inventory(...)` + `registry_coverage(...)` agai
 The summary table is registry baseline coverage for mutating OSC routes in the
 official dictionary. It does not count specialized runtime token exceptions
 implemented above the registry gate, such as Text cue `confirm:textBasic:v1:`
-exceptions, the closed Phase 4C
+exceptions, the runtime-validated Group `confirm:groupMode:v1:` and
+`confirm:groupPlaylist:v1:` exceptions, the closed Phase 4C
 `Video` `videoEffectIndex/0/parameter/inputRadius` real write, Phase 6
 `inputIntensity`, Phase 7 `fillStage`/`fillStyle`, Phase 7B `layer`, the
 Phase 7D local `quaternion` candidate, the Phase 7E local `resetRotation`
@@ -26,7 +27,7 @@ exceptions are listed in Current Invariants.
 | Section | Real write | Gated | Planned only | Missing |
 |---|---:|---:|---:|---:|
 | common/global cue properties | 15 | 21 | 0 | 0 |
-| Group/List/Cart | 7 | 0 | 6 | 0 |
+| Group/List/Cart | 6 | 9 | 12 | 0 |
 | Audio | 6 | 65 | 0 | 0 |
 | Mic | 2 | 5 | 0 | 0 |
 | Video | 0 | 79 | 0 | 0 |
@@ -47,7 +48,27 @@ exceptions are listed in Current Invariants.
 - `missing` must stay zero for mutating cue OSC routes parsed from the official dictionary.
 - `scriptSource` and `scriptText` stay `not_editable_by_osc`; `compileSource` is gated by `script_compile`.
 - `duration` and `tempDuration` are real-write capable only when `allowsEditingDuration=true`.
-- `playlist/*` real writes require Group mode `6` (Playlist mode).
+- Group `mode` uses `confirm:groupMode:v1:`; canonical Playlist scalars use
+  `confirm:groupPlaylist:v1:` and require freshly verified mode `6`.
+- Both Group token families are process-bound, expire after 300 seconds, bind
+  exact workspace/cue UUIDs plus the ordered direct-child snapshot, and require
+  atomic single-use consumption immediately before the sole setter send and a
+  new dry-run/token for rollback. Consumed tokens remain unavailable after
+  timeout or failed verification. Child or Group side effects are reported;
+  they are never restored implicitly.
+- QLab 5.5 runtime validation covers Group modes `1`, `2`, `3`, `4`, and `6`;
+  canonical Playlist `doLoop`, `doShuffle`, `doCrossfade`, and crossfade
+  duration; and common Basics `notes`, `flagged`, `preWait`, `postWait`, and
+  `continueMode` (`0 -> 1 -> 0`). Mode and Playlist timeout plus matching fresh
+  readback is classified `updated_with_confirmed_timeouts`; no mutating retry
+  occurs. Expected child order, `continueMode`, and `postWait` changes are
+  reported in `side_effects` and `group_child_readback`.
+- Group runtime edge validation remains pending for around 200 direct children,
+  Loop with a zero-duration child, crossfade longer than the shortest child,
+  minimum crossfade duration, playback, active/auditioning Groups,
+  warning-but-not-broken Groups, and token expiry in a live MCP process.
+- Playlist navigation, `/shuffle`, deprecated aliases, crossfade curve shapes,
+  and Timeline UI pseudo-properties remain non-real-write surfaces.
 - `cueTargetID`, `cueTargetNumber`, and temporary target refs require target resolution before real writes.
 - `cueTargetName` remains blocked for real writes; callers must use `cueTargetID` or `cueTargetNumber`.
 - Devamp local saved configuration emits `confirm:devamp:v1:` only for exact

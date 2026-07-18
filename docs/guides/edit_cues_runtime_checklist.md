@@ -98,20 +98,38 @@ Safety block smoke:
 
 Playlist Group smoke:
 
-1. Pick one disposable Group cue whose `mode` is not `6`.
-2. Run `qlab_edit_cues(..., dry_run=false)` for
-   `playlist/crossfade/duration`.
-3. Expected block:
-   - preflight fails before setters
-   - error says Playlist setters require Playlist mode `(mode 6)`
-4. Pick or create a disposable Playlist Group cue whose `mode` is already `6`.
-5. Run `dry_run=true`, then `dry_run=false`, for:
-   - `playlist/doCrossfade`
-   - `playlist/crossfade/duration`
-6. Expected real write:
-   - setter uses `/cue_id/{uniqueID}/playlist/...`
-   - read-after-write confirms values
-   - small floating-point readback differences are accepted
+1. Use only a disposable workspace and explicit workspace/cue UUIDs. The Group
+   and every direct child must be inactive; do not use GO, playback, audition,
+   raw OSC, panic, deletion, or unrelated mutations.
+2. Record fresh Group mode, health/activity, Playlist scalars, ordered direct
+   children, child timing/continue state, and global running/paused/auditioning
+   counts. Stop unless the counts are `0/0/0`.
+3. Run exactly one `group_basic` property with `dry_run=true`. Eligible mode
+   writes emit `confirm:groupMode:v1:`; eligible Playlist writes emit
+   `confirm:groupPlaylist:v1:` only when fresh mode is `6`.
+4. Review the exact UUID address, baseline/requested value, health checks,
+   ordered child fingerprint, duration constraints, and rollback requirement.
+   Any broken Group or child must fail closed before a setter.
+5. Use the fresh token once for the real write. The token must be consumed
+   atomically immediately before exactly one setter send. Require fresh scalar
+   and child readback. A confirmed timeout must return
+   `updated_with_confirmed_timeouts`; never retry the mutating setter. Any child
+   order/timing/continue/health change must be surfaced in both `side_effects`
+   and `group_child_readback`; it must not be restored implicitly.
+6. Roll back only with a new dry-run and new token. Confirm the original scalar
+   and every affected child field with fresh readback.
+7. Finish only when running/paused/auditioning counts are again `0/0/0`.
+8. Replay the accepted token once before and once after rollback. Both attempts
+   must execute zero setters; after baseline restoration the error must identify
+   the consumed confirmation. Stop if replay is accepted.
+
+Crossfade curve shapes remain blocked because the local OSC dictionary has no
+documented deterministic setter/readback. Timeline inspector gestures are
+child edits, not Group scalar properties, and are outside this smoke check.
+Around 200 children, zero-duration Loop children, crossfades beyond the
+shortest child, minimum crossfade duration, playback, active/auditioning
+Groups, warning-but-not-broken Groups, and runtime token expiry require
+separate explicit authorization and remain unvalidated edge cases.
 
 Mic input routing smoke:
 

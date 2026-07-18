@@ -53,6 +53,16 @@ from .timeouts import (
 from .network_patch_types import classify_network_patch_type, valid_osc_message_text
 from .moves import move_cues as _move_cues
 from .deletes import delete_cues as _delete_cues
+from .groups import (
+    GROUP_SOURCE_READ_KEYS,
+    consume_group_token as _consume_group_token,
+    group_operation as _group_operation,
+    group_preflight as _group_preflight,
+    group_side_effects as _group_side_effects,
+    group_structure_error as _group_structure_error,
+    read_group_snapshot as _read_group_snapshot,
+    validate_group_token as _validate_group_token,
+)
 
 
 MAX_BATCH_UPDATES = 50
@@ -718,6 +728,7 @@ class QLabWriteMixin:
         utility_target_call = any(
             _utility_target_operation(item) is not None for item in items
         )
+        group_call = any(_group_operation(item) is not None for item in items)
         devamp_call = any(_devamp_operation(item) is not None for item in items)
         network_call = any(_network_operation(item) is not None for item in items)
         fade_profile_call = any(item.get("profile") == "fade_basic" and item.get("operations") for item in items)
@@ -782,6 +793,8 @@ class QLabWriteMixin:
                 item["read_keys"] = list(
                     dict.fromkeys([*item["read_keys"], "hasCueTargets", "cueTargetID", *VIDEO_PHASE2_HEALTH_READ_KEYS])
                 )
+            if _group_operation(item) is not None:
+                item["read_keys"] = list(dict.fromkeys([*item["read_keys"], *GROUP_SOURCE_READ_KEYS]))
             if _devamp_operation(item) is not None:
                 item["read_keys"] = list(
                     dict.fromkeys(
@@ -997,6 +1010,7 @@ class QLabWriteMixin:
                 if utility_target_call
                 else None
             )
+            group_structure_error = _group_structure_error(items, workspace) if group_call else None
             devamp_structure_error = _devamp_call_structure_error(items) if devamp_call else None
             network_structure_error = _network_call_structure_error(items) if network_call else None
             fade_structure_error = _fade_call_structure_error(items) if fade_profile_call else None
@@ -1133,6 +1147,15 @@ class QLabWriteMixin:
                         errors[property_name] = (
                             f"{property_name} is gated or dry-run only without exactly one reviewed "
                             "Phase 8A confirm_token."
+                        )
+                elif not errors and group_call:
+                    property_name = item["operations"][0]["property"]
+                    if group_structure_error:
+                        errors[property_name] = group_structure_error
+                    elif len(item["confirm_gates"]) != 1:
+                        errors[property_name] = (
+                            f"{property_name} is gated or dry-run only without exactly one reviewed "
+                            "Group confirm_token."
                         )
                 elif not errors and utility_target_call:
                     property_name = item["operations"][0]["property"]
@@ -1401,6 +1424,7 @@ class QLabWriteMixin:
                 and _phase8_video_io_call_structure_error(items) is None
             )
             utility_target_candidate_shape = _utility_target_call_structure_error(items) is None
+            group_candidate_shape = group_call and _group_structure_error(items, workspace) is None
             devamp_candidate_shape = _devamp_call_structure_error(items) is None
             network_candidate_shape = _network_call_structure_error(items) is None
             fade_candidate_shape = fade_phase1_call and _fade_call_structure_error(items) is None
@@ -1625,6 +1649,21 @@ class QLabWriteMixin:
                             candidate_shape=utility_target_candidate_shape,
                         )
                     )
+                    if _group_operation(item) is not None:
+                        if not group_candidate_shape:
+                            errors[item["operations"][0]["property"]] = (
+                                _group_structure_error(items, workspace) or "Invalid Group write shape."
+                            )
+                        else:
+                            group_errors, group_warnings = _group_preflight(
+                                self,
+                                workspace,
+                                item,
+                                before,
+                                emit_token=True,
+                            )
+                            errors.update(group_errors)
+                            warnings.extend(group_warnings)
                     errors.update(
                         _devamp_dry_run_errors(
                             item,
@@ -2176,6 +2215,8 @@ class QLabWriteMixin:
                 errors.update(_validate_phase8_video_io_real_write(workspace, item, before, reader=self))
                 if not errors:
                     _mark_phase8_video_io_real_operation(item)
+            elif not errors and group_call:
+                errors.update(_validate_group_token(self, workspace, item, before))
             elif not errors and utility_target_call:
                 errors.update(_validate_utility_target_real_write(workspace, item, before, reader=self))
                 if not errors:
@@ -2387,12 +2428,32 @@ class QLabWriteMixin:
             errors: dict[str, str] = {}
             setter_timeouts: dict[str, str] = {}
             setter_reply_errors: dict[str, str] = {}
+            setter_elapsed_seconds: dict[str, float] = {}
             for operation in item["operations"]:
                 key = operation["property"]
                 address = _cue_id_address(workspace, cue_id, operation["path"])
                 if _budget_remaining(update_deadline) <= 0:
                     errors[key] = "Global update time budget exhausted before setter was sent."
                     break
+                if _group_operation(item) is not None:
+                    consume_errors = _consume_group_token(item)
+                    if consume_errors:
+                        rejected = dict(planned)
+                        rejected.update(
+                            status="preflight_failed",
+                            errors=consume_errors,
+                            executed_operations=[],
+                        )
+                        read_cache.clear()
+                        return _batch_update_result(
+                            workspace,
+                            dry_run=False,
+                            results=[rejected],
+                            status="preflight_failed",
+                            requested_count=len(updates),
+                            errors={"preflight": "Group confirmation token was rejected before any setter was sent."},
+                        )
+                setter_started = time.monotonic()
                 try:
                     reply = self.client.request(
                         address,
@@ -2432,10 +2493,12 @@ class QLabWriteMixin:
                         **({"error": error} if error else {}),
                     }
                 )
+                setter_elapsed_seconds[key] = time.monotonic() - setter_started
             item_result = dict(planned)
             item_result["executed_operations"] = executed_operations
             item_result["_setter_timeouts"] = setter_timeouts
             item_result["_setter_reply_errors"] = setter_reply_errors
+            item_result["_setter_elapsed_seconds"] = setter_elapsed_seconds
             item_result["_setter_errors"] = errors
             executed_items.append(item_result)
 
@@ -2461,6 +2524,7 @@ class QLabWriteMixin:
             confirmed_by_after = _properties_match(after, requested_values)
             setter_timeouts = result.pop("_setter_timeouts")
             setter_reply_errors = result.pop("_setter_reply_errors")
+            setter_elapsed_seconds = result.pop("_setter_elapsed_seconds")
             setter_errors = result.pop("_setter_errors")
             unconfirmed_timeouts = {} if confirmed_by_after else setter_timeouts
             unconfirmed_reply_errors = {} if confirmed_by_after else setter_reply_errors
@@ -2525,6 +2589,7 @@ class QLabWriteMixin:
                         or _phase7_video_geometry_operation(item) is not None
                         or _phase8_video_io_operation(item) is not None
                         or _utility_target_operation(item) is not None
+                        or _group_operation(item) is not None
                         or _devamp_operation(item) is not None
                         or _network_operation(item) is not None
                         or _phase8b_video_audio_time_operation(item) is not None
@@ -2593,6 +2658,7 @@ class QLabWriteMixin:
             )
             _refresh_network_repair_real_result(self, workspace, result, item)
             _refresh_fade_real_result(self, workspace, result, item)
+            _refresh_group_real_result(self, workspace, result, item)
             status = result["status"]
             _refresh_phase3_video_opacity_real_result(result, item)
             _refresh_phase3_video_translation_real_result(result, item)
@@ -2623,6 +2689,10 @@ class QLabWriteMixin:
                     "setter_timeouts": setter_timeouts,
                     "confirmed_timeouts": bool(setter_timeouts and confirmed_by_after),
                     "setter_errors": setter_errors,
+                    "setter_send_count": len(result["executed_operations"]),
+                    "setter_routes": [operation["address"] for operation in result["executed_operations"]],
+                    "setter_elapsed_seconds": setter_elapsed_seconds,
+                    "confirmation_reason": "fresh_readback_matched" if confirmed_by_after else None,
                     "final_status": status,
                 }
             final_results.append(result)
@@ -2655,6 +2725,55 @@ class QLabWriteMixin:
     ) -> dict[str, Any]:
         """Compatibility-forward alias; MCP exposes qlab_edit_cues and keeps qlab_update_cues."""
         return self.update_cues(workspace_id, updates, dry_run=dry_run)
+
+
+def _refresh_group_real_result(
+    reader: Any,
+    workspace_id: str,
+    result: dict[str, Any],
+    item: dict[str, Any],
+) -> None:
+    operation = _group_operation(item)
+    if operation is None or not isinstance(result.get("cue_id"), str):
+        return
+    snapshot, snapshot_error = _read_group_snapshot(
+        reader,
+        workspace_id,
+        result["cue_id"],
+        require_safe=False,
+    )
+    if snapshot_error or snapshot is None:
+        result["status"] = "verification_inconclusive"
+        errors = dict(result.get("errors") or {})
+        errors["group_children"] = snapshot_error or "Fresh Group child readback was unavailable."
+        result["errors"] = errors
+        result.setdefault("warnings", []).append("group_child_readback_inconclusive")
+        return
+    effects = _group_side_effects(operation, snapshot)
+    before = result.get("before")
+    after = result.get("after")
+    if isinstance(before, dict) and isinstance(after, dict):
+        source_keys = [
+            key
+            for key in GROUP_SOURCE_READ_KEYS
+            if key not in {"uniqueID", "type", operation.get("property")}
+        ]
+        for key in source_keys:
+            if before.get(key) != after.get(key):
+                effects.append(
+                    {"scope": "group", "cue_id": result["cue_id"], "field": key, "before": before.get(key), "after": after.get(key)}
+                )
+    result["group_child_readback"] = snapshot
+    result["side_effects"] = effects
+    if effects:
+        result.setdefault("warnings", []).append("group_write_changed_child_state")
+        operation["rollback_plan"] = {
+            "status": "new_dry_run_and_fresh_token_required",
+            "group_property": operation["property"],
+            "group_baseline": result.get("before", {}).get(operation["property"]),
+            "child_baseline": operation.get("group_before_snapshot", {}).get("ordered_children"),
+            "automatic_restoration": False,
+        }
 
 
 def _normalize_placement(after_cue_id: str | None) -> dict[str, Any] | None:
@@ -9789,7 +9908,7 @@ def _validate_contextual_real_write(
         prop = str(operation.get("property", ""))
         if prop.startswith("playlist/") and before.get("mode") != 6:
             errors[prop] = "Playlist setters require the Group cue to already be in Playlist mode (mode 6)."
-        if prop in {"duration", "tempDuration"} and before.get("allowsEditingDuration") is False:
+        if prop in {"duration", "tempDuration"} and before.get("allowsEditingDuration") is not True:
             errors[prop] = f"{prop} requires a cue with editable duration."
         if prop in {"cueTargetName"}:
             errors[prop] = f"{prop} real writes require cueTargetID or cueTargetNumber; name resolution is not supported."
@@ -11491,11 +11610,13 @@ def _planned_update_operations(
             "phase5_light_behavior_candidate",
             "phase7_video_geometry_candidate",
             "phase8_video_io_candidate",
+            "group_edit_candidate",
             "phase8b_video_audio_time_candidate",
             "phase9b_video_audio_matrix_candidate",
             "phase8c_video_slice_candidate",
             "phase8c_expected_slice_markers",
             "warning_metadata",
+            "rollback_plan",
             "light_command_analysis",
         ):
             if key in update_operation:
@@ -11654,6 +11775,7 @@ def _is_readback_confirmable_gated_item(item: dict[str, Any]) -> bool:
         or _phase3_video_appearance_operation(item) is not None
         or _phase7_video_geometry_operation(item) is not None
         or _phase8_video_io_operation(item) is not None
+        or _group_operation(item) is not None
         or _utility_target_operation(item) is not None
         or _devamp_operation(item) is not None
         or _network_operation(item) is not None

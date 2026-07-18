@@ -1,9 +1,32 @@
 # Active Roadmap
 
-Status: 2026-07-14
+Status: 2026-07-18
+
+## Locally implemented; runtime validation pending
+
+- Group edge coverage still pending: around 200 direct children, Loop with a
+  zero-duration child, crossfade longer than the shortest child, minimum
+  crossfade duration, playback, active/auditioning Groups,
+  warning-but-not-broken Groups, and token expiry in a live MCP process.
+- Playlist navigation, playback actions, `/shuffle`, deprecated aliases,
+  Timeline UI pseudo-properties, and undocumented crossfade curve setters
+  remain blocked.
+- Any further QLab 5.5 probing must use a disposable workspace, inactive cues,
+  explicit UUIDs, reversible changes, and finish with
+  running/paused/auditioning `0/0/0`; no GO, playback, raw OSC, panic, or
+  deletion.
 
 ## Closed
 
+- Group safe editing through existing `qlab_edit_cues` / `group_basic`:
+  QLab 5.5 runtime validation covers modes `1`, `2`, `3`, `4`, and `6`; canonical
+  Playlist `doLoop`, `doShuffle`, `doCrossfade`, and crossfade duration; common
+  Basics `notes`, `flagged`, `preWait`, `postWait`, and `continueMode`
+  (`0 -> 1 -> 0`). Mode/Playlist writes use exact UUIDs, fresh mode and child
+  snapshots, atomic single-use tokens, one setter, fresh scalar/child readback,
+  and fresh-token rollback. Confirmed setter timeouts return
+  `updated_with_confirmed_timeouts`; QLab child order, `continueMode`, and
+  `postWait` effects are reported and never restored implicitly.
 - Video Phase 1 — inventory, dry-run, and write-safety closure.
 - Video Phase 1D — lightweight Video read summaries.
 - Video Phase 2A — scalar dry-run matrix and blocked-family cleanup.

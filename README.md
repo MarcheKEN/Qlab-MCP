@@ -209,8 +209,30 @@ devamp_basic
 script_basic
 ```
 
-Current visual, text, and light write support is intentionally token-gated:
+Current specialized write support is intentionally token-gated:
 
+- `group_basic`: common Basics remain normal guarded writes. Group `mode`
+  values `1`, `2`, `3`, `4`, and `6` require an exact-UUID, one-property
+  `confirm:groupMode:v1:` token. Canonical Playlist scalars
+  `playlist/doLoop`, `playlist/doShuffle`, `playlist/doCrossfade`, and
+  `playlist/crossfade/duration` require `confirm:groupPlaylist:v1:` and a
+  freshly verified Playlist mode (`6`). Both token families expire after five
+  minutes, are atomically single-use within the MCP process, and bind the
+  ordered direct-child snapshot. Tokens are consumed immediately before the
+  one setter send and remain consumed after timeout or failed verification;
+  rollback always needs a new dry-run/token. Fresh post-write child differences
+  are reported as side effects; no hidden restoration occurs.
+  QLab 5.5 runtime validation covers modes `1`, `2`, `3`, `4`, and `6`; the four
+  canonical Playlist scalars; common Basics `notes`, `flagged`, `preWait`,
+  `postWait`, and `continueMode` (`0 -> 1 -> 0`). Expected QLab child order,
+  `continueMode`, and `postWait` changes are surfaced through `side_effects`
+  and `group_child_readback`. Setter timeout with matching fresh readback is
+  `updated_with_confirmed_timeouts`, with no mutating retry. Timeline UI edits,
+  Playlist navigation/actions, deprecated aliases, and crossfade curve shapes
+  are not real-write surfaces. Large Groups around 200 children, zero-duration
+  loop children, crossfades beyond the shortest child, minimum crossfade
+  duration, playback, active/auditioning Groups, warning-but-not-broken Groups,
+  and runtime token expiry still lack QLab 5.5 validation.
 - `video_basic`: safe cue metadata is the only normal real-write surface.
   Visual, embedded-audio, and slice edits are dry-run-first candidates with
   specialized confirm tokens. This includes opacity, translation, anchor/scale

@@ -5439,6 +5439,9 @@ class QLabReaderTests(unittest.TestCase):
                 "mode": 3,
                 "playbackPositionID": "child-id",
                 "playlist/doLoop": True,
+                "playlist/doShuffle": False,
+                "playlist/doCrossfade": True,
+                "playlist/crossfade/duration": 2.5,
             },
         }
         with FakeQlabOscServer(responses) as server:
@@ -5448,6 +5451,10 @@ class QLabReaderTests(unittest.TestCase):
 
         self.assertEqual(result["properties"]["mode"], 3)
         self.assertEqual(result["properties"]["playbackPositionID"], "child-id")
+        self.assertTrue(result["properties"]["playlist/doLoop"])
+        self.assertFalse(result["properties"]["playlist/doShuffle"])
+        self.assertTrue(result["properties"]["playlist/doCrossfade"])
+        self.assertEqual(result["properties"]["playlist/crossfade/duration"], 2.5)
         self.assertTrue(all("/children" not in address for address in server.received))
 
     def test_cart_details_do_not_expand_children(self) -> None:
@@ -5655,9 +5662,14 @@ class QLabReaderTests(unittest.TestCase):
                 capabilities = result["update_capabilities"]
                 self.assertEqual(capabilities["recommended_profile"], "group_basic")
                 self.assertIn("group_basic", capabilities["compatible_profiles"])
-                self.assertIn("mode", capabilities["real_write_properties"])
+                self.assertIn("mode", capabilities["dry_run_only_properties"])
+                self.assertNotIn("mode", capabilities["real_write_properties"])
                 self.assertEqual(capabilities["validators"]["mode"]["value"], "group_mode")
                 for prop in (
+                    "playlist/doLoop",
+                    "playlist/doShuffle",
+                    "playlist/doCrossfade",
+                    "playlist/crossfade/duration",
                     "playhead",
                     "playbackPositionID",
                     "playhead/next",

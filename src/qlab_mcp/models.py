@@ -386,6 +386,14 @@ class UpdateCueResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notices: list[str] = Field(default_factory=list)
     updateq_plan: dict[str, Any] | None = None
+    group_child_readback: dict[str, Any] | None = Field(
+        default=None,
+        description="Fresh ordered direct-child snapshot after a token-gated Group write.",
+    )
+    side_effects: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Explicit Group or child state changes observed beyond the requested scalar write.",
+    )
     message: str
 
 
@@ -451,6 +459,14 @@ class UpdateCueItemResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notices: list[str] = Field(default_factory=list)
     updateq_plan: dict[str, Any] | None = None
+    group_child_readback: dict[str, Any] | None = Field(
+        default=None,
+        description="Fresh ordered direct-child snapshot after a token-gated Group write.",
+    )
+    side_effects: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Explicit Group or child state changes observed beyond the requested scalar write.",
+    )
     debug: dict[str, Any] | None = Field(
         default=None,
         description="Optional verification diagnostics when QLAB_UPDATE_DEBUG is enabled.",

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import math
 from pathlib import Path
+import threading
 import time
 from types import SimpleNamespace
 from typing import Any
@@ -15,6 +17,7 @@ from qlab_mcp.models import CreateCueResult, CueUpdateInput, UpdateCuesResult, W
 from qlab_mcp.qlab import QLabReader
 from qlab_mcp.runtime.read_cache import shared_read_cache
 import qlab_mcp.write.operations as write_operations
+import qlab_mcp.write.groups as group_helpers
 import qlab_mcp.write.moves as move_helpers
 from qlab_mcp.write.moves import _build_plan, move_cues, simulate_move_batch
 from qlab_mcp.write.registry import QLAB_BLEND_MODES, UPDATE_PROFILE_NAMES, profile_catalog
@@ -487,6 +490,9 @@ class BatchFakeWriteClient:
         network_patches: list[dict[str, Any]] | None = None,
         network_repair_outcomes: dict[tuple[str, str, Any], dict[str, Any]] | None = None,
         property_outcomes: dict[tuple[str, str, Any], dict[str, Any]] | None = None,
+        children_by_parent: dict[str, list[str]] | None = None,
+        group_child_outcomes: dict[tuple[str, str, Any], dict[str, dict[str, Any]]] | None = None,
+        group_order_outcomes: dict[tuple[str, str, Any], list[str]] | None = None,
         broken_stage_ids: set[str] | None = None,
         numeric_bool_readback_properties: set[str] | None = None,
         omit_slice_markers_after_delete: bool = False,
@@ -520,6 +526,11 @@ class BatchFakeWriteClient:
         self.network_patches = network_patches or []
         self.network_repair_outcomes = network_repair_outcomes or {}
         self.property_outcomes = property_outcomes or {}
+        self.children_by_parent = {
+            parent_id: list(child_ids) for parent_id, child_ids in (children_by_parent or {}).items()
+        }
+        self.group_child_outcomes = group_child_outcomes or {}
+        self.group_order_outcomes = group_order_outcomes or {}
         self.broken_stage_ids = broken_stage_ids or set()
         self.numeric_bool_readback_properties = numeric_bool_readback_properties or set()
         self.omit_slice_markers_after_delete = omit_slice_markers_after_delete
@@ -559,6 +570,13 @@ class BatchFakeWriteClient:
             return SimpleNamespace(data=self.light_patch, status="ok")
         if address == f"/workspace/{self.workspace_id}/settings/video/stages":
             return SimpleNamespace(data=self.video_stages, status="ok")
+        children_prefix = f"/workspace/{self.workspace_id}/cue_id/"
+        if address.startswith(children_prefix) and address.endswith("/children/uniqueIDs/shallow"):
+            parent_id = address.removeprefix(children_prefix).removesuffix("/children/uniqueIDs/shallow")
+            return SimpleNamespace(
+                data=[{"uniqueID": child_id} for child_id in self.children_by_parent.get(parent_id, [])],
+                status="ok",
+            )
         stage_prefix = f"/workspace/{self.workspace_id}/settings/video/stageID/"
         if address.startswith(stage_prefix) and address.endswith("/regions"):
             stage_id = address.removeprefix(stage_prefix).removesuffix("/regions")
@@ -599,6 +617,14 @@ class BatchFakeWriteClient:
             outcome = self.property_outcomes.get((cue_id, prop, value), outcome)
         if outcome:
             self.cues[cue_id].update(outcome)
+        group_outcome_key = (cue_id, prop, value) if isinstance(value, (str, int, float, bool, type(None))) else None
+        child_outcome = self.group_child_outcomes.get(group_outcome_key) if group_outcome_key else None
+        if child_outcome:
+            for child_id, child_values in child_outcome.items():
+                self.cues[child_id].update(child_values)
+        order_outcome = self.group_order_outcomes.get(group_outcome_key) if group_outcome_key else None
+        if order_outcome is not None:
+            self.children_by_parent[cue_id] = list(order_outcome)
         if (cue_id, prop) in self.error_after_apply_properties:
             raise QLabReplyError("error", f"Failed setting {prop}", address)
         return SimpleNamespace(data=None, status="ok")
@@ -1066,6 +1092,7 @@ def _base_cue_values(cue_id: str, cue_type: str) -> dict[str, Any]:
         "armed": True,
         "flagged": False,
         "colorName": "none",
+        "allowsEditingDuration": True,
     }
 
 
@@ -1249,6 +1276,16 @@ def _dry_run_only_property_cases() -> list[Any]:
                 and prop_name in {"cueTargetID", "devampType", "startNextCueWhenSliceEnds", "stopTargetWhenSliceEnds"}
             ) or (
                 profile == "fade_basic" and prop_name in write_operations.FADE_PHASE1_PROPERTIES
+            ) or (
+                profile == "group_basic"
+                and prop_name
+                in {
+                    "mode",
+                    "playlist/doLoop",
+                    "playlist/doShuffle",
+                    "playlist/doCrossfade",
+                    "playlist/crossfade/duration",
+                }
             ):
                 continue
             if not prop["real_write_enabled"]:
@@ -1356,6 +1393,11 @@ def _assert_audio_group_profile_catalog(catalog: dict[str, Any]) -> None:
     assert catalog["group_basic"]["properties"]["playlist/crossfade/duration"]["contextual_requirements"] == [
         "group_mode_is_playlist"
     ]
+    assert all(
+        "curve" not in property_name.casefold()
+        for property_name in catalog["group_basic"]["properties"]
+        if property_name.startswith("playlist")
+    )
     assert catalog["memo_basic"]["properties"]["duration"]["contextual_requirements"] == ["allows_editing_duration"]
     _assert_planned_only_props(
         catalog,
@@ -1369,6 +1411,9 @@ def _assert_audio_group_profile_catalog(catalog: dict[str, Any]) -> None:
             "moveCartCue",
             "playlist/currentCue",
             "playlist/currentCueID",
+            "playlist/next",
+            "playlist/previous",
+            "shuffle",
             "playlistLoop",
             "playlistShuffle",
             "playlistCrossfade",
@@ -1392,8 +1437,6 @@ def _assert_audio_group_profile_catalog(catalog: dict[str, Any]) -> None:
             "hardStop",
             "load",
             "pause",
-            "playlist/next",
-            "playlist/previous",
         ),
     )
 
@@ -2957,11 +3000,6 @@ def test_update_cues_group_basic_dry_run_plans_documented_group_list_cart_paths(
                 "cue_ref": group_id,
                 "profile": "group_basic",
                 "properties": {
-                    "mode": 6,
-                    "playlist/doLoop": True,
-                    "playlist/doShuffle": True,
-                    "playlist/doCrossfade": True,
-                    "playlist/crossfade/duration": 2.5,
                     "playlist/currentCue": "A1",
                     "playlist/currentCueID": "child-new",
                     "playlistLoop": False,
@@ -3000,8 +3038,6 @@ def test_update_cues_group_basic_dry_run_plans_documented_group_list_cart_paths(
         }
         for item in result["results"]
     ]
-    assert planned_by_item[0]["mode"]["address"] == f"/workspace/ws-1/cue_id/{group_id}/mode"
-    assert planned_by_item[0]["mode"]["args"] == [6]
     assert planned_by_item[0]["playlist/currentCueID"]["address"] == f"/workspace/ws-1/cue_id/{group_id}/playlist/currentCueID"
     assert planned_by_item[0]["playlist/currentCueID"]["planned_only_reason"] == "playlist_navigation_needs_dedicated_validation"
     assert planned_by_item[0]["playlistLoop"]["address"] == f"/workspace/ws-1/cue_id/{group_id}/playlistLoop"
@@ -3078,17 +3114,22 @@ def test_update_cues_group_basic_real_blocks_planned_only_before_setters() -> No
 
 
 def test_update_cues_group_basic_real_blocks_playlist_setters_without_playlist_mode() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=3)
     client = BatchFakeWriteClient(
-        QLabConfig(enable_write=True, passcode="server-pass"),
-        cues={group_id: {"type": "Group", "mode": 3, "playlist/crossfade/duration": 3}},
+        QLabConfig(enable_write=False),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
     result = reader.update_cues(
-        "ws-1",
+        workspace_id,
         [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/crossfade/duration": 2.5}}],
-        dry_run=False,
+        dry_run=True,
     )
 
     assert result["ok"] is False
@@ -3100,22 +3141,1018 @@ def test_update_cues_group_basic_real_blocks_playlist_setters_without_playlist_m
 
 
 def test_update_cues_group_basic_real_allows_playlist_setters_for_playlist_mode() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6)
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
-        cues={group_id: {"type": "Group", "mode": 6, "playlist/crossfade/duration": 3}},
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
-        "ws-1",
-        [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/crossfade/duration": 2.5}}],
-        dry_run=False,
-    )
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/crossfade/duration": 2.5}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["playlist/crossfade/duration"]["confirm_token"]
+    result = reader.update_cues(workspace_id, [{**update, "confirm_gates": [token]}], dry_run=False)
 
     assert result["ok"] is True
     assert result["status"] == "updated"
     assert result["results"][0]["after"]["playlist/crossfade/duration"] == 2.5
+
+
+def _safe_group_fixture(
+    group_id: str,
+    child_id: str,
+    *,
+    mode: int = 3,
+    duration: float = 10.0,
+) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]]]:
+    inactive_health = {
+        "armed": True,
+        "isBroken": False,
+        "isWarning": False,
+        "isRunning": False,
+        "isPaused": False,
+        "isAuditioning": False,
+        "isLoaded": False,
+        "isOverridden": False,
+        "isActionRunning": False,
+    }
+    return (
+        {
+            group_id: {
+                "type": "Group",
+                "mode": mode,
+                "isChildAuditioning": False,
+                "playlist/doLoop": False,
+                "playlist/doShuffle": False,
+                "playlist/doCrossfade": False,
+                "playlist/crossfade/duration": 3.0,
+                **inactive_health,
+            },
+            child_id: {
+                "type": "Audio",
+                "continueMode": 0,
+                "preWait": 0.0,
+                "postWait": 0.0,
+                "duration": duration,
+                **inactive_health,
+            },
+        },
+        {group_id: [child_id]},
+    )
+
+
+def test_group_mode_dry_run_emits_dedicated_expiring_confirm_token() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}],
+        dry_run=True,
+    )
+
+    setter = planned_setters(result["results"][0])["mode"]
+    assert result["status"] == "dry_run"
+    assert setter["requires_confirm_token"] is True
+    assert setter["real_write_possible"] is True
+    assert setter["confirm_token"].startswith("confirm:groupMode:v1:")
+    assert setter["address"] == f"/workspace/{workspace_id}/cue_id/{group_id}/mode"
+
+
+@pytest.mark.parametrize("requested_mode", [1, 2, 3, 4, 6])
+def test_group_mode_documented_writable_values_are_token_candidates(requested_mode: int) -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    baseline_mode = 2 if requested_mode == 3 else 3
+    cues, children = _safe_group_fixture(group_id, child_id, mode=baseline_mode)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": requested_mode}}],
+        dry_run=True,
+    )
+
+    token = planned_setters(result["results"][0])["mode"]["confirm_token"]
+    assert token.startswith("confirm:groupMode:v1:")
+
+
+def test_group_mode_real_write_requires_reviewed_token() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "confirm_token" in result["results"][0]["errors"]["mode"]
+    assert all(not address.endswith("/mode") for address, _, _ in client.requests)
+
+
+@pytest.mark.parametrize(
+    ("workspace_id", "cue_ref", "expected"),
+    [
+        ("ws-1", "11111111-1111-4111-8111-111111111111", "workspace UUID"),
+        ("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "50", "cue UUID"),
+    ],
+)
+def test_group_mode_requires_exact_workspace_and_cue_uuids(
+    workspace_id: str,
+    cue_ref: str,
+    expected: str,
+) -> None:
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues=cues,
+        cue_numbers={"50": group_id},
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": cue_ref, "profile": "group_basic", "properties": {"mode": 1}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert expected in result["results"][0]["errors"]["mode"]
+
+
+def test_group_mode_token_binds_fresh_ordered_child_fingerprint() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+    client.cues[child_id]["continueMode"] = 2
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "stale" in result["results"][0]["errors"]["mode"].lower()
+    assert all(not address.endswith("/mode") for address, _, _ in client.requests)
+
+
+def test_group_mode_fails_closed_for_active_or_unhealthy_group() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    cues[group_id]["isRunning"] = True
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "isRunning=false" in result["results"][0]["errors"]["mode"]
+    assert result["results"][0]["planned_operations"] == []
+
+
+def test_group_playlist_dry_run_fails_closed_when_mode_is_not_fresh_playlist() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=3)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["planned_operations"] == []
+    assert "mode 6" in result["results"][0]["errors"]["playlist/doLoop"]
+
+
+def test_group_mode_reviewed_token_writes_and_reads_back() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["mode"] == 1
+    assert result["results"][0]["side_effects"] == []
+    assert result["results"][0]["operations"][0]["rollback_plan"] == {
+        "status": "new_dry_run_and_fresh_token_required",
+        "property": "mode",
+        "value": 3,
+        "automatic_restoration": False,
+    }
+
+
+def test_group_mode_immediate_replay_is_rejected_as_consumed_before_noop_baseline() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    first = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    replay = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert first["status"] == "updated"
+    assert replay["status"] == "preflight_failed"
+    assert replay["results"][0]["errors"] == {
+        "mode": "confirmation_already_consumed: confirm_token has already been used."
+    }
+    assert replay["results"][0]["executed_operations"] == []
+    assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
+
+
+def test_group_mode_timeout_with_matching_fresh_readback_is_confirmed() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass", update_debug=True),
+        cues=cues,
+        children_by_parent=children,
+        timeout_set_property=(group_id, "mode"),
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "updated_with_confirmed_timeouts"
+    assert result["results"][0]["status"] == "updated_with_confirmed_timeouts"
+    assert result["timeout_confirmed_count"] == 1
+    assert "setter_timeout_but_readback_matched" in result["results"][0]["warnings"]
+    assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
+    debug = result["results"][0]["debug"]
+    assert debug["setter_send_count"] == 1
+    assert debug["setter_elapsed_seconds"]["mode"] >= 0
+    assert debug["confirmation_reason"] == "fresh_readback_matched"
+
+
+def test_group_mode_token_is_rejected_after_rollback_restores_baseline() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    forward_update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    forward_plan = reader.update_cues(workspace_id, [forward_update], dry_run=True)
+    forward_token = planned_setters(forward_plan["results"][0])["mode"]["confirm_token"]
+    forward = reader.update_cues(
+        workspace_id,
+        [{**forward_update, "confirm_gates": [forward_token]}],
+        dry_run=False,
+    )
+    rollback_update = {**forward_update, "properties": {"mode": 3}}
+    rollback_plan = reader.update_cues(workspace_id, [rollback_update], dry_run=True)
+    rollback_token = planned_setters(rollback_plan["results"][0])["mode"]["confirm_token"]
+    rollback = reader.update_cues(
+        workspace_id,
+        [{**rollback_update, "confirm_gates": [rollback_token]}],
+        dry_run=False,
+    )
+    setter_count_before_replay = sum(address.endswith("/mode") for address, _, _ in client.requests)
+
+    replay = reader.update_cues(
+        workspace_id,
+        [{**forward_update, "confirm_gates": [forward_token]}],
+        dry_run=False,
+    )
+
+    assert forward["status"] == "updated"
+    assert rollback["status"] == "updated"
+    assert replay["status"] == "preflight_failed"
+    assert "consumed" in replay["results"][0]["errors"]["mode"]
+    assert replay["results"][0]["executed_operations"] == []
+    assert sum(address.endswith("/mode") for address, _, _ in client.requests) == setter_count_before_replay
+
+
+def test_group_mode_same_token_concurrent_calls_send_one_setter(monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+    barrier = threading.Barrier(2)
+    consume = write_operations._consume_group_token
+
+    def synchronized_consume(item: dict[str, Any]) -> dict[str, str]:
+        barrier.wait(timeout=2)
+        return consume(item)
+
+    monkeypatch.setattr(write_operations, "_consume_group_token", synchronized_consume)
+
+    def execute() -> dict[str, Any]:
+        return reader.update_cues(
+            workspace_id,
+            [{**update, "confirm_gates": [token]}],
+            dry_run=False,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _: execute(), range(2)))
+
+    assert sum(result["status"] == "updated" for result in results) == 1
+    assert sum(result["status"] == "preflight_failed" for result in results) == 1
+    rejected = next(result for result in results if result["status"] == "preflight_failed")
+    assert rejected["results"][0]["errors"] == {
+        "mode": "confirmation_already_consumed: confirm_token has already been used."
+    }
+    assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
+
+
+@pytest.mark.parametrize("timeout_without_apply", [False, True])
+def test_consumed_group_token_cannot_retry_after_timeout(
+    timeout_without_apply: bool,
+) -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        timeout_set_property=(group_id, "mode"),
+        timeout_without_apply=timeout_without_apply,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    first = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    client.cues[group_id]["mode"] = 3
+    replay = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert first["status"] == (
+        "partial_failed" if timeout_without_apply else "updated_with_confirmed_timeouts"
+    )
+    assert replay["status"] == "preflight_failed"
+    assert "consumed" in replay["results"][0]["errors"]["mode"]
+    assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
+
+
+def test_consumed_group_token_cannot_retry_after_qlab_error() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        error_after_apply_properties={(group_id, "mode")},
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    first = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    client.cues[group_id]["mode"] = 3
+    replay = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert first["status"] == "updated_with_confirmed_timeouts"
+    assert "setter_error_but_readback_matched" in first["results"][0]["warnings"]
+    assert replay["status"] == "preflight_failed"
+    assert "consumed" in replay["results"][0]["errors"]["mode"]
+    assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
+
+
+def test_group_continue_mode_real_change_and_rollback_use_integer_setter_once() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    cues[group_id]["continueMode"] = 0
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    forward_update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"continueMode": 1}}
+    forward_plan = reader.update_cues(workspace_id, [forward_update], dry_run=True)
+    forward = reader.update_cues(workspace_id, [forward_update], dry_run=False)
+    rollback_update = {**forward_update, "properties": {"continueMode": 0}}
+    reader.update_cues(workspace_id, [rollback_update], dry_run=True)
+    rollback = reader.update_cues(workspace_id, [rollback_update], dry_run=False)
+
+    setters = [(address, args) for address, args, _ in client.requests if address.endswith("/continueMode")]
+    assert "confirm_token" not in planned_setters(forward_plan["results"][0])["continueMode"]
+    assert forward["status"] == "updated"
+    assert forward["results"][0]["after"]["continueMode"] == 1
+    assert rollback["status"] == "updated"
+    assert rollback["results"][0]["after"]["continueMode"] == 0
+    assert setters == [
+        (f"/workspace/{workspace_id}/cue_id/{group_id}/continueMode", (1,)),
+        (f"/workspace/{workspace_id}/cue_id/{group_id}/continueMode", (0,)),
+    ]
+
+
+def test_group_continue_mode_timeout_is_confirmed_without_retry() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    cues[group_id]["continueMode"] = 0
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        timeout_set_property=(group_id, "continueMode"),
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"continueMode": 1}}
+
+    result = reader.update_cues(workspace_id, [update], dry_run=False)
+
+    assert result["status"] == "updated_with_confirmed_timeouts"
+    assert result["results"][0]["after"]["continueMode"] == 1
+    assert sum(address.endswith("/continueMode") for address, _, _ in client.requests) == 1
+
+
+def test_group_continue_mode_mismatch_is_verification_failed() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    cues[group_id]["continueMode"] = 0
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        ignore_set_property=(group_id, "continueMode"),
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": group_id, "profile": "group_basic", "properties": {"continueMode": 1}}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "verification_failed"
+    assert result["results"][0]["after"]["continueMode"] == 0
+    assert sum(address.endswith("/continueMode") for address, _, _ in client.requests) == 1
+
+
+def test_group_mode_rollback_requires_new_dry_run_token() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    forward_update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    forward_plan = reader.update_cues(workspace_id, [forward_update], dry_run=True)
+    forward_token = planned_setters(forward_plan["results"][0])["mode"]["confirm_token"]
+    forward = reader.update_cues(
+        workspace_id,
+        [{**forward_update, "confirm_gates": [forward_token]}],
+        dry_run=False,
+    )
+    rollback_update = {**forward_update, "properties": {"mode": 3}}
+    stale = reader.update_cues(
+        workspace_id,
+        [{**rollback_update, "confirm_gates": [forward_token]}],
+        dry_run=False,
+    )
+    rollback_plan = reader.update_cues(workspace_id, [rollback_update], dry_run=True)
+    rollback_token = planned_setters(rollback_plan["results"][0])["mode"]["confirm_token"]
+    rollback = reader.update_cues(
+        workspace_id,
+        [{**rollback_update, "confirm_gates": [rollback_token]}],
+        dry_run=False,
+    )
+
+    assert forward["status"] == "updated"
+    assert stale["status"] == "preflight_failed"
+    assert rollback["status"] == "updated"
+    assert rollback["results"][0]["after"]["mode"] == 3
+
+
+def test_group_mode_reports_child_side_effects_without_hidden_restoration() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        group_child_outcomes={(group_id, "mode", 6): {child_id: {"continueMode": 1, "postWait": 10.0}}},
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 6}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    item = result["results"][0]
+    assert result["status"] == "updated"
+    assert "group_write_changed_child_state" in item["warnings"]
+    assert {effect["field"] for effect in item["side_effects"]} == {"continueMode", "postWait"}
+    rollback = item["operations"][0]["rollback_plan"]
+    assert rollback["automatic_restoration"] is False
+    assert rollback["status"] == "new_dry_run_and_fresh_token_required"
+    modeled = UpdateCuesResult.model_validate(result).model_dump()
+    assert modeled["results"][0]["side_effects"] == item["side_effects"]
+    assert modeled["results"][0]["group_child_readback"] == item["group_child_readback"]
+
+
+def test_group_mode_reports_unrequested_playlist_scalar_side_effect() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        property_outcomes={(group_id, "mode", 1): {"playlist/doLoop": True}},
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["results"][0]["side_effects"] == [
+        {
+            "scope": "group",
+            "cue_id": group_id,
+            "field": "playlist/doLoop",
+            "before": False,
+            "after": True,
+        }
+    ]
+
+
+def test_group_playlist_reviewed_token_writes_in_verified_playlist_mode() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    setter = planned_setters(plan["results"][0])["playlist/doLoop"]
+    assert setter["confirm_token"].startswith("confirm:groupPlaylist:v1:")
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [setter["confirm_token"]]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["playlist/doLoop"] is True
+
+
+def test_group_playlist_timeout_is_confirmed_and_sends_one_setter() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        timeout_set_property=(group_id, "playlist/doLoop"),
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["playlist/doLoop"]["confirm_token"]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "updated_with_confirmed_timeouts"
+    assert result["results"][0]["after"]["playlist/doLoop"] is True
+    assert sum(address.endswith("/playlist/doLoop") for address, _, _ in client.requests) == 1
+
+
+def test_group_playlist_token_binds_dependent_playlist_state() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": group_id,
+        "profile": "group_basic",
+        "properties": {"playlist/doCrossfade": True},
+    }
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["playlist/doCrossfade"]["confirm_token"]
+    client.cues[group_id]["playlist/crossfade/duration"] = 2.0
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "stale_group_baseline" in result["results"][0]["errors"]["playlist/doCrossfade"]
+
+
+def test_group_mode_confirm_token_expires(monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    monkeypatch.setattr(group_helpers.time, "time", lambda: 1000)
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+    monkeypatch.setattr(group_helpers.time, "time", lambda: 1301)
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "expired" in result["results"][0]["errors"]["mode"]
+    assert all(not address.endswith("/mode") for address, _, _ in client.requests)
+
+
+def test_group_confirm_tokens_reject_changed_value_and_wrong_family() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    mode_update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    plan = reader.update_cues(workspace_id, [mode_update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    changed = reader.update_cues(
+        workspace_id,
+        [{**mode_update, "properties": {"mode": 2}, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    client.cues[group_id]["mode"] = 6
+    wrong_family = reader.update_cues(
+        workspace_id,
+        [
+            {
+                "cue_ref": group_id,
+                "profile": "group_basic",
+                "properties": {"playlist/doLoop": True},
+                "confirm_gates": [token],
+            }
+        ],
+        dry_run=False,
+    )
+
+    assert "stale_group_baseline" in changed["results"][0]["errors"]["mode"]
+    assert "unsupported family" in wrong_family["results"][0]["errors"]["playlist/doLoop"]
+
+
+def test_group_playlist_token_rejects_malformed_tampered_and_wrong_bindings() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    other_group_id = "33333333-3333-4333-8333-333333333333"
+    other_child_id = "44444444-4444-4444-8444-444444444444"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6)
+    other_cues, other_children = _safe_group_fixture(other_group_id, other_child_id, mode=6)
+    cues.update(other_cues)
+    children.update(other_children)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": group_id,
+        "profile": "group_basic",
+        "properties": {"playlist/doLoop": True},
+    }
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["playlist/doLoop"]["confirm_token"]
+    tampered = f"{token[:-1]}{'0' if token[-1] != '0' else '1'}"
+
+    malformed = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": ["malformed"]}],
+        dry_run=False,
+    )
+    invalid_signature = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [tampered]}],
+        dry_run=False,
+    )
+    wrong_group = reader.update_cues(
+        workspace_id,
+        [{**update, "cue_ref": other_group_id, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    wrong_property = reader.update_cues(
+        workspace_id,
+        [
+            {
+                **update,
+                "properties": {"playlist/doShuffle": True},
+                "confirm_gates": [token],
+            }
+        ],
+        dry_run=False,
+    )
+
+    assert "malformed" in malformed["results"][0]["errors"]["playlist/doLoop"]
+    assert "signature is invalid" in invalid_signature["results"][0]["errors"]["playlist/doLoop"]
+    assert "stale_group_baseline" in wrong_group["results"][0]["errors"]["playlist/doLoop"]
+    assert "stale_group_baseline" in wrong_property["results"][0]["errors"]["playlist/doShuffle"]
+    assert sum(
+        address.endswith(("/playlist/doLoop", "/playlist/doShuffle"))
+        for address, _, _ in client.requests
+    ) == 0
+
+
+def test_group_playlist_loop_requires_readable_nonzero_child_duration() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6, duration=0.0)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "non-zero duration" in result["results"][0]["errors"]["playlist/doLoop"]
+
+
+def test_group_playlist_crossfade_rejects_duration_longer_than_child() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6, duration=2.0)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doCrossfade": True}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "exceeds" in result["results"][0]["errors"]["playlist/doCrossfade"]
+
+
+def test_group_playlist_shuffle_reports_order_side_effect() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    first_id = "22222222-2222-4222-8222-222222222222"
+    second_id = "33333333-3333-4333-8333-333333333333"
+    cues, children = _safe_group_fixture(group_id, first_id, mode=6)
+    cues[second_id] = dict(cues[first_id], uniqueID=second_id)
+    children[group_id].append(second_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        group_order_outcomes={(group_id, "playlist/doShuffle", True): [second_id, first_id]},
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": group_id,
+        "profile": "group_basic",
+        "properties": {"playlist/doShuffle": True},
+    }
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["playlist/doShuffle"]["confirm_token"]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    effects = result["results"][0]["side_effects"]
+    assert effects == [
+        {
+            "scope": "children",
+            "field": "order",
+            "before": [first_id, second_id],
+            "after": [second_id, first_id],
+        }
+    ]
 
 
 def test_update_cues_real_blocks_duration_when_cue_duration_is_not_editable() -> None:
@@ -3135,6 +4172,25 @@ def test_update_cues_real_blocks_duration_when_cue_duration_is_not_editable() ->
     assert result["ok"] is False
     assert result["status"] == "preflight_failed"
     assert result["results"][0]["errors"] == {"duration": "duration requires a cue with editable duration."}
+    assert all(not request[0].endswith("/duration") for request in client.requests)
+
+
+def test_update_cues_real_blocks_duration_when_editability_readback_is_missing() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Wait", "duration": 0}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "profile": "wait_basic", "properties": {"duration": 1.0}}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"]["duration"] == "duration requires a cue with editable duration."
     assert all(not request[0].endswith("/duration") for request in client.requests)
 
 
@@ -5978,7 +7034,7 @@ def test_update_cues_verification_accepts_numeric_normalization() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
-        cues={cue_id: {"type": "Memo", "duration": 1.0}},
+        cues={cue_id: {"type": "Memo", "duration": 1.0, "allowsEditingDuration": True}},
         ignore_set_property=(cue_id, "duration"),
     )
     reader = QLabReader(client)  # type: ignore[arg-type]

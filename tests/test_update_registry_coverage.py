@@ -23,7 +23,7 @@ def test_update_registry_has_specs_for_all_mutating_cue_osc_routes() -> None:
     assert missing == []
     assert coverage_summary(coverage) == {
         "common/global cue properties": {"real_write": 15, "gated": 21},
-        "Group/List/Cart": {"real_write": 7, "planned_only": 6},
+        "Group/List/Cart": {"gated": 9, "real_write": 6, "planned_only": 12},
         "Audio": {"gated": 65, "real_write": 6},
         "Mic": {"gated": 5, "real_write": 2},
         "Video": {"gated": 79},
@@ -39,6 +39,49 @@ def test_update_registry_has_specs_for_all_mutating_cue_osc_routes() -> None:
         "Devamp": {"gated": 3},
         "Script": {"gated": 1},
     }
+
+
+def test_group_inventory_includes_documented_playlist_routes_and_actions() -> None:
+    inventory = extract_cue_osc_inventory(DICTIONARY_PATH.read_text())
+    group_entries = {
+        entry["property"]: entry
+        for entry in inventory
+        if entry["section"] == "Group/List/Cart"
+    }
+
+    for property_name in (
+        "playlist/currentCue",
+        "playlist/currentCueID",
+        "playlist/doCrossfade",
+        "playlist/doLoop",
+        "playlist/doShuffle",
+        "playlist/crossfade/duration",
+        "playlistCrossfade",
+        "playlistCrossfadeDuration",
+        "playlistLoop",
+        "playlistShuffle",
+        "playlist/next",
+        "playlist/previous",
+        "shuffle",
+    ):
+        assert property_name in group_entries
+
+    coverage = registry_coverage(inventory, profile_catalog())
+    group_status = {
+        entry["property"]: entry["registry_status"]
+        for entry in coverage
+        if entry["section"] == "Group/List/Cart"
+    }
+    for property_name in (
+        "mode",
+        "playlist/doCrossfade",
+        "playlist/doLoop",
+        "playlist/doShuffle",
+        "playlist/crossfade/duration",
+    ):
+        assert group_status[property_name] == "gated"
+    for property_name in ("playlist/next", "playlist/previous", "shuffle"):
+        assert group_status[property_name] == "planned_only"
 
 
 def test_devamp_and_network_catalog_routes_remain_gated_until_specialized_evidence() -> None:

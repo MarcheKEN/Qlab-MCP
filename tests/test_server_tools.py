@@ -125,7 +125,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         },
         "tags": ["batch-update", "cue-update", "deprecated-alias", "gated-write", "qlab", "write-mode"],
         "input_schema_hash": "d5202803e7b8b5bf7a07bc3693b27b3c86715258957fa8283284656cd6b280f6",
-        "output_schema_hash": "853257a5192b69f070e159611c4aa2151bc998d905a789cca4b93eaea37b7e61",
+        "output_schema_hash": "01dc7f64ae1ab1d4a69ff902432d9d615672be574a7ea61fe021bf41be1b60f5",
     },
     "qlab_edit_cues": {
         "title": "Edit QLab Cues",
@@ -138,7 +138,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         },
         "tags": ["batch-edit", "cue-edit", "gated-write", "qlab", "write-mode"],
         "input_schema_hash": "d5202803e7b8b5bf7a07bc3693b27b3c86715258957fa8283284656cd6b280f6",
-        "output_schema_hash": "853257a5192b69f070e159611c4aa2151bc998d905a789cca4b93eaea37b7e61",
+        "output_schema_hash": "01dc7f64ae1ab1d4a69ff902432d9d615672be574a7ea61fe021bf41be1b60f5",
     },
     "qlab_move_cues": {
         "title": "Move QLab Cues",

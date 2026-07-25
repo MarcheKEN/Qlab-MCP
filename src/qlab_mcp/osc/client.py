@@ -108,7 +108,7 @@ class QLabOscClient:
     ) -> QLabReply:
         with self._lock:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-                sock.bind(("", self.config.reply_port))
+                self._prepare_udp_socket(sock)
                 if workspace_id and self.config.passcode and not self._workspace_is_connected(workspace_id, "udp"):
                     self._send_with_reply_on_socket(
                         sock,
@@ -139,8 +139,23 @@ class QLabOscClient:
 
     def _send_with_reply(self, address: str, *args: Any, reply_timeout: float | None = None) -> QLabReply:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.bind(("", self.config.reply_port))
+            self._prepare_udp_socket(sock)
             return self._send_with_reply_on_socket(sock, address, *args, reply_timeout=reply_timeout)
+
+    def _prepare_udp_socket(self, sock: socket.socket) -> None:
+        """Prepare the UDP reply endpoint for this request.
+
+        Unprotected sessions use a fresh port because QLab has no request
+        identifier in its UDP replies. Protected sessions stay on the
+        configured port until authentication is complete.
+        """
+        if self.config.passcode:
+            # ponytail: protected QLab sessions may ignore /udpReplyPort until /connect.
+            sock.bind(("", self.config.reply_port))
+            return
+        sock.bind(("", 0))
+        reply_port = int(sock.getsockname()[1])
+        sock.sendto(encode_message("/udpReplyPort", reply_port), (self.config.host, self.config.osc_port))
 
     def _workspace_is_connected(self, workspace_id: str, transport: str) -> bool:
         return (workspace_id.strip("/"), transport) in self._connected_workspaces

@@ -29,6 +29,8 @@ class ReadCache:
         self._lock = threading.Lock()
         self._entries: dict[Hashable, _CacheEntry] = {}
         self._inflight: dict[Hashable, _InflightEntry] = {}
+        # Owners only publish results if no clear() happened while they ran.
+        self._generation = 0
 
     def get_or_set(self, key: Hashable, ttl: float, factory: Callable[[], Any]) -> Any:
         if ttl <= 0:
@@ -42,6 +44,7 @@ class ReadCache:
             if entry is not None:
                 self._entries.pop(key, None)
             inflight = self._inflight.get(key)
+            generation = self._generation
             if inflight is None:
                 inflight = _InflightEntry(event=threading.Event())
                 self._inflight[key] = inflight
@@ -59,25 +62,28 @@ class ReadCache:
             value = factory()
         except BaseException as exc:
             with self._lock:
-                inflight.error = exc
-                self._inflight.pop(key, None)
-                inflight.event.set()
+                if self._generation == generation:
+                    inflight.error = exc
+                    self._inflight.pop(key, None)
+                    inflight.event.set()
             raise
         with self._lock:
-            self._entries[key] = _CacheEntry(expires_at=now + ttl, value=value)
-            inflight.value = value
-            self._inflight.pop(key, None)
-            inflight.event.set()
+            if self._generation == generation:
+                self._entries[key] = _CacheEntry(expires_at=now + ttl, value=value)
+                inflight.value = value
+                self._inflight.pop(key, None)
+                inflight.event.set()
         return value
 
     def clear(self) -> None:
         with self._lock:
+            self._generation += 1
             self._entries.clear()
             inflight = list(self._inflight.values())
             self._inflight.clear()
-        for entry in inflight:
-            entry.error = RuntimeError("Read cache cleared while request was in flight")
-            entry.event.set()
+            for entry in inflight:
+                entry.error = RuntimeError("Read cache cleared while request was in flight")
+                entry.event.set()
 
 
 _SHARED_CACHE = ReadCache()

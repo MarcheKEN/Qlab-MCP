@@ -72,6 +72,18 @@ class FakeQlabOscServer:
                     reply_address = f"/reply/{message.address.lstrip('/')}"
                     sock.sendto(encode_message(reply_address, json.dumps(payload)), client_addr)
                     continue
+                if message.address == "/udpReplyPort":
+                    # The client announces a fresh per-request reply port as
+                    # a fire-and-forget control message.  Keep it out of the
+                    # request assertions while retaining a realistic reply.
+                    sock.sendto(
+                        encode_message(
+                            "/reply/udpReplyPort",
+                            json.dumps({"status": "ok", "data": message.args[0] if message.args else None}),
+                        ),
+                        client_addr,
+                    )
+                    continue
                 self.received.append(message.address)
                 self.received_args.append(message.args)
                 self.received_client_ports.append(client_addr[1])

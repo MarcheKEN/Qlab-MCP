@@ -55,7 +55,10 @@ def _read_string(packet: bytes, offset: int) -> tuple[str, int]:
     end = packet.find(b"\x00", offset)
     if end < 0:
         raise OscProtocolError("Unterminated OSC string")
-    value = packet[offset:end].decode("utf-8")
+    try:
+        value = packet[offset:end].decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise OscProtocolError("OSC string is not valid UTF-8") from exc
     next_offset = end + 1
     next_offset += (4 - (next_offset % 4)) % 4
     if next_offset > len(packet):

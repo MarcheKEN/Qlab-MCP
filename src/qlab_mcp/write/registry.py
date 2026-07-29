@@ -89,6 +89,7 @@ class CuePropertySpec:
     capability_gate: str | None = None
     readback: str = "value"
     contextual_requirements: tuple[str, ...] = ()
+    write_family: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1526,6 +1527,70 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
     "script_basic": UpdateProfileSpec("script_basic", ("Script",), (*COMMON_PROPERTIES, *SCRIPT_CATALOG_PROPERTIES), "high", True, "Script profile; script source remains dry-run only."),
 }
 
+_EXTRACTED_WRITE_FAMILY_PROPERTIES = {
+    "video_opacity": {
+        "video_basic": {"opacity"},
+        "camera_basic": {"opacity"},
+        "text_basic": {"opacity"},
+    },
+    "video_translation": {
+        profile: {"translation/x", "translation/y"}
+        for profile in ("video_basic", "camera_basic", "text_basic")
+    },
+    "video_scalars": {
+        profile: {
+            "scale/x",
+            "scale/y",
+            "anchor/x",
+            "anchor/y",
+            "cropTop",
+            "cropBottom",
+            "cropLeft",
+            "cropRight",
+        }
+        for profile in ("video_basic", "camera_basic", "text_basic")
+    },
+    "video_appearance": {
+        profile: {"blendMode", "preserveAspectRatio"}
+        for profile in ("video_basic", "camera_basic", "text_basic")
+    },
+    "video_audio_time": {
+        "video_basic": {
+            "startTime",
+            "endTime",
+            "playCount",
+            "infiniteLoop",
+            "rate",
+            "preservePitch",
+            "holdLastFrame",
+        }
+    },
+    "text_basics": {
+        "text_basic": {
+            "text",
+            "fixedWidth",
+            "text/format/fontSize",
+            "text/format/alignment",
+            "text/format/fontName",
+            "text/format/lineSpacing",
+            "text/format/color",
+        }
+    },
+}
+
+for _family_name, _profiles in _EXTRACTED_WRITE_FAMILY_PROPERTIES.items():
+    for _profile_name, _property_names in _profiles.items():
+        _profile = UPDATE_PROFILES[_profile_name]
+        UPDATE_PROFILES[_profile_name] = replace(
+            _profile,
+            properties=tuple(
+                replace(prop, write_family=_family_name)
+                if prop.name in _property_names
+                else prop
+                for prop in _profile.properties
+            ),
+        )
+
 CAPABILITY_GATES = {
     "audio_map_editing",
     "audio_output",
@@ -2415,6 +2480,9 @@ def _audio_object_color_name(value: Any) -> str:
 
 
 _CONTINUE_MODE_VALUES = {
+    0: 0,
+    1: 1,
+    2: 2,
     "0": 0,
     "do_not_continue": 0,
     "do-not-continue": 0,
@@ -2429,6 +2497,13 @@ _CONTINUE_MODE_VALUES = {
     "auto-follow": 2,
     "autofollow": 2,
 }
+
+
+def _continue_mode_comparison_value(value: Any) -> Any:
+    if isinstance(value, str):
+        normalized = value.strip().casefold().replace(" ", "_")
+        return _CONTINUE_MODE_VALUES.get(normalized, value)
+    return _CONTINUE_MODE_VALUES.get(value, value)
 
 
 def _continue_mode(value: Any) -> int:

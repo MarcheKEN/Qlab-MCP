@@ -10,6 +10,7 @@ import secrets
 import time
 from typing import Any
 
+from ..cues.refs import CONTAINER_CUE_TYPES
 from ..errors import OscTimeoutError, UnsafeWriteOperationError
 from .moves import (
     _activity_snapshot,
@@ -27,7 +28,6 @@ DELETE_TOKEN_TTL_SECONDS = 300
 DELETE_OPERATION_VERSION = 1
 DELETE_CONVERGENCE_DEADLINES_SECONDS = (0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0)
 _DELETE_TOKEN_SECRET = secrets.token_bytes(32)
-_CONTAINER_TYPES = {"Group", "Cue List", "Cue Cart", "Cart"}
 
 
 def delete_cues(
@@ -379,7 +379,7 @@ def _normalize_delete_ids(snapshot: dict[str, Any], cue_ids: list[str]) -> tuple
             if cue is None:
                 raise ValueError("cue_id does not resolve in this workspace.")
             cue_type = str(cue.get("type") or "")
-            if cue_type in _CONTAINER_TYPES or snapshot["children_by_parent"].get(cue_id):
+            if cue_type in CONTAINER_CUE_TYPES or snapshot["children_by_parent"].get(cue_id):
                 raise ValueError("Container cues and cues with children are blocked; delete is leaf-only.")
             if parents.get(cue_id) is None:
                 raise ValueError("Top-level cue deletion is blocked.")

@@ -44,6 +44,10 @@ class OscMessageTests(unittest.TestCase):
         with self.assertRaises(OscProtocolError):
             QLabOscClient._parse_reply(packet)
 
+    def test_invalid_utf8_raises_protocol_error(self) -> None:
+        with self.assertRaises(OscProtocolError):
+            decode_message(b"/reply/\xff\x00\x00\x00\x00")
+
     def test_unrelated_messages_can_be_ignored_while_waiting_for_reply(self) -> None:
         non_reply = encode_message("/updates/workspace/ws-1", "{}")
         other_reply = encode_message("/reply/workspace/ws-1/cue/2/name", json.dumps({"status": "ok", "data": "Other"}))
@@ -97,7 +101,7 @@ class OscMessageTests(unittest.TestCase):
         client._remember_connected_workspace("ws-1", "udp")
         sent: list[tuple[str, tuple[object, ...]]] = []
 
-        def fake_send(sock: object, address: str, *args: object) -> object:
+        def fake_send(sock: object, address: str, *args: object, **_kwargs: object) -> object:
             sent.append((address, args))
             return SimpleNamespace(status="ok", data="ok")
 
@@ -124,7 +128,7 @@ class OscMessageTests(unittest.TestCase):
         )
         sent: list[str] = []
 
-        def fake_send(sock: object, address: str, *args: object) -> object:
+        def fake_send(sock: object, address: str, *args: object, **_kwargs: object) -> object:
             sent.append(address)
             return SimpleNamespace(status="ok", data="ok")
 
@@ -136,6 +140,28 @@ class OscMessageTests(unittest.TestCase):
             with patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=fake_send):
                 client.request_tcp("/workspace/ws-1/settings/light/patch", workspace_id="ws-1")
                 client.request_tcp("/workspace/ws-1/settings/light/patch", workspace_id="ws-1")
+
+        self.assertEqual(sent.count("/workspace/ws-1/connect"), 2)
+        self.assertEqual(sent.count("/workspace/ws-1/settings/light/patch"), 2)
+
+    def test_tcp_request_infers_workspace_and_authenticates_each_call(self) -> None:
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, reply_port=0, timeout=0.05, passcode="secret")
+        )
+        sent: list[str] = []
+
+        def fake_send(sock: object, address: str, *args: object, **_kwargs: object) -> object:
+            sent.append(address)
+            return SimpleNamespace(status="ok", data="ok")
+
+        fake_sock = Mock()
+        fake_sock.__enter__ = Mock(return_value=fake_sock)
+        fake_sock.__exit__ = Mock(return_value=False)
+
+        with patch("socket.create_connection", return_value=fake_sock):
+            with patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=fake_send):
+                client.request_tcp("/workspace/ws-1/settings/light/patch")
+                client.request_tcp("/workspace/ws-1/settings/light/patch")
 
         self.assertEqual(sent.count("/workspace/ws-1/connect"), 2)
         self.assertEqual(sent.count("/workspace/ws-1/settings/light/patch"), 2)

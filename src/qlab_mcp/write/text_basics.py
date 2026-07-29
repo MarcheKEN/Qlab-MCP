@@ -7,9 +7,7 @@ annotations.
 
 from __future__ import annotations
 
-import base64
 import hashlib
-import hmac
 import json
 import math
 import secrets
@@ -17,6 +15,7 @@ from typing import Any
 from uuid import UUID
 
 from ..osc.addressing import _clean_cue_ref
+from .tokens import decode_confirm_token, encode_confirm_token
 
 
 TEXT_PHASE3E_COLOR_PROPERTIES = frozenset({"text/format/color"})
@@ -60,7 +59,7 @@ def _resolved_cue_id(values: dict[str, Any] | None) -> str | None:
     return None
 
 
-def _phase3e_text_basic_operation(item: dict[str, Any]) -> dict[str, Any] | None:
+def operation(item: dict[str, Any]) -> dict[str, Any] | None:
     if item.get("profile") != "text_basic":
         return None
     return next(
@@ -73,7 +72,7 @@ def _phase3e_text_basic_operation(item: dict[str, Any]) -> dict[str, Any] | None
     )
 
 
-def _phase3e_text_basic_call_structure_error(items: list[dict[str, Any]]) -> str | None:
+def call_structure_error(items: list[dict[str, Any]]) -> str | None:
     if len(items) != 1:
         return "Phase 3E Text Basics real writes require exactly one cue update."
     item = items[0]
@@ -175,48 +174,42 @@ def _phase3e_text_basic_token_payload(
 
 def _phase3e_text_basic_confirm_token(**payload_args: Any) -> str:
     payload = _phase3e_text_basic_token_payload(**payload_args)
-    encoded = base64.urlsafe_b64encode(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).decode("ascii").rstrip("=")
-    signature = hmac.new(_LIGHT_WRITE_TOKEN_SECRET, encoded.encode("ascii"), hashlib.sha256).hexdigest()
-    return f"confirm:textBasic:v{PHASE3E_TEXT_BASIC_TOKEN_VERSION}:{encoded}:{signature}"
+    return encode_confirm_token(
+        "textBasic",
+        PHASE3E_TEXT_BASIC_TOKEN_VERSION,
+        payload,
+        _LIGHT_WRITE_TOKEN_SECRET,
+    )
 
 
 def _decode_phase3e_text_basic_confirm_token(
     token: str,
 ) -> tuple[dict[str, Any] | None, str | None]:
-    parts = token.split(":", 4)
-    expected_prefix = ["confirm", "textBasic", f"v{PHASE3E_TEXT_BASIC_TOKEN_VERSION}"]
-    if len(parts) != 5 or parts[:3] != expected_prefix:
-        return None, "Phase 3E Text Basics confirm_token is malformed or has an unsupported version."
-    encoded, signature = parts[3], parts[4]
-    expected_signature = hmac.new(
+    payload, error = decode_confirm_token(
+        token,
+        "textBasic",
+        PHASE3E_TEXT_BASIC_TOKEN_VERSION,
         _LIGHT_WRITE_TOKEN_SECRET,
-        encoded.encode("ascii"),
-        hashlib.sha256,
-    ).hexdigest()
-    if not hmac.compare_digest(signature, expected_signature):
+    )
+    if error == "malformed":
+        return None, "Phase 3E Text Basics confirm_token is malformed or has an unsupported version."
+    if error == "signature":
         return None, "Phase 3E Text Basics confirm_token signature is invalid."
-    try:
-        padding = "=" * (-len(encoded) % 4)
-        payload = json.loads(base64.urlsafe_b64decode(encoded + padding).decode("utf-8"))
-    except Exception:
-        return None, "Phase 3E Text Basics confirm_token payload is invalid."
-    if not isinstance(payload, dict):
+    if error == "payload" or payload is None:
         return None, "Phase 3E Text Basics confirm_token payload is invalid."
     return payload, None
 
 
-def _phase3e_text_basic_dry_run_errors(
+def dry_run_errors(
     item: dict[str, Any],
     before: dict[str, Any] | None,
 ) -> dict[str, str]:
-    operation = _phase3e_text_basic_operation(item)
-    if operation is None or not isinstance(before, dict) or before.get("type") != "Text":
+    text_operation = operation(item)
+    if text_operation is None or not isinstance(before, dict) or before.get("type") != "Text":
         return {}
-    property_name = operation["property"]
+    property_name = text_operation["property"]
     baseline = before.get(property_name)
-    requested = _text_basic_requested_value(operation)
+    requested = _text_basic_requested_value(text_operation)
     if not _text_basic_value_valid(property_name, baseline):
         return {property_name: f"Phase 3E Text Basics requires readable {property_name} baseline."}
     if not _text_basic_value_valid(property_name, requested):
@@ -224,20 +217,20 @@ def _phase3e_text_basic_dry_run_errors(
     return {}
 
 
-def _annotate_phase3e_text_basic_operation(
+def annotate_operation(
     item: dict[str, Any],
     *,
     workspace_id: str,
     before: dict[str, Any] | None,
     candidate_shape: bool,
 ) -> list[str]:
-    operation = _phase3e_text_basic_operation(item)
-    if operation is None:
+    text_operation = operation(item)
+    if text_operation is None:
         return []
-    property_name = operation["property"]
+    property_name = text_operation["property"]
     cue_id = _resolved_cue_id(before)
     baseline = before.get(property_name) if isinstance(before, dict) else None
-    requested = _text_basic_requested_value(operation)
+    requested = _text_basic_requested_value(text_operation)
     candidate = (
         candidate_shape
         and isinstance(before, dict)
@@ -247,9 +240,9 @@ def _annotate_phase3e_text_basic_operation(
         and _text_basic_value_valid(property_name, requested)
     )
     if not candidate:
-        operation.pop("confirm_token", None)
+        text_operation.pop("confirm_token", None)
         return []
-    operation.update(
+    text_operation.update(
         {
             "risk_tier": "high",
             "real_write_enabled": False,
@@ -268,26 +261,26 @@ def _annotate_phase3e_text_basic_operation(
             ],
         }
     )
-    operation["confirm_token"] = _phase3e_text_basic_confirm_token(
+    text_operation["confirm_token"] = _phase3e_text_basic_confirm_token(
         workspace_id=workspace_id,
         cue_ref=item["cue_ref"],
         cue_id=cue_id,
         item=item,
-        operation=operation,
+        operation=text_operation,
         baseline=baseline,
         requested=requested,
     )
     return []
 
 
-def _validate_phase3e_text_basic_real_write(
+def validate_real_write(
     workspace_id: str,
     item: dict[str, Any],
     before: dict[str, Any] | None,
 ) -> dict[str, str]:
-    operation = _phase3e_text_basic_operation(item)
-    property_name = operation.get("property") if operation else "text_basic"
-    if operation is None or not isinstance(before, dict):
+    text_operation = operation(item)
+    property_name = text_operation.get("property") if text_operation else "text_basic"
+    if text_operation is None or not isinstance(before, dict):
         return {property_name: "Phase 3E Text Basics preflight is incomplete."}
     if item.get("profile") != "text_basic" or before.get("type") != "Text":
         return {property_name: "Phase 3E Text Basics real writes require a Text cue and text_basic profile."}
@@ -297,7 +290,7 @@ def _validate_phase3e_text_basic_real_write(
         return {property_name: "Phase 3E Text Basics real writes require an inactive cue."}
     cue_id = _resolved_cue_id(before)
     baseline = before.get(property_name)
-    requested = _text_basic_requested_value(operation)
+    requested = _text_basic_requested_value(text_operation)
     if cue_id != item.get("cue_ref"):
         return {property_name: "Phase 3E fresh read uniqueID does not exactly match requested cue UUID."}
     if not _text_basic_value_valid(property_name, baseline):
@@ -308,7 +301,7 @@ def _validate_phase3e_text_basic_real_write(
     payload, token_error = _decode_phase3e_text_basic_confirm_token(token)
     if token_error or payload is None:
         return {property_name: token_error or "Phase 3E Text Basics confirm_token is invalid."}
-    token_operation = dict(operation)
+    token_operation = dict(text_operation)
     token_operation["risk_tier"] = "high"
     expected = _phase3e_text_basic_token_payload(
         workspace_id=workspace_id,
@@ -349,11 +342,11 @@ def _validate_phase3e_text_basic_real_write(
     return {}
 
 
-def _mark_phase3e_text_basic_real_operation(item: dict[str, Any]) -> None:
-    operation = _phase3e_text_basic_operation(item)
-    if operation is None:
+def mark_real_operation(item: dict[str, Any]) -> None:
+    text_operation = operation(item)
+    if text_operation is None:
         return
-    operation.update(
+    text_operation.update(
         {
             "risk_tier": "high",
             "real_write_enabled": True,
@@ -371,35 +364,38 @@ def _mark_phase3e_text_basic_real_operation(item: dict[str, Any]) -> None:
             ],
         }
     )
-    operation.pop("planned_only_reason", None)
+    text_operation.pop("planned_only_reason", None)
 
 
-def _label_phase3e_text_basic_rejection(item: dict[str, Any]) -> None:
-    operation = _phase3e_text_basic_operation(item)
-    if operation is not None:
-        operation["planned_only_reason"] = "text_basic_requires_confirm_token"
+def label_rejection(item: dict[str, Any]) -> None:
+    text_operation = operation(item)
+    if text_operation is not None:
+        text_operation["planned_only_reason"] = "text_basic_requires_confirm_token"
 
 
-def _refresh_phase3e_text_basic_real_result(
+def refresh_real_result(
     result: dict[str, Any],
     item: dict[str, Any],
 ) -> None:
-    text_operation = _phase3e_text_basic_operation(item)
+    text_operation = operation(item)
     if text_operation is None or not result.get("executed_operations"):
         return
     property_name = text_operation["property"]
-    for operation in result.get("operations") or []:
-        if operation.get("property") == property_name:
-            operation["real_write_enabled"] = True
-            operation["real_write_possible"] = True
-            operation["requires_confirm_token"] = True
-            operation.pop("planned_only_reason", None)
-    for operation in result.get("planned_operations") or []:
-        if operation.get("operation") == "set_property" and operation.get("property") == property_name:
-            operation["real_write_enabled"] = True
-            operation["real_write_possible"] = True
-            operation["requires_confirm_token"] = True
-            operation.pop("planned_only_reason", None)
+    for result_operation in result.get("operations") or []:
+        if result_operation.get("property") == property_name:
+            result_operation["real_write_enabled"] = True
+            result_operation["real_write_possible"] = True
+            result_operation["requires_confirm_token"] = True
+            result_operation.pop("planned_only_reason", None)
+    for planned_operation in result.get("planned_operations") or []:
+        if (
+            planned_operation.get("operation") == "set_property"
+            and planned_operation.get("property") == property_name
+        ):
+            planned_operation["real_write_enabled"] = True
+            planned_operation["real_write_possible"] = True
+            planned_operation["requires_confirm_token"] = True
+            planned_operation.pop("planned_only_reason", None)
     plan = result.get("updateq_plan")
     if isinstance(plan, dict):
         plan["status"] = result.get("status")

@@ -138,7 +138,7 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
             "workspace_id": resolved_workspace_id,
             "workspace_name": workspace_info.get("displayName") or workspace_info.get("name"),
         }
-        connect_scopes = check_connect_scopes(reader.client, resolved_workspace_id)
+        connect_scopes = check_connect_scopes(reader.client, resolved_workspace_id, request=reader._request)
         checks["connect"] = connect_scopes
         edit_confirmed = connect_scopes.get("status") == "confirmed" and "edit" in (connect_scopes.get("scopes") or [])
         edit_status = "confirmed" if edit_confirmed else "not_granted"
@@ -168,7 +168,7 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
                 warnings=warnings,
             )
 
-        workspace_mode = read_workspace_mode(reader.client, resolved_workspace_id, authenticated=True)
+        workspace_mode = read_workspace_mode(reader.client, resolved_workspace_id, authenticated=True, request=reader._request)
     checks["show_mode"] = workspace_mode
     if workspace_mode.get("show_mode") is True:
         blockers.append("workspace_in_show_mode")
@@ -216,14 +216,26 @@ def check_write_readiness(reader: Any, workspace_id: str) -> dict[str, Any]:
     )
 
 
-def ensure_write_ready(reader: Any, workspace_id: str) -> str:
+def ensure_write_ready(
+    reader: Any,
+    workspace_id: str,
+    *,
+    request_timeout: float | None = None,
+) -> str:
     workspace = _clean_workspace_id(workspace_id)
     config = reader.client.config
     if not bool(getattr(config, "enable_write", False)):
         raise UnsafeWriteOperationError("Write mode is disabled. Set QLAB_ENABLE_WRITE=true to enable gated writes.")
     if not bool(getattr(config, "passcode", None)):
         raise UnsafeWriteOperationError("QLAB_PASSCODE must be configured on the server before write mode can run.")
-    readiness = check_write_readiness(reader, workspace)
+    previous_deadline = getattr(reader, "_read_deadline", None)
+    if request_timeout is not None:
+        reader.set_read_deadline(request_timeout)
+    try:
+        readiness = check_write_readiness(reader, workspace)
+    finally:
+        if request_timeout is not None:
+            reader._read_deadline = previous_deadline
     if not readiness["ok"]:
         raise UnsafeWriteOperationError(readiness["message"])
     return _clean_workspace_id(readiness.get("workspace_id") or workspace)

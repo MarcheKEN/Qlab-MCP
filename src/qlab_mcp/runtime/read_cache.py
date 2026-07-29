@@ -32,17 +32,25 @@ class ReadCache:
         # Owners only publish results if no clear() happened while they ran.
         self._generation = 0
 
-    def get_or_set(self, key: Hashable, ttl: float, factory: Callable[[], Any]) -> Any:
+    def get_or_set(
+        self,
+        key: Hashable,
+        ttl: float,
+        factory: Callable[[], Any],
+        *,
+        wait_timeout: float | None = None,
+    ) -> Any:
         if ttl <= 0:
             return factory()
 
-        now = time.monotonic()
         with self._lock:
+            now = time.monotonic()
+            expired_keys = [cache_key for cache_key, entry in self._entries.items() if entry.expires_at <= now]
+            for cache_key in expired_keys:
+                self._entries.pop(cache_key, None)
             entry = self._entries.get(key)
             if entry is not None and entry.expires_at > now:
                 return entry.value
-            if entry is not None:
-                self._entries.pop(key, None)
             inflight = self._inflight.get(key)
             generation = self._generation
             if inflight is None:
@@ -53,7 +61,8 @@ class ReadCache:
                 owner = False
 
         if not owner:
-            inflight.event.wait()
+            if not inflight.event.wait(wait_timeout):
+                raise TimeoutError("Timed out waiting for in-flight read cache request")
             if inflight.error is not None:
                 raise inflight.error
             return inflight.value
@@ -69,7 +78,7 @@ class ReadCache:
             raise
         with self._lock:
             if self._generation == generation:
-                self._entries[key] = _CacheEntry(expires_at=now + ttl, value=value)
+                self._entries[key] = _CacheEntry(expires_at=time.monotonic() + ttl, value=value)
                 inflight.value = value
                 self._inflight.pop(key, None)
                 inflight.event.set()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from ..osc.addressing import _clean_workspace_id, _workspace_address
 from ..osc.client import QLabOscClient
@@ -48,11 +48,17 @@ def normalize_workspace_mode(data: Any, address: str | None = None) -> dict[str,
     )
 
 
-def read_workspace_mode(client: QLabOscClient, workspace_id: str, *, authenticated: bool = False) -> dict[str, Any]:
+def read_workspace_mode(
+    client: QLabOscClient,
+    workspace_id: str,
+    *,
+    authenticated: bool = False,
+    request: Callable[..., Any] | None = None,
+) -> dict[str, Any]:
     workspace = _clean_workspace_id(workspace_id)
     address = _workspace_address(workspace, "showMode")
     try:
-        reply = client.request(address, workspace_id=workspace if authenticated else None)
+        reply = (request or client.request)(address, workspace_id=workspace if authenticated else None)
     except QLabReplyError as exc:
         return _workspace_mode_result(
             ok=False,
@@ -169,7 +175,12 @@ def parse_connect_scopes(data: Any) -> dict[str, Any]:
     )
 
 
-def check_connect_scopes(client: QLabOscClient, workspace_id: str) -> dict[str, Any]:
+def check_connect_scopes(
+    client: QLabOscClient,
+    workspace_id: str,
+    *,
+    request: Callable[..., Any] | None = None,
+) -> dict[str, Any]:
     workspace = _clean_workspace_id(workspace_id)
     address = _workspace_address(workspace, "connect")
     passcode = getattr(client.config, "passcode", None)
@@ -184,7 +195,7 @@ def check_connect_scopes(client: QLabOscClient, workspace_id: str) -> dict[str, 
         )
 
     try:
-        reply = client.request(address, passcode)
+        reply = (request or client.request)(address, passcode)
     except QLabReplyError as exc:
         return _connect_scope_result(
             ok=False,
@@ -340,13 +351,17 @@ def _normalize_override_enabled(value: Any) -> tuple[bool | None, bool]:
     return None, False
 
 
-def _read_override_controls(client: QLabOscClient) -> tuple[dict[str, Any], list[str]]:
+def _read_override_controls(
+    client: QLabOscClient,
+    *,
+    request: Callable[..., Any] | None = None,
+) -> tuple[dict[str, Any], list[str]]:
     overrides: dict[str, Any] = {}
     warnings: list[str] = []
     for key, endpoint in OVERRIDE_ENDPOINTS.items():
         address = f"/overrides/{endpoint}"
         try:
-            reply = client.request(address)
+            reply = (request or client.request)(address)
             value = reply.data
             enabled, normalized = _normalize_override_enabled(value)
             item = {
@@ -564,7 +579,7 @@ class WorkspaceConnectionMixin:
             }
         )
 
-        connect_scopes = check_connect_scopes(self.client, resolved_workspace_id)
+        connect_scopes = check_connect_scopes(self.client, resolved_workspace_id, request=self._request)
         checks["connect"] = connect_scopes
         base_result["connect_scopes"] = connect_scopes
         _apply_connect_permissions(permissions, capabilities, connect_scopes)
@@ -588,11 +603,11 @@ class WorkspaceConnectionMixin:
                 "message": "QLab is reachable, but /connect failed for the requested workspace.",
             }
 
-        workspace_mode = read_workspace_mode(self.client, resolved_workspace_id)
+        workspace_mode = read_workspace_mode(self.client, resolved_workspace_id, request=self._request)
         checks["show_mode"] = workspace_mode
         base_result["workspace_mode"] = workspace_mode
 
-        overrides, override_warnings = _read_override_controls(self.client)
+        overrides, override_warnings = _read_override_controls(self.client, request=self._request)
         base_result["overrides"] = overrides
         base_result["override_warnings"] = override_warnings
         warnings.extend(override_warnings)
@@ -615,7 +630,7 @@ class WorkspaceConnectionMixin:
 
         read_address = _workspace_address(resolved_workspace_id, "cueLists/shallow")
         try:
-            cue_lists = self.client.request(read_address).data
+            cue_lists = self._request(read_address).data
         except QLabReplyError as exc:
             passcode_status = exc.status
             checks["read_access"] = {

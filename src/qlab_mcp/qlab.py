@@ -8,6 +8,7 @@ short-lived read caching, and the disabled-by-default write-mode preface.
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 from .errors import OscTimeoutError
@@ -50,9 +51,47 @@ class QLabReader(
     def __init__(self, client: QLabOscClient | None = None):
         self.client = client or QLabOscClient()
         self._read_cache = shared_read_cache()
+        self._read_deadline: float | None = None
+
+    def close(self) -> None:
+        close = getattr(self.client, "close", None)
+        if callable(close):
+            close()
 
     def _cache_ttl(self) -> float:
         return float(getattr(getattr(self.client, "config", None), "cache_ttl", 10.0))
+
+    def set_read_deadline(self, timeout: float | None) -> None:
+        self._read_deadline = None if timeout is None else time.monotonic() + timeout
+
+    def _remaining_read_deadline(self) -> float | None:
+        if self._read_deadline is None:
+            return None
+        remaining = self._read_deadline - time.monotonic()
+        if remaining <= 0:
+            raise OscTimeoutError("QLab read deadline exhausted")
+        return remaining
+
+    def _bounded_read_timeout(self, request_timeout: float | None = None) -> float | None:
+        remaining = self._remaining_read_deadline()
+        configured_timeout = getattr(getattr(self.client, "config", None), "timeout", None)
+        timeout = request_timeout if request_timeout is not None else configured_timeout
+        if remaining is None:
+            return None if timeout is None else float(timeout)
+        return remaining if timeout is None else min(float(timeout), remaining)
+
+    def _request(self, address: str, *args: Any, workspace_id: str | None = None, request_timeout: float | None = None) -> Any:
+        timeout = self._bounded_read_timeout(request_timeout)
+        if request_timeout is None and self._read_deadline is None:
+            return self.client.request(address, *args, workspace_id=workspace_id)
+        return self.client.request(address, *args, workspace_id=workspace_id, reply_timeout=timeout)
+
+    def _request_tcp(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+        timeout = self._bounded_read_timeout()
+        request_tcp = getattr(self.client, "request_tcp")
+        if self._read_deadline is None:
+            return request_tcp(address, *args, workspace_id=workspace_id)
+        return request_tcp(address, *args, workspace_id=workspace_id, reply_timeout=timeout)
 
     def _request_data(
         self,
@@ -64,19 +103,21 @@ class QLabReader(
         request_timeout: float | None = None,
     ) -> Any:
         def read() -> Any:
-            if request_timeout is None:
-                return self.client.request(address, *args, workspace_id=workspace_id).data
-            return self.client.request(address, *args, workspace_id=workspace_id, reply_timeout=request_timeout).data
+            return self._request(address, *args, workspace_id=workspace_id, request_timeout=request_timeout).data
 
         if not cacheable or not cache_profile_is_safe(cache_profile):
             return read()
 
         key = (client_cache_namespace(self.client), workspace_id, address, args, request_timeout)
-        return self._read_cache.get_or_set(
-            key,
-            self._cache_ttl(),
-            read,
-        )
+        try:
+            return self._read_cache.get_or_set(
+                key,
+                self._cache_ttl(),
+                read,
+                wait_timeout=self._bounded_read_timeout(request_timeout),
+            )
+        except TimeoutError as exc:
+            raise OscTimeoutError("QLab read deadline exhausted while waiting for cached request") from exc
 
     def _request_data_with_tcp_fallback(
         self,
@@ -88,13 +129,13 @@ class QLabReader(
     ) -> tuple[Any, str]:
         def read() -> tuple[Any, str]:
             try:
-                return self.client.request(address, *args, workspace_id=workspace_id).data, "udp"
+                return self._request(address, *args, workspace_id=workspace_id).data, "udp"
             except OscTimeoutError as udp_exc:
                 request_tcp = getattr(self.client, "request_tcp", None)
                 if request_tcp is None:
                     raise
                 try:
-                    return request_tcp(address, *args, workspace_id=workspace_id).data, "tcp_fallback"
+                    return self._request_tcp(address, *args, workspace_id=workspace_id).data, "tcp_fallback"
                 except Exception as tcp_exc:
                     raise OscTimeoutError(
                         f"{udp_exc}; TCP fallback also failed for large read-only reply: {tcp_exc}"
@@ -104,15 +145,31 @@ class QLabReader(
             return read()
 
         key = (client_cache_namespace(self.client), workspace_id, address, args, "udp_tcp_timeout_fallback")
-        return self._read_cache.get_or_set(key, self._cache_ttl(), read)
+        try:
+            return self._read_cache.get_or_set(
+                key,
+                self._cache_ttl(),
+                read,
+                wait_timeout=self._bounded_read_timeout(),
+            )
+        except TimeoutError as exc:
+            raise OscTimeoutError("QLab read deadline exhausted while waiting for cached request") from exc
 
     def get_workspaces(self) -> dict[str, Any]:
         def read() -> dict[str, Any]:
-            reply = self.client.request("/workspaces")
+            reply = self._request("/workspaces")
             return {"workspaces": reply.data, "status": reply.status}
 
         key = (client_cache_namespace(self.client), None, "/workspaces", (), "workspace_resolution")
-        return self._read_cache.get_or_set(key, self._cache_ttl(), read)
+        try:
+            return self._read_cache.get_or_set(
+                key,
+                self._cache_ttl(),
+                read,
+                wait_timeout=self._bounded_read_timeout(),
+            )
+        except TimeoutError as exc:
+            raise OscTimeoutError("QLab read deadline exhausted while waiting for cached request") from exc
 
     def _resolve_workspace(self, workspaces: Any, workspace_id: str | None) -> dict[str, Any]:
         if not isinstance(workspaces, list):

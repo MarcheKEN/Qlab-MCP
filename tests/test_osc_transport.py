@@ -8,11 +8,12 @@ import time
 import unittest
 from pathlib import Path
 from typing import Any, Callable
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from qlab_mcp.config import QLabConfig
-from qlab_mcp.errors import OscProtocolError, OscTimeoutError
+from qlab_mcp.errors import OscProtocolError, OscTimeoutError, QLabReplyError
 from qlab_mcp.osc import decode_message, encode_message
 from qlab_mcp.osc.client import QLabOscClient, _slip_encode
 
@@ -146,28 +147,47 @@ class UdpTransportTests(unittest.TestCase):
         self.assertEqual(len(set(server.control_ports)), 2)
         self.assertNotEqual(server.client_ports[0], server.client_ports[1])
 
-    def test_workspace_discovery_uses_default_reply_port_before_authentication(self) -> None:
-        with ScheduledUdpServer(
-            current_reply_action,
-            default_reply_port=53001,
-            apply_reply_port_updates=False,
-        ) as server:
-            reply = self.client_for(server, passcode="9540").request("/workspaces")
+    def test_different_configured_reply_ports_share_the_udp_endpoint_lock(self) -> None:
+        first = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, reply_port=53001)
+        )
+        second = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, reply_port=53002)
+        )
+        self.assertIs(first._lock, second._lock)
 
-        self.assertEqual(reply.data, "reply-1")
+        ready = threading.Barrier(2)
+        sent = threading.Event()
+        errors: list[BaseException] = []
+        sock = MagicMock()
+        sock.__enter__.return_value = sock
 
-    def test_workspace_request_authenticates_before_custom_reply_port(self) -> None:
-        with ScheduledUdpServer(
-            current_reply_action,
-            default_reply_port=53001,
-            apply_reply_port_updates=False,
-        ) as server:
-            reply = self.client_for(server, passcode="9540").request(
-                "/workspace/ws-1/cueLists",
-                workspace_id="ws-1",
-            )
+        def run() -> None:
+            try:
+                ready.wait()
+                second.request("/version")
+            except BaseException as exc:
+                errors.append(exc)
 
-        self.assertEqual(reply.data, "reply-2")
+        def send(*_args: Any, **_kwargs: Any) -> Any:
+            sent.set()
+            return type("Reply", (), {"status": "ok", "data": "ok"})()
+
+        with (
+            patch("socket.socket", return_value=sock),
+            patch.object(second, "_prepare_udp_socket"),
+            patch.object(second, "_send_with_reply_on_socket", side_effect=send),
+        ):
+            with first._lock:
+                thread = threading.Thread(target=run)
+                thread.start()
+                ready.wait()
+                self.assertFalse(sent.is_set())
+            thread.join(1)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertTrue(sent.is_set())
 
     def test_late_identical_reply_cannot_be_consumed_by_next_request(self) -> None:
         def action(number: int, address: str, client_addr: tuple[str, int], reply_port: int) -> list[tuple[float, bytes, int]]:
@@ -318,6 +338,598 @@ class TcpSlipTransportTests(unittest.TestCase):
         with self.assertRaises(OscTimeoutError):
             client.request_tcp("/version")
         thread.join(2)
+
+
+class ProtectedTcpSessionTests(unittest.TestCase):
+    def test_application_request_runs_before_workspace_authentication(self) -> None:
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        )
+        sent: list[str] = []
+
+        def send(_sock: object, address: str, *args: Any, **_kwargs: Any) -> Any:
+            sent.append(address)
+            return type("Reply", (), {"status": "ok", "data": []})()
+
+        with (
+            patch("socket.create_connection", return_value=MagicMock()),
+            patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=send),
+        ):
+            client.request("/workspaces")
+
+        self.assertEqual(sent, ["/workspaces"])
+        self.assertEqual(client._tcp_connected_workspaces, set())
+
+    def test_protected_request_uses_tcp_without_opening_udp(self) -> None:
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        )
+        sock = MagicMock()
+        sent: list[tuple[str, tuple[Any, ...]]] = []
+
+        def send(_sock: object, address: str, *args: Any, **_kwargs: Any) -> Any:
+            sent.append((address, args))
+            return type("Reply", (), {"status": "ok", "data": "ok"})()
+
+        with (
+            patch("socket.create_connection", return_value=sock),
+            patch("socket.socket", side_effect=AssertionError("protected request opened UDP")),
+            patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=send),
+        ):
+            reply = client.request("/workspace/ws-1/showMode", workspace_id="ws-1")
+
+        self.assertEqual(reply.data, "ok")
+        self.assertEqual(
+            sent,
+            [
+                ("/workspace/ws-1/connect", ("secret",)),
+                ("/workspace/ws-1/showMode", ()),
+            ],
+        )
+
+    def test_two_protected_requests_reuse_connection_and_authentication(self) -> None:
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        )
+        sock = MagicMock()
+        sent: list[str] = []
+
+        def send(_sock: object, address: str, *args: Any, **_kwargs: Any) -> Any:
+            sent.append(address)
+            return type("Reply", (), {"status": "ok", "data": address})()
+
+        with (
+            patch("socket.create_connection", return_value=sock) as connect,
+            patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=send),
+        ):
+            client.request("/workspace/ws-1/showMode", workspace_id="ws-1")
+            client.request("/workspace/ws-1/cueLists", workspace_id="ws-1")
+
+        self.assertEqual(connect.call_count, 1)
+        self.assertEqual(sent.count("/workspace/ws-1/connect"), 1)
+        self.assertEqual(sent[-2:], ["/workspace/ws-1/showMode", "/workspace/ws-1/cueLists"])
+
+    def test_always_reply_and_workspace_action_share_session(self) -> None:
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        )
+        sent: list[str] = []
+
+        def send(_sock: object, address: str, *args: Any, **_kwargs: Any) -> Any:
+            sent.append(address)
+            return type("Reply", (), {"status": "ok", "data": "ok"})()
+
+        with (
+            patch("socket.create_connection", return_value=MagicMock()) as connect,
+            patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=send),
+        ):
+            client.request("/alwaysReply", 1)
+            client.request("/workspace/ws-1/showMode")
+
+        self.assertEqual(connect.call_count, 1)
+        self.assertEqual(
+            sent,
+            ["/alwaysReply", "/workspace/ws-1/connect", "/workspace/ws-1/showMode"],
+        )
+
+    def test_protected_request_infers_workspace_from_address(self) -> None:
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        )
+        sent: list[str] = []
+
+        def send(_sock: object, address: str, *args: Any, **_kwargs: Any) -> Any:
+            sent.append(address)
+            return type("Reply", (), {"status": "ok", "data": address})()
+
+        with (
+            patch("socket.create_connection", return_value=MagicMock()),
+            patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=send),
+        ):
+            client.request("/workspace/ws-1/showMode")
+
+        self.assertEqual(sent, ["/workspace/ws-1/connect", "/workspace/ws-1/showMode"])
+
+    def test_workspace_mismatch_fails_before_network_io(self) -> None:
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        )
+
+        with patch("socket.create_connection") as connect:
+            with self.assertRaisesRegex(ValueError, "workspace_id"):
+                client.request("/workspace/ws-address/showMode", workspace_id="ws-explicit")
+
+        connect.assert_not_called()
+
+    def test_direct_connect_sends_only_caller_request(self) -> None:
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="configured")
+        )
+        sent: list[tuple[str, tuple[Any, ...]]] = []
+
+        def send(_sock: object, address: str, *args: Any, **_kwargs: Any) -> Any:
+            sent.append((address, args))
+            return type("Reply", (), {"status": "ok", "data": "ok"})()
+
+        with (
+            patch("socket.create_connection", return_value=MagicMock()),
+            patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=send),
+        ):
+            client.request("/workspace/ws-1/connect", "caller-passcode")
+
+        self.assertEqual(sent, [("/workspace/ws-1/connect", ("caller-passcode",))])
+
+    def test_pre_request_buffered_frame_cannot_satisfy_next_request(self) -> None:
+        first_address = "/workspace/ws-1/showMode"
+        second_address = "/workspace/ws-1/cueLists"
+        coalesced = b"".join(
+            [
+                _slip_encode(reply_packet("/other", "ignored")),
+                _slip_encode(reply_packet(first_address, "first")),
+                _slip_encode(reply_packet(second_address, "stale")),
+            ]
+        )
+
+        class FakeSocket:
+            def __init__(self) -> None:
+                self.chunks = [
+                    _slip_encode(reply_packet("/workspace/ws-1/connect", "ok:view")),
+                    coalesced,
+                    _slip_encode(reply_packet(second_address, "fresh")),
+                ]
+
+            def settimeout(self, _timeout: float) -> None:
+                pass
+
+            def sendall(self, _packet: bytes) -> None:
+                pass
+
+            def recv(self, _size: int) -> bytes:
+                if not self.chunks:
+                    raise socket.timeout
+                return self.chunks.pop(0)
+
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        )
+        with patch("socket.create_connection", return_value=FakeSocket()):
+            first = client.request(first_address)
+            second = client.request(second_address)
+
+        self.assertEqual((first.data, second.data), ("first", "fresh"))
+
+    def test_invalid_utf8_discards_session_and_next_request_reauthenticates(self) -> None:
+        action = "/workspace/ws-1/showMode"
+
+        class FakeSocket:
+            def __init__(self, action_reply: bytes) -> None:
+                self.sent: list[str] = []
+                self.closed = False
+                self.chunks = [
+                    _slip_encode(reply_packet("/workspace/ws-1/connect", "ok:view")),
+                    action_reply,
+                ]
+
+            def settimeout(self, _timeout: float) -> None:
+                pass
+
+            def sendall(self, packet: bytes) -> None:
+                self.sent.append(decode_message(_unescape_slip(packet[1:-1])).address)
+
+            def recv(self, _size: int) -> bytes:
+                return self.chunks.pop(0)
+
+            def close(self) -> None:
+                self.closed = True
+
+        malformed = _slip_encode(b"/reply/\xff\x00\x00\x00\x00")
+        first_socket = FakeSocket(malformed)
+        second_socket = FakeSocket(_slip_encode(reply_packet(action, "fresh")))
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        )
+
+        with patch("socket.create_connection", side_effect=[first_socket, second_socket]) as connect:
+            with self.assertRaises(OscProtocolError):
+                client.request(action)
+
+            self.assertTrue(first_socket.closed)
+            self.assertIsNone(client._tcp_socket)
+            self.assertEqual(client._tcp_buffer, bytearray())
+            self.assertEqual(client._tcp_connected_workspaces, set())
+            reply = client.request(action)
+
+        self.assertEqual(reply.data, "fresh")
+        self.assertEqual(connect.call_count, 2)
+        self.assertEqual(first_socket.sent, ["/workspace/ws-1/connect", action])
+        self.assertEqual(second_socket.sent, ["/workspace/ws-1/connect", action])
+
+    def test_each_send_resets_socket_timeout_to_current_request_budget(self) -> None:
+        first_action = "/workspace/ws-1/showMode"
+        second_action = "/workspace/ws-1/cueLists"
+
+        class FakeSocket:
+            def __init__(self) -> None:
+                self.timeout: float | None = None
+                self.send_timeouts: list[tuple[str, float | None]] = []
+                self.chunks = [
+                    _slip_encode(reply_packet("/workspace/ws-1/connect", "ok:view")),
+                    _slip_encode(reply_packet(first_action, "first")),
+                    _slip_encode(reply_packet(second_action, "second")),
+                ]
+
+            def settimeout(self, timeout: float) -> None:
+                self.timeout = timeout
+
+            def sendall(self, packet: bytes) -> None:
+                address = decode_message(_unescape_slip(packet[1:-1])).address
+                self.send_timeouts.append((address, self.timeout))
+
+            def recv(self, _size: int) -> bytes:
+                return self.chunks.pop(0)
+
+        sock = FakeSocket()
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        )
+        with patch("socket.create_connection", return_value=sock):
+            client.request(first_action, reply_timeout=0.01)
+            client.request(second_action)
+
+        self.assertAlmostEqual(sock.send_timeouts[1][1] or 0.0, 0.01, delta=0.002)
+        self.assertAlmostEqual(sock.send_timeouts[2][1] or 0.0, 0.2, delta=0.002)
+
+    def test_reply_timeout_is_shared_by_tcp_creation_authentication_and_action(self) -> None:
+        action = "/workspace/ws-1/showMode"
+        clock = [0.0]
+
+        class FakeSocket:
+            def __init__(self) -> None:
+                self.timeout: float | None = None
+                self.sent: list[str] = []
+                self.send_timeouts: list[float | None] = []
+
+            def settimeout(self, timeout: float) -> None:
+                self.timeout = timeout
+
+            def sendall(self, packet: bytes) -> None:
+                self.sent.append(decode_message(_unescape_slip(packet[1:-1])).address)
+                self.send_timeouts.append(self.timeout)
+
+            def recv(self, _size: int) -> bytes:
+                if len(self.sent) == 1:
+                    clock[0] += 0.3
+                return _slip_encode(reply_packet(self.sent[-1], "ok"))
+
+        sock = FakeSocket()
+        connect_timeouts: list[float] = []
+
+        def create_connection(_endpoint: object, *, timeout: float) -> FakeSocket:
+            connect_timeouts.append(timeout)
+            clock[0] += 0.2
+            return sock
+
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=5.0, passcode="secret")
+        )
+        with (
+            patch("qlab_mcp.osc.client.time.monotonic", side_effect=lambda: clock[0]),
+            patch("socket.create_connection", side_effect=create_connection),
+        ):
+            reply = client.request(action, reply_timeout=1.0)
+
+        self.assertEqual(reply.data, "ok")
+        self.assertEqual(sock.sent, ["/workspace/ws-1/connect", action])
+        self.assertAlmostEqual(connect_timeouts[0], 1.0)
+        self.assertAlmostEqual(sock.send_timeouts[0] or 0.0, 0.8)
+        self.assertAlmostEqual(sock.send_timeouts[1] or 0.0, 0.5)
+
+    def test_one_shot_tcp_uses_the_same_end_to_end_reply_timeout(self) -> None:
+        action = "/workspace/ws-1/showMode"
+        clock = [0.0]
+        connect_timeouts: list[float] = []
+        send_timeouts: list[tuple[str, float]] = []
+        sock = MagicMock()
+        sock.__enter__.return_value = sock
+
+        def create_connection(_endpoint: object, *, timeout: float) -> MagicMock:
+            connect_timeouts.append(timeout)
+            clock[0] += 0.2
+            return sock
+
+        def send(
+            _sock: object,
+            address: str,
+            *_args: Any,
+            reply_timeout: float | None = None,
+            reply_deadline: float | None = None,
+            **_kwargs: Any,
+        ) -> Any:
+            effective_timeout = (
+                (reply_deadline - clock[0])
+                if reply_deadline is not None
+                else (client.config.timeout if reply_timeout is None else reply_timeout)
+            )
+            send_timeouts.append((address, effective_timeout))
+            if address.endswith("/connect"):
+                clock[0] += 0.3
+            return type("Reply", (), {"status": "ok", "data": "ok"})()
+
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=5.0, passcode="secret")
+        )
+        with (
+            patch("qlab_mcp.osc.client.time.monotonic", side_effect=lambda: clock[0]),
+            patch("socket.create_connection", side_effect=create_connection),
+            patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=send),
+        ):
+            reply = client.request_tcp(action, reply_timeout=1.0)
+
+        self.assertEqual(reply.data, "ok")
+        self.assertAlmostEqual(connect_timeouts[0], 1.0)
+        self.assertEqual([address for address, _timeout in send_timeouts], [
+            "/workspace/ws-1/connect",
+            action,
+        ])
+        self.assertAlmostEqual(send_timeouts[0][1], 0.8)
+        self.assertAlmostEqual(send_timeouts[1][1], 0.5)
+
+    def test_expired_reply_timeout_after_auth_does_not_send_action_or_retry(self) -> None:
+        action = "/workspace/ws-1/showMode"
+        clock = [0.0]
+
+        class FakeSocket:
+            def __init__(self) -> None:
+                self.sent: list[str] = []
+                self.closed = False
+
+            def settimeout(self, _timeout: float) -> None:
+                pass
+
+            def sendall(self, packet: bytes) -> None:
+                self.sent.append(decode_message(_unescape_slip(packet[1:-1])).address)
+
+            def recv(self, _size: int) -> bytes:
+                clock[0] += 0.9
+                return _slip_encode(reply_packet(self.sent[-1], "ok"))
+
+            def close(self) -> None:
+                self.closed = True
+
+        sock = FakeSocket()
+
+        def create_connection(_endpoint: object, *, timeout: float) -> FakeSocket:
+            self.assertAlmostEqual(timeout, 1.0)
+            clock[0] += 0.2
+            return sock
+
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=5.0, passcode="secret")
+        )
+        with (
+            patch("qlab_mcp.osc.client.time.monotonic", side_effect=lambda: clock[0]),
+            patch("socket.create_connection", side_effect=create_connection) as connect,
+        ):
+            with self.assertRaisesRegex(
+                OscTimeoutError,
+                "Timed out waiting for QLab TCP reply to /workspace/ws-1/showMode",
+            ):
+                client.request(action, reply_timeout=1.0)
+
+        self.assertEqual(sock.sent, ["/workspace/ws-1/connect"])
+        self.assertTrue(sock.closed)
+        self.assertEqual(connect.call_count, 1)
+        self.assertIsNone(client._tcp_socket)
+        self.assertEqual(client._tcp_connected_workspaces, set())
+
+    def test_all_persistent_reply_failures_discard_and_reauthenticate_without_retry(self) -> None:
+        action = "/workspace/ws-1/showMode"
+        failures = {
+            "reply_error": (
+                _slip_encode(reply_packet(action, "denied", status="denied")),
+                QLabReplyError,
+            ),
+            "clean_eof": (b"", OscTimeoutError),
+            "protocol_error": (b"\xc0\xdb\x01\xc0", OscProtocolError),
+            "timeout": (socket.timeout(), OscTimeoutError),
+        }
+
+        class FakeSocket:
+            def __init__(self, action_reply: bytes | BaseException) -> None:
+                self.sent: list[str] = []
+                self.closed = False
+                self.chunks: list[bytes | BaseException] = [
+                    _slip_encode(reply_packet("/workspace/ws-1/connect", "ok:view")),
+                    action_reply,
+                ]
+
+            def settimeout(self, _timeout: float) -> None:
+                pass
+
+            def sendall(self, packet: bytes) -> None:
+                self.sent.append(decode_message(_unescape_slip(packet[1:-1])).address)
+
+            def recv(self, _size: int) -> bytes:
+                item = self.chunks.pop(0)
+                if isinstance(item, BaseException):
+                    raise item
+                return item
+
+            def close(self) -> None:
+                self.closed = True
+
+        for label, (failure, expected_error) in failures.items():
+            with self.subTest(label=label):
+                first_socket = FakeSocket(failure)
+                second_socket = FakeSocket(_slip_encode(reply_packet(action, "fresh")))
+                client = QLabOscClient(
+                    QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+                )
+
+                with patch("socket.create_connection", side_effect=[first_socket, second_socket]) as connect:
+                    with self.assertRaises(expected_error):
+                        client.request(action)
+
+                    self.assertTrue(first_socket.closed)
+                    self.assertIsNone(client._tcp_socket)
+                    self.assertEqual(client._tcp_buffer, bytearray())
+                    self.assertEqual(client._tcp_connected_workspaces, set())
+                    reply = client.request(action)
+
+                self.assertEqual(reply.data, "fresh")
+                self.assertEqual(connect.call_count, 2)
+                self.assertEqual(first_socket.sent, ["/workspace/ws-1/connect", action])
+                self.assertEqual(second_socket.sent, ["/workspace/ws-1/connect", action])
+
+    def test_timeout_discards_session_without_retry_and_next_request_reauthenticates(self) -> None:
+        action = "/workspace/ws-1/showMode"
+
+        class FakeSocket:
+            def __init__(self, *, succeed: bool) -> None:
+                self.sent: list[str] = []
+                self.closed = False
+                self.timeouts: list[float] = []
+                self.chunks: list[bytes | BaseException] = [
+                    _slip_encode(reply_packet("/workspace/ws-1/connect", "ok:view")),
+                    (
+                        _slip_encode(reply_packet(action, "fresh"))
+                        if succeed
+                        else socket.timeout()
+                    ),
+                ]
+
+            def settimeout(self, timeout: float) -> None:
+                self.timeouts.append(timeout)
+
+            def sendall(self, packet: bytes) -> None:
+                self.sent.append(decode_message(_unescape_slip(packet[1:-1])).address)
+
+            def recv(self, _size: int) -> bytes:
+                item = self.chunks.pop(0)
+                if isinstance(item, BaseException):
+                    raise item
+                return item
+
+            def close(self) -> None:
+                self.closed = True
+
+        first_socket = FakeSocket(succeed=False)
+        second_socket = FakeSocket(succeed=True)
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        )
+
+        with patch("socket.create_connection", side_effect=[first_socket, second_socket]) as connect:
+            with self.assertRaises(OscTimeoutError):
+                client.request(action, reply_timeout=0.01)
+            self.assertIsNone(client._tcp_socket)
+            self.assertEqual(client._tcp_buffer, bytearray())
+            self.assertEqual(client._tcp_connected_workspaces, set())
+            reply = client.request(action)
+
+        self.assertEqual(reply.data, "fresh")
+        self.assertTrue(first_socket.closed)
+        self.assertEqual(connect.call_count, 2)
+        self.assertEqual(first_socket.sent, ["/workspace/ws-1/connect", action])
+        self.assertEqual(second_socket.sent, ["/workspace/ws-1/connect", action])
+        self.assertLessEqual(first_socket.timeouts[-1], 0.01)
+
+    def test_close_discards_persistent_session(self) -> None:
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        )
+        sock = MagicMock()
+
+        with (
+            patch("socket.create_connection", return_value=sock),
+            patch.object(
+                client,
+                "_send_with_reply_on_tcp_socket",
+                return_value=type("Reply", (), {"status": "ok", "data": "ok"})(),
+            ),
+        ):
+            client.request("/workspaces")
+            client.close()
+
+        sock.close.assert_called_once_with()
+
+    def test_context_manager_closes_persistent_session(self) -> None:
+        client = QLabOscClient(
+            QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        )
+        sock = MagicMock()
+
+        with (
+            patch("socket.create_connection", return_value=sock),
+            patch.object(
+                client,
+                "_send_with_reply_on_tcp_socket",
+                return_value=type("Reply", (), {"status": "ok", "data": "ok"})(),
+            ),
+        ):
+            with client:
+                client.request("/workspaces")
+
+        sock.close.assert_called_once_with()
+
+    def test_concurrent_clients_use_independent_tcp_sessions(self) -> None:
+        config = QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.2, passcode="secret")
+        clients = [QLabOscClient(config), QLabOscClient(config)]
+        sockets = [MagicMock(), MagicMock()]
+        barrier = threading.Barrier(2)
+        seen_sockets: list[list[object]] = [[], []]
+        errors: list[BaseException] = []
+
+        def send_for(index: int) -> Callable[..., Any]:
+            def send(sock: object, address: str, *args: Any, **_kwargs: Any) -> Any:
+                seen_sockets[index].append(sock)
+                if address.endswith("/showMode"):
+                    barrier.wait(timeout=1)
+                return type("Reply", (), {"status": "ok", "data": "ok"})()
+
+            return send
+
+        def run(index: int) -> None:
+            try:
+                clients[index].request("/workspace/ws-1/showMode")
+            except BaseException as exc:
+                errors.append(exc)
+
+        with (
+            patch("socket.create_connection", side_effect=sockets),
+            patch.object(clients[0], "_send_with_reply_on_tcp_socket", side_effect=send_for(0)),
+            patch.object(clients[1], "_send_with_reply_on_tcp_socket", side_effect=send_for(1)),
+        ):
+            threads = [threading.Thread(target=run, args=(index,)) for index in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=2)
+
+        self.assertEqual(errors, [])
+        self.assertEqual({id(sock) for sock in seen_sockets[0]}, {id(seen_sockets[0][0])})
+        self.assertEqual({id(sock) for sock in seen_sockets[1]}, {id(seen_sockets[1][0])})
+        self.assertIsNot(seen_sockets[0][0], seen_sockets[1][0])
 
 
 def _unescape_slip(frame: bytes) -> bytes:

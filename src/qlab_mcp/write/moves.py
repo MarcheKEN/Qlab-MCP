@@ -11,6 +11,7 @@ import time
 from typing import Any
 from uuid import UUID
 
+from ..cues.refs import CONTAINER_CUE_TYPES
 from ..errors import OscTimeoutError, QLabReplyError, UnsafeWriteOperationError
 from .safety import ensure_write_ready, resolve_dry_run
 
@@ -20,7 +21,6 @@ MAX_BATCH_MOVES = 10
 MOVE_TOKEN_TTL_SECONDS = 300
 MOVE_CONVERGENCE_DEADLINES_SECONDS = (0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0)
 _MOVE_TOKEN_SECRET = secrets.token_bytes(32)
-_CONTAINER_TYPES = {"Cue List", "Cue Cart", "Cart", "Group"}
 _LINEAR_PARENT_TYPES = {"Cue List", "Group"}
 _CART_PARENT_TYPES = {"Cue Cart", "Cart"}
 
@@ -486,7 +486,7 @@ def _read_snapshot(reader: Any, workspace_id: str) -> dict[str, Any]:
         parent_by_child[cue_id] = parent_id
         if parent_id is not None:
             children_by_parent.setdefault(parent_id, []).append(cue_id)
-        if cue_type not in _CONTAINER_TYPES:
+        if cue_type not in CONTAINER_CUE_TYPES:
             return
         children_by_parent.setdefault(cue_id, [])
         try:
@@ -545,7 +545,7 @@ def _normalize_moves(snapshot: dict[str, Any], moves: list[dict[str, Any]]) -> t
                 raise ValueError("destination_parent_id does not resolve in this workspace.")
             _validate_health(source, "source")
             _validate_health(destination, "destination")
-            if source.get("type") in _CONTAINER_TYPES and _is_descendant(destination_parent, cue_id, parents):
+            if source.get("type") in CONTAINER_CUE_TYPES and _is_descendant(destination_parent, cue_id, parents):
                 raise ValueError("A Group, Cue List, or Cue Cart cannot move into itself or a descendant.")
 
             cart_row = raw_move.get("cart_row")

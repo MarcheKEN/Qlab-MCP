@@ -8,11 +8,122 @@ from qlab_mcp.write.osc_inventory import (
     extract_workspace_video_osc_inventory,
     registry_coverage,
 )
-from qlab_mcp.write.registry import profile_catalog
+from qlab_mcp.write.registry import UPDATE_PROFILES, profile_catalog
+from qlab_mcp.write import (
+    text_basics,
+    video_appearance,
+    video_audio_time,
+    video_opacity,
+    video_scalars,
+    video_translation,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DICTIONARY_PATH = PROJECT_ROOT / "docs" / "references" / "qlab_osc_dictionary.md"
+
+
+EXTRACTED_FAMILY_REGISTRY_MEMBERSHIP = (
+    ("text_basics", {"text_basic": text_basics.TEXT_PHASE3E_PROPERTIES}),
+    (
+        "video_opacity",
+        {
+            profile: frozenset({video_opacity.PROPERTY})
+            for profile in video_opacity.PROFILE_TYPES
+        },
+    ),
+    (
+        "video_translation",
+        {
+            profile: video_translation.PROPERTIES
+            for profile in video_translation.PROFILE_TYPES
+        },
+    ),
+    (
+        "video_scalars",
+        {
+            profile: video_scalars.PROPERTIES
+            for profile in video_scalars.PROFILE_TYPES
+        },
+    ),
+    (
+        "video_appearance",
+        {
+            profile: video_appearance.PROPERTIES
+            for profile in video_appearance.PROFILE_TYPES
+        },
+    ),
+    (
+        "video_audio_time",
+        {
+            profile: video_audio_time.PROPERTIES
+            for profile in video_audio_time.PROFILE_TYPES
+        },
+    ),
+)
+
+
+def test_extracted_write_family_surfaces_remain_exact() -> None:
+    assert video_opacity.PROPERTY == "opacity"
+    assert video_opacity.PROFILE_TYPES == {
+        "video_basic": "Video",
+        "camera_basic": "Camera",
+        "text_basic": "Text",
+    }
+    assert video_translation.PROPERTIES == frozenset({"translation/x", "translation/y"})
+    assert video_translation.PROFILE_TYPES == video_opacity.PROFILE_TYPES
+    assert video_scalars.PROPERTIES == frozenset(
+        {
+            "scale/x",
+            "scale/y",
+            "anchor/x",
+            "anchor/y",
+            "cropTop",
+            "cropBottom",
+            "cropLeft",
+            "cropRight",
+        }
+    )
+    assert video_scalars.PROFILE_TYPES == video_opacity.PROFILE_TYPES
+    assert video_appearance.PROPERTIES == frozenset({"blendMode", "preserveAspectRatio"})
+    assert video_appearance.PROFILE_TYPES == video_opacity.PROFILE_TYPES
+    assert video_audio_time.PROPERTIES == frozenset(
+        {
+            "startTime",
+            "endTime",
+            "playCount",
+            "infiniteLoop",
+            "rate",
+            "preservePitch",
+            "holdLastFrame",
+        }
+    )
+    assert video_audio_time.PROFILE_TYPES == {"video_basic": "Video"}
+    assert video_audio_time.AUDIO_TRACK_PROPERTIES == video_audio_time.PROPERTIES - {
+        "holdLastFrame"
+    }
+    assert video_audio_time.EVIDENCE_KEYS == (
+        "audioTrackFormats",
+        "numChannelsIn",
+        "levels",
+    )
+
+
+def test_extracted_write_family_registry_tags_match_handlers_exactly() -> None:
+    expected = {
+        (family, profile, property_name)
+        for family, profiles in EXTRACTED_FAMILY_REGISTRY_MEMBERSHIP
+        for profile, properties in profiles.items()
+        for property_name in properties
+    }
+    actual = {
+        (property_spec.write_family, profile, property_spec.name)
+        for profile, profile_spec in UPDATE_PROFILES.items()
+        for property_spec in profile_spec.properties
+        if property_spec.write_family is not None
+    }
+
+    assert actual == expected
 
 
 def test_update_registry_has_specs_for_all_mutating_cue_osc_routes() -> None:

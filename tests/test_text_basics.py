@@ -4,11 +4,11 @@ from qlab_mcp.write import operations
 from qlab_mcp.write import text_basics
 
 
-def test_phase3e_helpers_remain_private_operations_aliases() -> None:
-    assert operations.TEXT_PHASE3E_PROPERTIES is text_basics.TEXT_PHASE3E_PROPERTIES
-    assert operations._phase3e_text_basic_operation is text_basics._phase3e_text_basic_operation
-    assert operations._validate_phase3e_text_basic_real_write is text_basics._validate_phase3e_text_basic_real_write
-    assert operations._refresh_phase3e_text_basic_real_result is text_basics._refresh_phase3e_text_basic_real_result
+def test_phase3e_helpers_are_owned_only_by_text_basics() -> None:
+    assert text_basics.operation({"profile": "text_basic", "operations": [{"property": "text"}]})
+    assert not hasattr(operations, "_phase3e_text_basic_operation")
+    assert not hasattr(operations, "_validate_phase3e_text_basic_real_write")
+    assert not hasattr(operations, "_refresh_phase3e_text_basic_real_result")
 
 
 def test_phase3e_token_round_trip_preserves_binding_and_canonical_values() -> None:

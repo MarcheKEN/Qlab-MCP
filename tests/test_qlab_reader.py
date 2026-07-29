@@ -9,10 +9,12 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from qlab_mcp.allowlist import properties_for_profile, validate_property_path, validate_value_keys
+from qlab_mcp.cues.profiles import _continue_mode_label
 from qlab_mcp.osc.client import QLabOscClient
 from qlab_mcp.config import QLabConfig
 from qlab_mcp.errors import OscTimeoutError, QLabReplyError, UnsafeCuePropertyError
@@ -22,6 +24,18 @@ from qlab_mcp.cues.coverage import default_read_coverage_report
 from qlab_mcp.runtime.connection import OVERRIDE_ENDPOINTS, normalize_workspace_mode, parse_connect_scopes
 from qlab_mcp.runtime.read_cache import shared_read_cache
 from qlab_mcp.sanitizer import REDACTED_INTERNAL_PATH, sanitize_response
+from qlab_mcp.status import WorkspaceStatusMixin
+
+
+def test_workspace_status_reuses_profile_continue_mode_labels() -> None:
+    assert not hasattr(WorkspaceStatusMixin, "_continue_mode_label")
+    assert [_continue_mode_label(value) for value in (0, 1.0, "auto-follow", True, [])] == [
+        "do_not_continue",
+        "auto_continue",
+        "auto_follow",
+        "unknown",
+        "unknown",
+    ]
 
 
 class FakeQlabOscServer:
@@ -195,6 +209,21 @@ def empty_settings_summary_responses() -> dict[str, Any]:
     }
 
 
+class ReaderLifecycleTests(unittest.TestCase):
+    def test_close_delegates_to_client(self) -> None:
+        class Client:
+            def __init__(self) -> None:
+                self.closed = False
+
+            def close(self) -> None:
+                self.closed = True
+
+        client = Client()
+        QLabReader(client).close()  # type: ignore[arg-type]
+
+        self.assertTrue(client.closed)
+
+
 class ConnectScopeTests(unittest.TestCase):
     def test_parse_connect_scope_combinations(self) -> None:
         cases = {
@@ -366,18 +395,16 @@ class QLabReaderTests(unittest.TestCase):
             "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-1", "name": "Main"}],
             **override_responses(),
         }
-        with FakeQlabOscServer(responses) as server:
-            assert server.port is not None
-            config = QLabConfig(
-                host="127.0.0.1",
-                osc_port=server.port,
-                reply_port=0,
-                timeout=0.25,
-                passcode="5983",
-            )
-            reader = QLabReader(QLabOscClient(config))
+        requests: list[str] = []
 
-            result = reader.check_connection()
+        class Client:
+            config = QLabConfig(passcode="5983")
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                requests.append(address)
+                return SimpleNamespace(status="ok", data=responses[address])
+
+        result = QLabReader(Client()).check_connection()  # type: ignore[arg-type]
 
         self.assertTrue(result["ok"])
         self.assertEqual(result["connect_scopes"]["status"], "confirmed")
@@ -391,7 +418,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertFalse(result["capabilities"]["control"])
         self.assertEqual(result["warnings"], [])
         self.assertEqual(
-            server.received,
+            requests,
             [
                 "/workspaces",
                 "/workspace/ws-1/connect",
@@ -496,18 +523,18 @@ class QLabReaderTests(unittest.TestCase):
             **override_responses(),
             "/workspace/ws-1/cueLists/shallow": lambda _message: time.sleep(0.2),
         }
-        with FakeQlabOscServer(responses) as server:
-            assert server.port is not None
-            config = QLabConfig(
-                host="127.0.0.1",
-                osc_port=server.port,
-                reply_port=0,
-                timeout=0.05,
-                passcode="5983",
-            )
-            reader = QLabReader(QLabOscClient(config))
+        requests: list[str] = []
 
-            result = reader.check_connection()
+        class Client:
+            config = QLabConfig(passcode="5983")
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                requests.append(address)
+                if address == "/workspace/ws-1/cueLists/shallow":
+                    raise OscTimeoutError("timed out")
+                return SimpleNamespace(status="ok", data=responses[address])
+
+        result = QLabReader(Client()).check_connection()  # type: ignore[arg-type]
 
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], "workspace_read_timeout")
@@ -520,7 +547,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["checks"]["read_access"]["status"], "timeout")
         self.assertEqual(result["checks"]["read_access"]["address"], "/workspace/ws-1/cueLists/shallow")
         self.assertEqual(
-            server.received,
+            requests,
             [
                 "/workspaces",
                 "/workspace/ws-1/connect",
@@ -4459,50 +4486,47 @@ class QLabReaderTests(unittest.TestCase):
             with self.assertRaises(QLabReplyError):
                 reader.get_selected_cues("ws-1")
 
-    def test_passcode_connect_and_request_share_udp_socket(self) -> None:
-        responses = {
-            "/workspace/ws-1/connect": [],
-            "/workspace/ws-1/selectedCues/shallow": [],
-        }
-        with FakeQlabOscServer(responses) as server:
-            assert server.port is not None
-            config = QLabConfig(
-                host="127.0.0.1",
-                osc_port=server.port,
-                reply_port=0,
-                timeout=0.25,
-                passcode="5983",
-            )
-            reader = QLabReader(QLabOscClient(config))
+    def test_passcode_connect_and_reader_request_share_tcp_session(self) -> None:
+        config = QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.25, passcode="5983")
+        client = QLabOscClient(config)
+        sock = MagicMock()
+        sent: list[tuple[object, str]] = []
 
-            result = reader.get_selected_cues("ws-1", include_children=False)
+        def send(request_sock: object, address: str, *args: Any, **kwargs: Any) -> Any:
+            sent.append((request_sock, address))
+            return SimpleNamespace(status="ok", data=[])
+
+        with (
+            patch("socket.create_connection", return_value=sock),
+            patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=send),
+        ):
+            result = QLabReader(client).get_selected_cues("ws-1", include_children=False)
 
         self.assertEqual(result["selected_cues"], [])
-        self.assertEqual(server.received, ["/workspace/ws-1/connect", "/workspace/ws-1/selectedCues/shallow"])
-        self.assertEqual(server.received_args[0], ("5983",))
-        self.assertEqual(len(set(server.received_client_ports)), 1)
+        self.assertEqual(
+            [address for _, address in sent],
+            ["/workspace/ws-1/connect", "/workspace/ws-1/selectedCues/shallow"],
+        )
+        self.assertEqual({id(request_sock) for request_sock, _ in sent}, {id(sock)})
 
-    def test_passcode_connect_is_reused_for_following_workspace_requests(self) -> None:
-        responses = {
-            "/workspace/ws-1/connect": "ok:view|edit",
-            "/workspace/ws-1/showMode": False,
-        }
-        with FakeQlabOscServer(responses) as server:
-            assert server.port is not None
-            config = QLabConfig(
-                host="127.0.0.1",
-                osc_port=server.port,
-                reply_port=0,
-                timeout=0.25,
-                passcode="5983",
-            )
-            client = QLabOscClient(config)
+    def test_direct_connect_is_reused_for_following_workspace_request(self) -> None:
+        config = QLabConfig(host="127.0.0.1", osc_port=53000, timeout=0.25, passcode="5983")
+        client = QLabOscClient(config)
+        sent: list[str] = []
 
+        def send(request_sock: object, address: str, *args: Any, **kwargs: Any) -> Any:
+            sent.append(address)
+            return SimpleNamespace(status="ok", data=False)
+
+        with (
+            patch("socket.create_connection", return_value=MagicMock()),
+            patch.object(client, "_send_with_reply_on_tcp_socket", side_effect=send),
+        ):
             client.request("/workspace/ws-1/connect", "5983")
             reply = client.request("/workspace/ws-1/showMode", workspace_id="ws-1")
 
         self.assertFalse(reply.data)
-        self.assertEqual(server.received, ["/workspace/ws-1/connect", "/workspace/ws-1/showMode"])
+        self.assertEqual(sent, ["/workspace/ws-1/connect", "/workspace/ws-1/showMode"])
 
     def test_timeout_raises(self) -> None:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
@@ -4513,6 +4537,129 @@ class QLabReaderTests(unittest.TestCase):
 
         with self.assertRaises(OscTimeoutError):
             client.request("/workspaces")
+
+    def test_reader_deadline_bounds_request_timeout(self) -> None:
+        class Client:
+            config = QLabConfig(timeout=5, cache_ttl=0)
+
+            def __init__(self) -> None:
+                self.timeouts: list[float | None] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None, reply_timeout: float | None = None) -> Any:
+                self.timeouts.append(reply_timeout)
+                return SimpleNamespace(data="ok", status="ok")
+
+        client = Client()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+        with patch("qlab_mcp.qlab.time.monotonic", side_effect=[100.0, 101.0, 101.0]):
+            reader.set_read_deadline(2.0)
+            self.assertEqual(reader._request_data("/workspaces", cacheable=False), "ok")
+
+        self.assertEqual(client.timeouts, [1.0])
+
+    def test_reader_deadline_bounds_cache_wait(self) -> None:
+        class Client:
+            config = QLabConfig(timeout=5, cache_ttl=10)
+
+        class Cache:
+            def __init__(self) -> None:
+                self.wait_timeout: float | None = None
+
+            def get_or_set(self, key: Any, ttl: float, factory: Any, *, wait_timeout: float | None = None) -> Any:
+                self.wait_timeout = wait_timeout
+                return "cached"
+
+        reader = QLabReader(Client())  # type: ignore[arg-type]
+        cache = Cache()
+        reader._read_cache = cache  # type: ignore[assignment]
+        with patch("qlab_mcp.qlab.time.monotonic", side_effect=[100.0, 101.0]):
+            reader.set_read_deadline(2.0)
+            self.assertEqual(reader._request_data("/workspaces"), "cached")
+
+        self.assertEqual(cache.wait_timeout, 1.0)
+
+    def test_reader_uses_configured_timeout_for_cache_wait_without_deadline(self) -> None:
+        class Client:
+            config = QLabConfig(timeout=2, cache_ttl=10)
+
+        class Cache:
+            def __init__(self) -> None:
+                self.wait_timeout: float | None = None
+
+            def get_or_set(self, key: Any, ttl: float, factory: Any, *, wait_timeout: float | None = None) -> Any:
+                self.wait_timeout = wait_timeout
+                return "cached"
+
+        reader = QLabReader(Client())  # type: ignore[arg-type]
+        cache = Cache()
+        reader._read_cache = cache  # type: ignore[assignment]
+
+        self.assertEqual(reader._request_data("/workspaces"), "cached")
+        self.assertEqual(cache.wait_timeout, 2.0)
+
+    def test_reader_deadline_bounds_workspace_resolution_request(self) -> None:
+        class Client:
+            config = QLabConfig(timeout=5, cache_ttl=0)
+
+            def __init__(self) -> None:
+                self.timeouts: list[float | None] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None, reply_timeout: float | None = None) -> Any:
+                self.timeouts.append(reply_timeout)
+                return SimpleNamespace(data=[], status="ok")
+
+        client = Client()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+        with patch("qlab_mcp.qlab.time.monotonic", side_effect=[100.0, 101.0, 101.0]):
+            reader.set_read_deadline(2.0)
+            self.assertEqual(reader.get_workspaces()["workspaces"], [])
+
+        self.assertEqual(client.timeouts, [1.0])
+
+    def test_exhausted_reader_deadline_sends_no_request(self) -> None:
+        class Client:
+            config = QLabConfig(cache_ttl=0)
+
+            def __init__(self) -> None:
+                self.requests: list[str] = []
+
+            def request(self, address: str, *args: Any, **kwargs: Any) -> Any:
+                self.requests.append(address)
+                return SimpleNamespace(data="unexpected", status="ok")
+
+        client = Client()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+        with patch("qlab_mcp.qlab.time.monotonic", side_effect=[100.0, 100.0]):
+            reader.set_read_deadline(0.0)
+            with self.assertRaises(OscTimeoutError):
+                reader._request_data("/workspaces", cacheable=False)
+
+        self.assertEqual(client.requests, [])
+
+    def test_connection_helpers_use_reader_deadline_request(self) -> None:
+        class Client:
+            config = QLabConfig(passcode="secret", timeout=5, cache_ttl=0)
+
+            def __init__(self) -> None:
+                self.timeouts: list[float | None] = []
+
+            def request(self, address: str, *args: Any, reply_timeout: float | None = None, **kwargs: Any) -> Any:
+                self.timeouts.append(reply_timeout)
+                if address == "/workspaces":
+                    data = [{"uniqueID": "ws-1", "displayName": "Demo"}]
+                elif address.endswith("/connect"):
+                    data = "ok:view|edit"
+                else:
+                    data = False
+                return SimpleNamespace(data=data, status="ok")
+
+        client = Client()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+        reader.set_read_deadline(10)
+
+        self.assertTrue(reader.check_connection("ws-1", require_read_access=False)["ok"])
+        self.assertTrue(client.timeouts)
+        self.assertTrue(all(timeout is not None for timeout in client.timeouts))
 
     def test_property_allowlist_rejects_actions_and_unknowns(self) -> None:
         self.assertEqual(validate_property_path("/name"), "name")

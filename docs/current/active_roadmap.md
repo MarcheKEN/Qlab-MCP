@@ -1,6 +1,17 @@
 # Active Roadmap
 
-Status: 2026-07-18
+Status: 2026-07-28
+
+Current local verification: `2446 passed, 41 subtests passed in 10.03s`;
+zero skips. The full suite includes wheel/sdist build and artifact-membership
+checks.
+
+Evidence terms follow [Current Docs](README.md): documented,
+source-confirmed, runtime-proven, inferred, and unsupported. Runtime claims
+below apply only to their named QLab version and procedure. The local reference
+snapshot is documented QLab 5 material with unknown exact patch and retrieval
+date; its first repository import date is inferred provenance only. QLab 5.6.x
+runtime support is not claimed.
 
 ## Locally implemented; runtime validation pending
 
@@ -18,6 +29,13 @@ Status: 2026-07-18
 
 ## Closed
 
+- Authenticated request/reply handling uses invocation-owned TCP sessions,
+  fresh post-timeout verification sessions, and deterministic cleanup. Packet
+  tests and a bounded reversible QLab 5.5.10 proof passed on 2026-07-28 after
+  reloading the MCP process: exact workspace/cue UUIDs, dry-run tokens, one
+  setter for the candidate and one for rollback, timeout-confirmed fresh
+  readback for both setters, baseline restored, and final
+  running/paused/auditioning `0/0/0`.
 - Group safe editing through existing `qlab_edit_cues` / `group_basic`:
   QLab 5.5 runtime validation covers modes `1`, `2`, `3`, `4`, and `6`; canonical
   Playlist `doLoop`, `doShuffle`, `doCrossfade`, and crossfade duration; common

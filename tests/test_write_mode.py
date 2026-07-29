@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+import json
 import math
 from pathlib import Path
 import threading
@@ -19,9 +20,83 @@ from qlab_mcp.runtime.read_cache import shared_read_cache
 import qlab_mcp.write.operations as write_operations
 import qlab_mcp.write.groups as group_helpers
 import qlab_mcp.write.moves as move_helpers
+import qlab_mcp.write.registry as write_registry
+import qlab_mcp.write.text_basics as text_basics
+import qlab_mcp.write.video_appearance as video_appearance
+import qlab_mcp.write.video_audio_time as video_audio_time
+import qlab_mcp.write.video_opacity as video_opacity
+import qlab_mcp.write.video_scalars as video_scalars
+import qlab_mcp.write.video_translation as video_translation
+from qlab_mcp.cues import refs as cue_refs
+from qlab_mcp.cues import overview as cue_overview
 from qlab_mcp.write.moves import _build_plan, move_cues, simulate_move_batch
 from qlab_mcp.write.registry import QLAB_BLEND_MODES, UPDATE_PROFILE_NAMES, profile_catalog
 from qlab_mcp.write.network_patch_types import classify_network_patch_type
+
+
+@pytest.fixture
+def no_after_read_retry_delay(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(write_operations, "AFTER_READ_RETRY_DELAYS", (0.0, 0.0, 0.0))
+
+
+UPDATE_BATCH_CALL_NAMES = frozenset(
+    {
+        "fade_phase1_call",
+        "fade_profile_call",
+        "group_call",
+        "extracted_family_calls",
+        "phase3f_text_style_call",
+        "phase4_light_call",
+        "phase4c_video_fx_scalar_call",
+        "phase5_light_call",
+        "phase7_video_geometry_call",
+        "phase8_video_io_call",
+        "phase8c_video_slice_call",
+        "phase9a_video_audio_level_call",
+        "phase9b_video_audio_matrix_call",
+        "phase9c_video_audio_level_meta_call",
+        "phase9d_video_audio_mute_solo_call",
+        "phase9e_video_audio_level_bulk_call",
+        "utility_target_call",
+        "video_clock_type_call",
+        "video_integrated_fade_call",
+        "devamp_call",
+        "network_call",
+    }
+)
+
+
+def test_write_modules_reuse_canonical_container_types_without_widening_placement_sets() -> None:
+    assert cue_refs.CONTAINER_CUE_TYPES == {"Cue List", "Cue Cart", "Cart", "Group"}
+    assert cue_overview.CONTAINER_CUE_TYPES is cue_refs.CONTAINER_CUE_TYPES
+    assert move_helpers.CONTAINER_CUE_TYPES is cue_refs.CONTAINER_CUE_TYPES
+    assert move_helpers._LINEAR_PARENT_TYPES == {"Cue List", "Group"}
+    assert move_helpers._CART_PARENT_TYPES == {"Cue Cart", "Cart"}
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (" auto follow ", 2),
+        ("auto follow", 2),
+        ("AUTO-CONTINUE", 1),
+        ("unknown", "unknown"),
+        (False, 0),
+        (True, 1),
+        (0.0, 0),
+        (1.0, 1),
+        (2.0, 2),
+        (3.0, 3.0),
+    ],
+)
+def test_continue_mode_comparison_normalizer_preserves_legacy_values(value: Any, expected: Any) -> None:
+    assert write_registry._continue_mode_comparison_value(value) == expected
+    assert write_operations._continue_mode_comparison_value is write_registry._continue_mode_comparison_value
+
+
+def test_continue_mode_comparison_normalizer_preserves_unhashable_type_error() -> None:
+    with pytest.raises(TypeError):
+        write_registry._continue_mode_comparison_value([])
 
 
 def test_simulate_move_batch_applies_moves_in_input_order() -> None:
@@ -1053,35 +1128,6 @@ VIDEO_PHASE4_FX_DRY_RUN_PROPERTIES = {
     "videoEffect/parameter",
     "videoEffectIndex/parameter",
 }
-VIDEO_PHASE2_REQUESTED_VALUES = {
-    "anchor/x": 12.5,
-    "anchor/y": -4.5,
-    "blendMode": "Normal",
-    "clockType": "video",
-    "cropBottom": 2.5,
-    "cropLeft": 3.5,
-    "cropRight": 4.5,
-    "cropTop": 1.5,
-    "fixedWidth": 640,
-    "opacity": 0.75,
-    "preserveAspectRatio": False,
-    "scale/x": 125,
-    "scale/y": 90,
-    "text": "New title",
-    "text/format/alignment": "center",
-    "text/format/fontName": "Helvetica",
-    "text/format/fontSize": 56,
-    "translation/x": 10.5,
-    "translation/y": -20.5,
-}
-VIDEO_PHASE2_NORMALIZED_VALUES = {
-    **VIDEO_PHASE2_REQUESTED_VALUES,
-    "blendMode": "Normal",
-    "clockType": "video",
-    "preserveAspectRatio": False,
-}
-
-
 def _base_cue_values(cue_id: str, cue_type: str) -> dict[str, Any]:
     return {
         "uniqueID": cue_id,
@@ -2474,6 +2520,207 @@ def test_update_cues_single_item_real_uses_unique_id_and_one_readiness_check() -
     assert "/workspace/ws-1/cue/1/valuesForKeys" in addresses
     assert f"/workspace/ws-1/cue_id/{cue_id}/name" in addresses
     assert "/workspace/ws-1/cue/1/name" not in addresses
+
+
+def test_update_cues_returns_normalization_failure_before_later_stages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = BatchFakeWriteClient(QLabConfig(enable_write=False), cues={})
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    failure = {"ok": False, "status": "preflight_failed"}
+
+    def fail_normalization(
+        self: Any,
+        workspace_id: str,
+        updates: list[dict[str, Any]],
+        dry_run: bool | None,
+    ) -> dict[str, Any]:
+        assert self is reader
+        assert workspace_id == "ws-1"
+        assert updates == [{"cue_ref": "cue-1", "properties": {"name": "New"}}]
+        assert dry_run is True
+        return failure
+
+    monkeypatch.setattr(
+        write_operations.QLabWriteMixin,
+        "_normalize_and_validate_update_batch",
+        fail_normalization,
+    )
+    monkeypatch.setattr(
+        write_operations,
+        "_plan_update_batch_dry_run",
+        lambda *_args, **_kwargs: pytest.fail("dry-run planning must not run after normalization failure"),
+    )
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": "cue-1", "properties": {"name": "New"}}],
+        dry_run=True,
+    )
+
+    assert result is failure
+    assert client.requests == []
+
+
+def test_update_cues_normalization_boundary_returns_complete_bundle_and_blocks_missing_gate() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(QLabConfig(enable_write=True), cues={})
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    bundle = reader._normalize_and_validate_update_batch(
+        "ws-1",
+        [{"cue_ref": cue_id, "properties": {"name": "New"}}],
+        True,
+    )
+
+    assert set(bundle) == {
+        "workspace",
+        "effective_dry_run",
+        "items",
+        "requested_count",
+        "calls",
+    }
+    assert bundle["workspace"] == "ws-1"
+    assert bundle["effective_dry_run"] is True
+    assert bundle["requested_count"] == 1
+    assert set(bundle["calls"]) == UPDATE_BATCH_CALL_NAMES
+    assert not any(bundle["calls"]["extracted_family_calls"].values())
+    assert not any(
+        value
+        for name, value in bundle["calls"].items()
+        if name != "extracted_family_calls"
+    )
+    assert client.requests == []
+
+    gate_failure = reader._normalize_and_validate_update_batch(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "video_basic",
+                "properties": {"opacity": 0.5},
+            }
+        ],
+        False,
+    )
+
+    assert gate_failure["status"] == "preflight_failed"
+    assert gate_failure["results"][0]["errors"]["opacity"] == (
+        "opacity is gated or dry-run only without exactly one reviewed "
+        "Phase 3A confirm_token."
+    )
+    assert client.requests == []
+
+
+def test_update_cues_real_delegates_one_setter_and_fresh_readback_to_execution_helper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "name": "Old", "flagged": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    original = write_operations._execute_and_verify_update_batch
+    helper_calls = 0
+
+    def tracked_helper(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        nonlocal helper_calls
+        helper_calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(write_operations, "_execute_and_verify_update_batch", tracked_helper)
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "properties": {"name": "New"}}],
+        dry_run=False,
+    )
+
+    cue_prefix = f"/workspace/ws-1/cue_id/{cue_id}/"
+    cue_requests = [address for address, *_ in client.requests if address.startswith(cue_prefix)]
+    assert result["status"] == "updated"
+    assert helper_calls == 1
+    assert cue_requests == [
+        f"{cue_prefix}valuesForKeys",
+        f"{cue_prefix}name",
+        f"{cue_prefix}valuesForKeys",
+    ]
+
+
+def test_update_cues_real_preflight_helper_sends_no_setter() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "name": "Old", "flagged": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    item = write_operations._normalize_batch_update_item_for_batch(
+        {"cue_ref": cue_id, "properties": {"name": "New"}}
+    )
+
+    with pytest.raises(KeyError):
+        write_operations._preflight_update_batch_real(
+            reader,
+            "ws-1",
+            [item],
+            time.monotonic() + write_operations.UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS,
+            requested_count=1,
+            calls={},
+        )
+
+    preflight = write_operations._preflight_update_batch_real(
+        reader,
+        "ws-1",
+        [item],
+        time.monotonic() + write_operations.UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS,
+        requested_count=1,
+        calls={
+            **{name: False for name in UPDATE_BATCH_CALL_NAMES},
+            "extracted_family_calls": {
+                family: False
+                for family in write_operations._EXTRACTED_WRITE_FAMILIES
+            },
+        },
+    )
+
+    cue_prefix = f"/workspace/ws-1/cue_id/{cue_id}/"
+    cue_requests = [address for address, *_ in client.requests if address.startswith(cue_prefix)]
+    assert preflight["workspace"] == "ws-1"
+    assert preflight["preflight_results"][0]["status"] == "planned"
+    assert cue_requests == [f"{cue_prefix}valuesForKeys"]
+
+
+def test_update_cues_dry_run_delegates_planning_without_setter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Memo", "name": "Old", "flagged": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    original = write_operations._plan_update_batch_dry_run
+    helper_calls = 0
+
+    def tracked_helper(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        nonlocal helper_calls
+        helper_calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(write_operations, "_plan_update_batch_dry_run", tracked_helper)
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "properties": {"name": "New"}}],
+        dry_run=True,
+    )
+
+    cue_prefix = f"/workspace/ws-1/cue_id/{cue_id}/"
+    cue_requests = [address for address, *_ in client.requests if address.startswith(cue_prefix)]
+    assert result["status"] == "dry_run"
+    assert helper_calls == 1
+    assert cue_requests == [f"{cue_prefix}valuesForKeys"]
 
 
 def test_update_cues_rejects_empty_and_over_limit() -> None:
@@ -6923,7 +7170,9 @@ def test_update_cues_confirmed_timeouts_do_not_count_as_failures_across_batch() 
     assert result["warnings"]
 
 
-def test_update_cues_unconfirmed_timeout_counts_as_failure() -> None:
+def test_update_cues_unconfirmed_timeout_counts_as_failure(
+    no_after_read_retry_delay: None,
+) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -6944,7 +7193,9 @@ def test_update_cues_unconfirmed_timeout_counts_as_failure() -> None:
     assert "flagged" in result["results"][0]["errors"]
 
 
-def test_update_cues_timed_out_setter_without_after_confirmation_reports_property() -> None:
+def test_update_cues_timed_out_setter_without_after_confirmation_reports_property(
+    no_after_read_retry_delay: None,
+) -> None:
     confirmed_id = "11111111-1111-4111-8111-111111111111"
     unconfirmed_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -6977,7 +7228,9 @@ def test_update_cues_timed_out_setter_without_after_confirmation_reports_propert
     assert "colorName" in result["results"][1]["errors"]
 
 
-def test_update_cues_retries_after_read_for_late_timeout_application() -> None:
+def test_update_cues_retries_after_read_for_late_timeout_application(
+    no_after_read_retry_delay: None,
+) -> None:
     cues = {
         f"{index:08d}-1111-4111-8111-111111111111": {"type": "Memo", "name": f"Old {index}"}
         for index in range(30)
@@ -7008,7 +7261,9 @@ def test_update_cues_retries_after_read_for_late_timeout_application() -> None:
     assert result["results"][17]["status"] == "updated_with_confirmed_timeouts"
 
 
-def test_update_cues_after_read_mismatch_reports_requested_and_after_values() -> None:
+def test_update_cues_after_read_mismatch_reports_requested_and_after_values(
+    no_after_read_retry_delay: None,
+) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -7751,92 +8006,6 @@ def test_video_phase2_dry_run_rejects_explicitly_blocked_families_before_osc(
 
 
 @pytest.mark.parametrize(
-    ("profile", "cue_type", "property_name"),
-    [
-        *[
-            (profile, cue_type, property_name)
-            for profile, cue_type in (
-                ("video_basic", "Video"),
-                ("camera_basic", "Camera"),
-                ("text_basic", "Text"),
-            )
-            for property_name in VIDEO_PHASE2_REQUESTED_VALUES
-            if property_name
-            not in {
-                "fixedWidth",
-                "opacity",
-                "text",
-                "text/format/alignment",
-                "text/format/fontName",
-                "text/format/fontSize",
-                *PHASE3F_TEXT_STYLE_VALUES,
-            }
-            and property_name not in {"translation/x", "translation/y"}
-            and property_name not in VIDEO_PHASE3C_SCALAR_PROPERTIES
-            and property_name not in VIDEO_PHASE3D_APPEARANCE_PROPERTIES
-            and property_name != "layer"
-            and property_name != "clockType"
-        ],
-    ],
-)
-def test_video_phase2_scalar_matrix_plans_normalized_diff_without_token(
-    profile: str,
-    cue_type: str,
-    property_name: str,
-) -> None:
-    cue_id = "11111111-1111-4111-8111-111111111111"
-    before_value = "Old title" if property_name == "text" else 1
-    client = FakeWriteClient(
-        QLabConfig(enable_write=False, passcode=None),
-        existing_cue_id=cue_id,
-        cue_values={"uniqueID": cue_id, "type": cue_type, property_name: before_value},
-    )
-    reader = QLabReader(client)  # type: ignore[arg-type]
-
-    result = reader.update_cue(
-        "ws-1",
-        cue_id,
-        {property_name: VIDEO_PHASE2_REQUESTED_VALUES[property_name]},
-        dry_run=True,
-        profile=profile,
-    )
-
-    assert result["ok"] is True
-    assert result["status"] == "dry_run"
-    normalized = VIDEO_PHASE2_NORMALIZED_VALUES[property_name]
-    assert result["properties"] == {property_name: normalized}
-    assert result["before"][property_name] == before_value
-    assert result["diff"] == {property_name: {"before": before_value, "requested": normalized}}
-    setter = planned_setters(result)[property_name]
-    assert setter["address"] == f"/workspace/ws-1/cue_id/{cue_id}/{property_name}"
-    assert setter["mode"] == "saved"
-    assert setter["risk_tier"] == "high"
-    assert setter["real_write_enabled"] is False
-    assert setter["real_write_possible"] is False
-    assert setter["requires_confirm_token"] is False
-    assert setter["planned_only_reason"] == (
-        "video_phase2_text_format_inheritance_risk"
-        if property_name == "text"
-        else "video_phase2_dry_run_only"
-    )
-    expected_requirements = {
-        "future_versioned_confirm_token",
-        "single_cue_single_property",
-        "saved_mode",
-        "fresh_baseline",
-        "exact_readback",
-        "manual_rollback_plan",
-    }
-    assert expected_requirements <= set(setter["future_gate_requirements"])
-    assert ("verify_first_character_inherited_format" in setter["future_gate_requirements"]) is (
-        property_name == "text"
-    )
-    assert_no_confirm_token(result)
-    assert result["after"] is None
-    assert result["executed_operations"] == []
-
-
-@pytest.mark.parametrize(
     ("cue_state", "error_key"),
     [
         ({"isBroken": True}, "health"),
@@ -7916,6 +8085,189 @@ def _phase3_opacity_fixture(
     return client, reader, cue_id, update, token
 
 
+class _FakeMonotonicClock:
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
+def test_real_update_preflight_budget_exhaustion_sends_no_setter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, reader, cue_id, update, token = _phase3_opacity_fixture()
+    clock = _FakeMonotonicClock()
+    original_read = write_operations._try_read_update_values
+    preflight_timeouts: list[float | None] = []
+
+    def consume_preflight_budget(
+        reader_arg: Any,
+        workspace_id: str,
+        cue_ref: str,
+        read_keys: list[str],
+        *,
+        request_timeout: float | None = None,
+    ) -> tuple[dict[str, Any] | None, dict[str, str]]:
+        preflight_timeouts.append(request_timeout)
+        result = original_read(
+            reader_arg,
+            workspace_id,
+            cue_ref,
+            read_keys,
+            request_timeout=request_timeout,
+        )
+        clock.advance(1.0)
+        return result
+
+    monkeypatch.setattr(write_operations.time, "monotonic", clock)
+    monkeypatch.setattr(write_operations, "UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS", 1.0)
+    monkeypatch.setattr(write_operations, "_try_read_update_values", consume_preflight_budget)
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    setter_address = f"/workspace/ws-1/cue_id/{cue_id}/opacity"
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"]["read_before"] == (
+        "Global update time budget exhausted during fresh preflight; no setter was sent."
+    )
+    assert preflight_timeouts == [pytest.approx(0.5)]
+    assert not any(address == setter_address for address, _, _ in client.requests)
+
+
+def test_real_update_preflight_shares_one_deadline_across_fifty_cues(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cue_ids = [
+        f"00000000-0000-4000-8000-{index:012d}"
+        for index in range(50)
+    ]
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            cue_id: {"type": "Memo", "name": f"Cue {index}"}
+            for index, cue_id in enumerate(cue_ids)
+        },
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    clock = _FakeMonotonicClock()
+    original_read = write_operations._try_read_update_values
+    preflight_timeouts: list[float | None] = []
+
+    def consume_shared_budget(*args: Any, request_timeout: float | None = None, **kwargs: Any):
+        preflight_timeouts.append(request_timeout)
+        result = original_read(*args, request_timeout=request_timeout, **kwargs)
+        clock.advance(0.03)
+        return result
+
+    monkeypatch.setattr(write_operations.time, "monotonic", clock)
+    monkeypatch.setattr(write_operations, "UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS", 0.1)
+    monkeypatch.setattr(write_operations, "_try_read_update_values", consume_shared_budget)
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {"cue_ref": cue_id, "properties": {"name": f"Updated {index}"}}
+            for index, cue_id in enumerate(cue_ids)
+        ],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert len(preflight_timeouts) == 4
+    assert preflight_timeouts == sorted(preflight_timeouts, reverse=True)
+    assert not any(
+        address.endswith("/name")
+        for address, *_ in client.requests
+    )
+
+
+def test_real_update_uses_fresh_verification_budget_after_setter_dispatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, reader, cue_id, update, token = _phase3_opacity_fixture()
+    clock = _FakeMonotonicClock()
+    original_request = client.request
+    setter_address = f"/workspace/ws-1/cue_id/{cue_id}/opacity"
+
+    def consume_remaining_budget_after_setter(
+        address: str,
+        *args: Any,
+        workspace_id: str | None = None,
+        reply_timeout: float | None = None,
+    ) -> Any:
+        reply = original_request(
+            address,
+            *args,
+            workspace_id=workspace_id,
+            reply_timeout=reply_timeout,
+        )
+        if address == setter_address:
+            clock.advance(1.0)
+        return reply
+
+    monkeypatch.setattr(write_operations.time, "monotonic", clock)
+    monkeypatch.setattr(write_operations, "UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS", 1.0)
+    monkeypatch.setattr(client, "request", consume_remaining_budget_after_setter)
+
+    result = reader.update_cues(
+        "ws-1",
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["opacity"] == 0.8
+    assert [address for address, _, _ in client.requests].count(setter_address) == 1
+    assert client.reply_timeouts[-1] == pytest.approx(0.5)
+
+
+def test_execution_guard_blocks_every_non_allowlisted_live_route() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={cue_id: {"type": "Memo", "name": "Old"}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    item = write_operations._normalize_batch_update_item_for_batch(
+        {"cue_ref": cue_id, "properties": {"name": "New"}}
+    )
+    item["operations"][0].update(mode="live", path="name/live")
+    planned = write_operations._batch_item_result(
+        "ws-1",
+        item,
+        cue_id=cue_id,
+        status="planned",
+        before={"uniqueID": cue_id, "type": "Memo", "name": "Old"},
+        after=None,
+        errors=None,
+        warnings=[],
+    )
+
+    result = write_operations._execute_and_verify_update_batch(
+        reader,
+        "ws-1",
+        [item],
+        [planned],
+        time.monotonic() + write_operations.UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS,
+        0.1,
+        shared_read_cache(),
+        requested_count=1,
+    )
+
+    assert result["results"][0]["errors"]["name"] == (
+        "Live writes are blocked except for secondColorName."
+    )
+    assert not any(address.endswith("/name/live") for address, *_ in client.requests)
+
+
 @pytest.mark.parametrize(
     ("profile", "cue_type"),
     [("video_basic", "Video"), ("camera_basic", "Camera"), ("text_basic", "Text")],
@@ -7924,7 +8276,7 @@ def test_phase3a_opacity_dry_run_candidate_emits_confirm_token(profile: str, cue
     client, reader, cue_id, update, _ = _phase3_opacity_fixture(profile=profile, cue_type=cue_type)
     plan = reader.update_cues("ws-1", [update], dry_run=True)
     setter = planned_setters(plan["results"][0])["opacity"]
-    payload, error = write_operations._decode_phase3_video_opacity_confirm_token(setter["confirm_token"])
+    payload, error = video_opacity._decode_confirm_token(setter["confirm_token"])
 
     assert error is None
     assert setter["real_write_possible"] is True
@@ -8097,7 +8449,9 @@ def test_phase3a_opacity_setter_timeout_with_matching_readback_is_updated_warnin
     assert item["executed_operations"][0]["status"] == "timeout_pending_verification"
 
 
-def test_phase3a_opacity_setter_timeout_mismatch_is_uncertain_failure_no_retry() -> None:
+def test_phase3a_opacity_setter_timeout_mismatch_is_uncertain_failure_no_retry(
+    no_after_read_retry_delay: None,
+) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -8190,7 +8544,7 @@ def test_phase3b_translation_dry_run_emits_bound_token(
     result = reader.update_cues("ws-1", [update], dry_run=True)
     item = result["results"][0]
     setter = planned_setters(item)[property_name]
-    payload, error = write_operations._decode_phase3_video_translation_confirm_token(
+    payload, error = video_translation._decode_confirm_token(
         setter["confirm_token"]
     )
 
@@ -8217,7 +8571,7 @@ def test_phase3b_translation_dry_run_emits_bound_token(
         "path": property_name,
         "mode": "saved",
         "baseline": 10.0,
-        "baseline_sha256": write_operations._video_translation_sha256(10.0),
+        "baseline_sha256": video_translation._sha256(10.0),
         "requested": 20.0,
         "risk_tier": "high",
         "capability_gate": "video_visual",
@@ -8532,7 +8886,9 @@ def test_phase3b_translation_setter_timeout_matching_readback_is_updated_warning
     assert item["updateq_plan"]["safety"]["will_modify_qlab"] is True
 
 
-def test_phase3b_translation_setter_timeout_mismatch_is_uncertain_no_retry() -> None:
+def test_phase3b_translation_setter_timeout_mismatch_is_uncertain_no_retry(
+    no_after_read_retry_delay: None,
+) -> None:
     client, reader, _, update, token = _phase3b_translation_fixture(
         timeout=True,
         timeout_without_apply=True,
@@ -8671,7 +9027,7 @@ def test_phase3c_scalar_dry_run_emits_bound_token(
     result = reader.update_cues("ws-1", [update], dry_run=True)
     item = result["results"][0]
     setter = planned_setters(item)[property_name]
-    payload, error = write_operations._decode_phase3_video_scalar_confirm_token(
+    payload, error = video_scalars._decode_confirm_token(
         setter["confirm_token"]
     )
 
@@ -8913,7 +9269,9 @@ def test_phase3c_scalar_timeout_matching_readback_is_updated_warning(
     assert item["updateq_plan"]["verification"]["readback_matched"] is True
 
 
-def test_phase3c_scalar_timeout_mismatch_is_uncertain_no_retry() -> None:
+def test_phase3c_scalar_timeout_mismatch_is_uncertain_no_retry(
+    no_after_read_retry_delay: None,
+) -> None:
     client, reader, _, update, token = _phase3c_scalar_fixture(
         timeout=True,
         timeout_without_apply=True,
@@ -8979,6 +9337,25 @@ PHASE3D_APPEARANCE_CASES = [
         ("preserveAspectRatio", True, False),
     )
 ]
+
+
+def test_phase3d_appearance_operation_detection_precedes_profile_validation() -> None:
+    appearance_operation = {
+        "property": "blendMode",
+        "path": "blendMode",
+        "mode": "saved",
+    }
+    item = {
+        "cue_ref": "11111111-1111-4111-8111-111111111111",
+        "profile": "audio_basic",
+        "operations": [appearance_operation],
+    }
+
+    assert video_appearance.operation(item) is appearance_operation
+    assert video_appearance.call_structure_error([item]) == (
+        "Phase 3D appearance real writes require video_basic, camera_basic, or text_basic profile."
+    )
+
 
 OFFICIAL_BLEND_MODE_NAMES = [
     "Normal",
@@ -9118,9 +9495,7 @@ def test_phase3d_appearance_dry_run_emits_bound_token(
     result = reader.update_cues("ws-1", [update], dry_run=True)
     item = result["results"][0]
     setter = planned_setters(item)[property_name]
-    payload, error = write_operations._decode_phase3_video_appearance_confirm_token(
-        setter["confirm_token"]
-    )
+    payload, error = video_appearance._decode_confirm_token(setter["confirm_token"])
 
     assert error is None
     assert setter["confirm_token"].startswith("confirm:videoAppearance:v1:")
@@ -9313,7 +9688,9 @@ def test_phase3d_appearance_timeout_and_rollback_contract() -> None:
     assert rollback["results"][0]["after"]["blendMode"] == "Normal"
 
 
-def test_phase3d_appearance_timeout_mismatch_is_uncertain_no_retry() -> None:
+def test_phase3d_appearance_timeout_mismatch_is_uncertain_no_retry(
+    no_after_read_retry_delay: None,
+) -> None:
     client, reader, _, update, token = _phase3d_appearance_fixture(
         timeout=True,
         timeout_without_apply=True,
@@ -10090,7 +10467,7 @@ def test_phase8b_video_audio_time_dry_run_emits_bound_token(
     result = reader.edit_cues("ws-1", [update], dry_run=True)
     item = result["results"][0]
     setter = planned_setters(item)[property_name]
-    payload, error = write_operations._decode_phase8b_video_audio_time_confirm_token(setter["confirm_token"])
+    payload, error = video_audio_time._decode_confirm_token(setter["confirm_token"])
 
     assert error is None
     assert setter["confirm_token"].startswith("confirm:videoAudioTime:v1:")
@@ -10106,6 +10483,16 @@ def test_phase8b_video_audio_time_dry_run_emits_bound_token(
     assert payload["baseline"] == baseline
     assert payload["requested"] == requested
     assert payload["workspace_validation"] == "post_write_fresh_readback_required"
+    read_keys = [
+        json.loads(args[0])
+        for address, args, _ in client.requests
+        if address.endswith("/valuesForKeys")
+    ]
+    assert read_keys
+    assert all(
+        {"audioTrackFormats", "numChannelsIn", "levels"}.issubset(keys)
+        for keys in read_keys
+    )
     assert not any(address.endswith(f"/{property_name}") for address, _, _ in client.requests)
 
 
@@ -10150,7 +10537,7 @@ def test_phase8b_preserve_pitch_accepts_numeric_qlab_readback(
     )
     client.numeric_bool_readback_properties.add("preservePitch")
     plan = reader.edit_cues("ws-1", [update], dry_run=True)
-    payload, error = write_operations._decode_phase8b_video_audio_time_confirm_token(
+    payload, error = video_audio_time._decode_confirm_token(
         planned_setters(plan["results"][0])["preservePitch"]["confirm_token"]
     )
     assert error is None
@@ -12676,7 +13063,7 @@ def test_phase3e_text_basic_dry_run_emits_bound_token(
     result = reader.update_cues("ws-1", [update], dry_run=True)
     item = result["results"][0]
     setter = planned_setters(item)[property_name]
-    payload, error = write_operations._decode_phase3e_text_basic_confirm_token(
+    payload, error = text_basics._decode_phase3e_text_basic_confirm_token(
         setter["confirm_token"]
     )
 
@@ -12692,7 +13079,7 @@ def test_phase3e_text_basic_dry_run_emits_bound_token(
     assert payload["cue_type"] == "Text"
     assert payload["profile"] == "text_basic"
     assert payload["property"] == property_name
-    assert payload["requested"] == write_operations._text_basic_canonical_value(property_name, requested)
+    assert payload["requested"] == text_basics._text_basic_canonical_value(property_name, requested)
     assert not any(address.endswith(f"/{property_name}") for address, _, _ in client.requests)
 
 
@@ -13017,7 +13404,9 @@ def test_phase3e_text_basic_timeout_and_rollback_contract() -> None:
     assert rollback["results"][0]["after"]["text"] == "Old text"
 
 
-def test_phase3e_text_basic_timeout_mismatch_is_uncertain_no_retry() -> None:
+def test_phase3e_text_basic_timeout_mismatch_is_uncertain_no_retry(
+    no_after_read_retry_delay: None,
+) -> None:
     client, reader, _, update, token = _phase3e_text_basic_fixture(
         timeout=True,
         timeout_without_apply=True,
@@ -16800,6 +17189,7 @@ def test_update_cue_real_accepts_setter_timeout_when_after_read_confirms_value()
     assert result["errors"] is None
     assert result["executed_operations"][0]["status"] == "timeout_pending_verification"
     assert result["warnings"] == ["One or more setters did not reply, but fresh after-read confirmed requested values."]
+    assert len([address for address, _, _ in client.requests if address.endswith("/flagged")]) == 1
 
 
 def test_update_cue_real_resolves_number_to_unique_id_for_setters() -> None:

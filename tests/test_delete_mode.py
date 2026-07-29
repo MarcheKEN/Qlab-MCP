@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from qlab_mcp.cues.refs import CONTAINER_CUE_TYPES
 from qlab_mcp.errors import OscTimeoutError, QLabReplyError
 
 
@@ -15,6 +16,12 @@ FIRST_ID = "44444444-4444-4444-8444-444444444444"
 SECOND_ID = "55555555-5555-4555-8555-555555555555"
 THIRD_ID = "66666666-6666-4666-8666-666666666666"
 NESTED_ID = "77777777-7777-4777-8777-777777777777"
+
+
+def test_delete_mode_reuses_canonical_container_types() -> None:
+    from qlab_mcp.write import deletes
+
+    assert deletes.CONTAINER_CUE_TYPES is CONTAINER_CUE_TYPES
 
 
 class DeleteReader:

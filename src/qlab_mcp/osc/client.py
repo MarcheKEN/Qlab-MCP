@@ -62,6 +62,13 @@ def _workspace_from_connect_address(address: str) -> str | None:
     return None
 
 
+def _workspace_from_address(address: str) -> str | None:
+    parts = address.strip("/").split("/")
+    if len(parts) >= 2 and parts[0] == "workspace" and parts[1]:
+        return parts[1]
+    return None
+
+
 @dataclass(frozen=True)
 class QLabReply:
     invoked_address: str
@@ -84,16 +91,20 @@ class QLabOscClient:
     """Send one OSC message to QLab and wait for its JSON reply."""
 
     _locks_guard = threading.Lock()
-    _locks: dict[tuple[str, int, int], threading.Lock] = {}
+    _locks: dict[tuple[str, int], threading.Lock] = {}
 
     def __init__(self, config: QLabConfig | None = None):
         self.config = config or QLabConfig.from_env()
         self._lock = self._get_lock(self.config)
+        self._tcp_lock = threading.Lock()
+        self._tcp_socket: socket.socket | None = None
+        self._tcp_buffer = bytearray()
+        self._tcp_connected_workspaces: set[str] = set()
         self._connected_workspaces: set[tuple[str, str]] = set()
 
     @classmethod
     def _get_lock(cls, config: QLabConfig) -> threading.Lock:
-        key = (config.host, config.osc_port, config.reply_port)
+        key = (config.host, config.osc_port)
         with cls._locks_guard:
             if key not in cls._locks:
                 cls._locks[key] = threading.Lock()
@@ -106,6 +117,62 @@ class QLabOscClient:
         workspace_id: str | None = None,
         reply_timeout: float | None = None,
     ) -> QLabReply:
+        address_workspace = _workspace_from_address(address)
+        if workspace_id and address_workspace and workspace_id != address_workspace:
+            raise ValueError(
+                f"workspace_id {workspace_id!r} does not match OSC address workspace {address_workspace!r}"
+            )
+        if self.config.passcode:
+            workspace_id = workspace_id or address_workspace
+            reply_deadline = (
+                None
+                if reply_timeout is None
+                else time.monotonic() + max(0.001, float(reply_timeout))
+            )
+            with self._tcp_lock:
+                try:
+                    if self._tcp_socket is None:
+                        connect_timeout = self._remaining_tcp_timeout(reply_deadline, address)
+                        try:
+                            self._tcp_socket = socket.create_connection(
+                                (self.config.host, self.config.osc_port),
+                                timeout=connect_timeout,
+                            )
+                        except socket.timeout as exc:
+                            raise OscTimeoutError(
+                                f"Timed out waiting for QLab TCP reply to {address}"
+                            ) from exc
+                        self._tcp_socket.settimeout(
+                            self._remaining_tcp_timeout(reply_deadline, address)
+                        )
+                    direct_connect = (
+                        workspace_id is not None
+                        and _workspace_from_connect_address(address) == workspace_id
+                    )
+                    if workspace_id and not direct_connect and workspace_id not in self._tcp_connected_workspaces:
+                        self._send_with_reply_on_tcp_socket(
+                            self._tcp_socket,
+                            f"/workspace/{workspace_id}/connect",
+                            self.config.passcode,
+                            buffer=self._tcp_buffer,
+                            reply_deadline=reply_deadline,
+                        )
+                        self._tcp_connected_workspaces.add(workspace_id)
+                    reply = self._send_with_reply_on_tcp_socket(
+                        self._tcp_socket,
+                        address,
+                        *args,
+                        reply_timeout=reply_timeout,
+                        buffer=self._tcp_buffer,
+                        reply_deadline=reply_deadline,
+                    )
+                    if direct_connect and workspace_id is not None and reply.status == "ok":
+                        self._tcp_connected_workspaces.add(workspace_id)
+                    return reply
+                except (OscTimeoutError, OscProtocolError, QLabReplyError, OSError):
+                    self._discard_tcp_session()
+                    raise
+
         with self._lock:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                 self._prepare_udp_socket(sock)
@@ -120,20 +187,54 @@ class QLabOscClient:
                 self._remember_connect_reply(address, reply, "udp")
                 return reply
 
-    def request_tcp(self, address: str, *args: Any, workspace_id: str | None = None) -> QLabReply:
-        with socket.create_connection(
-            (self.config.host, self.config.osc_port),
-            timeout=self.config.timeout,
-        ) as sock:
-            sock.settimeout(self.config.timeout)
-            if workspace_id and self.config.passcode:
+    def request_tcp(
+        self,
+        address: str,
+        *args: Any,
+        workspace_id: str | None = None,
+        reply_timeout: float | None = None,
+    ) -> QLabReply:
+        address_workspace = _workspace_from_address(address)
+        if workspace_id and address_workspace and workspace_id != address_workspace:
+            raise ValueError(
+                f"workspace_id {workspace_id!r} does not match OSC address workspace {address_workspace!r}"
+            )
+        workspace_id = workspace_id or address_workspace
+        reply_deadline = (
+            None
+            if reply_timeout is None
+            else time.monotonic() + max(0.001, float(reply_timeout))
+        )
+        try:
+            connected_socket = socket.create_connection(
+                (self.config.host, self.config.osc_port),
+                timeout=self._remaining_tcp_timeout(reply_deadline, address),
+            )
+        except socket.timeout as exc:
+            raise OscTimeoutError(
+                f"Timed out waiting for QLab TCP reply to {address}"
+            ) from exc
+        with connected_socket as sock:
+            sock.settimeout(self._remaining_tcp_timeout(reply_deadline, address))
+            direct_connect = (
+                workspace_id is not None
+                and _workspace_from_connect_address(address) == workspace_id
+            )
+            if workspace_id and self.config.passcode and not direct_connect:
                 self._send_with_reply_on_tcp_socket(
                     sock,
                     f"/workspace/{workspace_id}/connect",
                     self.config.passcode,
+                    reply_deadline=reply_deadline,
                 )
                 self._remember_connected_workspace(workspace_id, "tcp")
-            reply = self._send_with_reply_on_tcp_socket(sock, address, *args)
+            reply = self._send_with_reply_on_tcp_socket(
+                sock,
+                address,
+                *args,
+                reply_timeout=reply_timeout,
+                reply_deadline=reply_deadline,
+            )
             self._remember_connect_reply(address, reply, "tcp")
             return reply
 
@@ -156,6 +257,27 @@ class QLabOscClient:
         sock.bind(("", 0))
         reply_port = int(sock.getsockname()[1])
         sock.sendto(encode_message("/udpReplyPort", reply_port), (self.config.host, self.config.osc_port))
+
+    def _discard_tcp_session(self) -> None:
+        sock = self._tcp_socket
+        self._tcp_socket = None
+        self._tcp_buffer.clear()
+        self._tcp_connected_workspaces.clear()
+        if sock is not None:
+            try:
+                sock.close()
+            except OSError:
+                pass
+
+    def close(self) -> None:
+        with self._tcp_lock:
+            self._discard_tcp_session()
+
+    def __enter__(self) -> QLabOscClient:
+        return self
+
+    def __exit__(self, *_exc_info: Any) -> None:
+        self.close()
 
     def _workspace_is_connected(self, workspace_id: str, transport: str) -> bool:
         return (workspace_id.strip("/"), transport) in self._connected_workspaces
@@ -206,34 +328,37 @@ class QLabOscClient:
                     raise QLabReplyError(reply.status, reply.data, reply.invoked_address)
                 return reply
 
-    def _send_with_reply_on_tcp_socket(self, sock: socket.socket, address: str, *args: Any) -> QLabReply:
+    def _send_with_reply_on_tcp_socket(
+        self,
+        sock: socket.socket,
+        address: str,
+        *args: Any,
+        reply_timeout: float | None = None,
+        buffer: bytearray | None = None,
+        reply_deadline: float | None = None,
+    ) -> QLabReply:
         packet = encode_message(address, *args)
-        deadline = time.monotonic() + self.config.timeout
-        buffer = bytearray()
+        if reply_deadline is None:
+            timeout = self.config.timeout if reply_timeout is None else max(0.001, float(reply_timeout))
+            deadline = time.monotonic() + timeout
+        else:
+            timeout = self._remaining_tcp_timeout(reply_deadline, address)
+            deadline = reply_deadline
+        read_buffer = buffer if buffer is not None else bytearray()
 
+        # A frame received before this send cannot reply to this request.
+        read_buffer.clear()
+        sock.settimeout(timeout)
         sock.sendall(_slip_encode(packet))
 
         while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise OscTimeoutError(f"Timed out waiting for QLab TCP reply to {address}")
-            sock.settimeout(remaining)
-
-            try:
-                chunk = sock.recv(65535)
-            except (socket.timeout, ConnectionResetError) as exc:
-                raise OscTimeoutError(f"Timed out waiting for QLab TCP reply to {address}") from exc
-            if not chunk:
-                raise OscTimeoutError(f"QLab TCP connection closed before reply to {address}")
-
-            buffer.extend(chunk)
             while True:
                 try:
-                    end_index = buffer.index(SLIP_END)
+                    end_index = read_buffer.index(SLIP_END)
                 except ValueError:
                     break
-                frame = bytes(buffer[:end_index])
-                del buffer[: end_index + 1]
+                frame = bytes(read_buffer[:end_index])
+                del read_buffer[: end_index + 1]
                 if not frame:
                     continue
 
@@ -248,6 +373,28 @@ class QLabOscClient:
                     if reply.status != "ok":
                         raise QLabReplyError(reply.status, reply.data, reply.invoked_address)
                     return reply
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise OscTimeoutError(f"Timed out waiting for QLab TCP reply to {address}")
+            sock.settimeout(remaining)
+
+            try:
+                chunk = sock.recv(65535)
+            except (socket.timeout, ConnectionResetError) as exc:
+                raise OscTimeoutError(f"Timed out waiting for QLab TCP reply to {address}") from exc
+            if not chunk:
+                raise OscTimeoutError(f"QLab TCP connection closed before reply to {address}")
+
+            read_buffer.extend(chunk)
+
+    def _remaining_tcp_timeout(self, deadline: float | None, address: str) -> float:
+        if deadline is None:
+            return self.config.timeout
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise OscTimeoutError(f"Timed out waiting for QLab TCP reply to {address}")
+        return remaining
 
     @staticmethod
     def _reply_matches(reply: QLabReply, expected_address: str) -> bool:

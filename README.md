@@ -24,6 +24,8 @@ dry-run-first.
 - No GO, playback, stop, or panic controls.
 - No ungated deletion, container deletion, or cascade deletion.
 - No raw OSC tool.
+- No broad `/live` write surface. The sole narrow exception is the allowlisted
+  `secondColorName` edit; every other `/live` write remains blocked.
 - No ambiguous selected, active, playhead, or playback-position edits.
 - No ungated high-risk writes. High-risk families require dry-run review plus
   exact `planned_operations[].confirm_token` values when supported, or they
@@ -578,4 +580,5 @@ References:
 - [OSC coverage snapshot](docs/current/coverage/osc_coverage_snapshot.md)
 - [QLab OSC dictionary](docs/references/qlab_osc_dictionary.md)
 - [QLab OSC queries](docs/references/osc_queries.md)
+- [Reference provenance and checksums](docs/references/manifest.json)
 - [Video Phase 1 OSC matrix](docs/current/coverage/video_phase1_osc_matrix.md)

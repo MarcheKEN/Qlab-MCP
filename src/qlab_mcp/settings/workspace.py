@@ -235,7 +235,7 @@ class WorkspaceSettingsMixin:
     ) -> Any:
         address = _workspace_address(workspace_id, f"settings/{command}")
         try:
-            return self.client.request(address, workspace_id=workspace_id).data
+            return self._request(address, workspace_id=workspace_id).data
         except OscTimeoutError as exc:
             errors[error_key] = sanitize_exception_message(exc)
             return None
@@ -250,10 +250,10 @@ class WorkspaceSettingsMixin:
     ) -> tuple[Any, str | None]:
         address = _workspace_address(workspace_id, "settings/light/patch")
         try:
-            return self.client.request(address, workspace_id=workspace_id).data, "udp"
+            return self._request(address, workspace_id=workspace_id).data, "udp"
         except OscTimeoutError as udp_exc:
             try:
-                return self.client.request_tcp(address, workspace_id=workspace_id).data, "tcp_fallback"
+                return self._request_tcp(address, workspace_id=workspace_id).data, "tcp_fallback"
             except Exception as tcp_exc:
                 errors["light.patch"] = "Light patch read timed out over UDP; TCP fallback also failed."
                 return None, None

@@ -14,11 +14,10 @@ from .index import (
     normalize_cue_index_profile,
 )
 from .profiles import _derive_profile_fields
-from .refs import _bounded_cue_refs_from_shallow, _flatten_cue_refs
+from .refs import CONTAINER_CUE_TYPES, _bounded_cue_refs_from_shallow, _flatten_cue_refs
 from ..runtime.connection import QLAB_VERSION_KEYS, read_workspace_mode
 
 
-CONTAINER_CUE_TYPES = {"Cue List", "Cue Cart", "Cart", "Group"}
 KNOWN_TOTAL_CUES_MEANING = "cue_items_including_cue_lists"
 OVERVIEW_CUE_KEYS = (
     "uniqueID",
@@ -436,7 +435,7 @@ class CueOverviewMixin:
         else:
             workspace = self._resolve_workspace(workspaces, workspace_id)
         resolved_workspace_id = _clean_workspace_id(workspace.get("uniqueID") or workspace_id or "")
-        workspace_mode = read_workspace_mode(self.client, resolved_workspace_id, authenticated=True)
+        workspace_mode = read_workspace_mode(self.client, resolved_workspace_id, authenticated=True, request=self._request)
 
         if include_cue_index:
             shared_limit = max(max_cues, max_index_cues)

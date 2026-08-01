@@ -57,6 +57,9 @@ MUTATING_ACTIONS = {
     "mute/channel/clear",
     "mute/clear",
     "mute/object/clear",
+    "moveCartCue",
+    "playlist/next",
+    "playlist/previous",
     "prune",
     "pruneCommands",
     "removeLightCommandsMatching",
@@ -64,6 +67,7 @@ MUTATING_ACTIONS = {
     "resetRotation",
     "safeSort",
     "safeSortCommands",
+    "shuffle",
     "setDefaultLevels",
     "setLight",
     "setSilentLevels",
@@ -108,7 +112,9 @@ def extract_cue_osc_inventory(dictionary_text: str) -> list[dict[str, Any]]:
             increment_decrement = metadata["increment_decrement"] or _block_contains(
                 lines, group_index, block_end, "increment/decrement"
             )
-            writable = "read/write" in access_row
+            prose_read = section == "Group/List/Cart" and _block_contains(lines, group_index, block_end, "Read:")
+            prose_write = section == "Group/List/Cart" and _block_contains(lines, group_index, block_end, "Write:")
+            writable = "read/write" in access_row or prose_write
             action = any(_is_mutating_action(_suffix(route)) for route in route_group)
             if writable or action:
                 for route in route_group:
@@ -124,8 +130,8 @@ def extract_cue_osc_inventory(dictionary_text: str) -> list[dict[str, Any]]:
                             "normalized_property": normalize_registry_key(suffix),
                             "args": _arg_names(lines[line_index]),
                             "access": access_row,
-                            "read": metadata["read"],
-                            "write": metadata["write"],
+                            "read": metadata["read"] or prose_read,
+                            "write": metadata["write"] or prose_write or action,
                             "increment_decrement": increment_decrement,
                             "deprecated": deprecated,
                             "kind": "action" if action and not writable else "property",

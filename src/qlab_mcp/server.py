@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Annotated, Any, Literal, TypeVar
+from uuid import UUID
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
@@ -13,10 +14,13 @@ from pydantic import Field
 from .errors import QLabMcpError
 from .models import (
     CreateCueResult,
+    DeleteCuesResult,
     CueDetailsBatchResult,
     CueDetailsResult,
     CueUpdateInput,
     CueQueryResult,
+    MoveCueInput,
+    MoveCuesResult,
     QlabConnectionCheckResult,
     WorkspaceStatusResult,
     WorkspaceSettingRequestInput,
@@ -163,6 +167,12 @@ GATED_CREATE_QLAB_TOOL = ToolAnnotations(
     idempotentHint=False,
     openWorldHint=True,
 )
+GATED_DELETE_QLAB_TOOL = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=True,
+    idempotentHint=False,
+    openWorldHint=True,
+)
 CHECK_CONNECTION_TIMEOUT = 6.0
 WORKSPACE_OVERVIEW_TIMEOUT = 45.0
 WORKSPACE_STATUS_TIMEOUT = 60.0
@@ -173,6 +183,7 @@ CUE_DETAILS_TIMEOUT = 20.0
 WRITE_READINESS_TIMEOUT = 6.0
 CREATE_CUE_TIMEOUT = 30.0
 UPDATE_CUES_TIMEOUT = 180.0
+DELETE_CUES_TIMEOUT = 180.0
 
 T = TypeVar("T")
 
@@ -186,7 +197,7 @@ Use these tools to read QLab 5 workspace and cue information over OSC.
 The seven inspector tools are read-only and intentionally avoid playback, editing, deletion, and raw OSC.
 Write mode is a separate gated preface: it is disabled unless QLAB_ENABLE_WRITE=true and defaults to dry-run.
 When write mode is ready, all update profiles may exist; safe properties can execute as real writes, while dangerous or high-risk properties require explicit per-item confirm_gates.
-Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect, and currently only supports basic cue creation plus gated batch cue updates.
+Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect. It supports gated cue creation, cue editing, structural cue moves, and leaf-only cue deletion.
 
 Start with qlab_check_connection to verify QLab, workspace candidates, passcode, and read access.
 
@@ -200,7 +211,7 @@ Use qlab_get_workspace_settings(mode="details", requests=[...]) after settings w
 
 Use qlab_query_cues for filtered cue searches across up to 500 cues by default, or up to 5000 cues when a caller explicitly raises the scan limit, then qlab_get_cue_details for one cue that needs deeper inspection.
 
-For write preflight, call qlab_check_write_readiness with an explicit workspace_id. Only call qlab_create_cue or qlab_update_cues after reviewing dry_run output. This server does not expose GO, stop, panic, raw OSC, or playback control.
+For write preflight, call qlab_check_write_readiness with an explicit workspace_id and always review a dry-run first. qlab_create_cue accepts no confirm_token; real creation still requires write readiness, an explicit workspace_id, a configured passcode, edit permission, and Edit Mode. qlab_edit_cues may return confirmation tokens for individual planned high-risk operations; copy the exact relevant planned_operations[].confirm_token values into that update item's confirm_gates, not one tool-level token. qlab_move_cues returns a dedicated tool-level confirm_token bound to the reviewed workspace structure and planned move batch, and real execution must receive that exact token. qlab_delete_cues returns a dedicated tool-level confirm_token bound to the reviewed deletion plan and fresh workspace structure, and real execution must receive that exact token. Move and Delete tokens are process-bound, so restarting the MCP invalidates tokens issued by the previous process. This server does not expose GO, stop, panic, raw OSC, or playback control.
 """,
 )
 
@@ -209,11 +220,27 @@ def _reader() -> QLabReader:
     return QLabReader()
 
 
-def _run_tool(factory: Callable[[], T]) -> T:
+def _run_tool(
+    factory: Callable[[QLabReader], T],
+    timeout: float | None = None,
+    *,
+    translate_errors: bool = True,
+) -> T:
+    reader = _reader()
     try:
-        return factory()
+        if timeout is not None:
+            set_read_deadline = getattr(reader, "set_read_deadline", None)
+            if callable(set_read_deadline):
+                set_read_deadline(timeout)
+        return factory(reader)
     except (QLabMcpError, ValueError) as exc:
+        if not translate_errors:
+            raise
         raise ToolError(_safe_tool_error_message(exc)) from exc
+    finally:
+        close = getattr(reader, "close", None)
+        if callable(close):
+            close()
 
 
 def _workspace_overview_error(workspace_id: Any, **error: Any) -> WorkspaceOverviewResult:
@@ -366,9 +393,10 @@ def qlab_check_connection(
     Use this before the overview; it reports /connect permission scopes, /showMode state, and safe read access.
     """
     return _run_tool(
-        lambda: QlabConnectionCheckResult.model_validate(
-            _reader().check_connection(workspace_id=workspace_id, require_read_access=require_read_access)
-        )
+        lambda reader: QlabConnectionCheckResult.model_validate(
+            reader.check_connection(workspace_id=workspace_id, require_read_access=require_read_access)
+        ),
+        timeout=CHECK_CONNECTION_TIMEOUT,
     )
 
 
@@ -458,19 +486,23 @@ def qlab_get_workspace_overview(
     Use this as the first structural read after selecting a workspace; it includes Edit/Show mode and is bounded and shallow by default.
     """
     try:
-        return WorkspaceOverviewResult.model_validate(
-            _overview_success_payload(_reader().get_workspace_overview(
-                workspace_id=workspace_id,
-                max_depth=max_depth,
-                max_cues=max_cues,
-                include_live_state=include_live_state,
-                include_cue_index=include_cue_index,
-                max_index_cues=max_index_cues,
-                cue_index_profile=cue_index_profile,
-                include_global_count=include_global_count,
-            ))
+        return _run_tool(
+            lambda reader: WorkspaceOverviewResult.model_validate(
+                _overview_success_payload(reader.get_workspace_overview(
+                    workspace_id=workspace_id,
+                    max_depth=max_depth,
+                    max_cues=max_cues,
+                    include_live_state=include_live_state,
+                    include_cue_index=include_cue_index,
+                    max_index_cues=max_index_cues,
+                    cue_index_profile=cue_index_profile,
+                    include_global_count=include_global_count,
+                ))
+            ),
+            timeout=WORKSPACE_OVERVIEW_TIMEOUT,
+            translate_errors=False,
         )
-    except (QLabMcpError, ValueError, TypeError) as exc:
+    except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
         return _workspace_overview_error(
             workspace_id,
             error_code="validation_failed",
@@ -526,16 +558,20 @@ def qlab_get_workspace_status(
     endpoints are returned with source='not_exposed' instead of invented values.
     """
     try:
-        return WorkspaceStatusResult.model_validate(
-            _reader().get_workspace_status(
-                workspace_id=workspace_id,
-                profile=profile,
-                include_timecode=include_timecode,
-                max_cues_scanned=max_cues_scanned,
-                sample_limit=sample_limit,
-            )
+        return _run_tool(
+            lambda reader: WorkspaceStatusResult.model_validate(
+                reader.get_workspace_status(
+                    workspace_id=workspace_id,
+                    profile=profile,
+                    include_timecode=include_timecode,
+                    max_cues_scanned=max_cues_scanned,
+                    sample_limit=sample_limit,
+                )
+            ),
+            timeout=WORKSPACE_STATUS_TIMEOUT,
+            translate_errors=False,
         )
-    except (QLabMcpError, ValueError, TypeError) as exc:
+    except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
         return _workspace_status_error(
             workspace_id,
             profile,
@@ -601,18 +637,22 @@ def qlab_get_workspace_settings(
     per-request results; one failed request does not block other valid requests.
     """
     try:
-        return WorkspaceSettingsResult.model_validate(
-            _settings_success_payload(_reader().get_workspace_settings(
-                workspace_id=workspace_id,
-                mode=mode,
-                sections=sections,
-                requests=[request.model_dump() if hasattr(request, "model_dump") else request for request in requests]
-                if requests is not None
-                else None,
-                profile=profile,
-            ))
+        return _run_tool(
+            lambda reader: WorkspaceSettingsResult.model_validate(
+                _settings_success_payload(reader.get_workspace_settings(
+                    workspace_id=workspace_id,
+                    mode=mode,
+                    sections=sections,
+                    requests=[request.model_dump() if hasattr(request, "model_dump") else request for request in requests]
+                    if requests is not None
+                    else None,
+                    profile=profile,
+                ))
+            ),
+            timeout=WORKSPACE_SETTINGS_TIMEOUT,
+            translate_errors=False,
         )
-    except (QLabMcpError, ValueError, TypeError) as exc:
+    except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
         return _settings_error(
             workspace_id,
             mode,
@@ -673,16 +713,20 @@ def qlab_get_workspace_setting_details(
     summaries, and audio maps omit long level arrays. Use technical or exhaustive only for explicit low-level audits.
     """
     try:
-        return WorkspaceSettingDetailsResult.model_validate(
-            _settings_success_payload(_reader().get_workspace_setting_details(
-                workspace_id=workspace_id,
-                section=section,
-                kind=kind,
-                ref=ref,
-                profile=profile,
-            ))
+        return _run_tool(
+            lambda reader: WorkspaceSettingDetailsResult.model_validate(
+                _settings_success_payload(reader.get_workspace_setting_details(
+                    workspace_id=workspace_id,
+                    section=section,
+                    kind=kind,
+                    ref=ref,
+                    profile=profile,
+                ))
+            ),
+            timeout=WORKSPACE_SETTING_DETAILS_TIMEOUT,
+            translate_errors=False,
         )
-    except (QLabMcpError, ValueError, TypeError) as exc:
+    except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
         return _setting_details_error(
             workspace_id,
             section,
@@ -764,18 +808,22 @@ def qlab_query_cues(
     raise either limit up to 5000 for large shows; truncation metadata reports incomplete scans or result caps.
     """
     try:
-        return CueQueryResult.model_validate(
-            _query_success_payload(_reader().query_cues(
-                workspace_id=workspace_id,
-                primary_filter=primary_filter,
-                primary_value=primary_value,
-                optional_filters=optional_filters,
-                profile=profile,
-                max_results=max_results,
-                max_cues_scanned=max_cues_scanned,
-            ))
+        return _run_tool(
+            lambda reader: CueQueryResult.model_validate(
+                _query_success_payload(reader.query_cues(
+                    workspace_id=workspace_id,
+                    primary_filter=primary_filter,
+                    primary_value=primary_value,
+                    optional_filters=optional_filters,
+                    profile=profile,
+                    max_results=max_results,
+                    max_cues_scanned=max_cues_scanned,
+                ))
+            ),
+            timeout=QUERY_CUES_TIMEOUT,
+            translate_errors=False,
         )
-    except (QLabMcpError, ValueError, TypeError) as exc:
+    except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
         return _query_error(
             workspace_id,
             primary_filter,
@@ -820,12 +868,16 @@ def qlab_get_cue_details(
     or load testing because it can expose large/sensitive payloads.
     """
     try:
-        return (
-            CueDetailsBatchResult.model_validate(_cue_details_success_payload(_reader().get_cue_details(workspace_id, cue_ref, profile)))
-            if isinstance(cue_ref, list)
-            else CueDetailsResult.model_validate(_cue_details_success_payload(_reader().get_cue_details(workspace_id, cue_ref, profile)))
+        return _run_tool(
+            lambda reader: (
+                CueDetailsBatchResult.model_validate(_cue_details_success_payload(reader.get_cue_details(workspace_id, cue_ref, profile)))
+                if isinstance(cue_ref, list)
+                else CueDetailsResult.model_validate(_cue_details_success_payload(reader.get_cue_details(workspace_id, cue_ref, profile)))
+            ),
+            timeout=CUE_DETAILS_TIMEOUT,
+            translate_errors=False,
         )
-    except (QLabMcpError, ValueError, TypeError) as exc:
+    except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
         return _cue_details_error(
             workspace_id,
             cue_ref,
@@ -852,9 +904,10 @@ def qlab_check_write_readiness(
     planned write capabilities, edit permission confirmed by QLab /connect scopes, and Edit Mode from /showMode.
     """
     return _run_tool(
-        lambda: WriteReadinessResult.model_validate(
-            _reader().check_write_readiness(workspace_id)
-        )
+        lambda reader: WriteReadinessResult.model_validate(
+            reader.check_write_readiness(workspace_id)
+        ),
+        timeout=WRITE_READINESS_TIMEOUT,
     )
 
 
@@ -909,8 +962,8 @@ def qlab_create_cue(
     This tool never exposes playback control, raw OSC, target edits, scripts, routing, or media paths.
     """
     return _run_tool(
-        lambda: CreateCueResult.model_validate(
-            _reader().create_cue(
+        lambda reader: CreateCueResult.model_validate(
+            reader.create_cue(
                 workspace_id=workspace_id,
                 cue_type=cue_type,
                 properties=properties,
@@ -960,8 +1013,8 @@ def qlab_edit_cues(
     Batch real writes run all preflight checks before sending any setter and use cue unique IDs for setters.
     """
     return _run_tool(
-        lambda: UpdateCuesResult.model_validate(
-            _reader().edit_cues(
+        lambda reader: UpdateCuesResult.model_validate(
+            reader.edit_cues(
                 workspace_id=workspace_id,
                 updates=[update.model_dump() if hasattr(update, "model_dump") else update for update in updates],
                 dry_run=dry_run,
@@ -1005,6 +1058,107 @@ def qlab_update_cues(
     Dry-run planning never sends mutating OSC. Prefer qlab_edit_cues for new work.
     """
     return qlab_edit_cues(workspace_id=workspace_id, updates=updates, dry_run=dry_run)
+
+
+@mcp.tool(
+    title="Move QLab Cues",
+    tags={"qlab", "write-mode", "cue-move", "gated-write"},
+    annotations=GATED_CREATE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_move_cues(
+    workspace_id: WorkspaceId,
+    moves: Annotated[
+        list[MoveCueInput],
+        Field(
+            min_length=1,
+            max_length=10,
+            description=(
+                "One to ten explicit UUID cue moves. List and Group placements use exactly one linear "
+                "placement field; Cue Cart placements use cart_row and cart_column only."
+            ),
+        ),
+    ],
+    dry_run: Annotated[
+        bool | None,
+        Field(
+            description=(
+                "When true, plan the sequential move batch but send no mutating commands. "
+                "When omitted, QLAB_WRITE_DRY_RUN_DEFAULT is used and defaults to true."
+            ),
+        ),
+    ] = None,
+    confirm_token: Annotated[
+        str | None,
+        Field(description="Exact confirm:moveCues:v1: token returned by a reviewed dry-run plan."),
+    ] = None,
+) -> MoveCuesResult:
+    """Plan or execute one to ten sequential QLab cue moves.
+
+    Real moves require write readiness, Edit Mode, inactive healthy cues, a fresh dedicated confirmation
+    token, stable structural dependencies, and independent readback. This tool never claims atomicity.
+    """
+    return _run_tool(
+        lambda reader: MoveCuesResult.model_validate(
+            reader.move_cues(
+                workspace_id=workspace_id,
+                moves=[move.model_dump(mode="json", exclude_none=True) for move in moves],
+                dry_run=dry_run,
+                confirm_token=confirm_token,
+            )
+        )
+    )
+
+
+@mcp.tool(
+    title="Delete QLab Cues",
+    tags={"qlab", "write-mode", "cue-delete", "gated-write"},
+    annotations=GATED_DELETE_QLAB_TOOL,
+    timeout=DELETE_CUES_TIMEOUT,
+)
+def qlab_delete_cues(
+    workspace_id: WorkspaceId,
+    cue_ids: Annotated[
+        list[UUID],
+        Field(
+            min_length=1,
+            max_length=10,
+            description=(
+                "One to ten exact leaf cue UUIDs. Groups, Cue Lists, Cue Carts, cues with children, "
+                "and parent/descendant batches are blocked; deletion is not cascading."
+            ),
+        ),
+    ],
+    dry_run: Annotated[
+        bool | None,
+        Field(
+            description=(
+                "When true, plan the sequential leaf-cue deletion but send no mutating commands. "
+                "When omitted, QLAB_WRITE_DRY_RUN_DEFAULT is used and defaults to true."
+            ),
+        ),
+    ] = None,
+    confirm_token: Annotated[
+        str | None,
+        Field(description="Exact confirm:deleteCues:v1: token returned by a reviewed dry-run plan."),
+    ] = None,
+) -> DeleteCuesResult:
+    """Plan or execute one to ten sequential deletions of explicit leaf cues.
+
+    Real deletion requires write readiness, Edit Mode, zero activity, a fresh dedicated confirmation
+    token, leaf-only targets, and independent existence readback after every delete. Groups, Cue Lists,
+    Cue Carts, cascades, and ambiguous targets remain blocked. Deletion is sequential and not atomic.
+    """
+    return _run_tool(
+        lambda reader: DeleteCuesResult.model_validate(
+            reader.delete_cues(
+                workspace_id=workspace_id,
+                cue_ids=[str(cue_id) for cue_id in cue_ids],
+                dry_run=dry_run,
+                confirm_token=confirm_token,
+            )
+        )
+    )
 
 
 def main() -> None:

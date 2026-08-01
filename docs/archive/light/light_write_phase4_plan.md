@@ -102,7 +102,7 @@ No contiene texto LCL en claro. Reiniciar MCP cambia secreto e invalida tokens a
 
 ## 7. Protocolo runtime Phase 4B — no ejecutado
 
-Usar exclusivamente `mcp_prueba.qlab5`, tras identificar su UUID explícito. Elegir un Light Cue desarmado y aislado. No usar cues de show, Dashboard ni playback.
+Usar exclusivamente `<TEST_WORKSPACE_NAME>`, tras identificar su UUID explícito. Elegir un Light Cue desarmado y aislado. No usar cues de show, Dashboard ni playback.
 
 1. Confirmar conexión, workspace UUID, Edit Mode y scope `edit`.
 2. Leer cue y guardar `uniqueID`, tipo y `lightCommandText` original.
@@ -118,7 +118,7 @@ Usar exclusivamente `mcp_prueba.qlab5`, tras identificar su UUID explícito. Ele
 Prompt exacto para Phase 4B:
 
 ```text
-Usa solo tools MCP read-only salvo las dos llamadas qlab_update_cues expresamente descritas. Trabaja únicamente en mcp_prueba.qlab5 usando su workspace_id UUID explícito. No uses GO, playback, start, stop, panic, audition, preview, Dashboard ni raw OSC. Identifica un Light Cue desarmado y aislado; lee y conserva su lightCommandText original. Lee Light Patch safe y aborta si está vacío/parcial o no ofrece un target simple válido. Ejecuta dry_run=true para cambiar solo lightCommandText a un comando mínimo válido no vacío. Revisa overall_status=valid, phase4_real_write_candidate=true, diff, baseline y confirm_token. Si todo coincide, ejecuta exactamente una llamada real qlab_update_cues con un item, profile=light_basic, solo lightCommandText y ese token. Verifica un único setter y readback exacto. Después crea un nuevo dry-run desde el valor actual hacia el texto original, obtiene token nuevo y ejecuta un único rollback. Verifica readback original exacto. Ante cualquier error, stale baseline, análisis no válido o mismatch, no hagas más writes y reporta. No cambies ningún otro cue, patch, instrumento, grupo, definición ni dirección DMX.
+Usa solo tools MCP read-only salvo las dos llamadas qlab_update_cues expresamente descritas. Trabaja únicamente en <TEST_WORKSPACE_NAME> usando su workspace_id UUID explícito. No uses GO, playback, start, stop, panic, audition, preview, Dashboard ni raw OSC. Identifica un Light Cue desarmado y aislado; lee y conserva su lightCommandText original. Lee Light Patch safe y aborta si está vacío/parcial o no ofrece un target simple válido. Ejecuta dry_run=true para cambiar solo lightCommandText a un comando mínimo válido no vacío. Revisa overall_status=valid, phase4_real_write_candidate=true, diff, baseline y confirm_token. Si todo coincide, ejecuta exactamente una llamada real qlab_update_cues con un item, profile=light_basic, solo lightCommandText y ese token. Verifica un único setter y readback exacto. Después crea un nuevo dry-run desde el valor actual hacia el texto original, obtiene token nuevo y ejecuta un único rollback. Verifica readback original exacto. Ante cualquier error, stale baseline, análisis no válido o mismatch, no hagas más writes y reporta. No cambies ningún otro cue, patch, instrumento, grupo, definición ni dirección DMX.
 ```
 
 Phase 4B no forma parte de esta entrega y no se ha ejecutado.

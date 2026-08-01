@@ -174,9 +174,9 @@ Workspaces detectados:
 
 | Workspace | UUID | QLab | Cue lists leíbles |
 | --- | --- | --- | ---: |
-| `Memoria de la nisal - Filarmónica.qlab5` | `2BE85FBF-91A8-49AE-9617-C58B3332BF92` | 5.5.10 | 5 |
-| `mcp_prueba.qlab5` | `95F0A03D-140E-4673-974A-E76748EBB023` | 5.5.10 | 1 |
-| `MATADERO - FILAR.qlab5` | `A192C068-0974-4624-90BD-56D68BF0286B` | 5.5.10 | 7 |
+| `<TEST_WORKSPACE_NAME>` | `<TEST_WORKSPACE_UUID>` | 5.5.10 | 5 |
+| `<TEST_WORKSPACE_NAME>` | `<TEST_WORKSPACE_UUID>` | 5.5.10 | 1 |
+| `<TEST_WORKSPACE_NAME>` | `<TEST_WORKSPACE_UUID>` | 5.5.10 | 7 |
 
 Las tres comprobaciones explícitas devolvieron `ok=true`, `status="ready"`, `workspace_readable=true` y `qlab_version="5.5.10"`.
 
@@ -223,13 +223,13 @@ Resultados exactos relevantes:
 
 | Workspace | `patch_present` | Instrumentos | Grupos | Transporte | Sin patch | Conflictos |
 | --- | ---: | ---: | ---: | --- | ---: | ---: |
-| Memoria | true | 59 | 6 | `tcp_fallback` | 2 | 0 |
-| mcp_prueba | true | 0 | 0 | `udp` | 0 | 0 |
-| MATADERO | true | 60 | 13 | `tcp_fallback` | 12 | 0 |
+| `<TEST_WORKSPACE_NAME>` | true | 59 | 6 | `tcp_fallback` | 2 | 0 |
+| `<TEST_WORKSPACE_NAME>` | true | 0 | 0 | `udp` | 0 | 0 |
+| `<TEST_WORKSPACE_NAME>` | true | 60 | 13 | `tcp_fallback` | 12 | 0 |
 
 `patch_present=true` con cero elementos representa un patch devuelto correctamente pero vacío; no significa que haya instrumentos.
 
-Memoria devolvió:
+El primer workspace de prueba devolvió:
 
 ```json
 {
@@ -246,7 +246,7 @@ Memoria devolvió:
 
 Los instrumentos sin patch observados fueron `32 Cuna` y `104 FRONTAL`. Los RGBWA+UV publicaron siete nombres de parámetro: `color`, `red`, `green`, `blue`, `white`, `amber`, `uv`.
 
-MATADERO devolvió `{"definition_counts":{"Generic Dimmer":60}}`. Instrumentos sin patch: `07 PC refuerzo 1`, `10 PC refuerzo 4`, `37 Contra L medio`, `38 Contra L arriba`, `40 Contra R centro`, `41 Contra R arriba`, `46 Sala 2`, `46 Sala 3`, `46 Sala 4`, `48 Cabina`, `49 Cabina` y `50 Puntual butaca`.
+El tercer workspace de prueba devolvió `{"definition_counts":{"Generic Dimmer":60}}`. Instrumentos sin patch: `07 PC refuerzo 1`, `10 PC refuerzo 4`, `37 Contra L medio`, `38 Contra L arriba`, `40 Contra R centro`, `41 Contra R arriba`, `46 Sala 2`, `46 Sala 3`, `46 Sala 4`, `48 Cabina`, `49 Cabina` y `50 Puntual butaca`.
 
 Los arrays completos de 59 y 60 instrumentos y las listas completas de miembros de grupo no se reproducen aquí. Las cifras, nombres excepcionales y claves anteriores proceden directamente de la respuesta; esta omisión evita convertir el documento en un dump runtime.
 
@@ -267,17 +267,17 @@ Argumentos usados:
 
 | Workspace | Escaneadas | Light Cues | Devueltas | `query_completeness` | `truncated` | Motivo |
 | --- | ---: | ---: | ---: | --- | --- | --- |
-| Memoria | 316 | 90 | 10 | `complete` | true | `max_results` |
-| mcp_prueba | 30 | 1 | 1 | `complete` | false | — |
-| MATADERO | 1424 | 933 | 10 | `complete` | true | `max_results` |
+| `<TEST_WORKSPACE_NAME>` | 316 | 90 | 10 | `complete` | true | `max_results` |
+| `<TEST_WORKSPACE_NAME>` | 30 | 1 | 1 | `complete` | false | — |
+| `<TEST_WORKSPACE_NAME>` | 1424 | 933 | 10 | `complete` | true | `max_results` |
 
-`status="partial"` en Memoria y MATADERO indica límite de resultados, no escaneo incompleto: ambos devolvieron `scanned_all_cues=true` e `id_only_unscanned_count=0`.
+`status="partial"` en los workspaces primero y tercero indica límite de resultados, no escaneo incompleto: ambos devolvieron `scanned_all_cues=true` e `id_only_unscanned_count=0`.
 
 ### 4.5 Detalle de cues representativas
 
 Perfil usado: `inspector_safe`.
 
-Memoria, cue `300D567B-0754-41AC-BF5C-BCFC9C4CB724`:
+Primer workspace, cue `<TEST_CUE_UUID>`:
 
 ```json
 {
@@ -301,7 +301,7 @@ Memoria, cue `300D567B-0754-41AC-BF5C-BCFC9C4CB724`:
 }
 ```
 
-`mcp_prueba`, cue `A1B43231-CA7A-466A-A7E6-C1974D875D2A`:
+Segundo workspace, cue `<TEST_CUE_UUID>`:
 
 ```json
 {
@@ -321,7 +321,7 @@ Memoria, cue `300D567B-0754-41AC-BF5C-BCFC9C4CB724`:
 }
 ```
 
-MATADERO, cue `12679577-CB0F-40D0-A2E6-696DF8FDDFAB`:
+Tercer workspace, cue `<TEST_CUE_UUID>`:
 
 ```json
 {
@@ -581,7 +581,7 @@ El analizador no reordena, poda ni reemplaza comandos. Tampoco simula comandos d
 - Repetir contra los tres UUID del snapshot.
 - Confirmar 59/0/60 instrumentos y 6/0/13 grupos mientras los workspaces permanezcan sin cambios.
 - Repetir query completa de Light Cues y registrar `matched_count`, `scanned_all_cues` y truncación.
-- Leer varias cues por workspace, incluyendo cue rota de `mcp_prueba` y cues con comandos de grupo/parámetro.
+- Leer varias cues por workspace, incluyendo una cue rota del workspace de prueba y cues con comandos de grupo/parámetro.
 - Comparar analyzer contra identidad, grupos y parámetros del patch, sin ejecutar cues.
 - Registrar cualquier diferencia como cambio de workspace o incompatibilidad de modelo; nunca “corregir” QLab automáticamente.
 

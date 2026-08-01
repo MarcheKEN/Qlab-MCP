@@ -2,9 +2,9 @@
 
 Date: 2026-06-17
 
-Workspace under test: `mcp_prueba.qlab5`
+Workspace under test: `<TEST_WORKSPACE_NAME>`
 
-Workspace ID: `95F0A03D-140E-4673-974A-E76748EBB023`
+Workspace ID: `<TEST_WORKSPACE_UUID>`
 
 QLab version: 5.5.10
 
@@ -82,7 +82,7 @@ broken, 0 warnings, 2 flagged, 1 disarmed, 0 running, and 0 paused.
 ## Baseline
 
 `qlab_check_connection` without a workspace ID was ambiguous because two QLab
-workspaces were open. All probe calls used the explicit `mcp_prueba.qlab5`
+workspaces were open. All probe calls used the explicit `<TEST_WORKSPACE_NAME>`
 workspace ID above.
 
 | Metric | Initial | Final |
@@ -129,26 +129,26 @@ batch reported `updated_count=0` and `executed_operations=[]`.
 
 | Type | Cue ref / number | Name / display | uniqueID | State | Targets | Testability |
 | --- | --- | --- | --- | --- | --- | --- |
-| Cue List | empty number | `Main Cue List` | `CC4DF6DC-175E-4346-92A1-43CCB6062390` | broken=true | no file/cue target | Readable as list root; broken state inherited/reported by QLab. |
-| Audio | `2` | `AUDIO_VALID` | `9AFA9C07-2434-4C3A-ABD9-ED1EC6428509` | ok | file target present | Fully readable for fixture purposes; sensitive profiles expose local media path. |
-| Mic | `1.5` | `(Untitled Mic Cue)` | `1B704EC9-7F54-4A44-AFBE-9D2B4B7D1DC2` | ok | no file/cue target | Readable; hardware input behavior not exercised. |
-| Camera | `1.6` | `(Untitled Camera Cue)` | `3F05AE34-21EE-46CF-9668-5536CD6DCAC4` | ok | no file/cue target | Readable; camera hardware behavior not exercised. |
-| Text | `1.7` | `Text` | `084D2D69-FC8C-4F40-9EFB-AD572E11E672` | ok | no file/cue target | Readable; text and stage fields exposed in type-specific profiles. |
-| MIDI File | `1.8` | `(Untitled MIDI File Cue)` | `A2B5F72B-1407-4682-9C10-8D5B25E21565` | broken=true | file target present | Not fully testable; broken media/hardware-dependent cue. |
-| MIDI | `1.9` | `MIDI note on` | `66357970-7FDB-4867-A960-D2E3FA79903B` | broken=true | no file/cue target | Not fully testable; no MIDI patch/hardware validation. |
-| Timecode | `1.95` | `1:00:00:00` | `C21CDCC0-CC71-44CC-A003-241840277837` | broken=true | no file/cue target | Not fully testable; timing fields readable, timecode output not exercised. |
-| Devamp | `1.96` | `devamp AUDIO_VALID` | `755C11D0-5605-4B8C-B9C1-F4E21F13A138` | ok | targets Audio `2` | Readable target relationship. |
-| Target | `1.97` | `(Untitled Target Cue)` | `1F1F5E68-8854-4913-885D-6D2DB9E4ED61` | broken=true | `hasCueTargets=true`, empty target ID/number | Not fully testable; cue reports missing/broken target. |
-| Video | `4` | `VIDEO_VALID` | `01538A14-D86A-4F74-8467-ED7F24D2299B` | ok | file target present | Fully readable for fixture purposes; sensitive profiles expose local media path. |
-| Group | `5` | `GROUP_NESTED_LEVEL_1` | `619A9B19-7769-4F4E-A107-A8001B34863D` | ok | no file/cue target | Readable group/list fields. |
-| Fade | `10` | `FADE_VALID_TARGET` | `97043637-DF4B-44E3-BB36-D29366268926` | flagged=true | targets Audio `2` | Readable; high-risk target/fade edits dry-run only. |
-| Light | `12` | `LIGHT_DISARMED_BROKEN` | `A1B43231-CA7A-466A-A7E6-C1974D875D2A` | broken=true, armed=false | no file/cue target | Not fully testable; light output/hardware not exercised. |
-| Network | `13` | `NETWORK_VALID` | `BA42C1B4-5DDE-44EC-9C49-3A3B295D697D` | ok | network patch present | Not fully testable; external network output not sent. |
-| Memo | `14` | `MEMO_LONG_TEXT` | `7E9D9152-A0E6-41AD-8D48-131521028B24` | ok | no file/cue target | Readable; long text may be truncated by compact profiles. |
-| Script | `15` | `SCRIPT_SAFE_HIDDEN` | `EE71F73E-804C-4D89-9302-6D98E7140D64` | ok | no file/cue target | Readable; script source exposed only by sensitive/deep profiles and not executed. |
-| Pause | emoji number | `UNICODE_EMOJI_...` | `8E1451DF-8648-4E46-AFFF-4BA95501291F` | ok | targets Memo `14` | Readable target relationship and Unicode number/name behavior. |
-| Reset | `NBSP_A B_TEST` | `NBSP_A B` | `E2F7CFB6-C52D-4DFF-9A89-7CEEF9221FE6` | ok | targets Pause cue | Readable target relationship and spacing edge case. |
-| Start | `tuu` | `LONG_NOTES` | `562834C6-25FD-4B43-B73D-5DAB2C177349` | ok | targets Reset cue | Readable target relationship; long notes require sensitive/deep profile. |
+| Cue List | empty number | `Main Cue List` | `<TEST_CUE_UUID>` | broken=true | no file/cue target | Readable as list root; broken state inherited/reported by QLab. |
+| Audio | `2` | `AUDIO_VALID` | `<TEST_CUE_UUID>` | ok | file target present | Fully readable for fixture purposes; sensitive profiles expose local media path. |
+| Mic | `1.5` | `(Untitled Mic Cue)` | `<TEST_CUE_UUID>` | ok | no file/cue target | Readable; hardware input behavior not exercised. |
+| Camera | `1.6` | `(Untitled Camera Cue)` | `<TEST_CUE_UUID>` | ok | no file/cue target | Readable; camera hardware behavior not exercised. |
+| Text | `1.7` | `Text` | `<TEST_CUE_UUID>` | ok | no file/cue target | Readable; text and stage fields exposed in type-specific profiles. |
+| MIDI File | `1.8` | `(Untitled MIDI File Cue)` | `<TEST_CUE_UUID>` | broken=true | file target present | Not fully testable; broken media/hardware-dependent cue. |
+| MIDI | `1.9` | `MIDI note on` | `<TEST_CUE_UUID>` | broken=true | no file/cue target | Not fully testable; no MIDI patch/hardware validation. |
+| Timecode | `1.95` | `1:00:00:00` | `<TEST_CUE_UUID>` | broken=true | no file/cue target | Not fully testable; timing fields readable, timecode output not exercised. |
+| Devamp | `1.96` | `devamp AUDIO_VALID` | `<TEST_CUE_UUID>` | ok | targets Audio `2` | Readable target relationship. |
+| Target | `1.97` | `(Untitled Target Cue)` | `<TEST_CUE_UUID>` | broken=true | `hasCueTargets=true`, empty target ID/number | Not fully testable; cue reports missing/broken target. |
+| Video | `4` | `VIDEO_VALID` | `<TEST_CUE_UUID>` | ok | file target present | Fully readable for fixture purposes; sensitive profiles expose local media path. |
+| Group | `5` | `GROUP_NESTED_LEVEL_1` | `<TEST_CUE_UUID>` | ok | no file/cue target | Readable group/list fields. |
+| Fade | `10` | `FADE_VALID_TARGET` | `<TEST_CUE_UUID>` | flagged=true | targets Audio `2` | Readable; high-risk target/fade edits dry-run only. |
+| Light | `12` | `LIGHT_DISARMED_BROKEN` | `<TEST_CUE_UUID>` | broken=true, armed=false | no file/cue target | Not fully testable; light output/hardware not exercised. |
+| Network | `13` | `NETWORK_VALID` | `<TEST_CUE_UUID>` | ok | network patch present | Not fully testable; external network output not sent. |
+| Memo | `14` | `MEMO_LONG_TEXT` | `<TEST_CUE_UUID>` | ok | no file/cue target | Readable; long text may be truncated by compact profiles. |
+| Script | `15` | `SCRIPT_SAFE_HIDDEN` | `<TEST_CUE_UUID>` | ok | no file/cue target | Readable; script source exposed only by sensitive/deep profiles and not executed. |
+| Pause | emoji number | `UNICODE_EMOJI_...` | `<TEST_CUE_UUID>` | ok | targets Memo `14` | Readable target relationship and Unicode number/name behavior. |
+| Reset | `NBSP_A B_TEST` | `NBSP_A B` | `<TEST_CUE_UUID>` | ok | targets Pause cue | Readable target relationship and spacing edge case. |
+| Start | `tuu` | `LONG_NOTES` | `<TEST_CUE_UUID>` | ok | targets Reset cue | Readable target relationship; long notes require sensitive/deep profile. |
 
 Type-specific fields observed in `auto`, `inspector_safe`, `full`,
 `full_sensitive`, or `exhaustive`:
@@ -254,11 +254,11 @@ The dry-run batch used five high-risk examples and sent no mutating OSC:
 
 | Cue type | Profile | Property | planned_only_reason | capability_gate | confirm_token observed | Executed |
 | --- | --- | --- | --- | --- | --- | --- |
-| Light | `light_basic` | `lightCommandText` | `light_commands_can_affect_visual_output` | `light_output` | `confirm:lightCommandText:d3c65d2fa84dff9c` | no |
-| Network | `network_basic` | `customString` | `network_messages_can_trigger_external_systems` | `network_output` | `confirm:customString:8e1e6093ef4f29fb` | no |
-| Fade | `fade_basic` | `cueTargetID` | `fade_target_refs_need_dedicated_resolution` | `target_resolution` | `confirm:cueTargetID:8a90fb6deae4251b` | no |
-| Target | `target_basic` | `cueTargetID` | `target_refs_need_dedicated_resolution` | `target_resolution` | `confirm:cueTargetID:43756a3ce6f1eb3f` | no |
-| Script | `script_basic` | `scriptSource` | `not_editable_by_osc` | none | `confirm:scriptSource:d7186ca8c5f4583f` | no |
+| Light | `light_basic` | `lightCommandText` | `light_commands_can_affect_visual_output` | `light_output` | `<REDACTED_CONFIRM_TOKEN>` | no |
+| Network | `network_basic` | `customString` | `network_messages_can_trigger_external_systems` | `network_output` | `<REDACTED_CONFIRM_TOKEN>` | no |
+| Fade | `fade_basic` | `cueTargetID` | `fade_target_refs_need_dedicated_resolution` | `target_resolution` | `<REDACTED_CONFIRM_TOKEN>` | no |
+| Target | `target_basic` | `cueTargetID` | `target_refs_need_dedicated_resolution` | `target_resolution` | `<REDACTED_CONFIRM_TOKEN>` | no |
+| Script | `script_basic` | `scriptSource` | `not_editable_by_osc` | none | `<REDACTED_CONFIRM_TOKEN>` | no |
 
 Dry-run result:
 

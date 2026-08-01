@@ -11,7 +11,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.utilities.mcp_server_config.v1.mcp_server_config import MCPServerConfig
 
 import qlab_mcp.server as server_module
-from qlab_mcp.errors import QLabReplyError
+from qlab_mcp.errors import OscTimeoutError, QLabReplyError
 from qlab_mcp.server import (
     CHECK_CONNECTION_TIMEOUT,
     CREATE_CUE_TIMEOUT,
@@ -32,26 +32,27 @@ from qlab_mcp.server import (
     qlab_get_cue_details,
     qlab_query_cues,
 )
+from qlab_mcp.write.registry import UPDATE_PROFILES
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_NOISE_KEYS = {"description", "title"}
+SCHEMA_NOISE_KEYS: frozenset[str] = frozenset()
 EXPECTED_FASTMCP_TOOL_CONTRACTS = {
     "qlab_check_connection": {
         "title": "Check QLab Connection",
         "timeout": CHECK_CONNECTION_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["diagnostics", "orientation", "qlab", "safe-read"],
-        "input_schema_hash": "3c1421fec20d831fb3b0220cebf8f7e280875c06d85b4862946550d6f3717f57",
-        "output_schema_hash": "f0c06b61b1bf2863b649b46d386b3b199ec81449446f1631fc8b759c8a35cc4c",
+        "input_schema_hash": "c8967eca6cd7a45b2f08cc835ff932aea3551d133cc6fd5c8388ffc177e44b83",
+        "output_schema_hash": "abf13920f210805507d32c24c3166d28c8dd6fdbfe04b50678924063d4508e56",
     },
     "qlab_check_write_readiness": {
         "title": "Check QLab Write Readiness",
         "timeout": WRITE_READINESS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["diagnostics", "qlab", "safe-read", "write-mode"],
-        "input_schema_hash": "614f112549e5fdf796242506fdc6a63b4eadab384ea7c01460262a36efbde86c",
-        "output_schema_hash": "42caaba0a23ffe174d0ffce943c35b0dae73ef36c1970eb4ee1cfd43fe83518f",
+        "input_schema_hash": "a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578",
+        "output_schema_hash": "0f27f2df78299a76f441eeb8d81064c38cda1bdf763bddb1f5ae79b67451de26",
     },
     "qlab_create_cue": {
         "title": "Create QLab Cue",
@@ -63,56 +64,56 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["cue-create", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "a41f7916a34170006cd76c2cdce8590f2a93ee86f5f88fee91f4b3b836dac61b",
-        "output_schema_hash": "80ffefed7d3cb667574e96746da8caeac0680eb5731915c0f186b84d1f73e9c3",
+        "input_schema_hash": "17535dbb35cb97e9105385195bcb5176d8f248ec9a0f6261a30b18e89554a771",
+        "output_schema_hash": "d30743735833e36fe06c57738953f52ebf8c8911d0824e43d4e0f402890042c5",
     },
     "qlab_get_cue_details": {
         "title": "Get QLab Cue Details",
         "timeout": CUE_DETAILS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["details", "diagnostics", "qlab", "safe-read"],
-        "input_schema_hash": "21bab2f935cc8a4e971975a26a1ed10d82dc315374d3a0646a5607fc6e356f35",
-        "output_schema_hash": "da79d543184f2edbba73a34704dde72e95dd60480905b788819f237692613acf",
+        "input_schema_hash": "9a8109c01c69e0241cdc3b062f128dfc64f322f7180589bfb534997f964ca704",
+        "output_schema_hash": "f5d340a970b906607ed9c3a2015c17a8da6f3eee5d70b36971c26920aa14da72",
     },
     "qlab_get_workspace_overview": {
         "title": "Get QLab Workspace Overview",
         "timeout": WORKSPACE_OVERVIEW_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["orientation", "qlab", "safe-read", "structure"],
-        "input_schema_hash": "7aa799e3dbf7884bd6d2b259568e83894d00c17212b3e882b8563132b8e134b9",
-        "output_schema_hash": "84484094570badc3b9d29073783b83e84c8e930d4ddeea4f26799b03f5ca8cc2",
+        "input_schema_hash": "02908bfb5dd7d423c04a7d1e071a711db5cf76ce5b00d0355de38585df5a0608",
+        "output_schema_hash": "dcf4a4fc455bb3ebc3e62b0ca04e3cbc75bd91fc7e19fdb978283796f3f50454",
     },
     "qlab_get_workspace_setting_details": {
         "title": "Get QLab Workspace Setting Details",
         "timeout": WORKSPACE_SETTING_DETAILS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["details", "patches", "qlab", "routing", "safe-read", "settings"],
-        "input_schema_hash": "d105b796940efc5714fd42001a733042c391a419c3207623925736fd40b79a7c",
-        "output_schema_hash": "e5c910941d0fd52c04cb8229a336b74b33fc1bb4ff96c921780e24dfed3ccba4",
+        "input_schema_hash": "9bf79634d0ff17fccb9fc8b3bfe70bbbbdaed6ccbb8f709a52ad9e1cb8170ac0",
+        "output_schema_hash": "21e6efa3493bb4c6108339758493006c3b27ef4fe6e884201372db7c77dc7d3f",
     },
     "qlab_get_workspace_settings": {
         "title": "Get QLab Workspace Settings",
         "timeout": WORKSPACE_SETTINGS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["inventory", "patches", "qlab", "routing", "safe-read", "settings"],
-        "input_schema_hash": "0d11116604c2a2cf5f3fb06ee689d5a1225e4cc58fbb9a43f241a15a83c8779d",
-        "output_schema_hash": "b22ec5ba261a2cdb7bfc5d1423069c98961e6db0284b762ea9429188821c282d",
+        "input_schema_hash": "5dfb80df0399045ef0399e5bf40541955ce01e67f94456f0a1d721d368ad5b9d",
+        "output_schema_hash": "3c4381ac3b10af3e7655c8cb65240d8909bf89f3c0c58d04513299380781b8d0",
     },
     "qlab_get_workspace_status": {
         "title": "Get QLab Workspace Status",
         "timeout": WORKSPACE_STATUS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["diagnostics", "qlab", "safe-read", "status", "timecode"],
-        "input_schema_hash": "23f7bda8ae859d4f82418863e6fa3ff2a3ff6b4ab9fb56fd2a93066ea74c221c",
-        "output_schema_hash": "9e61708ab098aec05fddf13e81b5e9751480ff0e478b7167728296407d39467c",
+        "input_schema_hash": "e2257d4dd2a0f5ad860001e3fb2e58347fbd1802d4fc0ca35dfe1c4712bffd46",
+        "output_schema_hash": "a313d8fccd6b881ef920a3782fa3381f17854dcd88ce902b5f376ef2fdfc8a8a",
     },
     "qlab_query_cues": {
         "title": "Query QLab Cues",
         "timeout": QUERY_CUES_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["details", "inventory", "qlab", "query", "safe-read"],
-        "input_schema_hash": "b2c0c530c681dc61407675be8fd3b30006dbd113edb2c5f26dbbfd2100fda8d0",
-        "output_schema_hash": "4981dabcf1bfb2e82e83bbf29f9a2aed315ddbea4b0f5634c3ed4ad14dbe6060",
+        "input_schema_hash": "5dd4fc8fe6b29bb717c596e0c32c1b50dfb720b26fe0f1c71d145668b95ec65b",
+        "output_schema_hash": "16613ad3378154e2b01bb1dabe40ba6d56ff1394ffea2ad960ae14cd775549a5",
     },
     "qlab_update_cues": {
         "title": "Update QLab Cues (compatibility alias)",
@@ -124,8 +125,8 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["batch-update", "cue-update", "deprecated-alias", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "d5202803e7b8b5bf7a07bc3693b27b3c86715258957fa8283284656cd6b280f6",
-        "output_schema_hash": "853257a5192b69f070e159611c4aa2151bc998d905a789cca4b93eaea37b7e61",
+        "input_schema_hash": "1c6a057ebffa0ddc96500efad31a48663a392d288371d7c2fdb5b9ee46647ab9",
+        "output_schema_hash": "016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d",
     },
     "qlab_edit_cues": {
         "title": "Edit QLab Cues",
@@ -137,8 +138,34 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["batch-edit", "cue-edit", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "d5202803e7b8b5bf7a07bc3693b27b3c86715258957fa8283284656cd6b280f6",
-        "output_schema_hash": "853257a5192b69f070e159611c4aa2151bc998d905a789cca4b93eaea37b7e61",
+        "input_schema_hash": "ed9ba9bbfec6d77e87994f66680f65dcf2399f17e963c226f1daaf6c8b62f7df",
+        "output_schema_hash": "016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d",
+    },
+    "qlab_move_cues": {
+        "title": "Move QLab Cues",
+        "timeout": UPDATE_CUES_TIMEOUT,
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+        "tags": ["cue-move", "gated-write", "qlab", "write-mode"],
+        "input_schema_hash": "947607daa76e34b06f01d84f95d19107735b865150c48203ab6fb0978a864c8a",
+        "output_schema_hash": "1338128f239451d8d5d14fe5847888f657b4f5864972c221b5466606fa90f33a",
+    },
+    "qlab_delete_cues": {
+        "title": "Delete QLab Cues",
+        "timeout": 180.0,
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+        "tags": ["cue-delete", "gated-write", "qlab", "write-mode"],
+        "input_schema_hash": "d4c9037076e6af74d4a90e184d5e0905e2efd23bd26455ea486f9fb690068abf",
+        "output_schema_hash": "088ad8235eba896f24a405aa7332220b29d4f81675b0a88e3cca92996f47bed3",
     },
 }
 EXPECTED_DESCRIPTION_PHRASES = {
@@ -153,6 +180,8 @@ EXPECTED_DESCRIPTION_PHRASES = {
     "qlab_create_cue": ("dry-run plan", "Dry-run planning never sends mutating OSC"),
     "qlab_edit_cues": ("Dry-run planning never sends mutating OSC", "High-risk profiles"),
     "qlab_update_cues": ("Compatibility alias", "qlab_edit_cues"),
+    "qlab_move_cues": ("sequential QLab cue moves", "never claims atomicity"),
+    "qlab_delete_cues": ("sequential deletions", "not atomic"),
 }
 
 
@@ -203,10 +232,12 @@ def test_fastmcp_json_points_to_stdio_server_without_write_env() -> None:
     raw_config = json.loads((PROJECT_ROOT / "fastmcp.json").read_text())
     parsed = MCPServerConfig.model_validate(raw_config)
 
-    assert parsed.source.path == "src/qlab_mcp/server.py"
+    assert parsed.source.path == "fastmcp_entrypoint.py"
     assert parsed.source.entrypoint == "mcp"
-    assert parsed.environment.project == Path(".")
+    assert parsed.environment.project is None
+    assert parsed.environment.dependencies == ["qlab-mcp @ ."]
     assert parsed.deployment.transport == "stdio"
+    assert (PROJECT_ROOT / parsed.source.path).read_text() == "from qlab_mcp.server import mcp\n"
 
     deployment_env = raw_config.get("deployment", {}).get("env", {})
     assert "QLAB_PASSCODE" not in deployment_env
@@ -216,6 +247,200 @@ def test_fastmcp_json_points_to_stdio_server_without_write_env() -> None:
 
 def test_fastmcp_tool_contract_snapshot_matches_current_public_surface() -> None:
     assert asyncio.run(_tool_contract_snapshot()) == EXPECTED_FASTMCP_TOOL_CONTRACTS
+
+
+def test_readme_tool_inventory_matches_current_public_surface() -> None:
+    readme = (PROJECT_ROOT / "README.md").read_text()
+    tool_groups = readme.split("## Tool Groups", 1)[1].split("## Read Model", 1)[0]
+    documented_tools = [
+        line.split("`", 2)[1]
+        for line in tool_groups.splitlines()
+        if line.startswith("| `qlab_")
+    ]
+
+    assert len(documented_tools) == len(EXPECTED_FASTMCP_TOOL_CONTRACTS)
+    assert set(documented_tools) == set(EXPECTED_FASTMCP_TOOL_CONTRACTS)
+
+
+def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None:
+    async def list_tools() -> list[Any]:
+        async with Client(mcp) as client:
+            return await client.list_tools()
+
+    tools = asyncio.run(list_tools())
+    tool_names = {tool.name for tool in tools}
+
+    assert len(tools) == 13
+    assert tool_names == set(EXPECTED_FASTMCP_TOOL_CONTRACTS)
+    forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
+    assert all(
+        token not in tool_name.casefold()
+        for tool_name in tool_names
+        for token in forbidden_surface_tokens
+    )
+
+    def schema_fields(value: Any) -> set[str]:
+        if isinstance(value, dict):
+            return set(value.get("properties", {})).union(
+                *(schema_fields(child) for child in value.values())
+            )
+        if isinstance(value, list):
+            return set().union(*(schema_fields(child) for child in value))
+        return set()
+
+    public_input_fields = set().union(
+        *(schema_fields(tool.inputSchema) for tool in tools)
+    )
+    assert public_input_fields.isdisjoint(
+        {"address", "osc_address", "osc_path", "raw_osc", "raw_osc_message"}
+    )
+
+    real_write_specs = [
+        property_spec
+        for profile in UPDATE_PROFILES.values()
+        for property_spec in profile.properties
+        if property_spec.real_write_enabled
+    ]
+    assert {
+        property_spec.name
+        for property_spec in real_write_specs
+        if "live" in property_spec.modes
+    } == {"secondColorName"}
+
+    control_properties = {
+        "playbackPosition",
+        "playbackPositionID",
+        "playbackPosition/next",
+        "playbackPosition/previous",
+        "playbackPosition/none",
+        "playbackPosition/nextSequence",
+        "playbackPosition/previousSequence",
+        "playlist/next",
+        "playlist/previous",
+        "panic",
+        "auditionGo",
+        "auditionPreview",
+        "preview",
+    }
+    assert not {
+        property_spec.name
+        for property_spec in real_write_specs
+        if property_spec.name in control_properties
+    }
+
+
+def test_move_cues_fastmcp_schema_limits_and_nested_model() -> None:
+    async def get_tool_schema() -> dict[str, Any]:
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+        return next(tool.inputSchema for tool in tools if tool.name == "qlab_move_cues")
+
+    schema = asyncio.run(get_tool_schema())
+    moves = schema["properties"]["moves"]
+
+    assert moves["minItems"] == 1
+    assert moves["maxItems"] == 10
+    assert moves["items"]["required"] == ["cue_id"]
+    assert moves["items"]["properties"]["cue_id"]["format"] == "uuid"
+
+
+def test_move_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
+    class FakeReader:
+        def move_cues(self, workspace_id, moves, dry_run, confirm_token):
+            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            assert moves == [{"cue_id": "11111111-1111-4111-8111-111111111111", "position": "last"}]
+            assert dry_run is True
+            assert confirm_token is None
+            return {
+                "ok": True,
+                "status": "planned",
+                "workspace_id": workspace_id,
+                "dry_run": True,
+                "requested_count": 1,
+                "planned_count": 1,
+                "moved_count": 0,
+                "failed_count": 0,
+                "results": [{"cue_id": moves[0]["cue_id"], "position": "last"}],
+                "confirm_token": "confirm:moveCues:v1:payload:signature",
+                "rollback": None,
+                "errors": None,
+                "warnings": ["Dry run only."],
+                "message": "Cue move batch planned.",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_move_cues",
+                {
+                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "moves": [{"cue_id": "11111111-1111-4111-8111-111111111111", "position": "last"}],
+                    "dry_run": True,
+                },
+            )
+
+    result = asyncio.run(call_tool())
+    assert result.structured_content["status"] == "planned"
+    assert result.structured_content["confirm_token"].startswith("confirm:moveCues:v1:")
+
+
+def test_delete_cues_fastmcp_schema_limits_and_nested_uuid_model() -> None:
+    async def get_tool_schema() -> dict[str, Any]:
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+        return next(tool.inputSchema for tool in tools if tool.name == "qlab_delete_cues")
+
+    schema = asyncio.run(get_tool_schema())
+    cue_ids = schema["properties"]["cue_ids"]
+
+    assert cue_ids["minItems"] == 1
+    assert cue_ids["maxItems"] == 10
+    assert cue_ids["items"]["format"] == "uuid"
+    assert "confirm_token" in schema["properties"]
+
+
+def test_delete_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
+    class FakeReader:
+        def delete_cues(self, workspace_id, cue_ids, dry_run, confirm_token):
+            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            assert cue_ids == ["11111111-1111-4111-8111-111111111111"]
+            assert dry_run is True
+            assert confirm_token is None
+            return {
+                "ok": True,
+                "status": "planned",
+                "workspace_id": workspace_id,
+                "dry_run": True,
+                "requested_count": 1,
+                "planned_count": 1,
+                "deleted_count": 0,
+                "failed_count": 0,
+                "timeout_confirmed_count": 0,
+                "results": [{"cue_id": cue_ids[0]}],
+                "confirm_token": "confirm:deleteCues:v1:payload:signature",
+                "errors": None,
+                "warnings": ["Dry run only."],
+                "message": "Cue delete batch planned.",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_delete_cues",
+                {
+                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "cue_ids": ["11111111-1111-4111-8111-111111111111"],
+                    "dry_run": True,
+                },
+            )
+
+    result = asyncio.run(call_tool())
+    assert result.structured_content["status"] == "planned"
+    assert result.structured_content["confirm_token"].startswith("confirm:deleteCues:v1:")
 
 
 def test_fastmcp_tool_descriptions_keep_agent_safety_phrases() -> None:
@@ -237,17 +462,21 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    write_tools = {"qlab_create_cue", "qlab_edit_cues", "qlab_update_cues"}
+    write_tools = {"qlab_create_cue", "qlab_edit_cues", "qlab_update_cues", "qlab_move_cues", "qlab_delete_cues"}
     read_only_tools = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) - write_tools
 
     for tool_name in read_only_tools:
         assert tools[tool_name].annotations.readOnlyHint is True, f"{tool_name} lost readOnlyHint"
-        assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
+        if tool_name != "qlab_delete_cues":
+            assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
         assert tools[tool_name].outputSchema, f"{tool_name} lost outputSchema"
 
     for tool_name in write_tools:
         assert tools[tool_name].annotations.readOnlyHint is False, f"{tool_name} was marked read-only"
-        assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
+        if tool_name == "qlab_delete_cues":
+            assert tools[tool_name].annotations.destructiveHint is True
+        else:
+            assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
         assert tools[tool_name].annotations.idempotentHint is False, f"{tool_name} was marked idempotent"
         assert tools[tool_name].outputSchema, f"{tool_name} lost outputSchema"
 
@@ -288,6 +517,78 @@ def test_update_cues_fastmcp_schema_keeps_batch_contract() -> None:
     assert "updateq_plan" in update_output["properties"]["results"]["items"]["properties"]
 
 
+def test_qlab_edit_cues_fastmcp_response_keeps_fade_basic_token(monkeypatch) -> None:
+    token = "confirm:fadeBasic:v1:test-payload:test-signature"
+
+    class FakeReader:
+        def edit_cues(self, workspace_id, updates, dry_run):
+            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            assert dry_run is True
+            assert updates == [
+                {
+                    "cue_ref": "11111111-1111-4111-8111-111111111111",
+                    "profile": "fade_basic",
+                    "properties": {"name": "Renamed Fade"},
+                    "operations": None,
+                    "confirm_gates": None,
+                }
+            ]
+            return {
+                "ok": True,
+                "status": "dry_run",
+                "workspace_id": workspace_id,
+                "dry_run": True,
+                "requested_count": 1,
+                "planned_count": 1,
+                "updated_count": 0,
+                "failed_count": 0,
+                "timeout_confirmed_count": 0,
+                "results": [
+                    {
+                        "cue_ref": updates[0]["cue_ref"],
+                        "cue_id": updates[0]["cue_ref"],
+                        "profile": "fade_basic",
+                        "status": "dry_run",
+                        "properties": updates[0]["properties"],
+                        "planned_operations": [
+                            {
+                                "operation": "set_property",
+                                "property": "name",
+                                "confirm_token": token,
+                            }
+                        ],
+                        "executed_operations": [],
+                    }
+                ],
+                "message": "Dry run succeeded.",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_edit_cues",
+                {
+                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "updates": [
+                        {
+                            "cue_ref": "11111111-1111-4111-8111-111111111111",
+                            "profile": "fade_basic",
+                            "properties": {"name": "Renamed Fade"},
+                        }
+                    ],
+                    "dry_run": True,
+                },
+            )
+
+    result = asyncio.run(call_tool())
+    planned = result.structured_content["results"][0]["planned_operations"]
+
+    assert planned[0]["confirm_token"].startswith("confirm:fadeBasic:v1:")
+    assert result.structured_content["results"][0]["executed_operations"] == []
+
+
 def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -> None:
     async def list_tools():
         async with Client(mcp) as client:
@@ -306,6 +607,8 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_create_cue",
         "qlab_edit_cues",
         "qlab_update_cues",
+        "qlab_move_cues",
+        "qlab_delete_cues",
     }
 
     check = tools["qlab_check_connection"]
@@ -467,6 +770,18 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "dry_run_preflight_failed" in result_item["status"]["enum"]
     assert "QLAB_UPDATE_DEBUG" in result_item["debug"]["description"]
 
+    delete = tools["qlab_delete_cues"]
+    assert delete.title == "Delete QLab Cues"
+    assert "explicit leaf cues" in delete.description
+    assert delete.annotations.readOnlyHint is False
+    assert delete.annotations.destructiveHint is True
+    assert delete.annotations.idempotentHint is False
+    assert delete.inputSchema["properties"]["cue_ids"]["minItems"] == 1
+    assert delete.inputSchema["properties"]["cue_ids"]["maxItems"] == 10
+    assert delete.inputSchema["properties"]["cue_ids"]["items"]["format"] == "uuid"
+    assert "confirm:deleteCues:v1:" in delete.inputSchema["properties"]["confirm_token"]["description"]
+    assert "verification_failed" in delete.outputSchema["properties"]["status"]["enum"]
+
 
 def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
     async def tool_timeouts():
@@ -503,8 +818,96 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
     }
 
 
+def test_run_tool_closes_reader_on_success(monkeypatch) -> None:
+    class FakeReader:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    reader = FakeReader()
+    monkeypatch.setattr(server_module, "_reader", lambda: reader)
+
+    result = _run_tool(lambda supplied_reader: supplied_reader)
+
+    assert result is reader
+    assert reader.closed is True
+
+
+def test_run_tool_sets_read_deadline_and_closes_reader(monkeypatch) -> None:
+    class FakeReader:
+        def __init__(self) -> None:
+            self.closed = False
+            self.deadline: float | None = None
+
+        def set_read_deadline(self, timeout: float) -> None:
+            self.deadline = timeout
+
+        def close(self) -> None:
+            self.closed = True
+
+    reader = FakeReader()
+    monkeypatch.setattr(server_module, "_reader", lambda: reader)
+
+    assert _run_tool(lambda supplied_reader: supplied_reader, timeout=3.0) is reader
+    assert reader.deadline == 3.0
+    assert reader.closed is True
+
+
+def test_read_tool_wrappers_pass_their_fastmcp_timeout_to_run_tool(monkeypatch) -> None:
+    timeouts: list[float | None] = []
+
+    def capture(_factory, timeout=None):
+        timeouts.append(timeout)
+        return "ok"
+
+    monkeypatch.setattr(server_module, "_run_tool", capture)
+
+    assert server_module.qlab_check_connection() == "ok"
+    assert server_module.qlab_check_write_readiness("ws-1") == "ok"
+    assert timeouts == [CHECK_CONNECTION_TIMEOUT, WRITE_READINESS_TIMEOUT]
+
+
+def test_write_tool_wrappers_do_not_pass_outer_reader_deadlines(monkeypatch) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def capture(_factory, **kwargs):
+        calls.append(kwargs)
+        return "ok"
+
+    monkeypatch.setattr(server_module, "_run_tool", capture)
+
+    assert server_module.qlab_create_cue("ws-1", "memo") == "ok"
+    assert server_module.qlab_edit_cues("ws-1", [], dry_run=True) == "ok"
+    assert server_module.qlab_move_cues("ws-1", [], dry_run=True) == "ok"
+    assert server_module.qlab_delete_cues("ws-1", [], dry_run=True) == "ok"
+    assert calls == [{}, {}, {}, {}]
+
+
+def test_run_tool_closes_reader_on_failure(monkeypatch) -> None:
+    class FakeReader:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    reader = FakeReader()
+    monkeypatch.setattr(server_module, "_reader", lambda: reader)
+
+    try:
+        _run_tool(lambda _reader: (_ for _ in ()).throw(QLabReplyError("denied", "badpass", "/workspaces")))
+    except ToolError:
+        pass
+    else:
+        raise AssertionError("Expected ToolError")
+
+    assert reader.closed is True
+
+
 def test_expected_tool_errors_are_sanitized() -> None:
-    def denied_with_sensitive_payload() -> None:
+    def denied_with_sensitive_payload(_reader: Any) -> None:
         raise QLabReplyError(
             "denied",
             {"fileTarget": "/Users/stage/secret.wav", "passcode": "1234"},
@@ -555,6 +958,18 @@ def test_public_cue_details_reports_clear_batch_limit_as_structured_json(monkeyp
     assert "cue_ref list can include at most 50 cues" in payload["message"]
     assert payload["requested_count"] == 51
     assert payload["failed_count"] == 51
+
+
+def test_structured_read_error_keeps_original_sanitized_message(monkeypatch) -> None:
+    class FakeReader:
+        def get_workspace_overview(self, **kwargs):
+            raise OscTimeoutError("read deadline exhausted")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    payload = qlab_get_workspace_overview("ws-1").model_dump()
+
+    assert payload["message"] == "read deadline exhausted"
 
 
 def test_public_read_tools_redact_internal_exception_paths(monkeypatch) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -385,6 +386,14 @@ class UpdateCueResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notices: list[str] = Field(default_factory=list)
     updateq_plan: dict[str, Any] | None = None
+    group_child_readback: dict[str, Any] | None = Field(
+        default=None,
+        description="Fresh ordered direct-child snapshot after a token-gated Group write.",
+    )
+    side_effects: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Explicit Group or child state changes observed beyond the requested scalar write.",
+    )
     message: str
 
 
@@ -450,6 +459,14 @@ class UpdateCueItemResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notices: list[str] = Field(default_factory=list)
     updateq_plan: dict[str, Any] | None = None
+    group_child_readback: dict[str, Any] | None = Field(
+        default=None,
+        description="Fresh ordered direct-child snapshot after a token-gated Group write.",
+    )
+    side_effects: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Explicit Group or child state changes observed beyond the requested scalar write.",
+    )
     debug: dict[str, Any] | None = Field(
         default=None,
         description="Optional verification diagnostics when QLAB_UPDATE_DEBUG is enabled.",
@@ -487,4 +504,85 @@ class UpdateCuesResult(BaseModel):
         default=None,
         description="Short next action for resolving failed batch updates; null when ok is true.",
     )
+    message: str
+
+
+DeleteCuesStatus = Literal[
+    "planned",
+    "deleted",
+    "deleted_with_confirmed_timeouts",
+    "deleted_immediately",
+    "deleted_after_convergence",
+    "indeterminate",
+    "failed",
+    "preflight_failed",
+    "partial_failed",
+    "verification_failed",
+]
+
+
+class DeleteCuesResult(BaseModel):
+    """Result for isolated, leaf-only cue deletion."""
+
+    ok: bool
+    status: DeleteCuesStatus
+    workspace_id: str
+    dry_run: bool
+    requested_count: int
+    planned_count: int
+    deleted_count: int
+    failed_count: int
+    timeout_confirmed_count: int = 0
+    results: list[dict[str, Any]] = Field(default_factory=list)
+    confirm_token: str | None = None
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    message: str
+
+
+MoveCueStatus = Literal[
+    "planned",
+    "runtime_blocked",
+    "moved",
+    "moved_after_convergence",
+    "moved_with_confirmed_timeout",
+    "partial_failed",
+    "verification_failed",
+    "verification_inconclusive",
+    "rollback_required",
+    "rollback_failed",
+    "preflight_failed",
+]
+
+
+class MoveCueInput(BaseModel):
+    """One explicit structural cue move."""
+
+    cue_id: UUID
+    destination_parent_id: UUID | None = None
+    destination_index: int | None = None
+    before_cue_id: UUID | None = None
+    after_cue_id: UUID | None = None
+    position: Literal["first", "last"] | None = None
+    cart_row: int | None = None
+    cart_column: int | None = None
+
+
+class MoveCuesResult(BaseModel):
+    """Result for one gated, sequential structural move batch."""
+
+    ok: bool
+    status: MoveCueStatus
+    workspace_id: str
+    dry_run: bool
+    requested_count: int
+    planned_count: int
+    moved_count: int
+    failed_count: int
+    timeout_confirmed_count: int = 0
+    results: list[dict[str, Any]] = Field(default_factory=list)
+    confirm_token: str | None = None
+    rollback: dict[str, Any] | None = None
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
     message: str

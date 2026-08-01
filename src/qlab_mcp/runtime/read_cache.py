@@ -29,19 +29,30 @@ class ReadCache:
         self._lock = threading.Lock()
         self._entries: dict[Hashable, _CacheEntry] = {}
         self._inflight: dict[Hashable, _InflightEntry] = {}
+        # Owners only publish results if no clear() happened while they ran.
+        self._generation = 0
 
-    def get_or_set(self, key: Hashable, ttl: float, factory: Callable[[], Any]) -> Any:
+    def get_or_set(
+        self,
+        key: Hashable,
+        ttl: float,
+        factory: Callable[[], Any],
+        *,
+        wait_timeout: float | None = None,
+    ) -> Any:
         if ttl <= 0:
             return factory()
 
-        now = time.monotonic()
         with self._lock:
+            now = time.monotonic()
+            expired_keys = [cache_key for cache_key, entry in self._entries.items() if entry.expires_at <= now]
+            for cache_key in expired_keys:
+                self._entries.pop(cache_key, None)
             entry = self._entries.get(key)
             if entry is not None and entry.expires_at > now:
                 return entry.value
-            if entry is not None:
-                self._entries.pop(key, None)
             inflight = self._inflight.get(key)
+            generation = self._generation
             if inflight is None:
                 inflight = _InflightEntry(event=threading.Event())
                 self._inflight[key] = inflight
@@ -50,7 +61,8 @@ class ReadCache:
                 owner = False
 
         if not owner:
-            inflight.event.wait()
+            if not inflight.event.wait(wait_timeout):
+                raise TimeoutError("Timed out waiting for in-flight read cache request")
             if inflight.error is not None:
                 raise inflight.error
             return inflight.value
@@ -59,25 +71,28 @@ class ReadCache:
             value = factory()
         except BaseException as exc:
             with self._lock:
-                inflight.error = exc
-                self._inflight.pop(key, None)
-                inflight.event.set()
+                if self._generation == generation:
+                    inflight.error = exc
+                    self._inflight.pop(key, None)
+                    inflight.event.set()
             raise
         with self._lock:
-            self._entries[key] = _CacheEntry(expires_at=now + ttl, value=value)
-            inflight.value = value
-            self._inflight.pop(key, None)
-            inflight.event.set()
+            if self._generation == generation:
+                self._entries[key] = _CacheEntry(expires_at=time.monotonic() + ttl, value=value)
+                inflight.value = value
+                self._inflight.pop(key, None)
+                inflight.event.set()
         return value
 
     def clear(self) -> None:
         with self._lock:
+            self._generation += 1
             self._entries.clear()
             inflight = list(self._inflight.values())
             self._inflight.clear()
-        for entry in inflight:
-            entry.error = RuntimeError("Read cache cleared while request was in flight")
-            entry.event.set()
+            for entry in inflight:
+                entry.error = RuntimeError("Read cache cleared while request was in flight")
+                entry.event.set()
 
 
 _SHARED_CACHE = ReadCache()

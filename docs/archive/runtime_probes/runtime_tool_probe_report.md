@@ -2,9 +2,9 @@
 
 Probe date: 2026-06-17
 
-Workspace used: `mcp_prueba.qlab5`
+Workspace used: `<TEST_WORKSPACE_NAME>`
 
-Workspace ID: `95F0A03D-140E-4673-974A-E76748EBB023`
+Workspace ID: `<TEST_WORKSPACE_UUID>`
 
 QLab version: `5.5.10`
 
@@ -35,8 +35,8 @@ treats the MCP-exposed schema as authoritative.
 Initial workspace selection without `workspace_id` returned
 `status="workspace_ambiguous"` because two workspaces were open:
 
-- `MATADERO - FILAR.qlab5`
-- `mcp_prueba.qlab5`
+- `<TEST_WORKSPACE_NAME>`
+- `<TEST_WORKSPACE_NAME>`
 
 Chosen fixture workspace connection result:
 
@@ -114,10 +114,10 @@ No baseline mutation was observed. All dry-run update results had
 Calls:
 
 ```json
-{"workspace_id":"95F0A03D-140E-4673-974A-E76748EBB023","max_depth":1,"max_cues":100,"include_cue_index":false,"include_live_state":false}
-{"workspace_id":"95F0A03D-140E-4673-974A-E76748EBB023","max_depth":5,"max_cues":1000,"include_cue_index":true,"max_index_cues":1000,"cue_index_profile":"health","include_live_state":false}
-{"workspace_id":"95F0A03D-140E-4673-974A-E76748EBB023","max_depth":2,"max_cues":1000,"include_cue_index":true,"max_index_cues":1000,"cue_index_profile":"health","include_live_state":true}
-{"workspace_id":"95F0A03D-140E-4673-974A-E76748EBB023","max_depth":5,"max_cues":5000,"include_cue_index":true,"max_index_cues":5000,"cue_index_profile":"minimal","include_live_state":false}
+{"workspace_id":"<TEST_WORKSPACE_UUID>","max_depth":1,"max_cues":100,"include_cue_index":false,"include_live_state":false}
+{"workspace_id":"<TEST_WORKSPACE_UUID>","max_depth":5,"max_cues":1000,"include_cue_index":true,"max_index_cues":1000,"cue_index_profile":"health","include_live_state":false}
+{"workspace_id":"<TEST_WORKSPACE_UUID>","max_depth":2,"max_cues":1000,"include_cue_index":true,"max_index_cues":1000,"cue_index_profile":"health","include_live_state":true}
+{"workspace_id":"<TEST_WORKSPACE_UUID>","max_depth":5,"max_cues":5000,"include_cue_index":true,"max_index_cues":5000,"cue_index_profile":"minimal","include_live_state":false}
 ```
 
 Results:
@@ -136,8 +136,8 @@ Results:
 Calls:
 
 ```json
-{"workspace_id":"95F0A03D-140E-4673-974A-E76748EBB023"}
-{"workspace_id":"95F0A03D-140E-4673-974A-E76748EBB023","sections":["audio","video","network","midi","light","general"]}
+{"workspace_id":"<TEST_WORKSPACE_UUID>"}
+{"workspace_id":"<TEST_WORKSPACE_UUID>","sections":["audio","video","network","midi","light","general"]}
 ```
 
 Normal result summary:
@@ -208,7 +208,7 @@ Successful profile probes:
 | --- | --- |
 | `cue_ref="1", profile="auto"` | Audio details with `sections.identity`, `sections.status`, `sections.timing`, `sections.targets`, `sections.type_specific`; `isBroken=true`, `fileTargetPresent=true`. |
 | `cue_ref="2", profile="basic_safe"` | Compact identity/status only: `uniqueID`, `number`, `name`, `displayName`, `type`, `armed`, `flagged`, `colorName`. |
-| `cue_ref="2", profile="technical"` | Includes sensitive media path: `fileTarget="/Users/filarmonica/Movies/mcp_prueba/audio/Jungkook - Standing Next to You.mp3"`. |
+| `cue_ref="2", profile="technical"` | Includes sensitive media path: `fileTarget="<LOCAL_MEDIA_FIXTURE_PATH>"`. |
 | `cue_ref="10", profile="targets"` | Returns `cueTargetID`, `currentCueTargetID`, `cueTargetNumber="2"`, `hasCueTargets=true`. |
 | `cue_ref="5", profile="group"` | Returns group playback/cart/playlist/timecode fields, including `mode=3`, `cartRows=4`, `cartColumns=4`. |
 | `cue_ref="14", profile="editable"` | Returns `update_capabilities` for `common` and `memo_basic`, with safe real-write properties and validators. |

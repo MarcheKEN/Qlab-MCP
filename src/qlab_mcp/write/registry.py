@@ -89,6 +89,7 @@ class CuePropertySpec:
     capability_gate: str | None = None
     readback: str = "value"
     contextual_requirements: tuple[str, ...] = ()
+    write_family: str | None = None
 
 
 @dataclass(frozen=True)
@@ -218,7 +219,12 @@ def _rgba_args() -> tuple[tuple[str, str], ...]:
 
 def _group_properties() -> tuple[CuePropertySpec, ...]:
     return (
-        _prop("mode", "group_mode", real_write_enabled=True),
+        _planned_prop(
+            "mode",
+            "group_mode",
+            reason="group_mode_requires_confirm_token",
+            capability_gate="group_mode",
+        ),
         _planned_prop("playhead", "non_empty_string", reason="playhead_changes_are_control_behavior"),
         _planned_prop("playheadID", "non_empty_string", reason="playhead_changes_are_control_behavior"),
         _planned_prop("playbackPosition", "non_empty_string", reason="playhead_changes_are_control_behavior"),
@@ -272,13 +278,53 @@ def _group_properties() -> tuple[CuePropertySpec, ...]:
         ),
         _planned_prop("playlist/currentCue", "non_empty_string", reason="playlist_navigation_needs_dedicated_validation"),
         _planned_prop("playlist/currentCueID", "non_empty_string", reason="playlist_navigation_needs_dedicated_validation"),
-        _prop("playlist/doLoop", "boolean", real_write_enabled=True, contextual_requirements=("group_mode_is_playlist",)),
-        _prop("playlist/doShuffle", "boolean", real_write_enabled=True, contextual_requirements=("group_mode_is_playlist",)),
-        _prop("playlist/doCrossfade", "boolean", real_write_enabled=True, contextual_requirements=("group_mode_is_playlist",)),
-        _prop(
+        _op(
+            "playlist/next",
+            (),
+            path="playlist/next",
+            risk_tier="high",
+            planned_only_reason="playlist_navigation_starts_playback",
+        ),
+        _op(
+            "playlist/previous",
+            (),
+            path="playlist/previous",
+            risk_tier="high",
+            planned_only_reason="playlist_navigation_starts_playback",
+        ),
+        _op(
+            "shuffle",
+            (),
+            path="shuffle",
+            risk_tier="high",
+            planned_only_reason="group_shuffle_action_changes_child_order",
+        ),
+        _planned_prop(
+            "playlist/doLoop",
+            "boolean",
+            reason="group_playlist_requires_confirm_token",
+            capability_gate="group_playlist",
+            contextual_requirements=("group_mode_is_playlist",),
+        ),
+        _planned_prop(
+            "playlist/doShuffle",
+            "boolean",
+            reason="group_playlist_requires_confirm_token",
+            capability_gate="group_playlist",
+            contextual_requirements=("group_mode_is_playlist",),
+        ),
+        _planned_prop(
+            "playlist/doCrossfade",
+            "boolean",
+            reason="group_playlist_requires_confirm_token",
+            capability_gate="group_playlist",
+            contextual_requirements=("group_mode_is_playlist",),
+        ),
+        _planned_prop(
             "playlist/crossfade/duration",
             "non_negative_number",
-            real_write_enabled=True,
+            reason="group_playlist_requires_confirm_token",
+            capability_gate="group_playlist",
             contextual_requirements=("group_mode_is_playlist",),
         ),
         _planned_prop("playlistLoop", "boolean", path="playlistLoop", reason="deprecated_use_playlist_doLoop"),
@@ -327,6 +373,16 @@ COMMON_PROPERTIES = (
     _prop("useSecondColor", "boolean", real_write_enabled=True),
 )
 
+FADE_COMMON_PROPERTIES = tuple(
+    replace(
+        prop,
+        risk_tier="high",
+        real_write_enabled=False,
+        planned_only_reason="fade_basic_requires_confirm_token",
+    )
+    for prop in COMMON_PROPERTIES
+)
+
 COMMON_CATALOG_PROPERTIES = (
     _planned_prop("colorCondition", "color_condition", reason="deprecated_unsupported_in_current_qlab"),
     _planned_prop("duckLevel", "decibel", reason="ducking_changes_cue_behavior"),
@@ -352,22 +408,28 @@ COMMON_CATALOG_PROPERTIES = (
     _planned_prop("timecodeTrigger/text", "string", reason="timecode_trigger_changes_show_control_behavior"),
 )
 
-AUDIO_SAFE_PROPERTIES = (
-    _prop("rate", "rate", real_write_enabled=True),
-    _prop("startTime", "non_negative_number", real_write_enabled=True),
-    _prop("endTime", "non_negative_number", real_write_enabled=True),
-    _prop("playCount", "positive_int", real_write_enabled=True),
-    _prop("infiniteLoop", "boolean", real_write_enabled=True),
-    _prop("preservePitch", "boolean", real_write_enabled=True),
+_AUDIO_TIME_ROUTE_VALIDATORS = (
+    ("rate", "rate"),
+    ("startTime", "non_negative_number"),
+    ("endTime", "non_negative_number"),
+    ("playCount", "positive_int"),
+    ("infiniteLoop", "boolean"),
+    ("preservePitch", "boolean"),
 )
 
-VIDEO_AUDIO_TIME_PROPERTIES = (
-    _planned_prop("rate", "rate", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
-    _planned_prop("startTime", "non_negative_number", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
-    _planned_prop("endTime", "non_negative_number", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
-    _planned_prop("playCount", "positive_int", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
-    _planned_prop("infiniteLoop", "boolean", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
-    _planned_prop("preservePitch", "boolean", reason="video_audio_time_requires_confirm_token", capability_gate="audio_output"),
+AUDIO_SAFE_PROPERTIES = tuple(
+    _prop(name, validator, real_write_enabled=True)
+    for name, validator in _AUDIO_TIME_ROUTE_VALIDATORS
+)
+
+VIDEO_AUDIO_TIME_PROPERTIES = tuple(
+    _planned_prop(
+        name,
+        validator,
+        reason="video_audio_time_requires_confirm_token",
+        capability_gate="audio_output",
+    )
+    for name, validator in _AUDIO_TIME_ROUTE_VALIDATORS
 )
 
 VIDEO_AUDIO_LEVEL_PROPERTIES = (
@@ -929,7 +991,12 @@ MIC_CATALOG_PROPERTIES = (
         reason="audio_input_channel_offset_needs_patch_bounds_validation",
         capability_gate="patch_routing",
     ),
-    _prop("channels", "positive_int", risk_tier="medium", real_write_enabled=True),
+    _planned_prop(
+        "channels",
+        "positive_int",
+        reason="audio_input_channel_count_needs_patch_bounds_validation",
+        capability_gate="patch_routing",
+    ),
     *AUDIO_CATALOG_PROPERTIES,
 )
 
@@ -1211,7 +1278,7 @@ FADE_CATALOG_PROPERTIES = (
     _planned_prop("targetMode", "target_mode", reason="target_behavior_needs_validation"),
     _planned_prop("levelsMode", "fade_mode", reason="fade_level_mode_needs_validation"),
     _planned_prop("geoMode", "fade_mode", reason="fade_geometry_mode_needs_validation"),
-    _planned_prop("mode", "fade_mode", path="geoMode", read_key="geoMode", reason="deprecated_use_geoMode"),
+    _planned_prop("mode", "fade_mode", path="levelsMode", read_key="levelsMode", reason="deprecated_use_levelsMode"),
     _planned_prop("fadeType", "fade_type", reason="fade_type_needs_validation"),
     _planned_prop("pathHeight", "positive_number", reason="fade_geometry_path_needs_validation"),
     _planned_prop("pathWidth", "positive_number", reason="fade_geometry_path_needs_validation"),
@@ -1222,7 +1289,44 @@ FADE_CATALOG_PROPERTIES = (
     _planned_prop("doRotation", "boolean", reason="fade_target_behavior_needs_validation"),
     _planned_prop("doScale", "boolean", reason="fade_target_behavior_needs_validation"),
     _planned_prop("doTranslation", "boolean", reason="fade_target_behavior_needs_validation"),
-    _op("doLevel", (("row", "audio_level_row"), ("column", "audio_output_ref"), ("value", "boolean")), path="doLevel/{row}/{column}", risk_tier="high", planned_only_reason="fade_level_targets_need_validation"),
+    _planned_prop("opacity", "opacity", reason="fade_geometry_requires_confirm_token"),
+    _planned_prop("rate", "rate", reason="fade_geometry_requires_confirm_token"),
+    _planned_prop("translation/x", "number", reason="fade_geometry_requires_confirm_token"),
+    _planned_prop("translation/y", "number", reason="fade_geometry_requires_confirm_token"),
+    _planned_prop("scale/x", "number", reason="fade_geometry_requires_confirm_token"),
+    _planned_prop("scale/y", "number", reason="fade_geometry_requires_confirm_token"),
+    _planned_prop("quaternion", "quaternion", reason="fade_geometry_requires_confirm_token"),
+    _op(
+        "sliderLevel",
+        (("channel", "audio_output_ref"), ("decibel", "decibel")),
+        path="sliderLevel/{channel}",
+        read_key="sliderLevels",
+        risk_tier="high",
+        planned_only_reason="fade_audio_levels_require_confirm_token",
+    ),
+    _op(
+        "level",
+        (("inChannel", "audio_level_row"), ("outChannel", "audio_output_ref"), ("decibel", "decibel")),
+        path="level/{inChannel}/{outChannel}",
+        read_key="levels",
+        risk_tier="high",
+        planned_only_reason="fade_audio_levels_require_confirm_token",
+    ),
+    _op("doLevel", (("row", "audio_level_row"), ("column", "audio_output_ref"), ("value", "boolean")), path="doLevel/{row}/{column}", read_key="doLevel", risk_tier="high", planned_only_reason="fade_level_targets_need_validation"),
+    _op(
+        "inputChannelName",
+        (("number", "positive_int"), ("name", "string")),
+        path="inputChannelName/{number}",
+        risk_tier="high",
+        planned_only_reason="fade_audio_level_meta_requires_confirm_token",
+    ),
+    _op(
+        "gang",
+        (("inChannel", "audio_level_row"), ("outChannel", "audio_output_ref"), ("gang", "string")),
+        path="gang/{inChannel}/{outChannel}",
+        risk_tier="high",
+        planned_only_reason="fade_audio_level_meta_requires_confirm_token",
+    ),
     _op("doObjectLevel", (("row", "audio_level_row"), ("object", "audio_object_ref"), ("value", "boolean")), path="doObjectLevel/{row}/{object}", risk_tier="high", planned_only_reason="fade_object_targets_need_validation"),
     _op("doObjectIDLevel", (("row", "audio_level_row"), ("objectID", "audio_object_ref"), ("value", "boolean")), path="doObjectIDLevel/{row}/{objectID}", risk_tier="high", planned_only_reason="fade_object_targets_need_validation"),
     _op("setGeometryFromTarget", (), path="setGeometryFromTarget", risk_tier="high", planned_only_reason="target_copy_actions_need_dedicated_validation"),
@@ -1231,27 +1335,29 @@ FADE_CATALOG_PROPERTIES = (
 )
 
 NETWORK_CATALOG_PROPERTIES = (
-    *_planned_patch_refs("networkPatch", validator="patch_ref"),
-    _planned_prop("customString", "string", reason="network_messages_can_trigger_external_systems"),
-    _planned_prop("fadeEntries", "list_or_json_string", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("fadeFrom", "number", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("fadeNumberType", "fade_number_type", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("fadeTo", "number", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("fadeType", "network_fade_type", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("fps", "network_fps", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("pathHeight", "positive_number", reason="network_fade_shape_can_trigger_external_systems"),
-    _planned_prop("pathWidth", "positive_number", reason="network_fade_shape_can_trigger_external_systems"),
+    _planned_prop("networkPatchName", "string", reason="network_osc_message_requires_patch_type_validation", capability_gate="patch_routing"),
+    _planned_prop("networkPatchNumber", "non_negative_int", reason="network_osc_message_requires_patch_type_validation", capability_gate="patch_routing"),
+    _planned_prop("networkPatchID", "string", reason="network_osc_message_requires_patch_type_validation", capability_gate="patch_routing"),
+    _planned_prop("customString", "string", reason="network_osc_message_requires_patch_type_validation"),
+    _planned_prop("fadeEntries", "list_or_json_string", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("fadeFrom", "number", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("fadeNumberType", "fade_number_type", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("fadeTo", "number", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("fadeType", "network_fade_type", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("fps", "network_fps", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("pathHeight", "positive_number", reason="network_fade_routes_require_deterministic_readback"),
+    _planned_prop("pathWidth", "positive_number", reason="network_fade_routes_require_deterministic_readback"),
     _planned_prop("patch", "non_negative_int", reason="deprecated_use_networkPatchNumber"),
-    _op("parameterFadeEnabled", (("parameter", "non_empty_string"), ("value", "boolean")), path="parameterFadeEnabled/{parameter}", risk_tier="high", planned_only_reason="network_parameter_values_can_trigger_external_systems"),
-    _planned_prop("parameterFadesEnabled", "list", reason="network_parameter_values_can_trigger_external_systems"),
+    _op("parameterFadeEnabled", (("parameter", "non_empty_string"), ("value", "boolean")), path="parameterFadeEnabled/{parameter}", risk_tier="high", planned_only_reason="network_device_description_parameters_out_of_scope"),
+    _planned_prop("parameterFadesEnabled", "list", reason="network_device_description_parameters_out_of_scope"),
     _op(
         "parameterValue",
         (("parameter", "non_empty_string"), ("value", "json_value")),
         path="parameterValue/{parameter}",
         risk_tier="high",
-        planned_only_reason="network_parameter_values_can_trigger_external_systems",
+        planned_only_reason="network_device_description_parameters_out_of_scope",
     ),
-    _planned_prop("parameterValues", "list", reason="network_parameter_values_can_trigger_external_systems"),
+    _planned_prop("parameterValues", "list", reason="network_device_description_parameters_out_of_scope"),
 )
 
 MIDI_CATALOG_PROPERTIES = (
@@ -1330,7 +1436,7 @@ TIMECODE_CATALOG_PROPERTIES = (
 
 TARGET_CATALOG_PROPERTIES = (
     _planned_prop("cueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
-    _planned_prop("cueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetID", "cue_target_id", reason="utility_target_requires_confirm_token", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("cueTargetName", "non_empty_string", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_name_resolution_unsupported",)),
     _planned_prop("tempCueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("tempCueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
@@ -1339,22 +1445,22 @@ TARGET_CATALOG_PROPERTIES = (
 
 RESET_CATALOG_PROPERTIES = (
     _planned_prop("cueTargetNumber", "cue_target_number", reason="reset_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
-    _planned_prop("cueTargetID", "cue_target_id", reason="reset_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetID", "cue_target_id", reason="utility_target_requires_confirm_token", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("patchTargetID", "target_id", reason="reset_targets_need_validation"),
     _planned_prop("audioMapTargetID", "target_id", reason="reset_targets_need_validation"),
     _planned_prop("targetMode", "target_mode", reason="reset_targets_need_validation"),
 )
 
 DEVAMP_CATALOG_PROPERTIES = (
-    _planned_prop("cueTargetNumber", "cue_target_number", reason="devamp_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
-    _planned_prop("cueTargetID", "cue_target_id", reason="devamp_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
-    _planned_prop("cueTargetName", "non_empty_string", reason="devamp_targets_need_validation", contextual_requirements=("target_name_resolution_unsupported",)),
-    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="devamp_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
-    _planned_prop("tempCueTargetID", "cue_target_id", reason="devamp_targets_need_validation", contextual_requirements=("target_ref_resolves",)),
-    _planned_prop("targetMode", "target_mode", reason="devamp_targets_need_validation"),
-    _planned_prop("devampType", "devamp_type", reason="devamp_targets_need_validation"),
-    _planned_prop("startNextCueWhenSliceEnds", "boolean", reason="devamp_targets_need_validation"),
-    _planned_prop("stopTargetWhenSliceEnds", "boolean", reason="devamp_targets_need_validation"),
+    _planned_prop("cueTargetNumber", "cue_target_number", reason="devamp_target_uuid_only", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetID", "cue_target_id", reason="devamp_target_requires_confirm_token", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("cueTargetName", "non_empty_string", reason="devamp_target_uuid_only", contextual_requirements=("target_name_resolution_unsupported",)),
+    _planned_prop("tempCueTargetNumber", "cue_target_number", reason="devamp_target_uuid_only", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("tempCueTargetID", "cue_target_id", reason="devamp_target_uuid_only", contextual_requirements=("target_ref_resolves",)),
+    _planned_prop("targetMode", "target_mode", reason="devamp_target_mode_out_of_scope"),
+    _planned_prop("devampType", "devamp_type", reason="devamp_settings_require_confirm_token"),
+    _planned_prop("startNextCueWhenSliceEnds", "boolean", reason="devamp_settings_require_confirm_token"),
+    _planned_prop("stopTargetWhenSliceEnds", "boolean", reason="devamp_settings_require_confirm_token"),
 )
 
 SCRIPT_CATALOG_PROPERTIES = (
@@ -1389,9 +1495,16 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
         (*COMMON_PROPERTIES, *AUDIO_SAFE_PROPERTIES, *AUDIO_CATALOG_PROPERTIES),
         "medium",
         True,
-        "Audio profile; only transport metadata is real-write enabled.",
+        "Audio transport, cue I/O selection, and Levels use specialized confirmation gates; other catalog routes remain dry-run only.",
     ),
-    "mic_basic": UpdateProfileSpec("mic_basic", ("Mic",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES), "medium", True, "Mic profile with safe channel metadata writes."),
+    "mic_basic": UpdateProfileSpec(
+        "mic_basic",
+        ("Mic",),
+        (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES),
+        "medium",
+        True,
+        "Mic cue I/O selection and Levels use specialized confirmation gates; Format remains dry-run only pending input-patch capacity validation.",
+    ),
     "video_basic": UpdateProfileSpec("video_basic", ("Video",), (*COMMON_PROPERTIES, *VIDEO_AUDIO_TIME_PROPERTIES, *VIDEO_AUDIO_LEVEL_PROPERTIES, *VIDEO_AUDIO_MATRIX_PROPERTIES, *VIDEO_AUDIO_LEVEL_META_PROPERTIES, *VIDEO_AUDIO_MUTE_SOLO_PROPERTIES, *VIDEO_AUDIO_LEVEL_BULK_PROPERTIES, _planned_prop("doFade", "boolean", reason="video_integrated_fade_requires_confirm_token"), _planned_prop("lockFadeToCue", "boolean", reason="video_integrated_fade_requires_confirm_token"), *VIDEO_SLICE_MARKER_PROPERTIES, *VIDEO_CATALOG_PROPERTIES), "medium", True, "Video opacity, translation, visual scalars, embedded-audio timing, audio level, audio matrix, audio level metadata, mute/solo, integrated fade, clockType, and slice marker edits use specialized confirmation gates; remaining visual properties stay dry-run only."),
     "camera_basic": UpdateProfileSpec("camera_basic", ("Camera",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES, *VIDEO_CATALOG_PROPERTIES, *CAMERA_CATALOG_PROPERTIES), "medium", True, "Camera opacity, translation, and visual scalars use specialized confirmation gates; remaining visual properties stay dry-run only."),
     TEXT_BASIC_UPDATE_PROFILE: UpdateProfileSpec(
@@ -1403,16 +1516,80 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
         "Text visual properties and basic text content, font size, and alignment use specialized confirmation gates; rich formatting stays dry-run only.",
     ),
     "light_basic": UpdateProfileSpec("light_basic", ("Light",), (*COMMON_PROPERTIES, *LIGHT_CATALOG_PROPERTIES), "high", True, "Light profile; lightCommandText and saved behavior flags use specialized confirmation gates."),
-    "fade_basic": UpdateProfileSpec("fade_basic", ("Fade",), (*COMMON_PROPERTIES, *FADE_CATALOG_PROPERTIES), "high", True, "Fade profile; fade targets remain dry-run only."),
-    "network_basic": UpdateProfileSpec("network_basic", ("Network",), (*COMMON_PROPERTIES, *NETWORK_CATALOG_PROPERTIES), "high", True, "Network profile; network messages remain dry-run only."),
+    "fade_basic": UpdateProfileSpec("fade_basic", ("Fade",), (*FADE_COMMON_PROPERTIES, *FADE_CATALOG_PROPERTIES), "high", True, "Fade Basics, exact cue targets, 1D geometry, Levels matrices, and completion behavior use specialized confirmation gates; remaining Fade routes stay planned-only."),
+    "network_basic": UpdateProfileSpec("network_basic", ("Network",), (*COMMON_PROPERTIES, *NETWORK_CATALOG_PROPERTIES), "high", True, "Network profile; OSC Message mode cannot be proven from documented patch readback, so network output remains dry-run only."),
     "midi_basic": UpdateProfileSpec("midi_basic", ("MIDI",), (*COMMON_PROPERTIES, *MIDI_CATALOG_PROPERTIES), "high", True, "MIDI profile; MIDI messages remain dry-run only."),
     "midi_file_basic": UpdateProfileSpec("midi_file_basic", ("MIDI File",), (*COMMON_PROPERTIES, *MIDI_FILE_CATALOG_PROPERTIES), "medium", True, "MIDI File profile with playback metadata writes."),
     "timecode_basic": UpdateProfileSpec("timecode_basic", ("Timecode",), (*COMMON_PROPERTIES, *TIMECODE_CATALOG_PROPERTIES), "medium", True, "Timecode profile with basic metadata writes."),
-    "target_basic": UpdateProfileSpec("target_basic", ("Start", "Stop", "Pause", "Load", "Goto", "Target", "Arm", "Disarm"), (*COMMON_PROPERTIES, *TARGET_CATALOG_PROPERTIES), "high", True, "Target cue profile; target refs remain dry-run only."),
+    "target_basic": UpdateProfileSpec("target_basic", ("Start", "Stop", "Pause", "Load", "Goto", "GoTo", "Target", "Arm", "Disarm"), (*COMMON_PROPERTIES, *TARGET_CATALOG_PROPERTIES), "high", True, "Target cue profile; target refs remain dry-run only."),
     "reset_basic": UpdateProfileSpec("reset_basic", ("Reset",), (*COMMON_PROPERTIES, *RESET_CATALOG_PROPERTIES), "high", True, "Reset profile; reset targets remain dry-run only."),
-    "devamp_basic": UpdateProfileSpec("devamp_basic", ("Devamp",), (*COMMON_PROPERTIES, *DEVAMP_CATALOG_PROPERTIES), "high", True, "Devamp profile; devamp targets remain dry-run only."),
+    "devamp_basic": UpdateProfileSpec("devamp_basic", ("Devamp",), (*COMMON_PROPERTIES, *DEVAMP_CATALOG_PROPERTIES), "high", True, "Devamp target and settings use a specialized exact-UUID confirmation gate; name, number, temporary, and mode targets remain dry-run only."),
     "script_basic": UpdateProfileSpec("script_basic", ("Script",), (*COMMON_PROPERTIES, *SCRIPT_CATALOG_PROPERTIES), "high", True, "Script profile; script source remains dry-run only."),
 }
+
+_EXTRACTED_WRITE_FAMILY_PROPERTIES = {
+    "video_opacity": {
+        "video_basic": {"opacity"},
+        "camera_basic": {"opacity"},
+        "text_basic": {"opacity"},
+    },
+    "video_translation": {
+        profile: {"translation/x", "translation/y"}
+        for profile in ("video_basic", "camera_basic", "text_basic")
+    },
+    "video_scalars": {
+        profile: {
+            "scale/x",
+            "scale/y",
+            "anchor/x",
+            "anchor/y",
+            "cropTop",
+            "cropBottom",
+            "cropLeft",
+            "cropRight",
+        }
+        for profile in ("video_basic", "camera_basic", "text_basic")
+    },
+    "video_appearance": {
+        profile: {"blendMode", "preserveAspectRatio"}
+        for profile in ("video_basic", "camera_basic", "text_basic")
+    },
+    "video_audio_time": {
+        "video_basic": {
+            "startTime",
+            "endTime",
+            "playCount",
+            "infiniteLoop",
+            "rate",
+            "preservePitch",
+            "holdLastFrame",
+        }
+    },
+    "text_basics": {
+        "text_basic": {
+            "text",
+            "fixedWidth",
+            "text/format/fontSize",
+            "text/format/alignment",
+            "text/format/fontName",
+            "text/format/lineSpacing",
+            "text/format/color",
+        }
+    },
+}
+
+for _family_name, _profiles in _EXTRACTED_WRITE_FAMILY_PROPERTIES.items():
+    for _profile_name, _property_names in _profiles.items():
+        _profile = UPDATE_PROFILES[_profile_name]
+        UPDATE_PROFILES[_profile_name] = replace(
+            _profile,
+            properties=tuple(
+                replace(prop, write_family=_family_name)
+                if prop.name in _property_names
+                else prop
+                for prop in _profile.properties
+            ),
+        )
 
 CAPABILITY_GATES = {
     "audio_map_editing",
@@ -1420,6 +1597,8 @@ CAPABILITY_GATES = {
     "cue_behavior",
     "deprecated_osc",
     "fade_targets",
+    "group_mode",
+    "group_playlist",
     "file_target_access",
     "light_output",
     "midi_output",
@@ -1704,6 +1883,35 @@ def real_write_permission_errors(
     errors: dict[str, str] = {}
     for operation in operations:
         prop = str(operation["property"])
+        if profile == "fade_basic":
+            errors[prop] = (
+                f"{prop} is gated or dry-run only outside the specialized single-cue Fade gate."
+            )
+            continue
+        if profile in {"target_basic", "reset_basic"} and prop in {
+            "cueTargetID",
+            "cueTargetNumber",
+            "cueTargetName",
+            "tempCueTargetID",
+            "tempCueTargetNumber",
+            "patchTargetID",
+            "audioMapTargetID",
+            "targetMode",
+        }:
+            errors[prop] = (
+                f"{prop} is gated or dry-run only outside the specialized single-cue saved cueTargetID gate."
+            )
+            continue
+        if profile == "devamp_basic" and prop in {
+            "cueTargetID",
+            "devampType",
+            "startNextCueWhenSliceEnds",
+            "stopTargetWhenSliceEnds",
+        }:
+            errors[prop] = (
+                f"{prop} is gated or dry-run only outside the specialized single-cue saved Devamp gate."
+            )
+            continue
         if profile == "light_basic" and prop == "lightCommandText":
             errors[prop] = (
                 "lightCommandText is gated or dry-run only outside the specialized "
@@ -1919,6 +2127,10 @@ def _normalize_args(spec: CuePropertySpec, raw_args: Any, *, source: str) -> dic
             raise UnsafeWriteOperationError(f"{spec.name} requires operations[] because it has structured arguments")
         return {"value": _validate_named_value(spec.name, spec.args[0][1], raw_args)}
     if spec.name == "quaternion" and len(spec.args) == 1 and spec.args[0][0] == "value":
+        if isinstance(raw_args, dict):
+            if set(raw_args) != {"value"}:
+                raise UnsafeWriteOperationError("quaternion args must contain only value")
+            raw_args = raw_args["value"]
         return {"value": _validate_named_value(spec.name, spec.args[0][1], raw_args)}
     if len(spec.args) == 1 and spec.args[0][0] == "value" and not isinstance(raw_args, dict):
         return {"value": _validate_named_value(spec.name, spec.args[0][1], raw_args)}
@@ -2059,7 +2271,7 @@ def _validate_value(validator: str, value: Any) -> Any:
     if validator == "fade_mode":
         return _int_range(value, 0, 1, "value must be 0 or 1")
     if validator == "fade_type":
-        return _int_range(value, 1, 2, "value must be 1 for absolute or 2 for relative")
+        return _int_range(value, 1, 2, "value must be 1 for 1D Curve or 2 for 2D Path")
     if validator == "network_fade_type":
         return _int_range(value, 0, 2, "value must be 0, 1, or 2")
     if validator == "fade_number_type":
@@ -2268,6 +2480,9 @@ def _audio_object_color_name(value: Any) -> str:
 
 
 _CONTINUE_MODE_VALUES = {
+    0: 0,
+    1: 1,
+    2: 2,
     "0": 0,
     "do_not_continue": 0,
     "do-not-continue": 0,
@@ -2282,6 +2497,13 @@ _CONTINUE_MODE_VALUES = {
     "auto-follow": 2,
     "autofollow": 2,
 }
+
+
+def _continue_mode_comparison_value(value: Any) -> Any:
+    if isinstance(value, str):
+        normalized = value.strip().casefold().replace(" ", "_")
+        return _CONTINUE_MODE_VALUES.get(normalized, value)
+    return _CONTINUE_MODE_VALUES.get(value, value)
 
 
 def _continue_mode(value: Any) -> int:

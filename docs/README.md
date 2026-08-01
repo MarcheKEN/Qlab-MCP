@@ -2,31 +2,40 @@
 
 Start here, then follow the folder index nearest to the work you are doing.
 
-## Current
+## Users
 
-- `current/README.md` - active status, coverage, plans, and workorders.
-- `current/active_roadmap.md` - current implementation and safety status.
-- `current/coverage/` - OSC coverage snapshots and matrices.
-- `current/workorders/` - active/status-audit workorders plus completed history.
-- `guides/edit_cues_runtime_checklist.md` - runtime checklist for `qlab_edit_cues`.
+- [User guide](user/README.md)
+- [Public tools](user/tools.md)
+
+## Status
+
+- [Project status](status/README.md)
+- [Roadmap](status/roadmap.md)
+- [Workorders](status/workorders/README.md)
+- [Coverage](status/coverage/README.md)
+
+## Development
+
+- [Development index](development/README.md)
+- [Architecture](development/architecture.md)
+- [Runtime checklist for `qlab_edit_cues`](development/runtime-validation/edit-cues.md)
 
 ## References
 
 Official or imported reference material. Keep content immutable unless the
 source is regenerated.
 
-- `references/README.md`
-- `references/qlab_osc_dictionary.md`
-- `references/osc_queries.md`
-- `qclass/README.md`
-
-## Research
-
-- `current/research/` - project research and architecture notes.
+- [Reference index](references/README.md)
+- [QLab OSC dictionary](references/qlab_osc_dictionary.md)
+- [OSC queries](references/osc_queries.md)
+- [QClass transcripts](qclass/README.md)
 
 ## Archive
 
-- `archive/README.md` - historical plans and runtime reports.
+- [Archive index](archive/README.md)
+- [Historical research](archive/research/README.md)
+- [Completed workorders](archive/workorders/completed/README.md)
+- [Refactor audit](archive/audits/refactor-2026-07/README.md)
 
 Archived docs are kept for traceability. They are not the active implementation
 plan.

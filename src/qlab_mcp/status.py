@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .allowlist import validate_value_keys
-from .cues.profiles import _coerce_qlab_bool
+from .cues.profiles import _coerce_qlab_bool, _continue_mode_label
 from .cues.refs import _bounded_cue_refs_from_shallow
 from .osc.addressing import _clean_workspace_id
 from .sanitizer import sanitize_exception_message
@@ -364,7 +364,7 @@ class WorkspaceStatusMixin:
                 except Exception as exc:
                     errors[f"cue_values.{cue_id}"] = _compact_error(exc)
             cue.setdefault("uniqueID", cue_id)
-            cue["continueModeLabel"] = self._continue_mode_label(cue.get("continueMode"))
+            cue["continueModeLabel"] = _continue_mode_label(cue.get("continueMode"))
             cues.append(cue)
 
         scan_completeness = "partial" if bounded.get("truncated") or bounded.get("errors") else "complete"
@@ -574,19 +574,3 @@ class WorkspaceStatusMixin:
             for key in ("uniqueID", "number", "name", "displayName", "type")
             if cue.get(key) is not None
         }
-
-    def _continue_mode_label(self, value: Any) -> str:
-        if isinstance(value, bool) or value in (None, ""):
-            return "unknown"
-        if isinstance(value, int):
-            return {0: "do_not_continue", 1: "auto_continue", 2: "auto_follow"}.get(value, "unknown")
-        if isinstance(value, float) and value.is_integer():
-            return {0: "do_not_continue", 1: "auto_continue", 2: "auto_follow"}.get(int(value), "unknown")
-        normalized = str(value).strip().casefold().replace("-", "_").replace(" ", "_")
-        if normalized in {"0", "do_not_continue", "manual", "none"}:
-            return "do_not_continue"
-        if normalized in {"1", "auto_continue", "autocontinue"}:
-            return "auto_continue"
-        if normalized in {"2", "auto_follow", "autofollow"}:
-            return "auto_follow"
-        return "unknown"

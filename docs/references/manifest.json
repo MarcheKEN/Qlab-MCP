@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "references": [
+    {
+      "path": "docs/references/osc_queries.md",
+      "source_url": "https://qlab.app/docs/v5/scripting/osc-queries/",
+      "documented_qlab_version": "QLab 5; exact patch unknown",
+      "retrieval_date": null,
+      "first_repository_import": "2026-05-15",
+      "provenance_status": "inferred",
+      "sha256": "94c6c49d30d1e76a54ee12d3dbd6a59c2bcc97028b3a87d4a07e8cf1a92cb489"
+    },
+    {
+      "path": "docs/references/qlab_osc_dictionary.md",
+      "source_url": "https://qlab.app/docs/v5/scripting/osc-dictionary-v5/",
+      "documented_qlab_version": "QLab 5; exact patch unknown",
+      "retrieval_date": null,
+      "first_repository_import": "2026-05-15",
+      "provenance_status": "inferred",
+      "sha256": "946f7f88d94b475e13658ec978a24ac02febba22db672956558364814360e8d9"
+    }
+  ]
+}

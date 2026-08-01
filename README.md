@@ -1,6 +1,7 @@
 # QLab MCP
 
-FastMCP server for safely inspecting QLab 5 workspaces over OSC.
+QLab MCP `0.2.0` is a FastMCP server for safely inspecting QLab 5 workspaces
+over OSC.
 
 **Read-only by default.** The normal tools inspect workspace state, cues,
 settings, patches, and routes. They do not expose playback or mutation controls.
@@ -16,14 +17,16 @@ dry-run-first.
   target presence, timing, and health; inspect one cue or a batch of up to 50.
 - Workspace settings diagnostics: compact settings summaries plus focused
   patch, route, stage, audio, video, network, MIDI, and light details.
-- Optional gated write tools: dry-run-first blank cue creation and batch cue
-  updates through an allowlisted editing registry.
+- Optional gated write tools: dry-run-first blank cue creation, allowlisted cue
+  editing, structural List/Group moves, and exact-UUID leaf deletion.
 
 ## What It Does Not Do
 
 - No GO, playback, stop, or panic controls.
-- No deletion tools.
+- No ungated deletion, container deletion, or cascade deletion.
 - No raw OSC tool.
+- No broad `/live` write surface. The sole narrow exception is the allowlisted
+  `secondColorName` edit; every other `/live` write remains blocked.
 - No ambiguous selected, active, playhead, or playback-position edits.
 - No ungated high-risk writes. High-risk families require dry-run review plus
   exact `planned_operations[].confirm_token` values when supported, or they
@@ -34,18 +37,31 @@ dry-run-first.
 Install and run with the existing project commands:
 
 ```bash
-uv sync --extra dev
+uv sync --no-editable --python 3.11 --extra dev
 uv run qlab-mcp
 ```
 
-Or run the FastMCP server directly:
+`qlab-mcp` is the public server command. To inspect its FastMCP contract without
+connecting to QLab:
 
 ```bash
-uv run fastmcp run src/qlab_mcp/server.py:mcp
+uv run fastmcp inspect fastmcp.json
 ```
 
-`fastmcp.json` points FastMCP at `src/qlab_mcp/server.py:mcp` with STDIO
-transport and the project environment.
+`fastmcp.json` uses the repository-only `fastmcp_entrypoint.py` wrapper so
+FastMCP imports the installed package correctly. Neither file is included in
+the wheel or sdist.
+
+If an existing `.venv` cannot import `qlab_mcp`, rebuild it safely:
+
+```bash
+uv sync --no-editable --python 3.11 --extra dev
+uv run python -c "import qlab_mcp; print(qlab_mcp.__version__)"
+```
+
+The observed import failure is related to the editable project installation in
+the environment, not specifically to Python 3.12. Use the non-editable sync
+command above for a reproducible Python 3.11 development environment.
 
 Manual QLab check:
 
@@ -114,6 +130,8 @@ Cue edit flow:
 | `qlab_create_cue` | Dry-runs or creates one blank allowlisted cue with safe initial properties. |
 | `qlab_edit_cues` | Dry-runs or updates 1-50 concrete cues through the cue editing registry. |
 | `qlab_update_cues` | Compatibility alias for older prompts, tests, and clients. |
+| `qlab_move_cues` | Dry-runs or moves 1-10 exact UUID-addressed cues within or between Lists and Groups. |
+| `qlab_delete_cues` | Dry-runs or deletes 1-10 exact leaf-cue UUIDs; container and cascade deletion is blocked. |
 
 ## Read Model
 
@@ -141,6 +159,8 @@ report `truncated`, `truncation_reasons`, `scanned_all_cues`, and
 
 Write mode is deliberately gated:
 
+- Pass an explicit `workspace_id` and run `qlab_check_write_readiness` before
+  every real write session.
 - `QLAB_ENABLE_WRITE=true` is required before real write commands can run.
 - `QLAB_PASSCODE` is a server-side credential only. It is never a tool argument.
 - `dry_run=true` is the default through `QLAB_WRITE_DRY_RUN_DEFAULT=true`.
@@ -153,8 +173,18 @@ Write mode is deliberately gated:
 - Once real setters start, batch writes are not transactional. Later failures
   are reported per item and require normal readback or manual review.
 - Real writes bypass and clear the read cache before fresh verification.
-- Real high-risk writes require the exact `planned_operations[].confirm_token`
-  from the reviewed dry-run.
+- `qlab_create_cue` has no `confirm_token` argument. Review its dry-run before
+  real creation.
+- `qlab_edit_cues` may return tokens for individual planned high-risk
+  operations. Copy each exact relevant `planned_operations[].confirm_token`
+  into that update item's `confirm_gates`; there is no tool-level Edit token.
+- An eligible reviewed dry-run for `qlab_move_cues` or `qlab_delete_cues`
+  returns one dedicated tool-level `confirm_token`. Real execution must receive
+  that exact token.
+- Move tokens bind the reviewed workspace structure and move batch. Delete
+  tokens bind the reviewed deletion plan and fresh workspace structure.
+- Move and Delete tokens are process-bound; restarting the MCP invalidates
+  tokens issued by the previous process.
 - Broad capability gate names are discovery labels, not real-write approval
   tokens.
 - Operations without deterministic readback must be blocked or reported
@@ -195,8 +225,30 @@ devamp_basic
 script_basic
 ```
 
-Current visual, text, and light write support is intentionally token-gated:
+Current specialized write support is intentionally token-gated:
 
+- `group_basic`: common Basics remain normal guarded writes. Group `mode`
+  values `1`, `2`, `3`, `4`, and `6` require an exact-UUID, one-property
+  `confirm:groupMode:v1:` token. Canonical Playlist scalars
+  `playlist/doLoop`, `playlist/doShuffle`, `playlist/doCrossfade`, and
+  `playlist/crossfade/duration` require `confirm:groupPlaylist:v1:` and a
+  freshly verified Playlist mode (`6`). Both token families expire after five
+  minutes, are atomically single-use within the MCP process, and bind the
+  ordered direct-child snapshot. Tokens are consumed immediately before the
+  one setter send and remain consumed after timeout or failed verification;
+  rollback always needs a new dry-run/token. Fresh post-write child differences
+  are reported as side effects; no hidden restoration occurs.
+  QLab 5.5 runtime validation covers modes `1`, `2`, `3`, `4`, and `6`; the four
+  canonical Playlist scalars; common Basics `notes`, `flagged`, `preWait`,
+  `postWait`, and `continueMode` (`0 -> 1 -> 0`). Expected QLab child order,
+  `continueMode`, and `postWait` changes are surfaced through `side_effects`
+  and `group_child_readback`. Setter timeout with matching fresh readback is
+  `updated_with_confirmed_timeouts`, with no mutating retry. Timeline UI edits,
+  Playlist navigation/actions, deprecated aliases, and crossfade curve shapes
+  are not real-write surfaces. Large Groups around 200 children, zero-duration
+  loop children, crossfades beyond the shortest child, minimum crossfade
+  duration, playback, active/auditioning Groups, warning-but-not-broken Groups,
+  and runtime token expiry still lack QLab 5.5 validation.
 - `video_basic`: safe cue metadata is the only normal real-write surface.
   Visual, embedded-audio, and slice edits are dry-run-first candidates with
   specialized confirm tokens. This includes opacity, translation, anchor/scale
@@ -241,6 +293,87 @@ If a setter times out but a fresh after-read confirms the requested value,
 `qlab_edit_cues` reports `updated_with_confirmed_timeouts` with a warning. If
 fresh verification cannot prove the requested value, the result is failed or
 inconclusive.
+
+### Utility and Network cues
+
+Utility real writes support only saved `cueTargetID` assignment for exact-UUID
+source and target cues through `confirm:utilityTarget:v1:`. `cueTargetNumber`,
+`cueTargetName`, temporary targets, Reset patch/map targets, and target actions
+remain blocked.
+
+Network OSC Message `customString` is runtime validated for an exact healthy,
+inactive cue whose current patch is freshly classified as `OSC Message`. It
+uses the item-level `confirm:networkOscMessage:v1:` Edit flow.
+`networkPatchID` reassignment remains blocked/planned-only: the tested
+reassignment read back but left the cue broken. Patch definitions,
+destinations, fades, device descriptions, raw OSC, and `/live` remain blocked.
+
+### Fade cues
+
+`qlab_edit_cues` supports gated Fade Basics and duration, exact UUID cue targets,
+and promoted direct target types Audio, Mic, Video, Camera, and Text. Group and
+Cue List fanout, patches, maps, Objects, Audio FX, Video FX, Curve internals,
+Geometry Path, unsupported resets, and planned-only actions remain out of scope.
+
+Supported fields include absolute/relative `levelsMode`, `doLevel`, `level`,
+`sliderLevel`, `gang`, `inputChannelName`, `stopTargetWhenDone`, and supported
+visual Geometry fields. `-inf` is accepted only for absolute Levels and maps to
+workspace Audio minimum on readback. Dedicated token families are
+`confirm:fadeBasic:v1:`, `confirm:fadeTarget:v1:`, `confirm:fadeGeometry:v1:`,
+`confirm:fadeAudio:v1:`, `confirm:fadeBehavior:v1:`,
+`confirm:fadeSetup:v1:`, and `confirm:fadeRecovery:v1:`. Promoted writes require
+fresh readback, health/activity gates, one setter, and fresh verification.
+
+Runtime validation covers Fade Audio targeting Mic, absolute/relative Levels,
+`doLevel`, `level`, `sliderLevel`, semantic `-inf` mapped to workspace minimum,
+`stopTargetWhenDone`, fresh readback, and `0.001 dB` tolerance. No runtime
+claim is made for `inputChannelName`, gangs, visual Geometry, setup/recovery,
+special resets, or listed out-of-scope features.
+
+### Move cues
+
+`qlab_move_cues` accepts one workspace UUID and 1–10 strict cue UUID moves.
+Linear placement uses exactly one of `destination_index`, `before_cue_id`,
+`after_cue_id`, `position="first"`, or `position="last"`, within or between
+Cue Lists and Groups. Execution is ordered and sequential. Dry-run returns
+`confirm:moveCues:v1:`; structural simulation binds parent/order fingerprints,
+rejects cycles and invalid parents, preserves UUIDs and cue properties, and
+never claims OSC atomicity. Results distinguish partial failure, verification,
+timeout, and indeterminate outcomes.
+
+QLab may acknowledge a move before readable tree update. Convergence polls at
+approximately 0, 250, 500 ms, 1, 2, 4, 6, 8, and 10 seconds; next move waits
+for prior convergence. Cue Cart fields are schema-supported, but real Cart
+execution remains runtime-blocked. Linear List/Group movement is runtime
+validated; QLab tree convergence can take approximately 4–10 seconds, so moves
+are sequential and not atomic.
+Large batches can take several seconds per cue. Local tests cover same-parent
+up/down, List/Group transfers, nested Groups, first/last/before/after, batches
+of 2 and 10, and structural/property preservation.
+
+### Delete cues
+
+`qlab_delete_cues` accepts one workspace UUID and 1–10 exact leaf-cue UUIDs.
+Dry-run returns `confirm:deleteCues:v1:`. Duplicate, invalid, active, container,
+parent/descendant, cascade, Group, Cue List, and Cue Cart requests are rejected.
+Deletes are sequential, stop on unresolved failure, use independent existence
+and neighbor readback, have no automatic rollback, and are destructive and
+non-idempotent.
+
+Tokens bind workspace, requested UUID order, cue type, parent, sibling index,
+previous/next neighbors, parent-order and deletion-impact fingerprints,
+readiness/activity, operation version, and expiry. Deletion convergence polls
+over bounded 0–10 second window. Result states include `deleted_immediately`,
+`deleted_after_convergence`, `indeterminate`, `failed`, and `partial_failed`.
+Permanent container/descendant deletion remains out of scope. Local tests cover
+leaf/batch deletion, neighbor preservation, stale and wrong-family tokens,
+container guards, and no cascade.
+
+Runtime validation covers individual and sequential batch leaf deletion,
+approximately 4–10 second convergence, neighbor preservation, stale-token and
+wrong-family token rejection, and container/cascade blocking. Move and Delete
+confirmation tokens are process-bound; restarting the MCP invalidates tokens
+issued by the previous process.
 
 ## Privacy Profiles
 
@@ -332,6 +465,7 @@ QLAB_CACHE_TTL=10.0
 QLAB_PASSCODE=
 QLAB_ENABLE_WRITE=false
 QLAB_WRITE_DRY_RUN_DEFAULT=true
+QLAB_UPDATE_DEBUG=false
 QLAB_ALLOWED_FILE_ROOTS=
 ```
 
@@ -346,6 +480,10 @@ Notes:
   `isOverridden`, or `isAuditioning` bypass the cache.
 - Sensitive `technical`, `full_sensitive`, and `exhaustive` reads bypass the
   cache.
+- `QLAB_UPDATE_DEBUG=true` adds per-item diagnostics to real
+  `qlab_edit_cues`/`qlab_update_cues` results, including requested and readback
+  values. It is off by default, requires an MCP restart after changing the
+  environment, and does not weaken write gates or verification.
 
 ## Diagnostic Limits
 
@@ -387,6 +525,8 @@ qlab_check_write_readiness(workspace_id)
 qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
 qlab_edit_cues(workspace_id, updates, dry_run=None)
 qlab_update_cues(workspace_id, updates, dry_run=None)  # compatibility alias
+qlab_move_cues(workspace_id, moves, dry_run=None, confirm_token=None)
+qlab_delete_cues(workspace_id, cue_ids, dry_run=None, confirm_token=None)
 ```
 
 `qlab_edit_cues` update items use this shape:
@@ -411,6 +551,28 @@ Structured update operations inside each item use this shape:
 }
 ```
 
+Compact examples:
+
+```json
+{"workspace_id":"WORKSPACE_UUID","updates":[{"cue_ref":"FADE_UUID","profile":"fade_basic","operations":[{"property":"level","args":{"inChannel":0,"outChannel":0,"decibel":-6},"mode":"saved"}]}],"dry_run":true}
+```
+
+```json
+{"workspace_id":"WORKSPACE_UUID","moves":[{"cue_id":"CUE_UUID","destination_parent_id":"GROUP_UUID","position":"last"}],"dry_run":true}
+```
+
+```json
+{"workspace_id":"WORKSPACE_UUID","moves":[{"cue_id":"CUE_A_UUID","before_cue_id":"CUE_B_UUID"},{"cue_id":"CUE_C_UUID","position":"first"}],"dry_run":true}
+```
+
+```json
+{"workspace_id":"WORKSPACE_UUID","cue_ids":["LEAF_UUID"],"dry_run":true}
+```
+
+```json
+{"workspace_id":"WORKSPACE_UUID","cue_ids":["LEAF_UUID"],"dry_run":false,"confirm_token":"confirm:deleteCues:v1:RETURNED_TOKEN"}
+```
+
 ## Development And References
 
 - `src/qlab_mcp/server.py` exposes the read tools plus gated write-mode tools.
@@ -428,8 +590,10 @@ Structured update operations inside each item use this shape:
 
 References:
 
-- [QLab edit cues runtime checklist](docs/guides/edit_cues_runtime_checklist.md)
-- [OSC coverage snapshot](docs/current/coverage/osc_coverage_snapshot.md)
+- [Documentation index](docs/README.md)
+- [QLab edit cues runtime checklist](docs/development/runtime-validation/edit-cues.md)
+- [OSC coverage snapshot](docs/status/coverage/osc_coverage_snapshot.md)
 - [QLab OSC dictionary](docs/references/qlab_osc_dictionary.md)
 - [QLab OSC queries](docs/references/osc_queries.md)
-- [Video Phase 1 OSC matrix](docs/current/coverage/video_phase1_osc_matrix.md)
+- [Reference provenance and checksums](docs/references/manifest.json)
+- [Historical Video Phase 1 OSC matrix](docs/archive/coverage/video_phase1_osc_matrix.md)

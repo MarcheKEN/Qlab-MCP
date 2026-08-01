@@ -114,9 +114,9 @@ Phase 3A real write must pass every gate:
 ```json
 {
   "name": "accept_video_opacity_exact_context",
-  "workspace_id": "95F0A03D-140E-4673-974A-E76748EBB023",
-  "cue_id": "1EE5940A-858B-4F63-BE6A-2CA3D2B8C7F2",
-  "cue_ref": "1EE5940A-858B-4F63-BE6A-2CA3D2B8C7F2",
+  "workspace_id": "11111111-1111-4111-8111-111111111111",
+  "cue_id": "22222222-2222-4222-8222-222222222222",
+  "cue_ref": "22222222-2222-4222-8222-222222222222",
   "cue_type": "Video",
   "profile": "video_basic",
   "property": "opacity",

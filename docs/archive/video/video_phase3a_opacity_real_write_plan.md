@@ -302,7 +302,7 @@ Suggested commands:
 
 After implementation and manual MCP restart only:
 
-1. Use workspace `mcp_prueba`.
+1. Use workspace `<TEST_WORKSPACE_NAME>`.
 2. Use cue list `MCP_VIDEO_WRITE_FIXTURE`.
 3. Capture baseline for healthy Video, Camera, and Text cues.
 4. Start with healthy Video cue only.

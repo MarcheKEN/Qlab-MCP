@@ -232,10 +232,12 @@ def test_fastmcp_json_points_to_stdio_server_without_write_env() -> None:
     raw_config = json.loads((PROJECT_ROOT / "fastmcp.json").read_text())
     parsed = MCPServerConfig.model_validate(raw_config)
 
-    assert parsed.source.path == "src/qlab_mcp/server.py"
+    assert parsed.source.path == "fastmcp_entrypoint.py"
     assert parsed.source.entrypoint == "mcp"
-    assert parsed.environment.project == Path(".")
+    assert parsed.environment.project is None
+    assert parsed.environment.dependencies == ["qlab-mcp @ ."]
     assert parsed.deployment.transport == "stdio"
+    assert (PROJECT_ROOT / parsed.source.path).read_text() == "from qlab_mcp.server import mcp\n"
 
     deployment_env = raw_config.get("deployment", {}).get("env", {})
     assert "QLAB_PASSCODE" not in deployment_env

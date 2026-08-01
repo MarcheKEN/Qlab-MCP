@@ -29,7 +29,7 @@ Fake-client cubre ambos sentidos de ambos flags, token/contexto, rollback, basel
 
 ## Protocolo runtime Phase 5B
 
-Solo en `mcp_prueba.qlab5`, con workspace UUID explícito y sin ejecutar cues:
+Solo en `<TEST_WORKSPACE_NAME>`, con workspace UUID explícito y sin ejecutar cues:
 
 1. Confirmar readiness y baseline fresh.
 2. L1: `alwaysCollate false → true`; readback; nuevo dry-run/token; rollback `true → false`; readback final.

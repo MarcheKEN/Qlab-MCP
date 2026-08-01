@@ -1,6 +1,7 @@
 # QLab MCP
 
-FastMCP server for safely inspecting QLab 5 workspaces over OSC.
+QLab MCP `0.2.0` is a FastMCP server for safely inspecting QLab 5 workspaces
+over OSC.
 
 **Read-only by default.** The normal tools inspect workspace state, cues,
 settings, patches, and routes. They do not expose playback or mutation controls.
@@ -36,18 +37,31 @@ dry-run-first.
 Install and run with the existing project commands:
 
 ```bash
-uv sync --extra dev
+uv sync --no-editable --python 3.11 --extra dev
 uv run qlab-mcp
 ```
 
-Or run the FastMCP server directly:
+`qlab-mcp` is the public server command. To inspect its FastMCP contract without
+connecting to QLab:
 
 ```bash
-uv run fastmcp run src/qlab_mcp/server.py:mcp
+uv run fastmcp inspect fastmcp.json
 ```
 
-`fastmcp.json` points FastMCP at `src/qlab_mcp/server.py:mcp` with STDIO
-transport and the project environment.
+`fastmcp.json` uses the repository-only `fastmcp_entrypoint.py` wrapper so
+FastMCP imports the installed package correctly. Neither file is included in
+the wheel or sdist.
+
+If an existing `.venv` cannot import `qlab_mcp`, rebuild it safely:
+
+```bash
+uv sync --no-editable --python 3.11 --extra dev
+uv run python -c "import qlab_mcp; print(qlab_mcp.__version__)"
+```
+
+The observed import failure is related to the editable project installation in
+the environment, not specifically to Python 3.12. Use the non-editable sync
+command above for a reproducible Python 3.11 development environment.
 
 Manual QLab check:
 
@@ -576,9 +590,10 @@ Compact examples:
 
 References:
 
-- [QLab edit cues runtime checklist](docs/guides/edit_cues_runtime_checklist.md)
-- [OSC coverage snapshot](docs/current/coverage/osc_coverage_snapshot.md)
+- [Documentation index](docs/README.md)
+- [QLab edit cues runtime checklist](docs/development/runtime-validation/edit-cues.md)
+- [OSC coverage snapshot](docs/status/coverage/osc_coverage_snapshot.md)
 - [QLab OSC dictionary](docs/references/qlab_osc_dictionary.md)
 - [QLab OSC queries](docs/references/osc_queries.md)
 - [Reference provenance and checksums](docs/references/manifest.json)
-- [Video Phase 1 OSC matrix](docs/current/coverage/video_phase1_osc_matrix.md)
+- [Historical Video Phase 1 OSC matrix](docs/archive/coverage/video_phase1_osc_matrix.md)

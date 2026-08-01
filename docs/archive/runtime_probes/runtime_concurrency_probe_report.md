@@ -2,9 +2,9 @@
 
 Date: 2026-06-17
 
-Workspace under test: `mcp_prueba.qlab5`
+Workspace under test: `<TEST_WORKSPACE_NAME>`
 
-Workspace ID: `95F0A03D-140E-4673-974A-E76748EBB023`
+Workspace ID: `<TEST_WORKSPACE_UUID>`
 
 QLab version: 5.5.10
 
@@ -147,8 +147,8 @@ Timeouts occurred in the c8 connection/overview block.
 
 Exact failed/degraded contexts:
 
-- `qlab_check_connection(workspace_id="95F0A03D-140E-4673-974A-E76748EBB023", require_read_access=true)` returned `status="workspace_read_timeout"` in one c8 call. Timed-out reads included `/showMode`, `/cueLists/shallow`, and override probes.
-- `qlab_check_connection(workspace_id="95F0A03D-140E-4673-974A-E76748EBB023", require_read_access=true)` returned `status="workspace_connect_failed"` in another c8 call. `/connect` timed out.
+- `qlab_check_connection(workspace_id="<TEST_WORKSPACE_UUID>", require_read_access=true)` returned `status="workspace_read_timeout"` in one c8 call. Timed-out reads included `/showMode`, `/cueLists/shallow`, and override probes.
+- `qlab_check_connection(workspace_id="<TEST_WORKSPACE_UUID>", require_read_access=true)` returned `status="workspace_connect_failed"` in another c8 call. `/connect` timed out.
 - `qlab_get_workspace_overview(max_depth=1, max_cues=100, include_cue_index=false, include_live_state=false)` returned partial overview data, but its `mode_check` timed out in some c8 calls.
 
 Recovery after a 5-second pause:

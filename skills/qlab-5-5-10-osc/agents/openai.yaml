@@ -1,0 +1,4 @@
+interface:
+  display_name: "QLab 5.5.10 OSC"
+  short_description: "Exact QLab OSC Dictionary navigation"
+  default_prompt: "Use the supplied QLab OSC Dictionary for exact addresses, arguments, permissions, and replies."

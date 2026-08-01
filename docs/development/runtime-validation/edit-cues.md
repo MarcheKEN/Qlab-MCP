@@ -164,23 +164,29 @@ Editable duration smoke:
 Target resolution smoke:
 
 1. Pick one disposable target cue and one disposable Start/Stop/Pause/Load/GoTo/Arm/Disarm cue.
-2. Run `qlab_edit_cues(..., dry_run=true)` for `cueTargetID`.
-3. Copy the exact `planned_operations[].confirm_token` for `cueTargetID` into
+2. If the source is initially untargeted and QLab reports it broken solely
+   because the saved target is empty, verify `cueTargetID==""`,
+   `isWarning==false`, and inactive activity flags. This is the only broken
+   source allowed for initial assignment.
+3. Run `qlab_edit_cues(..., dry_run=true)` for `cueTargetID`.
+4. Copy the exact `planned_operations[].confirm_token` for `cueTargetID` into
    `updates[].confirm_gates`, then run the same with `dry_run=false`.
-4. Expected real write:
+5. Expected real write:
    - preflight reads the target cue before setters
    - setter uses `/cue_id/{uniqueID}/cueTargetID`
    - read-after-write confirms target ID
-5. Repeat with a missing target ID.
-6. Expected block:
+6. Repeat with a missing target ID.
+7. Expected block:
    - no `/cueTargetID` setter is sent
    - error says target could not be resolved
-7. Repeat with `cueTargetName`.
-8. Expected block:
+8. Repeat with `cueTargetName`.
+9. Expected block:
    - no `/cueTargetName` setter is sent
    - Utility real writes allow only `cueTargetID`; `cueTargetName` and
      `cueTargetNumber` remain blocked
    - both source `cue_ref` and requested target must be exact UUIDs
+10. Repeat with an already-targeted or warning/broken source; it must remain
+    blocked before any setter.
 
 Network OSC Message smoke:
 

@@ -5,6 +5,24 @@ Status: active; bounded edge validation remains.
 The implemented and runtime-validated Group contract is preserved in
 [`028_group_cue_safe_editing.md`](../../../archive/workorders/completed/028_group_cue_safe_editing.md).
 
+## Local deterministic evidence
+
+On 2026-08-01, branch `validation/group-edge-runtime` added focused local
+coverage for the 200-child ordered snapshot, warning-but-not-broken fail-closed
+behavior, exact-shortest-child crossfade, zero-duration crossfade, and
+process-bound token invalidation. The suite passes with `2451 passed, 41
+subtests passed`.
+
+This does not close the runtime workorder. QLab 5.5.10 runtime proof remains
+pending. The current read-only readiness probe selected disposable workspace
+`mcp_prueba.qlab5` (`95F0A03D-140E-4673-974A-E76748EBB023`), confirmed Edit Mode,
+healthy inactive target fixtures, and recorded DMX output enabled without
+changing it. The active MCP dry-run process did not return a Group confirmation
+token, so no real Group setter was attempted; restart/reload the active MCP
+process before runtime writes. The workspace currently has no approximately
+200-child Group fixture, so that case remains blocked until a disposable
+fixture exists outside MCP mutation.
+
 ## Pending scope
 
 - Repeat consumed-token replay validation after a confirmed MCP restart and

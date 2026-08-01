@@ -3980,7 +3980,9 @@ def _decode_utility_target_confirm_token(token: str) -> tuple[dict[str, Any] | N
     return (payload, None) if isinstance(payload, dict) else (None, "Utility cue target confirm_token payload is invalid.")
 
 
-def _utility_target_source_error(before: dict[str, Any], item: dict[str, Any]) -> str | None:
+def _utility_target_source_error(
+    before: dict[str, Any], item: dict[str, Any], *, requested: Any
+) -> str | None:
     source_type = before.get("type")
     if source_type not in UTILITY_TARGET_CUE_TYPES:
         return "Utility cue target real writes require Start, Stop, Pause, Load, Reset, Goto, Arm, or Disarm."
@@ -3992,7 +3994,8 @@ def _utility_target_source_error(before: dict[str, Any], item: dict[str, Any]) -
         return "Utility transport cue target writes require target_basic profile."
     if before.get("hasCueTargets") is not True:
         return "Utility cue target real writes require a source cue with cue targets."
-    if before.get("isBroken") is True or before.get("isWarning") is True:
+    initial_assignment = before.get("cueTargetID") == "" and _is_exact_cue_uuid(requested)
+    if (before.get("isBroken") is True and not initial_assignment) or before.get("isWarning") is True:
         return "Utility cue target real writes require a healthy source cue without warnings."
     if any(before.get(key) is True for key in ("isRunning", "isPaused", "isAuditioning")):
         return "Utility cue target real writes require an inactive source cue."
@@ -4021,10 +4024,12 @@ def _utility_target_dry_run_errors(
     if not candidate_shape:
         return {}
     property_name = operation["property"]
-    source_error = _utility_target_source_error(before, item)
     cue_id = _resolved_cue_id(before)
     baseline = before.get(property_name)
     requested = _utility_target_requested_value(operation)
+    if requested != "" and not _is_exact_cue_uuid(requested):
+        return {property_name: "cueTargetID requires an exact target cue UUID."}
+    source_error = _utility_target_source_error(before, item, requested=requested)
     if source_error:
         return {property_name: source_error}
     if cue_id != item.get("cue_ref"):
@@ -4091,10 +4096,12 @@ def _validate_utility_target_real_write(
     property_name = operation.get("property") if operation else "cueTargetID"
     if operation is None or not isinstance(before, dict):
         return {property_name: "Utility cue target preflight is incomplete."}
-    source_error = _utility_target_source_error(before, item)
     cue_id = _resolved_cue_id(before)
     baseline = before.get(property_name)
     requested = _utility_target_requested_value(operation)
+    if requested != "" and not _is_exact_cue_uuid(requested):
+        return {property_name: "cueTargetID requires an exact target cue UUID."}
+    source_error = _utility_target_source_error(before, item, requested=requested)
     if source_error:
         return {property_name: source_error}
     if cue_id != item.get("cue_ref") or not isinstance(baseline, str):

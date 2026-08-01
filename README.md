@@ -301,6 +301,12 @@ source and target cues through `confirm:utilityTarget:v1:`. `cueTargetNumber`,
 `cueTargetName`, temporary targets, Reset patch/map targets, and target actions
 remain blocked.
 
+An initially untargeted source may be `isBroken=true` only for this first
+assignment when its saved `cueTargetID` is empty and the requested target is an
+exact UUID. The source must still be inactive and warning-free, the target must
+be healthy and inactive, and the normal fresh-token/readback gate still applies.
+Already-targeted or otherwise broken sources remain blocked.
+
 Network OSC Message `customString` is runtime validated for an exact healthy,
 inactive cue whose current patch is freshly classified as `OSC Message`. It
 uses the item-level `confirm:networkOscMessage:v1:` Edit flow.

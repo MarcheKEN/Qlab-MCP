@@ -1,0 +1,4 @@
+interface:
+  display_name: "QLab 5.5.10 Reference"
+  short_description: "Official QLab 5.5.10 reference navigation"
+  default_prompt: "Use the official QLab 5.5.10 reference to answer QLab questions precisely."

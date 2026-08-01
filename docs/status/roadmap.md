@@ -1,8 +1,8 @@
 # Active Roadmap
 
-Status: 2026-07-28
+Status: 2026-08-01
 
-Current local verification: `2446 passed, 41 subtests passed in 10.03s`;
+Current local verification: `2451 passed, 41 subtests passed in 6.93s`;
 zero skips. The full suite includes wheel/sdist build and artifact-membership
 checks.
 
@@ -207,8 +207,13 @@ Utility cue editing (runtime validated and closed):
 
 - only the local `cueTargetID` gate for `Start`, `Stop`, `Pause`, `Load`, `Reset`,
   `Goto`, `Arm`, and `Disarm`, using `confirm:utilityTarget:v1:`
-- exact source/target UUIDs only; one healthy inactive source and target; saved
-  mode; fresh baseline/readback; fresh-token rollback
+- exact source/target UUIDs only; one inactive source and healthy inactive
+  target; initial assignment may clear the source's broken state only when its
+  saved target is empty and it has no warning; saved mode; fresh
+  baseline/readback; fresh-token rollback; already-targeted or otherwise broken
+  sources remain blocked
+- initial broken-empty assignment is locally and live covered; the active MCP
+  process must be restarted to expose the updated guard to other clients
 - Wait and Memo remain Basics-only
 - target names/numbers, temporary targets, Reset patch/map targets, target
   mode, actions, `/live`, playback, raw OSC, batch/multi-property writes, and

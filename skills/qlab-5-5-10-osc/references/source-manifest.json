@@ -1,0 +1,14 @@
+{
+  "skill": "qlab-5-5-10-osc",
+  "canonical_url": "https://reference.qlab.app/docs/v5/scripting/osc-dictionary-v5/",
+  "retrieval_date": "2026-08-01",
+  "source_version": "QLab 5; exact patch unknown in repository manifest",
+  "official_page_scope": "QLab 5 OSC Dictionary; official manual page verified as QLab 5.5.10 at the version root",
+  "repository_source": {
+    "path": "docs/references/qlab_osc_dictionary.md",
+    "sha256": "946f7f88d94b475e13658ec978a24ac02febba22db672956558364814360e8d9"
+  },
+  "portable_copy": "references/qlab_osc_dictionary.md",
+  "selection_reason": "Most complete repository copy; it contains the full dictionary, replies, updates, permissions, queries, live and +/- variants.",
+  "uncertainty": "The repository cannot prove the exact patch release of the imported dictionary. Do not silently call every entry 5.5.10-only."
+}

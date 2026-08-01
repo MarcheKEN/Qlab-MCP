@@ -3453,6 +3453,155 @@ def _safe_group_fixture(
     )
 
 
+def test_group_playlist_large_child_snapshot_preserves_all_ordered_children() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    first_child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, first_child_id, mode=6, duration=1.0)
+    child_ids = [first_child_id]
+    for index in range(1, 200):
+        child_id = f"00000000-2222-4222-8222-{index:012x}"
+        cues[child_id] = dict(cues[first_child_id], uniqueID=child_id)
+        child_ids.append(child_id)
+    children[group_id] = child_ids
+
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}
+
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    setter = planned_setters(plan["results"][0])["playlist/doLoop"]
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [setter["confirm_token"]]}],
+        dry_run=False,
+    )
+
+    item = result["results"][0]
+    assert result["status"] == "updated"
+    assert [child["uniqueID"] for child in item["group_child_readback"]["ordered_children"]] == child_ids
+    assert len(item["group_child_readback"]["ordered_children"]) == 200
+    assert sum(address.endswith("/playlist/doLoop") for address, _, _ in client.requests) == 1
+
+
+def test_group_warning_but_not_broken_fails_closed_before_setter() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    cues[group_id]["isWarning"] = True
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"]["mode"] == "Group real writes require fresh isWarning=false."
+    assert result["results"][0]["executed_operations"] == []
+    assert all(not address.endswith("/mode") for address, _, _ in client.requests)
+
+
+def test_group_playlist_crossfade_accepts_exact_shortest_child_duration() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6, duration=3.0)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doCrossfade": True}}
+
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["playlist/doCrossfade"]["confirm_token"]
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["playlist/doCrossfade"] is True
+    assert sum(address.endswith("/playlist/doCrossfade") for address, _, _ in client.requests) == 1
+
+
+def test_group_playlist_crossfade_accepts_zero_duration_candidate() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6, duration=3.0)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": group_id,
+        "profile": "group_basic",
+        "properties": {"playlist/crossfade/duration": 0.0},
+    }
+
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["playlist/crossfade/duration"]["confirm_token"]
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["playlist/crossfade/duration"] == 0.0
+    assert sum(address.endswith("/playlist/crossfade/duration") for address, _, _ in client.requests) == 1
+
+
+def test_group_token_from_previous_process_fails_signature_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    monkeypatch.setattr(group_helpers, "_GROUP_TOKEN_SECRET", b"simulated-new-process-secret")
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"]["mode"] == "groupMode confirm_token signature is invalid."
+    assert result["results"][0]["executed_operations"] == []
+    assert all(not address.endswith("/mode") for address, _, _ in client.requests)
+
+
 def test_group_mode_dry_run_emits_dedicated_expiring_confirm_token() -> None:
     workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     group_id = "11111111-1111-4111-8111-111111111111"
@@ -6552,6 +6701,91 @@ def test_update_cues_real_blocks_target_refs_before_osc() -> None:
     assert result["status"] == "preflight_failed"
     assert "dry-run only" in result["results"][0]["errors"]["cueTargetID"]
     assert client.requests == []
+
+
+def test_update_cues_utility_target_initial_assignment_allows_broken_empty_source() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            source_id: {
+                "type": "Start", "cueTargetID": "", "hasCueTargets": True,
+                "isBroken": True, "isWarning": False, "isRunning": False,
+                "isPaused": False, "isAuditioning": False,
+            },
+            target_id: {
+                "type": "Memo", "isBroken": False, "isWarning": False,
+                "isRunning": False, "isPaused": False, "isAuditioning": False,
+            },
+        },
+        property_outcomes={(source_id, "cueTargetID", target_id): {"isBroken": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    request = {"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": target_id}}
+
+    dry = reader.update_cues("ws-1", [request], dry_run=True)
+    operation = planned_setters(dry["results"][0])["cueTargetID"]
+    result = reader.update_cues(
+        "ws-1", [{**request, "confirm_gates": [operation["confirm_token"]]}], dry_run=False
+    )
+
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["cueTargetID"] == target_id
+    assert result["results"][0]["after"]["isBroken"] is False
+    assert sum(address.endswith("/cueTargetID") for address, _, _ in client.requests) == 1
+
+
+@pytest.mark.parametrize(
+    "source_values",
+    [
+        {"cueTargetID": "22222222-2222-4222-8222-222222222222", "isBroken": True},
+        {"cueTargetID": "", "isBroken": True, "isWarning": True},
+    ],
+)
+def test_update_cues_utility_target_initial_assignment_preserves_broken_source_guards(
+    source_values: dict[str, Any],
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    source = {
+        "type": "Start", "cueTargetID": "", "hasCueTargets": True,
+        "isBroken": False, "isWarning": False, "isRunning": False,
+        "isPaused": False, "isAuditioning": False,
+    }
+    source.update(source_values)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={source_id: source, target_id: {"type": "Memo", "isBroken": False, "isWarning": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": target_id}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "healthy source" in result["results"][0]["errors"]["cueTargetID"]
+    assert not any(address.endswith("/cueTargetID") for address, _, _ in client.requests)
+
+
+def test_update_cues_utility_target_initial_assignment_requires_exact_target_uuid() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={source_id: {"type": "Start", "cueTargetID": "", "hasCueTargets": True, "isBroken": True, "isWarning": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": "target-id"}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"] == {"cueTargetID": "cueTargetID requires an exact target cue UUID."}
+    assert not any(address.endswith("/cueTargetID") for address, _, _ in client.requests)
 
 
 @pytest.mark.parametrize(

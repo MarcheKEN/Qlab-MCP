@@ -17,12 +17,18 @@ def test_reference_manifest_matches_local_files() -> None:
     assert {item["path"] for item in references} == {
         "docs/references/osc_queries.md",
         "docs/references/qlab_osc_dictionary.md",
+        "docs/references/qlab_applescript_dictionary.md",
     }
     for item in references:
         content = (PROJECT_ROOT / item["path"]).read_bytes()
         assert hashlib.sha256(content).hexdigest() == item["sha256"]
         assert item["documented_qlab_version"] == "QLab 5; exact patch unknown"
-        assert item["retrieval_date"] is None
-        assert item["first_repository_import"] == "2026-05-15"
-        assert item["provenance_status"] == "inferred"
         assert item["source_url"].startswith("https://qlab.app/docs/v5/")
+        if item["path"].endswith("qlab_applescript_dictionary.md"):
+            assert item["retrieval_date"] == "2026-08-02"
+            assert item["source_snapshot"].endswith("applescript_dictionary_v5.local.html")
+            assert item["provenance_status"] == "official HTML snapshot"
+        else:
+            assert item["retrieval_date"] is None
+            assert item["first_repository_import"] == "2026-05-15"
+            assert item["provenance_status"] == "inferred"

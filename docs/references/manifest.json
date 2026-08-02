@@ -18,6 +18,15 @@
       "first_repository_import": "2026-05-15",
       "provenance_status": "inferred",
       "sha256": "946f7f88d94b475e13658ec978a24ac02febba22db672956558364814360e8d9"
+    },
+    {
+      "path": "docs/references/qlab_applescript_dictionary.md",
+      "source_url": "https://qlab.app/docs/v5/scripting/applescript-dictionary-v5/",
+      "documented_qlab_version": "QLab 5; exact patch unknown",
+      "retrieval_date": "2026-08-02",
+      "source_snapshot": "docs/sources/qlab-5-applescript/applescript_dictionary_v5.local.html",
+      "provenance_status": "official HTML snapshot",
+      "sha256": "19d01b6cbf2d2a02008ff121180dbb3fda33e641b3c73f2cfd524765e9d5a909"
     }
   ]
 }

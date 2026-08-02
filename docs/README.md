@@ -28,6 +28,7 @@ source is regenerated.
 - [Reference index](references/README.md)
 - [QLab OSC dictionary](references/qlab_osc_dictionary.md)
 - [OSC queries](references/osc_queries.md)
+- [QLab AppleScript dictionary](references/qlab_applescript_dictionary.md)
 - [QClass transcripts](qclass/README.md)
 
 ## Archive

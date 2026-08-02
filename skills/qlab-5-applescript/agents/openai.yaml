@@ -1,0 +1,4 @@
+interface:
+  display_name: "QLab 5 AppleScript"
+  short_description: "Exact AppleScript Dictionary lookup for QLab 5"
+  default_prompt: "Use the supplied QLab 5 AppleScript Dictionary to find exact commands, classes, properties, and examples."

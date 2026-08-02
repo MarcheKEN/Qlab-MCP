@@ -3890,6 +3890,51 @@ def test_group_mode_timeout_with_matching_fresh_readback_is_confirmed() -> None:
     assert debug["setter_send_count"] == 1
     assert debug["setter_elapsed_seconds"]["mode"] >= 0
     assert debug["confirmation_reason"] == "fresh_readback_matched"
+    modeled = UpdateCuesResult.model_validate(result)
+    assert modeled.results[0].executed_operations[0]["property"] == "mode"
+
+
+def test_group_mode_ignored_setter_reports_structured_verification_failure_without_retry() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        ignore_set_property=(group_id, "mode"),
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 6}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    item = result["results"][0]
+
+    assert result["status"] == "verification_failed"
+    assert item["status"] == "verification_failed"
+    assert item["after"]["mode"] == 3
+    assert len(item["executed_operations"]) == 1
+    assert item["executed_operations"][0]["address"].endswith("/mode")
+    assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
+    modeled = UpdateCuesResult.model_validate(result)
+    assert modeled.results[0].status == "verification_failed"
+
+    replay = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    assert replay["status"] == "preflight_failed"
+    assert "consumed" in replay["results"][0]["errors"]["mode"]
+    assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
 
 
 def test_group_mode_token_is_rejected_after_rollback_restores_baseline() -> None:
@@ -4054,6 +4099,41 @@ def test_consumed_group_token_cannot_retry_after_qlab_error() -> None:
     assert replay["status"] == "preflight_failed"
     assert "consumed" in replay["results"][0]["errors"]["mode"]
     assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
+    modeled = UpdateCuesResult.model_validate(first)
+    assert modeled.results[0].executed_operations[0]["property"] == "mode"
+
+
+def test_group_mode_qlab_error_before_apply_reports_structured_partial_failure() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        fail_set_property=(group_id, "mode"),
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 6}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    item = result["results"][0]
+
+    assert result["status"] == "partial_failed"
+    assert item["after"]["mode"] == 3
+    assert len(item["executed_operations"]) == 1
+    assert item["errors"]["mode"]
+    assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
+    modeled = UpdateCuesResult.model_validate(result)
+    assert modeled.status == "partial_failed"
 
 
 def test_group_continue_mode_real_change_and_rollback_use_integer_setter_once() -> None:
@@ -4299,6 +4379,49 @@ def test_group_playlist_timeout_is_confirmed_and_sends_one_setter() -> None:
 
     assert result["status"] == "updated_with_confirmed_timeouts"
     assert result["results"][0]["after"]["playlist/doLoop"] is True
+    assert sum(address.endswith("/playlist/doLoop") for address, _, _ in client.requests) == 1
+
+
+def test_group_playlist_ignored_setter_reports_structured_verification_failure_without_retry() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        ignore_set_property=(group_id, "playlist/doLoop"),
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["playlist/doLoop"]["confirm_token"]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    item = result["results"][0]
+
+    assert result["status"] == "verification_failed"
+    assert item["status"] == "verification_failed"
+    assert item["after"]["playlist/doLoop"] is False
+    assert len(item["executed_operations"]) == 1
+    assert item["executed_operations"][0]["address"].endswith("/playlist/doLoop")
+    assert sum(address.endswith("/playlist/doLoop") for address, _, _ in client.requests) == 1
+    modeled = UpdateCuesResult.model_validate(result)
+    assert modeled.results[0].status == "verification_failed"
+
+    replay = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    assert replay["status"] == "preflight_failed"
+    assert "consumed" in replay["results"][0]["errors"]["playlist/doLoop"]
     assert sum(address.endswith("/playlist/doLoop") for address, _, _ in client.requests) == 1
 
 

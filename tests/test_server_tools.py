@@ -589,6 +589,77 @@ def test_qlab_edit_cues_fastmcp_response_keeps_fade_basic_token(monkeypatch) -> 
     assert result.structured_content["results"][0]["executed_operations"] == []
 
 
+def test_qlab_edit_cues_fastmcp_response_keeps_structured_group_failure(monkeypatch) -> None:
+    workspace_uuid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    update = {
+        "cue_ref": cue_id,
+        "profile": "group_basic",
+        "properties": {"mode": 6},
+    }
+
+    class FakeReader:
+        def edit_cues(self, *, workspace_id: str, updates, dry_run):
+            assert workspace_id == workspace_uuid
+            assert dry_run is False
+            assert updates[0]["properties"] == {"mode": 6}
+            return {
+                "ok": False,
+                "status": "verification_failed",
+                "workspace_id": workspace_uuid,
+                "dry_run": False,
+                "requested_count": 1,
+                "planned_count": 1,
+                "updated_count": 0,
+                "failed_count": 1,
+                "timeout_confirmed_count": 0,
+                "results": [
+                    {
+                        "cue_ref": cue_id,
+                        "cue_id": cue_id,
+                        "profile": "group_basic",
+                        "status": "verification_failed",
+                        "properties": {"mode": 6},
+                        "before": {"mode": 3},
+                        "after": {"mode": 3},
+                        "executed_operations": [
+                            {
+                                "operation": "set_property",
+                                "property": "mode",
+                                "address": f"/workspace/{workspace_uuid}/cue_id/{cue_id}/mode",
+                                "args": [6],
+                                "mode": "saved",
+                                "status": "ok",
+                            }
+                        ],
+                        "errors": {"verification": "Fresh readback did not match requested mode."},
+                        "warnings": [],
+                    }
+                ],
+                "message": "Group write was not confirmed by fresh readback.",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_edit_cues",
+                {"workspace_id": workspace_uuid, "updates": [update], "dry_run": False},
+            )
+
+    result = asyncio.run(call_tool())
+    payload = result.structured_content
+    item = payload["results"][0]
+
+    assert result.is_error is False
+    assert payload["status"] == "verification_failed"
+    assert item["status"] == "verification_failed"
+    assert len(item["executed_operations"]) == 1
+    assert item["executed_operations"][0]["address"].endswith("/mode")
+    assert item["after"]["mode"] == 3
+
+
 def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -> None:
     async def list_tools():
         async with Client(mcp) as client:

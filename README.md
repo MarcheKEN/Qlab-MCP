@@ -245,10 +245,15 @@ Current specialized write support is intentionally token-gated:
   and `group_child_readback`. Setter timeout with matching fresh readback is
   `updated_with_confirmed_timeouts`, with no mutating retry. Timeline UI edits,
   Playlist navigation/actions, deprecated aliases, and crossfade curve shapes
-  are not real-write surfaces. Large Groups around 200 children, zero-duration
-  loop children, crossfades beyond the shortest child, minimum crossfade
-  duration, playback, active/auditioning Groups, warning-but-not-broken Groups,
-  and runtime token expiry still lack QLab 5.5 validation.
+  are not real-write surfaces. QLab 5.5.10 runtime validation now covers the
+  disposable `378`-child ordered snapshot, finite and mixed zero/finite
+  Playlist Loop, one-setter timeout/readback/rollback behavior, consumed-token
+  replay, and preflight rejection when crossfade exceeds the shortest child.
+  Requests for `1 s` and `2 s` crossfade retained/read back as `3 s` in the
+  named fixture; this is fixture/version-specific evidence, not a global API
+  minimum, so short/equal active crossfade behavior remains unconfirmed.
+  All-zero-child Loop, warning-only Groups, active/auditioning Groups, live
+  token expiry, and live MCP restart invalidation remain follow-up limits.
 - `video_basic`: safe cue metadata is the only normal real-write surface.
   Visual, embedded-audio, and slice edits are dry-run-first candidates with
   specialized confirm tokens. This includes opacity, translation, anchor/scale

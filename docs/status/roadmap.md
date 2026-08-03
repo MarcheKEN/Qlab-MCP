@@ -1,8 +1,8 @@
 # Active Roadmap
 
-Status: 2026-08-01
+Status: 2026-08-03
 
-Current local verification: `2451 passed, 41 subtests passed in 6.93s`;
+Current local verification: `2467 passed, 41 subtests passed in 11.27s`;
 zero skips. The full suite includes wheel/sdist build and artifact-membership
 checks.
 
@@ -15,10 +15,6 @@ runtime support is not claimed.
 
 ## Locally implemented; runtime validation pending
 
-- [Group edge validation](workorders/active/030_group_edge_runtime_validation.md)
-  covers the bounded inactive-cue cases: around 200 direct children, Loop with
-  a zero-duration child, crossfade bounds, warning-but-not-broken Groups,
-  consumed-token error ordering, and token expiry in a live MCP process.
 - [Video audio validation](workorders/active/029_video_audio_runtime_validation.md)
   covers `clockType`, Integrated Fade checkboxes, and bounded channel
   mute/solo candidates.
@@ -31,6 +27,19 @@ runtime support is not claimed.
   deletion.
 
 ## Closed
+
+- Group edge runtime validation — QLab 5.5.10 runtime evidence for exact-UUID
+  Group `mode 3 -> 6 -> 3`, one-setter timeout/readback handling, structured
+  MCP results, child `continueMode` side effects, fresh-token rollback,
+  finite and mixed zero/finite Playlist Loop, and complete ordered snapshots
+  of `378` direct Wait children. Consumed-token replay is rejected with zero
+  setters; isolated fresh-process tests reject old tokens by signature.
+  Crossfade requests for `1 s` and `2 s` retained/read back as `3 s` in the
+  named QLab 5.5.10 fixture, while an effective duration above the shortest
+  child was rejected during dry-run with zero setters. These are observed
+  fixture/version results, not a global API minimum. Live MCP restart
+  invalidation remains a documented follow-up because no safe restart API was
+  available.
 
 - Authenticated request/reply handling uses invocation-owned TCP sessions,
   fresh post-timeout verification sessions, and deterministic cleanup. Packet

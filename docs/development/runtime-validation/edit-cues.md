@@ -126,10 +126,15 @@ Playlist Group smoke:
 Crossfade curve shapes remain blocked because the local OSC dictionary has no
 documented deterministic setter/readback. Timeline inspector gestures are
 child edits, not Group scalar properties, and are outside this smoke check.
-Around 200 children, zero-duration Loop children, crossfades beyond the
-shortest child, minimum crossfade duration, playback, active/auditioning
-Groups, warning-but-not-broken Groups, and runtime token expiry require
-separate explicit authorization and remain unvalidated edge cases.
+Workorder 030 closed the bounded QLab 5.5.10 cases with a disposable
+`378`-child Group, finite and mixed zero/finite Playlist Loop, exact-UUID
+single-setter timeout/readback/rollback, consumed-token replay, and
+crossfade-over-shortest preflight rejection. Requested `1 s` and `2 s`
+crossfade durations retained/read back as `3 s` in that fixture; this is an
+observed fixture/version mismatch, not a documented global minimum, so
+short/equal active crossfade behavior remains unconfirmed. All-zero-child
+Loop, warning-only Groups, active/auditioning Groups, live token expiry, and
+live MCP restart invalidation remain separate follow-up limits.
 
 Mic input routing smoke:
 

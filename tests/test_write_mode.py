@@ -2443,6 +2443,115 @@ def test_create_cue_real_creates_applies_properties_and_verifies_fresh_details()
     assert addresses.count(f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys") >= 2
 
 
+def test_create_and_edit_share_common_property_normalization_and_setter_shape() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    properties = {"name": "Created", "continueMode": " auto_follow "}
+
+    create_client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        created_cue_id=cue_id,
+    )
+    create_reader = QLabReader(create_client)  # type: ignore[arg-type]
+    created = create_reader.create_cue("ws-1", "memo", properties=properties, dry_run=False)
+
+    edit_client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+    )
+    edit_reader = QLabReader(edit_client)  # type: ignore[arg-type]
+    edited = edit_reader.update_cue("ws-1", cue_id, properties=properties, dry_run=False)
+
+    assert created["properties"] == edited["properties"] == {"name": "Created", "continueMode": 2}
+    create_setters = [request for request in create_client.requests if request[0].endswith(("/name", "/continueMode"))]
+    edit_setters = [request for request in edit_client.requests if request[0].endswith(("/name", "/continueMode"))]
+    assert [(request[0].rsplit("/", 1)[-1], request[1]) for request in create_setters] == [
+        (request[0].rsplit("/", 1)[-1], request[1]) for request in edit_setters
+    ]
+    assert created["verification"]["properties"]["name"] == edited["after"]["name"] == "Created"
+
+
+def test_create_and_edit_share_common_property_validation_error() -> None:
+    create_reader = QLabReader(FakeWriteClient(QLabConfig(enable_write=False)))  # type: ignore[arg-type]
+    edit_reader = QLabReader(FakeWriteClient(QLabConfig(enable_write=False)))  # type: ignore[arg-type]
+
+    with pytest.raises(UnsafeWriteOperationError) as create_error:
+        create_reader.create_cue("ws-1", "memo", properties={"continueMode": "not-a-mode"}, dry_run=True)
+    with pytest.raises(UnsafeWriteOperationError) as edit_error:
+        edit_reader.update_cue("ws-1", "1", properties={"continueMode": "not-a-mode"}, dry_run=True)
+
+    assert str(create_error.value).endswith("continueMode must be 0, 1, 2, do_not_continue, auto_continue, or auto_follow")
+    assert str(edit_error.value).endswith("continueMode must be 0, 1, 2, do_not_continue, auto_continue, or auto_follow")
+
+
+def test_create_and_edit_share_setter_timeout_readback_confirmation() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    properties = {"name": "Created"}
+    create_client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        created_cue_id=cue_id,
+        timeout_set_property="name",
+    )
+    edit_client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        existing_cue_id=cue_id,
+        timeout_set_property="name",
+    )
+
+    created = QLabReader(create_client).create_cue("ws-1", "memo", properties=properties, dry_run=False)  # type: ignore[arg-type]
+    edited = QLabReader(edit_client).update_cue("ws-1", cue_id, properties=properties, dry_run=False)  # type: ignore[arg-type]
+
+    assert created["ok"] is True
+    assert created["warnings"]
+    assert edited["status"] == "updated"
+    assert edited["warnings"]
+    assert created["verification"]["properties"]["name"] == edited["after"]["name"] == "Created"
+
+
+def test_create_new_timeout_is_indeterminate_and_sends_no_setters(monkeypatch: pytest.MonkeyPatch) -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        created_cue_id=cue_id,
+    )
+    original_request = client.request
+
+    def timeout_new(address: str, *args: Any, **kwargs: Any) -> Any:
+        if address == "/workspace/ws-1/new":
+            raise OscTimeoutError("new timed out")
+        return original_request(address, *args, **kwargs)
+
+    monkeypatch.setattr(client, "request", timeout_new)
+    result = QLabReader(client).create_cue(
+        "ws-1",
+        "memo",
+        properties={"name": "Never blindly retried"},
+        dry_run=False,
+    )  # type: ignore[arg-type]
+
+    assert result["ok"] is False
+    assert result["cleanup_required"] is True
+    assert result["error_code"] == "create_identity_indeterminate"
+    assert not any(address.endswith("/name") for address, _, _ in client.requests)
+
+
+def test_create_rejects_invalid_new_uuid_without_setters() -> None:
+    client = FakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        created_cue_id="not-a-uuid",
+    )
+    result = QLabReader(client).create_cue(
+        "ws-1",
+        "memo",
+        properties={"name": "Never applied"},
+        dry_run=False,
+    )  # type: ignore[arg-type]
+
+    assert result["ok"] is False
+    assert result["error_code"] == "create_identity_invalid"
+    assert result["cleanup_required"] is True
+    assert not any(address.endswith("/name") for address, _, _ in client.requests)
+
+
 def test_update_cue_dry_run_sends_no_mutating_osc() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None), existing_cue_id=cue_id)

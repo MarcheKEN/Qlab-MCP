@@ -65,7 +65,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         },
         "tags": ["cue-create", "gated-write", "qlab", "write-mode"],
         "input_schema_hash": "17535dbb35cb97e9105385195bcb5176d8f248ec9a0f6261a30b18e89554a771",
-        "output_schema_hash": "d30743735833e36fe06c57738953f52ebf8c8911d0824e43d4e0f402890042c5",
+        "output_schema_hash": "8bfe75a3ee9294044a6e77bf79c34dae8ed27a4faaf9786f17f6ae74085973ee",
     },
     "qlab_get_cue_details": {
         "title": "Get QLab Cue Details",
@@ -808,6 +808,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "workspace_ambiguous",
         "workspace_unavailable",
     ]
+    assert "cleanup_required" in create.outputSchema["properties"]
 
     edit = tools["qlab_edit_cues"]
     assert edit.title == "Edit QLab Cues"

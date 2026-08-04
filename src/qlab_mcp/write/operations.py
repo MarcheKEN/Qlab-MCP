@@ -29,12 +29,12 @@ from .allowlist import (
     VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES,
     ensure_real_write_allowed,
     normalize_update_request,
+    normalize_write_properties,
     read_keys_for_operations,
     real_write_permission_errors,
     validate_update_profile,
     validate_update_profile_for_cue,
     validate_writable_cue_type,
-    validate_write_properties,
 )
 from .safety import check_write_readiness, ensure_write_ready, resolve_dry_run
 from .results import build_batch_update_result as _batch_update_result
@@ -426,7 +426,7 @@ class QLabWriteMixin:
         workspace = _clean_workspace_id(workspace_id)
         effective_dry_run = resolve_dry_run(self, dry_run)
         qlab_cue_type = validate_writable_cue_type(cue_type)
-        normalized_properties = validate_write_properties(properties)
+        normalized_properties, update_operations = normalize_write_properties(properties)
         placement = _normalize_placement(after_cue_id)
 
         if placement is not None and not effective_dry_run:
@@ -450,13 +450,15 @@ class QLabWriteMixin:
                     "planned_operations": [],
                     "executed_operations": [],
                     "verification": None,
+                    "cleanup_required": False,
+                    "cleanup": None,
                     "errors": {"workspace_resolution": str(exc)},
                     "warnings": ["Requested workspace could not be resolved."],
                     "error_code": getattr(exc, "status", "workspace_not_found"),
                     "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
                     "message": "Requested workspace could not be resolved; no cue create operation was planned or sent.",
                 }
-            planned_operations = _planned_create_operations(workspace, qlab_cue_type, normalized_properties, placement)
+            planned_operations = _planned_create_operations(workspace, qlab_cue_type, update_operations, placement)
             return {
                 "ok": True,
                 "status": "dry_run",
@@ -476,7 +478,7 @@ class QLabWriteMixin:
             }
 
         workspace = ensure_write_ready(self, workspace)
-        planned_operations = _planned_create_operations(workspace, qlab_cue_type, normalized_properties, placement)
+        planned_operations = _planned_create_operations(workspace, qlab_cue_type, update_operations, placement)
 
         read_cache = getattr(self, "_read_cache", shared_read_cache())
         read_cache.clear()
@@ -490,12 +492,47 @@ class QLabWriteMixin:
             new_reply = self.client.request(new_address, qlab_cue_type)
             created_cue_id = _extract_created_cue_id(new_reply.data)
             new_status = new_reply.status
-        except OscTimeoutError as exc:
-            created_cue_id = _resolve_created_cue_after_timeout(self, workspace, before_ids)
-            new_status = "timeout_confirmed_by_fresh_read"
-            warnings.append(f"QLab did not reply to /new, but a fresh cue ID diff found created cue {created_cue_id}.")
-            if created_cue_id is None:
-                raise UnsafeWriteOperationError(f"QLab did not reply to /new and the created cue could not be identified: {exc}") from exc
+        except (OscTimeoutError, UnsafeWriteOperationError) as exc:
+            candidate_cue_id = _resolve_created_cue_after_timeout(self, workspace, before_ids)
+            candidate_cue_ids = [candidate_cue_id] if candidate_cue_id else []
+            timeout_indeterminate = isinstance(exc, OscTimeoutError)
+            warnings.append(
+                "QLab did not reply to /new; creation identity is indeterminate and no setter or retry was sent."
+                if timeout_indeterminate
+                else "QLab returned an invalid /new identity; no setter or retry was sent."
+            )
+            return {
+                "ok": False,
+                "status": "verification_failed",
+                "workspace_id": workspace,
+                "cue_type": qlab_cue_type,
+                "dry_run": False,
+                "created_cue_id": None,
+                "placement": placement,
+                "properties": normalized_properties,
+                "planned_operations": planned_operations,
+                "executed_operations": [
+                    {
+                        "operation": "new",
+                        "address": new_address,
+                        "args": [qlab_cue_type],
+                        "status": "timeout_indeterminate" if timeout_indeterminate else "identity_invalid",
+                        "created_cue_id": None,
+                    }
+                ],
+                "verification": None,
+                "cleanup_required": True,
+                "cleanup": {
+                    "status": "manual_review_required",
+                    "candidate_cue_ids": candidate_cue_ids or [],
+                    "reason": str(exc),
+                },
+                "errors": {"new": str(exc)},
+                "warnings": warnings,
+                "error_code": "create_identity_indeterminate" if timeout_indeterminate else "create_identity_invalid",
+                "suggested_action": "Inspect the workspace, then use a fresh dry-run/token before any cleanup or retry.",
+                "message": "QLab may have created a cue, but its identity could not be proven safely.",
+            }
         executed_operations.append(
             {
                 "operation": "new",
@@ -506,43 +543,62 @@ class QLabWriteMixin:
             }
         )
 
-        for key, value in normalized_properties.items():
-            address = _cue_id_address(workspace, created_cue_id, key)
+        verification_error = False
+        try:
+            shared_update = _apply_create_properties(self, workspace, created_cue_id, normalized_properties)
+        except Exception as exc:
+            shared_update = {}
+            verification_error = True
+            errors["verification"] = str(exc)
+        shared_item = _first_update_result(shared_update)
+        if shared_item is not None:
+            executed_operations.extend(shared_item.get("executed_operations") or [])
+            verification = {
+                "properties": shared_item.get("after") or {},
+                "cue_id": created_cue_id,
+            }
+            errors.update(shared_item.get("errors") or {})
+            warnings.extend(shared_item.get("warnings") or [])
+            identity_matches = _created_cue_identity_matches(verification["properties"], created_cue_id, qlab_cue_type)
+            verified = shared_item.get("status") in {
+                "updated",
+                "updated_with_confirmed_timeouts",
+            } and identity_matches
+            if not identity_matches:
+                errors.setdefault("verification", "Fresh readback did not identify the created cue and type.")
+        elif verification_error:
+            verification = None
+            verified = False
+        else:
             try:
-                reply = self.client.request(address, value)
-                status = reply.status
-                error = None
-            except OscTimeoutError as exc:
-                status = "timeout_pending_verification"
-                error = str(exc)
-                warnings.append(f"QLab did not reply to setter {key}; fresh verification is authoritative.")
+                read_cache.clear()
+                verification = self.get_cue_details(workspace, created_cue_id, "auto")
+                read_cache.clear()
+                verification_properties = verification.get("properties") if isinstance(verification, dict) else {}
+                identity_matches = _created_cue_identity_matches(verification_properties, created_cue_id, qlab_cue_type)
+                verified = _properties_match(verification_properties, normalized_properties) and identity_matches
+                if not identity_matches:
+                    errors["verification"] = "Fresh readback did not identify the created cue and type."
             except Exception as exc:
-                errors[key] = str(exc)
-                break
-            executed_operations.append(
-                {
-                    "operation": "set_property",
-                    "property": key,
-                    "address": address,
-                    "args": [value],
-                    "status": status,
-                    **({"error": error} if error else {}),
-                }
-            )
-
-        read_cache.clear()
-        verification = self.get_cue_details(workspace, created_cue_id, "auto")
-        read_cache.clear()
-        verification_properties = verification.get("properties") if isinstance(verification, dict) else {}
-        verified = _properties_match(verification_properties, normalized_properties)
+                errors["verification"] = str(exc)
+                verification = None
+                verified = False
         if errors or not verified:
             status = "verification_failed"
             ok = False
             message = "Cue create command was sent, but fresh verification did not confirm all requested properties."
+            cleanup_required = True
+            cleanup = {
+                "status": "manual_review_required",
+                "created_cue_id": created_cue_id,
+                "reason": "Creation completed but setter or fresh readback verification failed.",
+            }
         else:
             status = "created"
             ok = True
             message = "Cue created, safe initial properties applied, and cue details read back fresh."
+            cleanup_required = False
+            cleanup = None
 
         return {
             "ok": ok,
@@ -556,6 +612,8 @@ class QLabWriteMixin:
             "planned_operations": planned_operations,
             "executed_operations": executed_operations,
             "verification": verification,
+            "cleanup_required": cleanup_required,
+            "cleanup": cleanup,
             "errors": errors or None,
             "warnings": warnings,
             "message": message,
@@ -9563,7 +9621,7 @@ def _video_phase2_updateq_suggestion(property_name: str | None, reason: str) -> 
 def _planned_create_operations(
     workspace_id: str,
     cue_type: str,
-    properties: dict[str, Any],
+    update_operations: list[dict[str, Any]],
     placement: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     operations: list[dict[str, Any]] = [
@@ -9581,23 +9639,53 @@ def _planned_create_operations(
                 "status": "planned_only",
             }
         )
-    for key, value in properties.items():
-        operations.append(
-            {
-                "operation": "set_property",
-                "property": key,
-                "address": f"/workspace/{workspace_id}/cue_id/{{created_cue_id}}/{key}",
-                "args": [value],
-            }
-        )
-    operations.append(
-        {
-            "operation": "verify",
-            "profile": "auto",
-            "cacheable": False,
-        }
+    shared = _planned_update_operations(
+        workspace_id,
+        "{created_cue_id}",
+        update_operations,
+        resolved_cue_id="{created_cue_id}",
     )
+    operations.extend(shared[1:])
     return operations
+
+
+def _apply_create_properties(reader: Any, workspace: str, cue_id: str, properties: dict[str, Any]) -> dict[str, Any]:
+    """Run Create setters through Edit's preflight, timeout, and fresh-readback path."""
+    if not properties:
+        return {}
+    normalized = reader._normalize_and_validate_update_batch(
+        workspace,
+        [{"cue_ref": cue_id, "profile": COMMON_UPDATE_PROFILE, "properties": properties}],
+        dry_run=False,
+    )
+    if "items" not in normalized:
+        return normalized
+    deadline = time.monotonic() + UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS
+    preflight = _preflight_update_batch_real(
+        reader,
+        normalized["workspace"],
+        normalized["items"],
+        deadline,
+        requested_count=1,
+        calls=normalized["calls"],
+    )
+    if "preflight_results" not in preflight:
+        return preflight
+    return _execute_and_verify_update_batch(
+        reader,
+        preflight["workspace"],
+        normalized["items"],
+        preflight["preflight_results"],
+        preflight["update_deadline"],
+        preflight["setter_reply_timeout"],
+        preflight["read_cache"],
+        requested_count=1,
+    )
+
+
+def _first_update_result(batch: dict[str, Any]) -> dict[str, Any] | None:
+    results = batch.get("results") if isinstance(batch, dict) else None
+    return results[0] if isinstance(results, list) and results and isinstance(results[0], dict) else None
 
 
 def _planned_update_operations(
@@ -9818,6 +9906,12 @@ def _properties_match(values: Any, requested: dict[str, Any]) -> bool:
     if not isinstance(values, dict):
         return False
     return all(_property_values_match(key, values.get(key), value) for key, value in requested.items())
+
+
+def _created_cue_identity_matches(values: Any, created_cue_id: str, cue_type: str) -> bool:
+    if not isinstance(values, dict):
+        return False
+    return values.get("uniqueID") == created_cue_id and str(values.get("type") or "").casefold() == cue_type.casefold()
 
 
 def _is_readback_confirmable_gated_item(item: dict[str, Any]) -> bool:
@@ -10260,13 +10354,20 @@ def _diff_properties(
 
 
 def _extract_created_cue_id(data: Any) -> str:
+    def validate(value: str) -> str:
+        try:
+            UUID(value)
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise UnsafeWriteOperationError("QLab returned an invalid cue unique ID after /new.") from exc
+        return value
+
     if isinstance(data, str):
-        return _clean_cue_ref(data)
+        return validate(data.strip())
     if isinstance(data, dict):
         for key in ("uniqueID", "cueID", "cue_id", "id"):
             value = data.get(key)
             if isinstance(value, str) and value.strip():
-                return _clean_cue_ref(value)
+                return validate(value.strip())
         cue = data.get("cue")
         if isinstance(cue, dict):
             return _extract_created_cue_id(cue)

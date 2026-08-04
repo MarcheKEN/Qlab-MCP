@@ -348,6 +348,14 @@ class CreateCueResult(BaseModel):
     planned_operations: list[dict[str, Any]] = Field(default_factory=list)
     executed_operations: list[dict[str, Any]] = Field(default_factory=list)
     verification: dict[str, Any] | None = None
+    cleanup_required: bool = Field(
+        default=False,
+        description="True when creation may have mutated QLab but verification or later setters did not complete.",
+    )
+    cleanup: dict[str, Any] | None = Field(
+        default=None,
+        description="Manual cleanup guidance and any non-authoritative candidate cue IDs.",
+    )
     errors: dict[str, str] | None = Field(
         default=None,
         description="Per-property or verification errors; null when no errors were detected.",

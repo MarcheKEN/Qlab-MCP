@@ -42,8 +42,15 @@ def validate_writable_cue_type(cue_type: str) -> str:
 
 
 def validate_write_properties(properties: dict[str, Any] | None) -> dict[str, Any]:
+    return normalize_write_properties(properties)[0]
+
+
+def normalize_write_properties(
+    properties: dict[str, Any] | None,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Normalize Create's common properties through the Edit registry once."""
     if properties is None:
-        return {}
+        return {}, []
     normalized_properties, operations = normalize_update_request(COMMON_UPDATE_PROFILE, properties, None)
     blocked = [operation["property"] for operation in operations if not operation["real_write_enabled"]]
     if blocked:
@@ -51,7 +58,7 @@ def validate_write_properties(properties: dict[str, Any] | None) -> dict[str, An
         raise UnsafeWriteOperationError(
             f"cue create property is not allowlisted for real create writes; blocked: {blocked_text}"
         )
-    return normalized_properties
+    return normalized_properties, operations
 
 
 def validate_update_properties(

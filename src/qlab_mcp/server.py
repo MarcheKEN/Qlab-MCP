@@ -211,7 +211,7 @@ Use qlab_get_workspace_settings(mode="details", requests=[...]) after settings w
 
 Use qlab_query_cues for filtered cue searches across up to 500 cues by default, or up to 5000 cues when a caller explicitly raises the scan limit, then qlab_get_cue_details for one cue that needs deeper inspection.
 
-For write preflight, call qlab_check_write_readiness with an explicit workspace_id and always review a dry-run first. qlab_create_cue accepts no confirm_token; real creation still requires write readiness, an explicit workspace_id, a configured passcode, edit permission, and Edit Mode. qlab_edit_cues may return confirmation tokens for individual planned high-risk operations; copy the exact relevant planned_operations[].confirm_token values into that update item's confirm_gates, not one tool-level token. qlab_move_cues returns a dedicated tool-level confirm_token bound to the reviewed workspace structure and planned move batch, and real execution must receive that exact token. qlab_delete_cues returns a dedicated tool-level confirm_token bound to the reviewed deletion plan and fresh workspace structure, and real execution must receive that exact token. Move and Delete tokens are process-bound, so restarting the MCP invalidates tokens issued by the previous process. This server does not expose GO, stop, panic, raw OSC, or playback control.
+For write preflight, call qlab_check_write_readiness with an explicit workspace_id and always review a dry-run first. qlab_create_cue requires an exact after_cue_id anchor and a dedicated confirm:createCue:v1 token bound to the reviewed workspace structure; real creation still requires write readiness, an explicit workspace_id, a configured passcode, edit permission, and Edit Mode. qlab_edit_cues may return confirmation tokens for individual planned high-risk operations; copy the exact relevant planned_operations[].confirm_token values into that update item's confirm_gates, not one tool-level token. qlab_move_cues returns a dedicated tool-level confirm_token bound to the reviewed workspace structure and planned move batch, and real execution must receive that exact token. qlab_delete_cues returns a dedicated tool-level confirm_token bound to the reviewed deletion plan and fresh workspace structure, and real execution must receive that exact token. Create, Move, and Delete tokens are process-bound, so restarting the MCP invalidates tokens issued by the previous process. This server does not expose GO, stop, panic, raw OSC, or playback control.
 """,
 )
 
@@ -927,6 +927,14 @@ def qlab_create_cue(
             ),
         ),
     ],
+    after_cue_id: Annotated[
+        str,
+        Field(
+            description=(
+                "Required exact UUID anchor. The new cue is created immediately after this cue."
+            ),
+        ),
+    ],
     properties: Annotated[
         dict[str, Any] | None,
         Field(
@@ -945,12 +953,12 @@ def qlab_create_cue(
             ),
         ),
     ] = None,
-    after_cue_id: Annotated[
+    confirm_token: Annotated[
         str | None,
         Field(
             description=(
-                "Optional future placement target. In this preface it is accepted for dry-run planning only; "
-                "real creation with after_cue_id fails safely."
+                "Exact confirm:createCue:v1 token returned by the reviewed dry-run. "
+                "Required for real creation."
             ),
         ),
     ] = None,
@@ -958,7 +966,8 @@ def qlab_create_cue(
     """Create one blank allowlisted cue or return a dry-run plan.
 
     Real creation requires QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
-    Dry-run planning never sends mutating OSC.
+    Dry-run planning never sends mutating OSC. Real creation requires the exact
+    dedicated token from the dry-run and an unchanged structural anchor snapshot.
     This tool never exposes playback control, raw OSC, target edits, scripts, routing, or media paths.
     """
     return _run_tool(
@@ -969,6 +978,7 @@ def qlab_create_cue(
                 properties=properties,
                 dry_run=dry_run,
                 after_cue_id=after_cue_id,
+                confirm_token=confirm_token,
             )
         )
     )

@@ -41,9 +41,11 @@ Writes are disabled by default. Before any authorized write:
 5. Send one intended setter and require fresh readback.
 6. Roll back with a new dry-run and new token when the workflow requires one.
 
-`qlab_create_cue` has no confirmation-token argument. Edit tokens belong to
-individual `updates[].confirm_gates`. Move and Delete use one dedicated
-tool-level token. Restarting the MCP invalidates process-bound tokens.
+`qlab_create_cue` requires an exact `after_cue_id` anchor. Review its dry-run,
+then pass the returned dedicated `confirm:createCue:v1` token for real
+creation. Edit tokens belong to individual `updates[].confirm_gates`; Move and
+Delete use one dedicated tool-level token. Restarting the MCP invalidates
+process-bound tokens.
 
 See the [13 public tools](tools.md) and the
 [runtime edit checklist](../development/runtime-validation/edit-cues.md).

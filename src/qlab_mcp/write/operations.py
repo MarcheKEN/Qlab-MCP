@@ -9,6 +9,7 @@ import json
 import math
 import os
 import secrets
+import threading
 import time
 from typing import Any
 from uuid import UUID
@@ -59,7 +60,12 @@ from . import video_audio_time as _video_audio_time
 from . import video_opacity as _video_opacity
 from . import video_scalars as _video_scalars
 from . import video_translation as _video_translation
-from .moves import move_cues as _move_cues
+from .moves import (
+    _activity_snapshot as _structural_activity_snapshot,
+    _fingerprint as _structural_fingerprint,
+    _read_snapshot as _read_structural_snapshot,
+    move_cues as _move_cues,
+)
 from .deletes import delete_cues as _delete_cues
 from .groups import (
     GROUP_SOURCE_READ_KEYS,
@@ -96,6 +102,12 @@ _EXTRACTED_CONFIRM_TOKEN_LABELS = {
     _video_audio_time: "Phase 8B",
     _text_basics: "Phase 3E",
 }
+
+CREATE_TOKEN_VERSION = 1
+CREATE_TOKEN_TTL_SECONDS = 300
+_CREATE_TOKEN_SECRET = secrets.token_bytes(32)
+_CONSUMED_CREATE_TOKENS: dict[str, int] = {}
+_CONSUMED_CREATE_TOKENS_LOCK = threading.Lock()
 
 
 MAX_BATCH_UPDATES = 50
@@ -422,17 +434,12 @@ class QLabWriteMixin:
         properties: dict[str, Any] | None = None,
         dry_run: bool | None = None,
         after_cue_id: str | None = None,
+        confirm_token: str | None = None,
     ) -> dict[str, Any]:
         workspace = _clean_workspace_id(workspace_id)
         effective_dry_run = resolve_dry_run(self, dry_run)
         qlab_cue_type = validate_writable_cue_type(cue_type)
         normalized_properties, update_operations = normalize_write_properties(properties)
-        placement = _normalize_placement(after_cue_id)
-
-        if placement is not None and not effective_dry_run:
-            raise UnsafeWriteOperationError(
-                "after_cue_id placement is only available in dry-run during this write-mode preface."
-            )
 
         if effective_dry_run:
             try:
@@ -445,7 +452,8 @@ class QLabWriteMixin:
                     "cue_type": qlab_cue_type,
                     "dry_run": True,
                     "created_cue_id": None,
-                    "placement": placement,
+                    "confirm_token": None,
+                    "placement": None,
                     "properties": normalized_properties,
                     "planned_operations": [],
                     "executed_operations": [],
@@ -458,7 +466,34 @@ class QLabWriteMixin:
                     "suggested_action": "Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
                     "message": "Requested workspace could not be resolved; no cue create operation was planned or sent.",
                 }
-            planned_operations = _planned_create_operations(workspace, qlab_cue_type, update_operations, placement)
+            placement_anchor = _normalize_create_anchor(after_cue_id)
+            snapshot, activity, placement, preflight_error = _create_preflight(
+                self, workspace, placement_anchor
+            )
+            if preflight_error:
+                return _create_failure(
+                    workspace,
+                    qlab_cue_type,
+                    normalized_properties,
+                    dry_run=True,
+                    placement=placement,
+                    planned_operations=[],
+                    error_code="preflight_failed",
+                    errors={"preflight": preflight_error},
+                    message="Create dry-run preflight failed; no mutating OSC commands were planned or sent.",
+                )
+            binding = _create_token_binding(
+                workspace,
+                qlab_cue_type,
+                normalized_properties,
+                placement_anchor,
+                snapshot,
+                activity,
+            )
+            token = _encode_create_token(binding)
+            planned_operations = _planned_create_operations(
+                workspace, qlab_cue_type, update_operations, placement
+            )
             return {
                 "ok": True,
                 "status": "dry_run",
@@ -466,6 +501,7 @@ class QLabWriteMixin:
                 "cue_type": qlab_cue_type,
                 "dry_run": True,
                 "created_cue_id": None,
+                "confirm_token": token,
                 "placement": placement,
                 "properties": normalized_properties,
                 "planned_operations": planned_operations,
@@ -478,7 +514,83 @@ class QLabWriteMixin:
             }
 
         workspace = ensure_write_ready(self, workspace)
-        planned_operations = _planned_create_operations(workspace, qlab_cue_type, update_operations, placement)
+        placement_anchor = _normalize_create_anchor(after_cue_id)
+        snapshot, activity, placement, preflight_error = _create_preflight(
+            self, workspace, placement_anchor
+        )
+        if preflight_error:
+            return _create_failure(
+                workspace,
+                qlab_cue_type,
+                normalized_properties,
+                dry_run=False,
+                placement=placement,
+                planned_operations=[],
+                error_code="preflight_failed",
+                errors={"preflight": preflight_error},
+                message="Create preflight failed; no mutating OSC commands were sent.",
+            )
+        planned_operations = _planned_create_operations(
+            workspace, qlab_cue_type, update_operations, placement
+        )
+        payload, token_error = _decode_create_token(confirm_token)
+        if token_error or payload is None:
+            return _create_failure(
+                workspace,
+                qlab_cue_type,
+                normalized_properties,
+                dry_run=False,
+                placement=placement,
+                planned_operations=planned_operations,
+                error_code="preflight_failed",
+                errors={"confirm_token": token_error or "create confirmation token is invalid."},
+                message="Create real execution was rejected before any mutating OSC command.",
+            )
+        if _create_token_is_consumed(confirm_token):
+            return _create_failure(
+                workspace,
+                qlab_cue_type,
+                normalized_properties,
+                dry_run=False,
+                placement=placement,
+                planned_operations=planned_operations,
+                error_code="preflight_failed",
+                errors={"confirm_token": "confirmation_already_consumed: create confirm_token has already been used."},
+                message="Create real execution was rejected before any mutating OSC command.",
+            )
+        binding = _create_token_binding(
+            workspace,
+            qlab_cue_type,
+            normalized_properties,
+            placement_anchor,
+            snapshot,
+            activity,
+        )
+        if payload.get("binding") != binding:
+            return _create_failure(
+                workspace,
+                qlab_cue_type,
+                normalized_properties,
+                dry_run=False,
+                placement=placement,
+                planned_operations=planned_operations,
+                error_code="preflight_failed",
+                errors={"confirm_token": "create confirmation token does not match the fresh workspace structure."},
+                message="Create real execution was rejected before any mutating OSC command.",
+            )
+        token_error = _consume_create_token(confirm_token, payload)
+        if token_error:
+            return _create_failure(
+                workspace,
+                qlab_cue_type,
+                normalized_properties,
+                dry_run=False,
+                placement=placement,
+                planned_operations=planned_operations,
+                error_code="preflight_failed",
+                errors={"confirm_token": token_error},
+                message="Create real execution was rejected before any mutating OSC command.",
+            )
 
         read_cache = getattr(self, "_read_cache", shared_read_cache())
         read_cache.clear()
@@ -486,15 +598,14 @@ class QLabWriteMixin:
         executed_operations: list[dict[str, Any]] = []
         warnings: list[str] = []
         errors: dict[str, str] = {}
-        before_ids = _try_workspace_cue_ids(self, workspace)
         new_address = _workspace_address(workspace, "new")
         try:
-            new_reply = self.client.request(new_address, qlab_cue_type)
+            anchor_osc_id = placement["anchor_osc_id"]
+            new_reply = self.client.request(new_address, qlab_cue_type, anchor_osc_id)
             created_cue_id = _extract_created_cue_id(new_reply.data)
             new_status = new_reply.status
         except (OscTimeoutError, UnsafeWriteOperationError) as exc:
-            candidate_cue_id = _resolve_created_cue_after_timeout(self, workspace, before_ids)
-            candidate_cue_ids = [candidate_cue_id] if candidate_cue_id else []
+            candidate_cue_ids = []
             timeout_indeterminate = isinstance(exc, OscTimeoutError)
             warnings.append(
                 "QLab did not reply to /new; creation identity is indeterminate and no setter or retry was sent."
@@ -508,6 +619,7 @@ class QLabWriteMixin:
                 "cue_type": qlab_cue_type,
                 "dry_run": False,
                 "created_cue_id": None,
+                "confirm_token": None,
                 "placement": placement,
                 "properties": normalized_properties,
                 "planned_operations": planned_operations,
@@ -515,7 +627,7 @@ class QLabWriteMixin:
                     {
                         "operation": "new",
                         "address": new_address,
-                        "args": [qlab_cue_type],
+                        "args": [qlab_cue_type, anchor_osc_id],
                         "status": "timeout_indeterminate" if timeout_indeterminate else "identity_invalid",
                         "created_cue_id": None,
                     }
@@ -537,7 +649,7 @@ class QLabWriteMixin:
             {
                 "operation": "new",
                 "address": new_address,
-                "args": [qlab_cue_type],
+                "args": [qlab_cue_type, anchor_osc_id],
                 "status": new_status,
                 "created_cue_id": created_cue_id,
             }
@@ -583,6 +695,14 @@ class QLabWriteMixin:
                 errors["verification"] = str(exc)
                 verification = None
                 verified = False
+        structure = _verify_created_structure(self, workspace, created_cue_id, placement, snapshot)
+        verification = _merge_create_verification(verification, structure)
+        if structure.get("error"):
+            errors.setdefault("placement", str(structure["error"]))
+        verification_properties = verification.get("properties") if isinstance(verification, dict) else {}
+        if not _create_health_matches(verification_properties):
+            errors.setdefault("verification", "Fresh readback did not confirm a healthy, inactive created cue.")
+        verified = verified and bool(structure.get("ok"))
         if errors or not verified:
             status = "verification_failed"
             ok = False
@@ -612,6 +732,7 @@ class QLabWriteMixin:
             "planned_operations": planned_operations,
             "executed_operations": executed_operations,
             "verification": verification,
+            "confirm_token": None,
             "cleanup_required": cleanup_required,
             "cleanup": cleanup,
             "errors": errors or None,
@@ -2803,15 +2924,265 @@ def _refresh_group_real_result(
         }
 
 
-def _normalize_placement(after_cue_id: str | None) -> dict[str, Any] | None:
-    if after_cue_id is None:
-        return None
-    cue_id = _clean_cue_ref(after_cue_id)
-    return {
-        "after_cue_id": cue_id,
-        "status": "planned_only",
-        "message": "after_cue_id is accepted for dry-run planning only in this preface.",
+def _normalize_create_anchor(after_cue_id: str | None) -> str:
+    if not isinstance(after_cue_id, str) or not after_cue_id.strip():
+        raise UnsafeWriteOperationError("after_cue_id is required for deterministic cue creation.")
+    try:
+        return str(UUID(after_cue_id.strip()))
+    except (TypeError, ValueError) as exc:
+        raise UnsafeWriteOperationError("after_cue_id must be an exact cue UUID.") from exc
+
+
+def _create_tree_fingerprint(snapshot: dict[str, Any]) -> str:
+    tree = snapshot.get("children_by_parent")
+    if not isinstance(tree, dict):
+        raise UnsafeWriteOperationError("Create structural snapshot is incomplete.")
+    return _structural_fingerprint(
+        [f"{parent}:{','.join(children)}" for parent, children in sorted(tree.items())]
+    )
+
+
+def _create_preflight(
+    reader: Any,
+    workspace_id: str,
+    anchor_id: str,
+) -> tuple[dict[str, Any] | None, dict[str, Any], dict[str, Any] | None, str | None]:
+    try:
+        snapshot = _read_structural_snapshot(reader, workspace_id)
+        activity = _structural_activity_snapshot(reader, workspace_id)
+    except Exception as exc:
+        return None, {}, None, str(exc)
+    if activity.get("active_count"):
+        return snapshot, activity, None, "Workspace activity is not safely idle; create requires 0 running/paused cues."
+    nodes = snapshot.get("nodes") or {}
+    anchor = nodes.get(anchor_id)
+    if not isinstance(anchor, dict):
+        return snapshot, activity, None, "after_cue_id does not resolve in the workspace."
+    parent_id = snapshot.get("parent_by_child", {}).get(anchor_id)
+    if not parent_id:
+        return snapshot, activity, None, "after_cue_id must identify a cue inside a Cue List or Group."
+    parent = nodes.get(parent_id) or {}
+    if parent.get("type") not in {"Cue List", "Group"}:
+        return snapshot, activity, None, "after_cue_id must be inside a linear Cue List or Group."
+    if any(
+        value in (True, 1, "true", "yes", "1")
+        for value in (
+            anchor.get("isBroken"),
+            anchor.get("isWarning"),
+            parent.get("isBroken"),
+            parent.get("isWarning"),
+        )
+    ):
+        return snapshot, activity, None, "after_cue_id must identify a healthy anchor cue."
+    children = list(snapshot.get("children_by_parent", {}).get(parent_id, []))
+    try:
+        anchor_index = children.index(anchor_id)
+    except ValueError:
+        return snapshot, activity, None, "Structural snapshot does not contain the requested anchor order."
+    placement = {
+        "after_cue_id": anchor_id,
+        "anchor_osc_id": anchor.get("uniqueID", anchor_id),
+        "parent_id": parent_id,
+        "anchor_index": anchor_index,
+        "expected_index": anchor_index + 1,
+        "parent_children": children,
+        "parent_fingerprint": _structural_fingerprint(children),
+        "tree_fingerprint": _create_tree_fingerprint(snapshot),
+        "status": "anchored",
     }
+    return snapshot, activity, placement, None
+
+
+def _create_token_binding(
+    workspace_id: str,
+    cue_type: str,
+    properties: dict[str, Any],
+    anchor_id: str,
+    snapshot: dict[str, Any] | None,
+    activity: dict[str, Any],
+) -> dict[str, Any]:
+    if snapshot is None:
+        raise UnsafeWriteOperationError("Create structural snapshot is required for confirmation.")
+    parent_id = snapshot.get("parent_by_child", {}).get(anchor_id)
+    children = list(snapshot.get("children_by_parent", {}).get(parent_id, []))
+    anchor_index = children.index(anchor_id)
+    return {
+        "version": CREATE_TOKEN_VERSION,
+        "workspace_id": workspace_id,
+        "cue_type": cue_type,
+        "properties": properties,
+        "after_cue_id": anchor_id,
+        "parent_id": parent_id,
+        "anchor_index": anchor_index,
+        "parent_children": children,
+        "parent_fingerprint": _structural_fingerprint(children),
+        "tree_fingerprint": _create_tree_fingerprint(snapshot),
+        "activity_snapshot": activity,
+    }
+
+
+def _encode_create_token(binding: dict[str, Any]) -> str:
+    return encode_confirm_token(
+        "createCue",
+        CREATE_TOKEN_VERSION,
+        {
+            "binding": binding,
+            "expires_at": int(time.time()) + CREATE_TOKEN_TTL_SECONDS,
+            "nonce": secrets.token_urlsafe(12),
+        },
+        _CREATE_TOKEN_SECRET,
+    )
+
+
+def _decode_create_token(token: str | None) -> tuple[dict[str, Any] | None, str | None]:
+    if not isinstance(token, str):
+        return None, "create confirmation token is required."
+    payload, error = decode_confirm_token(
+        token,
+        "createCue",
+        CREATE_TOKEN_VERSION,
+        _CREATE_TOKEN_SECRET,
+    )
+    if error == "malformed":
+        return None, "create confirmation token is malformed or has an unsupported family."
+    if error == "signature":
+        return None, "create confirmation token signature is invalid."
+    if error == "payload" or payload is None:
+        return None, "create confirmation token payload is invalid."
+    expires_at = payload.get("expires_at")
+    if not isinstance(expires_at, int):
+        return None, "create confirmation token payload is invalid."
+    if expires_at < int(time.time()):
+        return None, "create confirmation token has expired."
+    if not isinstance(payload.get("binding"), dict):
+        return None, "create confirmation token payload is invalid."
+    return payload, None
+
+
+def _consume_create_token(token: str | None, payload: dict[str, Any]) -> str | None:
+    if not isinstance(token, str):
+        return "create confirmation token is required."
+    digest = hashlib.sha256(token.encode()).hexdigest()
+    expires_at = int(payload.get("expires_at", 0))
+    now = int(time.time())
+    with _CONSUMED_CREATE_TOKENS_LOCK:
+        for consumed, expiry in list(_CONSUMED_CREATE_TOKENS.items()):
+            if expiry < now:
+                del _CONSUMED_CREATE_TOKENS[consumed]
+        if digest in _CONSUMED_CREATE_TOKENS:
+            return "confirmation_already_consumed: create confirm_token has already been used."
+        _CONSUMED_CREATE_TOKENS[digest] = expires_at
+    return None
+
+
+def _create_token_is_consumed(token: str | None) -> bool:
+    if not isinstance(token, str):
+        return False
+    digest = hashlib.sha256(token.encode()).hexdigest()
+    now = int(time.time())
+    with _CONSUMED_CREATE_TOKENS_LOCK:
+        for consumed, expiry in list(_CONSUMED_CREATE_TOKENS.items()):
+            if expiry < now:
+                del _CONSUMED_CREATE_TOKENS[consumed]
+        return digest in _CONSUMED_CREATE_TOKENS
+
+
+def _create_failure(
+    workspace_id: str,
+    cue_type: str,
+    properties: dict[str, Any],
+    *,
+    dry_run: bool,
+    placement: dict[str, Any] | None,
+    planned_operations: list[dict[str, Any]],
+    error_code: str,
+    errors: dict[str, str],
+    message: str,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": "preflight_failed" if dry_run or error_code == "preflight_failed" else "verification_failed",
+        "workspace_id": workspace_id,
+        "cue_type": cue_type,
+        "dry_run": dry_run,
+        "created_cue_id": None,
+        "confirm_token": None,
+        "placement": placement,
+        "properties": properties,
+        "planned_operations": planned_operations,
+        "executed_operations": [],
+        "verification": None,
+        "cleanup_required": False,
+        "cleanup": None,
+        "errors": errors,
+        "warnings": [],
+        "error_code": error_code,
+        "suggested_action": "Review the fresh workspace snapshot and run a new dry-run before retrying.",
+        "message": message,
+    }
+
+
+def _verify_created_structure(
+    reader: Any,
+    workspace_id: str,
+    created_cue_id: str,
+    placement: dict[str, Any],
+    before_snapshot: dict[str, Any] | None,
+) -> dict[str, Any]:
+    try:
+        after = _read_structural_snapshot(reader, workspace_id)
+        created_id = str(UUID(created_cue_id))
+        parent_id = placement["parent_id"]
+        children = list(after.get("children_by_parent", {}).get(parent_id, []))
+        actual_index = children.index(created_id)
+        expected_children = list(placement["parent_children"])
+        expected_children.insert(placement["expected_index"], created_id)
+        expected_tree = {
+            parent: list(values)
+            for parent, values in (before_snapshot or {}).get("children_by_parent", {}).items()
+        }
+        expected_tree[parent_id] = expected_children
+        created_node = after.get("nodes", {}).get(created_id, {})
+        if created_node.get("type") in {"Group", "Cue List", "Cue Cart", "Cart"}:
+            expected_tree.setdefault(created_id, [])
+        expected_fingerprint = _structural_fingerprint(
+            [f"{parent}:{','.join(values)}" for parent, values in sorted(expected_tree.items())]
+        )
+        actual_fingerprint = _create_tree_fingerprint(after)
+        if children != expected_children:
+            raise UnsafeWriteOperationError(
+                "Fresh structural readback did not confirm the created cue immediately after the anchor."
+            )
+        if actual_fingerprint != expected_fingerprint:
+            raise UnsafeWriteOperationError("Fresh structural readback detected workspace drift during creation.")
+        return {
+            "ok": True,
+            "parent_id": parent_id,
+            "index": actual_index,
+            "after_cue_id": placement["after_cue_id"],
+            "tree_fingerprint": actual_fingerprint,
+            "expected_tree_fingerprint": expected_fingerprint,
+        }
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def _merge_create_verification(
+    verification: dict[str, Any] | None,
+    structure: dict[str, Any],
+) -> dict[str, Any]:
+    merged = dict(verification or {})
+    merged["structure"] = structure
+    return merged
+
+
+def _create_health_matches(properties: Any) -> bool:
+    if not isinstance(properties, dict):
+        return False
+    for key in ("isBroken", "isWarning", "isRunning", "isPaused", "isAuditioning", "isActionRunning"):
+        if key in properties and properties[key] in (True, 1, "true", "yes", "1"):
+            return False
+    return True
 
 
 def _clean_update_cue_ref(cue_ref: str) -> str:
@@ -9622,23 +9993,16 @@ def _planned_create_operations(
     workspace_id: str,
     cue_type: str,
     update_operations: list[dict[str, Any]],
-    placement: dict[str, Any] | None,
+    placement: dict[str, Any],
 ) -> list[dict[str, Any]]:
     operations: list[dict[str, Any]] = [
         {
             "operation": "new",
             "address": _workspace_address(workspace_id, "new"),
-            "args": [cue_type],
-        }
+            "args": [cue_type, placement["anchor_osc_id"]],
+            "after_cue_id": placement["after_cue_id"],
+        },
     ]
-    if placement is not None:
-        operations.append(
-            {
-                "operation": "move_after",
-                "after_cue_id": placement["after_cue_id"],
-                "status": "planned_only",
-            }
-        )
     shared = _planned_update_operations(
         workspace_id,
         "{created_cue_id}",
@@ -9646,6 +10010,15 @@ def _planned_create_operations(
         resolved_cue_id="{created_cue_id}",
     )
     operations.extend(shared[1:])
+    operations.append(
+        {
+            "operation": "verify_structure",
+            "parent_id": placement["parent_id"],
+            "after_cue_id": placement["after_cue_id"],
+            "expected_index": placement["expected_index"],
+            "cacheable": False,
+        }
+    )
     return operations
 
 

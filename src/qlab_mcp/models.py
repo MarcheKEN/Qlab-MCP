@@ -43,6 +43,7 @@ WriteReadinessStatus = Literal[
 ]
 CreateCueStatus = Literal[
     "dry_run",
+    "preflight_failed",
     "created",
     "verification_failed",
     "workspace_not_found",
@@ -342,6 +343,10 @@ class CreateCueResult(BaseModel):
     workspace_id: str
     cue_type: str
     dry_run: bool
+    confirm_token: str | None = Field(
+        default=None,
+        description="Dedicated confirm:createCue:v1 token returned by dry-run and consumed by real creation.",
+    )
     created_cue_id: str | None = None
     placement: dict[str, Any] | None = None
     properties: dict[str, Any] = Field(default_factory=dict)

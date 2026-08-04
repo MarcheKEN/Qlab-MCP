@@ -14,14 +14,16 @@ the source of truth for exact annotations and constraints.
 | `qlab_query_cues` | `workspace_id`, `primary_filter`, `primary_value`, `optional_filters=None`, `profile="basic_safe"`, `max_results=500`, `max_cues_scanned=500` | `CueQueryResult` | Read-only |
 | `qlab_get_cue_details` | `workspace_id`, `cue_ref`, `profile="auto"` | `CueDetailsResult` or `CueDetailsBatchResult` | Read-only |
 | `qlab_check_write_readiness` | `workspace_id` | `WriteReadinessResult` | Read-only preflight |
-| `qlab_create_cue` | `workspace_id`, `cue_type`, `properties=None`, `dry_run=None`, `after_cue_id=None` | `CreateCueResult` | Gated write |
+| `qlab_create_cue` | `workspace_id`, `cue_type`, `after_cue_id`, `properties=None`, `dry_run=None`, `confirm_token=None` | `CreateCueResult` | Gated structural write |
 | `qlab_edit_cues` | `workspace_id`, `updates`, `dry_run=None` | `UpdateCuesResult` | Gated write |
 | `qlab_update_cues` | Same arguments and defaults as `qlab_edit_cues` | `UpdateCuesResult` | Compatible alias |
 | `qlab_move_cues` | `workspace_id`, `moves`, `dry_run=None`, `confirm_token=None` | `MoveCuesResult` | Gated structural write |
 | `qlab_delete_cues` | `workspace_id`, `cue_ids`, `dry_run=None`, `confirm_token=None` | `DeleteCuesResult` | Gated destructive write |
 
 `dry_run=None` follows `QLAB_WRITE_DRY_RUN_DEFAULT`, which defaults to dry-run.
-Create accepts only blank `memo`, `group`, `wait`, or `audio` cues. Edit accepts
+Create accepts only blank `memo`, `group`, `wait`, or `audio` cues and requires
+an exact anchor plus a fresh dry-run token bound to the workspace structure.
+Edit accepts
 1–50 updates; Move and Delete accept 1–10 exact UUID targets. Delete is
 leaf-only and does not cascade.
 

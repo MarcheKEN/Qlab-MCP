@@ -1997,9 +1997,10 @@ def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
             "properties": [prop.name for prop in COMMON_PROPERTIES],
             "dry_run_default": dry_run_default,
             "placement": {
-                "after_cue_id": "dry_run_only_in_this_preface",
-                "parent_id": "planned_later",
-                "index": "planned_later",
+                "after_cue_id": "required_exact_uuid_anchor",
+                "parent_id": "verified_from_structural_snapshot",
+                "index": "anchor_index_plus_one",
+                "confirm_token": "confirm:createCue:v1",
             },
         },
         "batch_update_cues": update_cues_capability,

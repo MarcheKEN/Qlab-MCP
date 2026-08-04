@@ -64,8 +64,8 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["cue-create", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "17535dbb35cb97e9105385195bcb5176d8f248ec9a0f6261a30b18e89554a771",
-        "output_schema_hash": "8bfe75a3ee9294044a6e77bf79c34dae8ed27a4faaf9786f17f6ae74085973ee",
+        "input_schema_hash": "ea020bbee21d28e0e554a44c90b2c599740f5c20e496109850359f0786a10ef4",
+        "output_schema_hash": "779ad46ef58546d76ad25fe5577516fb2aa660608653b5d684c044f34a790013",
     },
     "qlab_get_cue_details": {
         "title": "Get QLab Cue Details",
@@ -800,8 +800,10 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "dry_run" in create.inputSchema["properties"]
     assert "workspace_id" in create.inputSchema["required"]
     assert "cue_type" in create.inputSchema["required"]
+    assert "after_cue_id" in create.inputSchema["required"]
     assert create.outputSchema["properties"]["status"]["enum"] == [
         "dry_run",
+        "preflight_failed",
         "created",
         "verification_failed",
         "workspace_not_found",
@@ -950,7 +952,7 @@ def test_write_tool_wrappers_do_not_pass_outer_reader_deadlines(monkeypatch) -> 
 
     monkeypatch.setattr(server_module, "_run_tool", capture)
 
-    assert server_module.qlab_create_cue("ws-1", "memo") == "ok"
+    assert server_module.qlab_create_cue("ws-1", "memo", "11111111-1111-4111-8111-111111111111") == "ok"
     assert server_module.qlab_edit_cues("ws-1", [], dry_run=True) == "ok"
     assert server_module.qlab_move_cues("ws-1", [], dry_run=True) == "ok"
     assert server_module.qlab_delete_cues("ws-1", [], dry_run=True) == "ok"

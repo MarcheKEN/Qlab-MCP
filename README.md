@@ -127,7 +127,7 @@ Cue edit flow:
 | Tool | Purpose |
 | --- | --- |
 | `qlab_check_write_readiness` | Checks disabled-by-default write readiness without mutation. |
-| `qlab_create_cue` | Dry-runs or creates one blank allowlisted cue with safe initial properties. |
+| `qlab_create_cue` | Dry-runs or creates one blank allowlisted cue after an exact anchor with safe initial properties. |
 | `qlab_edit_cues` | Dry-runs or updates 1-50 concrete cues through the cue editing registry. |
 | `qlab_update_cues` | Compatibility alias for older prompts, tests, and clients. |
 | `qlab_move_cues` | Dry-runs or moves 1-10 exact UUID-addressed cues within or between Lists and Groups. |
@@ -173,8 +173,9 @@ Write mode is deliberately gated:
 - Once real setters start, batch writes are not transactional. Later failures
   are reported per item and require normal readback or manual review.
 - Real writes bypass and clear the read cache before fresh verification.
-- `qlab_create_cue` has no `confirm_token` argument. Review its dry-run before
-  real creation.
+- `qlab_create_cue` requires an exact `after_cue_id` anchor and the exact fresh
+  `confirm:createCue:v1` token returned by its dry-run. The token binds the
+  reviewed workspace structure and is consumed before `/new`.
 - `qlab_edit_cues` may return tokens for individual planned high-risk
   operations. Copy each exact relevant `planned_operations[].confirm_token`
   into that update item's `confirm_gates`; there is no tool-level Edit token.
@@ -192,11 +193,22 @@ Write mode is deliberately gated:
 
 Allowed cue creation is intentionally narrow:
 
-- Only blank cue creation is allowed in this preface.
+- Only blank cue creation is allowed in this preface; blank means no initial
+  properties were supplied, not that QLab templates or cue normalization are
+  guaranteed to be empty.
 - Allowed cue types are `memo`, `group`, `wait`, and `audio`.
 - Safe initial properties are `name`, `number`, `armed`, `flagged`, `colorName`,
   `preWait`, `postWait`, `duration`, and `continueMode`.
-- `after_cue_id` placement is dry-run planning only.
+- `after_cue_id` is required and is the only real placement mode currently
+  supported. It must identify a healthy inactive cue in a linear Cue List or
+  Group. Group-empty insertion, Cue Cart placement, `parent_id + position`,
+  and arbitrary index placement remain out of scope.
+- Real Create sends `/new` once at most. A timeout or invalid identity is
+  indeterminate: no property setter or retry is allowed. The result reports
+  `created_cue_id`, `placement`, `verification`, `executed_operations`,
+  `errors`, `warnings`, `cleanup_required`, and manual `cleanup` guidance.
+- Runtime proof currently covers only one blank anchored Wait. Other allowlisted
+  types and property families remain source/test-supported, not runtime-certified.
 
 Cue updates use concrete cue numbers or unique IDs. `selected`, `active`,
 `playhead`, and `playbackPosition` are rejected for updates.
@@ -533,7 +545,7 @@ qlab_get_workspace_setting_details(workspace_id, section, kind=None, ref=None, p
 qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=None, profile="basic_safe", max_results=500, max_cues_scanned=500)
 qlab_get_cue_details(workspace_id, cue_ref, profile="auto")
 qlab_check_write_readiness(workspace_id)
-qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
+qlab_create_cue(workspace_id, cue_type, after_cue_id, properties=None, dry_run=None, confirm_token=None)
 qlab_edit_cues(workspace_id, updates, dry_run=None)
 qlab_update_cues(workspace_id, updates, dry_run=None)  # compatibility alias
 qlab_move_cues(workspace_id, moves, dry_run=None, confirm_token=None)

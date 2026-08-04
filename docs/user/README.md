@@ -47,5 +47,14 @@ creation. Edit tokens belong to individual `updates[].confirm_gates`; Move and
 Delete use one dedicated tool-level token. Restarting the MCP invalidates
 process-bound tokens.
 
-See the [13 public tools](tools.md) and the
+Create sends `/new` at most once. If QLab times out or returns an identity that
+cannot be proven, stop without applying properties or retrying. The result may
+set `cleanup_required=true`; inspect the workspace manually and use a fresh
+Delete dry-run/token only after the created UUID is unambiguous. Create has no
+automatic cleanup or fallback backend. Workorder 031 runtime evidence covers
+only one blank anchored Wait; the other allowlisted types and property families
+remain source/test-supported but runtime-uncertified.
+
+See the [13 public tools](tools.md), the
+[runtime Create checklist](../development/runtime-validation/create-cues.md), and the
 [runtime edit checklist](../development/runtime-validation/edit-cues.md).

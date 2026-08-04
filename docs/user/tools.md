@@ -22,10 +22,16 @@ the source of truth for exact annotations and constraints.
 
 `dry_run=None` follows `QLAB_WRITE_DRY_RUN_DEFAULT`, which defaults to dry-run.
 Create accepts only blank `memo`, `group`, `wait`, or `audio` cues and requires
-an exact anchor plus a fresh dry-run token bound to the workspace structure.
+an exact anchor plus a fresh `confirm:createCue:v1` token bound to the workspace
+structure. Real Create returns a structured `CreateCueResult` with the created
+UUID, placement, fresh verification, executed operations, warnings/errors, and
+`cleanup_required`/manual cleanup guidance. An ambiguous `/new` timeout is
+never retried and receives no property setters. Runtime proof currently covers
+only blank anchored Wait creation.
 Edit accepts
 1–50 updates; Move and Delete accept 1–10 exact UUID targets. Delete is
-leaf-only and does not cascade.
+leaf-only, sequential, non-atomic, and does not cascade; real deletion requires
+its exact fresh `confirm:deleteCues:v1` token.
 
 `qlab_update_cues` calls `qlab_edit_cues` directly and remains available for
 older clients. Move and Delete are intentional public additions, not aliases.

@@ -18,6 +18,7 @@ Start here, then follow the folder index nearest to the work you are doing.
 
 - [Development index](development/README.md)
 - [Architecture](development/architecture.md)
+- [Runtime checklist for `qlab_create_cue`](development/runtime-validation/create-cues.md)
 - [Runtime checklist for `qlab_edit_cues`](development/runtime-validation/edit-cues.md)
 
 ## References

@@ -386,6 +386,67 @@ def test_move_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
     assert result.structured_content["confirm_token"].startswith("confirm:moveCues:v1:")
 
 
+def test_create_cue_fastmcp_forwards_anchor_and_returns_structured_plan(monkeypatch) -> None:
+    class FakeReader:
+        def create_cue(self, workspace_id, cue_type, properties, dry_run, after_cue_id, confirm_token):
+            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            assert cue_type == "wait"
+            assert properties is None
+            assert dry_run is True
+            assert after_cue_id == "11111111-1111-4111-8111-111111111111"
+            assert confirm_token is None
+            return {
+                "ok": True,
+                "status": "dry_run",
+                "workspace_id": workspace_id,
+                "cue_type": "Wait",
+                "dry_run": True,
+                "confirm_token": "confirm:createCue:v1:payload:signature",
+                "created_cue_id": None,
+                "placement": {
+                    "after_cue_id": after_cue_id,
+                    "expected_index": 1,
+                    "status": "anchored",
+                },
+                "planned_operations": [
+                    {"operation": "new", "args": ["Wait", after_cue_id]},
+                    {"operation": "verify"},
+                    {"operation": "verify_structure"},
+                ],
+                "executed_operations": [],
+                "verification": None,
+                "cleanup_required": False,
+                "cleanup": None,
+                "errors": None,
+                "warnings": ["Dry run only."],
+                "message": "Cue create batch planned.",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_create_cue",
+                {
+                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "cue_type": "wait",
+                    "after_cue_id": "11111111-1111-4111-8111-111111111111",
+                    "dry_run": True,
+                },
+            )
+
+    result = asyncio.run(call_tool())
+    assert result.is_error is False
+    assert result.structured_content["status"] == "dry_run"
+    assert result.structured_content["confirm_token"].startswith("confirm:createCue:v1:")
+    assert result.structured_content["planned_operations"][0]["args"] == [
+        "Wait",
+        "11111111-1111-4111-8111-111111111111",
+    ]
+    assert result.structured_content["executed_operations"] == []
+
+
 def test_delete_cues_fastmcp_schema_limits_and_nested_uuid_model() -> None:
     async def get_tool_schema() -> dict[str, Any]:
         async with Client(mcp) as client:

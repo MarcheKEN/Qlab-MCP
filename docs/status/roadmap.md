@@ -1,6 +1,6 @@
 # Active Roadmap
 
-Status: 2026-08-04
+Status: 2026-08-07
 
 Current local verification: `2479 passed, 41 subtests passed in 6.35s`; zero
 skips. The full suite includes wheel/sdist build and artifact-membership checks.
@@ -11,6 +11,24 @@ below apply only to their named QLab version and procedure. The local reference
 snapshot is documented QLab 5 material with unknown exact patch and retrieval
 date; its first repository import date is inferred provenance only. QLab 5.6.x
 runtime support is not claimed.
+
+## Security hardening status
+
+- PR-1 through PR-4 are implemented and validated locally and against the
+  documented QLab 5.5.10 runtime evidence: settings batches are bounded,
+  numeric OSC values are wire-format validated, script profiles use canonical
+  `scriptSource` rules, and `lightCommandText` analysis is bounded.
+- The repository threat model and accepted risks are defined in the root
+  [`SECURITY.md`](../../SECURITY.md). The local caller may provide malformed or
+  oversized arguments; QLab, `QLAB_HOST`, and the operator are trusted, and a
+  hostile same-network process is outside the initial scope.
+- UDP source-port filtering is intentionally pending. QLab 5.5.10 packet
+  capture could not be completed because macOS capture permissions were
+  unavailable. A fake-UDP test for delayed same-address replies is the next
+  transport investigation and is separate from source-port authenticity.
+- No new schema limits, AppleScript fallback, raw OSC, playback, GO, Dashboard,
+  or broad write surface is planned from this security pass without new
+  evidence and an explicit compatibility decision.
 
 ## Locally implemented; runtime validation pending
 

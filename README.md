@@ -8,6 +8,9 @@ settings, patches, and routes. They do not expose playback or mutation controls.
 Optional write-mode tools are separate, disabled unless explicitly gated, and
 dry-run-first.
 
+See [`SECURITY.md`](SECURITY.md) for the supported threat model, security
+invariants, accepted risks, and QLab 5.5.10 evidence boundary.
+
 ## What It Does
 
 - Workspace overview and status: cue lists, groups, counts, Edit/Show mode,
@@ -31,6 +34,12 @@ dry-run-first.
 - No ungated high-risk writes. High-risk families require dry-run review plus
   exact `planned_operations[].confirm_token` values when supported, or they
   remain blocked.
+
+The initial security model is local: QLab, `QLAB_HOST`, and the operator are
+trusted, while MCP arguments are treated as untrusted. A hostile process on the
+same network is outside the initial scope. UDP replies are matched by sender IP
+and OSC address; source-port filtering is intentionally deferred pending real
+QLab 5.5.10 packet evidence.
 
 ## Quick Start
 
@@ -149,6 +158,8 @@ at once.
   settings items.
 - `technical`, `full_sensitive`, and `exhaustive` are explicit audit modes, not
   normal defaults.
+- Details batches accept at most 50 requests and six sections. Over-limit
+  input returns a structured error before workspace resolution or OSC traffic.
 
 For large shows, `qlab_query_cues` defaults to `max_results=500` and
 `max_cues_scanned=500`. Callers can raise either limit up to `5000`. Results
@@ -427,10 +438,20 @@ Cue detail profiles are tiered:
 - `full_sensitive` / `exhaustive`: explicit large/sensitive reads; still no MCP
   implementation paths.
 
+Sensitive cue queries return at most 50 cues and 1 MiB of serialized response.
+`qlab_query_cues(profile="exhaustive")` is rejected; `exhaustive` is reserved
+for cue details. `scriptSource` is the only public script-content field, and
+only explicit sensitive profiles may expose it. `scriptText` is not sent as an
+independent OSC key or returned by normal profiles.
+
 Compact profiles truncate long text fields such as notes, memo text, light
 commands, and network messages. Script source is excluded from compact
 profiles. Truncated fields return
 `field_truncated: true` and `original_length`.
+
+`lightCommandText` analysis rejects input over 65,536 UTF-8 bytes, 2,000 lines,
+or 2,000 analysis results. Numeric values outside the OSC int32/float32 wire
+format are rejected; they are never clamped or rounded.
 
 ## Query Filters
 
@@ -497,6 +518,9 @@ Notes:
 
 - QLab listens for OSC on port `53000` by default.
 - QLab sends UDP replies to `53001` by default.
+- `QLAB_REPLY_PORT` is the local destination on which the client receives
+  replies. It is not evidence of QLab's outgoing source port, which remains
+  unverified.
 - `QLAB_REPLY_PORT=0` is useful for automated tests with a fake OSC server.
 - `QLAB_CACHE_TTL=0` disables the short read cache.
 - Live selected/running/active state bypasses the cache.
@@ -615,6 +639,7 @@ Compact examples:
 References:
 
 - [Documentation index](docs/README.md)
+- [Security policy](SECURITY.md)
 - [QLab edit cues runtime checklist](docs/development/runtime-validation/edit-cues.md)
 - [OSC coverage snapshot](docs/status/coverage/osc_coverage_snapshot.md)
 - [QLab OSC dictionary](docs/references/qlab_osc_dictionary.md)

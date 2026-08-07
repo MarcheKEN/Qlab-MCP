@@ -1,8 +1,14 @@
 # Current Architecture
 
-This describes QLab MCP 0.2.0 at baseline
-`83bf9c129fc27af04fcfd7b687f9e789d2cc1d34`. Historical graphs and refactor
+This describes QLab MCP 0.2.0 at the security-hardened baseline
+`8a5a92c195e2cdab30cb381c124f2d726c0b4def`. Historical graphs and refactor
 analysis live under [`docs/archive/`](../archive/README.md).
+
+The supported threat model and accepted risks are defined in the repository
+root [`SECURITY.md`](../../SECURITY.md). The current hardening rejects
+over-limit settings batches, non-representable OSC numbers, massive or
+sensitive cue payloads, and oversized `lightCommandText` input before OSC
+traffic.
 
 ## Public boundary
 
@@ -24,12 +30,18 @@ another public start command.
 - `settings/` — settings inventory, detail normalization, and redaction;
 - `status.py` — derived workspace status;
 - `runtime/read_cache.py` — short-lived safe-read cache and single-flight;
-- `osc/` — address validation, OSC encoding, UDP/TCP request sessions, reply
-  correlation, deadlines, and socket cleanup.
+- `osc/` — address validation, OSC encoding, UDP/TCP request sessions, sender-IP
+  and OSC reply matching, deadlines, and socket cleanup. UDP source-port
+  filtering remains intentionally unimplemented pending QLab 5.5.10 evidence.
 
 Reads use explicit workspace qualification once a workspace is selected.
 Sensitive profiles are opt-in. Cache entries are invalidated around writes;
 verification reads are fresh.
+
+The public read contract keeps sensitive profiles explicit: `scriptSource` is
+canonical, `scriptText` is not a public OSC key, and `exhaustive` is available
+for cue details rather than mass cue queries. FastMCP/Pydantic schema errors
+and structured runtime errors are separate compatibility surfaces.
 
 ## Write path
 

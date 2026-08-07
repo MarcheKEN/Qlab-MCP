@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Defines the local threat model, security invariants, reportable findings, and
+  accepted risks in `SECURITY.md`.
+- Documents the PR-1 through PR-4 input limits, canonical script profile
+  contract, UDP source-port limitation, and QLab 5.5.10 evidence boundary.
+- Records delayed UDP reply correlation as a separate follow-up from source-port
+  authenticity.
+
 ## 0.2.0
 
 - Exposes 13 public MCP tools for QLab inspection and gated cue creation,

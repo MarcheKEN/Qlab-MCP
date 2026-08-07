@@ -18,6 +18,7 @@ from .profiles import (
     _is_active_cue_ref,
 )
 from .coverage import default_read_coverage_report
+from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES, sensitive_payload_size
 
 
 MAX_VALUES_FOR_KEYS = 100
@@ -61,6 +62,66 @@ def _batch_error_summary(result: dict[str, Any]) -> str:
     if isinstance(result_errors, dict) and result_errors.get("error_code"):
         return str(result_errors["error_code"])
     return "Cue detail read returned errors; inspect results item errors for details."
+
+
+def _sensitive_payload_limit_error(
+    workspace_id: str,
+    cue_refs: list[str],
+    profile: str,
+    payload_size: int,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": "error",
+        "partial": False,
+        "error_code": "cue_payload_too_large",
+        "message": (
+            f"sensitive cue detail response is {payload_size} bytes; maximum is "
+            f"{MAX_SENSITIVE_CUE_RESPONSE_BYTES} bytes"
+        ),
+        "received": {"payload_bytes": payload_size},
+        "allowed": {"max_payload_bytes": MAX_SENSITIVE_CUE_RESPONSE_BYTES},
+        "workspace_id": workspace_id,
+        "requested_count": len(cue_refs),
+        "succeeded_count": 0,
+        "failed_count": len(cue_refs),
+        "profile": profile,
+        "results": [],
+        "errors": {"error_code": "cue_payload_too_large"},
+        "warnings": [
+            "Sensitive cue detail response exceeded the configured payload budget; no results were returned."
+        ],
+    }
+
+
+def _batch_payload_size_for_budget(
+    workspace_id: str,
+    cue_refs: list[str],
+    profile: str,
+    results: list[dict[str, Any]],
+    errors: dict[str, str],
+    warnings: list[str],
+    failed_count: int,
+) -> int | None:
+    partial = bool(failed_count and len(results) > failed_count)
+    probe = {
+        "ok": failed_count == 0 or len(results) > failed_count,
+        "status": "partial" if partial else "ok",
+        "partial": partial,
+        "workspace_id": workspace_id,
+        "requested_count": len(cue_refs),
+        "succeeded_count": len(results) - failed_count,
+        "failed_count": failed_count,
+        "profile": profile,
+        "results": results,
+        "errors": errors or None,
+        "warnings": [
+            *warnings,
+            *(["One or more cue detail reads failed; inspect errors for per-cue failures."] if failed_count else []),
+        ],
+    }
+    _attach_read_coverage(probe, profile)
+    return sensitive_payload_size(probe, profile)
 
 
 def _profile_warnings(profile: str, requested_count: int = 1) -> list[str]:
@@ -355,6 +416,13 @@ class CueDetailsMixin:
 
     def get_cue_details(self, workspace_id: str, cue_ref: str | list[str], profile: str = "auto") -> dict[str, Any]:
         requested_workspace_id = _clean_workspace_id(workspace_id)
+        if isinstance(cue_ref, list):
+            if not cue_ref:
+                raise ValueError("cue_ref list must include at least one cue")
+            if len(cue_ref) > MAX_BATCH_CUE_DETAILS:
+                raise ValueError(f"cue_ref list can include at most {MAX_BATCH_CUE_DETAILS} cues")
+        elif not isinstance(cue_ref, str):
+            raise ValueError("cue_ref must be a string or a list of strings")
         try:
             resolved_workspace_id = self._resolve_workspace_id_strict(workspace_id)
         except Exception as exc:
@@ -390,14 +458,22 @@ class CueDetailsMixin:
         if isinstance(cue_ref, str):
             result = _normalize_cue_detail_result(self._get_single_cue_details(resolved_workspace_id, cue_ref, profile))
             self._attach_video_summaries(resolved_workspace_id, [result], profile)
+            payload_size = sensitive_payload_size(result, profile)
+            if payload_size is not None and payload_size > MAX_SENSITIVE_CUE_RESPONSE_BYTES:
+                limited = _failed_cue_detail_result(
+                    resolved_workspace_id,
+                    cue_ref,
+                    profile,
+                    "cue_payload_too_large",
+                    (
+                        f"sensitive cue detail response is {payload_size} bytes; maximum is "
+                        f"{MAX_SENSITIVE_CUE_RESPONSE_BYTES} bytes"
+                    ),
+                )
+                limited["received"] = {"payload_bytes": payload_size}
+                limited["allowed"] = {"max_payload_bytes": MAX_SENSITIVE_CUE_RESPONSE_BYTES}
+                return limited
             return result
-        if not isinstance(cue_ref, list):
-            raise ValueError("cue_ref must be a string or a list of strings")
-        if not cue_ref:
-            raise ValueError("cue_ref list must include at least one cue")
-        if len(cue_ref) > MAX_BATCH_CUE_DETAILS:
-            raise ValueError(f"cue_ref list can include at most {MAX_BATCH_CUE_DETAILS} cues")
-
         results: list[dict[str, Any]] = []
         errors: dict[str, str] = {}
         warnings: list[str] = _profile_warnings(profile, len(cue_ref))
@@ -429,6 +505,22 @@ class CueDetailsMixin:
                 if result.get("errors"):
                     errors[ref] = _batch_error_summary(result)
                     failed_count += 1
+                payload_size = _batch_payload_size_for_budget(
+                    resolved_workspace_id,
+                    cue_ref,
+                    profile,
+                    results,
+                    errors,
+                    warnings,
+                    failed_count,
+                )
+                if payload_size is not None and payload_size > MAX_SENSITIVE_CUE_RESPONSE_BYTES:
+                    return _sensitive_payload_limit_error(
+                        resolved_workspace_id,
+                        cue_ref,
+                        profile,
+                        payload_size,
+                    )
             except Exception as exc:
                 errors[ref] = sanitize_exception_message(exc)
                 failed_count += 1

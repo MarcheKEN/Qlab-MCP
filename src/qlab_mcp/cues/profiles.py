@@ -276,6 +276,10 @@ def _is_positive_number(value: Any) -> bool:
 def _derive_profile_fields(profile: str, values: dict[str, Any]) -> dict[str, Any]:
     normalized = profile.strip().lower()
     derived = dict(values)
+    if "scriptText" in derived:
+        if normalized in {"full_sensitive", "exhaustive"} and "scriptSource" not in derived:
+            derived["scriptSource"] = derived["scriptText"]
+        derived.pop("scriptText", None)
     if "sliceMarkers" in derived:
         if derived.get("sliceMarkers") is None:
             derived["sliceMarkers"] = []

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import struct
 from dataclasses import dataclass, replace
 from string import Formatter
 from typing import Any
@@ -2348,7 +2349,7 @@ def _validate_named_value(name: str, validator: str, value: Any) -> Any:
             message = message.replace("opacity must", f"{name} must", 1)
         elif message.startswith("colorName must"):
             message = message.replace("colorName must", f"{name} must", 1)
-        raise UnsafeWriteOperationError(message) from exc
+        raise UnsafeWriteOperationError(message, error_code=exc.error_code) from exc
 
 
 def _group_mode(value: Any) -> int:
@@ -2361,8 +2362,16 @@ def _group_mode(value: Any) -> int:
 def _number(value: Any, message: str) -> int | float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise UnsafeWriteOperationError(message)
-    if not math.isfinite(float(value)):
-        raise UnsafeWriteOperationError(message)
+    if isinstance(value, int):
+        if not -(2**31) <= value <= 2**31 - 1:
+            raise UnsafeWriteOperationError(message, error_code="osc_value_out_of_range")
+        return value
+    if not math.isfinite(value):
+        raise UnsafeWriteOperationError(message, error_code="osc_value_out_of_range")
+    try:
+        struct.pack(">f", value)
+    except (OverflowError, struct.error) as exc:
+        raise UnsafeWriteOperationError(message, error_code="osc_value_out_of_range") from exc
     return value
 
 
@@ -2371,11 +2380,7 @@ def _quaternion(value: Any) -> list[int | float]:
         raise UnsafeWriteOperationError("value must be an array of exactly four finite numbers")
     quaternion: list[int | float] = []
     for component in value:
-        if isinstance(component, bool) or not isinstance(component, (int, float)):
-            raise UnsafeWriteOperationError("value must be an array of exactly four finite numbers")
-        if not math.isfinite(float(component)):
-            raise UnsafeWriteOperationError("value must be an array of exactly four finite numbers")
-        quaternion.append(component)
+        quaternion.append(_number(component, "value must be an array of exactly four finite numbers"))
     return quaternion
 
 
@@ -2383,7 +2388,7 @@ def _decibel(value: Any) -> int | float | str:
     if isinstance(value, bool):
         raise UnsafeWriteOperationError("value must be a number or '-inf'")
     if isinstance(value, (int, float)):
-        return value
+        return _number(value, "value must be a number or '-inf'")
     if isinstance(value, str) and value.strip().casefold() == "-inf":
         return "-inf"
     raise UnsafeWriteOperationError("value must be a number or '-inf'")
@@ -2392,6 +2397,8 @@ def _decibel(value: Any) -> int | float | str:
 def _int(value: Any, message: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise UnsafeWriteOperationError(message)
+    if not -(2**31) <= value <= 2**31 - 1:
+        raise UnsafeWriteOperationError(message, error_code="osc_value_out_of_range")
     return value
 
 

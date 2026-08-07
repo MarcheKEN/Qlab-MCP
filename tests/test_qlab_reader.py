@@ -2823,6 +2823,31 @@ class QLabReaderTests(unittest.TestCase):
             ],
         )
 
+    def test_workspace_settings_details_batch_rejects_more_than_50_requests(self) -> None:
+        with FakeQlabOscServer({}) as server:
+            reader = QLabReader(client_for(server))
+
+            with self.assertRaisesRegex(ValueError, "at most 50"):
+                reader.get_workspace_settings(
+                    "ws-1",
+                    mode="details",
+                    requests=[{"section": "light", "kind": "light_patch"}] * 51,
+                )
+
+        self.assertEqual(server.received, [])
+
+    def test_workspace_settings_sections_reject_more_than_six_entries(self) -> None:
+        with FakeQlabOscServer({}) as server:
+            reader = QLabReader(client_for(server))
+
+            with self.assertRaisesRegex(ValueError, "at most 6"):
+                reader.get_workspace_settings(
+                    "ws-1",
+                    sections=["audio", "video", "network", "midi", "light", "general", "audio"],
+                )
+
+        self.assertEqual(server.received, [])
+
     def test_workspace_settings_details_mode_preserves_choices_for_omitted_ref(self) -> None:
         responses = {
             "/workspace/ws-1/settings/network/patchList": [
@@ -4681,14 +4706,18 @@ class QLabReaderTests(unittest.TestCase):
         self.assertNotIn("stage", properties_for_profile("type_specific"))
         self.assertNotIn("stage/regions", properties_for_profile("type_specific"))
         self.assertNotIn("scriptSource", properties_for_profile("type_specific"))
+        self.assertNotIn("scriptText", properties_for_profile("type_specific"))
+        self.assertNotIn("scriptText", properties_for_profile("inspector_safe"))
         self.assertNotIn("notes", properties_for_profile("full"))
         self.assertNotIn("fileTarget", properties_for_profile("full"))
         self.assertNotIn("scriptSource", properties_for_profile("full"))
+        self.assertNotIn("scriptText", properties_for_profile("full"))
         self.assertNotIn("stage", properties_for_profile("full"))
         self.assertNotIn("stage/regions", properties_for_profile("full"))
         self.assertIn("notes", properties_for_profile("full_sensitive"))
         self.assertIn("fileTarget", properties_for_profile("full_sensitive"))
         self.assertIn("scriptSource", properties_for_profile("full_sensitive"))
+        self.assertNotIn("scriptText", properties_for_profile("full_sensitive"))
         self.assertIn("stage", properties_for_profile("full_sensitive"))
 
     def test_sanitizer_removes_internal_paths_without_redacting_media_targets(self) -> None:
@@ -5586,9 +5615,80 @@ class QLabReaderTests(unittest.TestCase):
             result = reader.get_cue_details("ws-1", "10", "exhaustive")
 
         self.assertEqual(result["properties"]["scriptSource"], "display dialog \"secret\"")
-        self.assertEqual(result["properties"]["scriptText"], "display dialog \"secret\"")
+        self.assertNotIn("scriptText", result["properties"])
         self.assertEqual(result["properties"]["notes"], "operator note")
         self.assertIn("scripts", result["warnings"][0])
+        values_for_keys_args = [
+            args[0]
+            for address, args in zip(server.received, server.received_args, strict=True)
+            if address.endswith("/valuesForKeys")
+        ]
+        self.assertTrue(values_for_keys_args)
+        self.assertNotIn("scriptText", json.loads(values_for_keys_args[0]))
+
+    def test_sensitive_detail_batch_budget_aborts_before_remaining_cue_reads(self) -> None:
+        reader = QLabReader()
+        calls: list[str] = []
+        reader._resolve_workspace_id_strict = lambda workspace_id: workspace_id  # type: ignore[method-assign]
+
+        def fake_single(workspace_id: str, cue_ref: str, profile: str, include_read_coverage: bool = True):
+            calls.append(cue_ref)
+            return {
+                "workspace_id": workspace_id,
+                "cue_ref": cue_ref,
+                "profile": profile,
+                "cue_type": "Script",
+                "properties": {"scriptSource": "x" * (1_048_577)},
+            }
+
+        reader._get_single_cue_details = fake_single  # type: ignore[method-assign]
+
+        result = reader.get_cue_details("ws-1", ["10", "11"], "exhaustive")
+
+        self.assertEqual(result["error_code"], "cue_payload_too_large")
+        self.assertEqual(result["allowed"]["max_payload_bytes"], 1_048_576)
+        self.assertEqual(calls, ["10"])
+
+    def test_sensitive_query_budget_aborts_before_remaining_cue_reads(self) -> None:
+        reader = QLabReader()
+        reader._resolve_workspace_id_strict = lambda workspace_id: workspace_id  # type: ignore[method-assign]
+        calls: list[str] = []
+
+        def fake_values(workspace_id: str, cue_id: str, keys: list[str], **kwargs: Any):
+            calls.append(cue_id)
+            return {
+                "values": {
+                    "uniqueID": cue_id,
+                    "type": "Script",
+                    "scriptSource": "x" * (1_048_577),
+                }
+            }
+
+        reader.read_cue_values = fake_values  # type: ignore[method-assign]
+        shallow = {
+            "refs": [
+                {"uniqueID": "cue-1", "type": "Script"},
+                {"uniqueID": "cue-2", "type": "Script"},
+            ],
+            "truncated": False,
+            "truncation_reasons": [],
+            "errors": {},
+            "child_read_errors": [],
+        }
+
+        with patch("qlab_mcp.cues.query._bounded_cue_refs_from_shallow", return_value=shallow):
+            result = reader.query_cues(
+                "ws-1",
+                "type",
+                "Script",
+                profile="full_sensitive",
+                max_results=50,
+            )
+
+        self.assertEqual(result["error_code"], "cue_payload_too_large")
+        self.assertEqual(result["allowed"]["max_payload_bytes"], 1_048_576)
+        self.assertTrue(calls)
+        self.assertEqual(set(calls), {"cue-1"})
 
     def test_exhaustive_group_details_do_not_expand_children(self) -> None:
         responses = {

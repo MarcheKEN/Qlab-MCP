@@ -16,6 +16,20 @@ from qlab_mcp.osc import decode_message, encode_message
 
 
 class OscMessageTests(unittest.TestCase):
+    def test_encode_accepts_signed_int32_boundaries(self) -> None:
+        self.assertEqual(decode_message(encode_message("/value", -2_147_483_648)).args, (-2_147_483_648,))
+        self.assertEqual(decode_message(encode_message("/value", 2_147_483_647)).args, (2_147_483_647,))
+
+    def test_encode_rejects_values_outside_osc_wire_ranges(self) -> None:
+        with self.assertRaises(OscProtocolError):
+            encode_message("/cue/1/number", 2_147_483_648)
+        with self.assertRaises(OscProtocolError):
+            encode_message("/cue/1/number", 1e39)
+        with self.assertRaises(OscProtocolError):
+            encode_message("/cue/1/number", float("nan"))
+        with self.assertRaises(OscProtocolError):
+            encode_message("/cue/1/number", float("inf"))
+
     def test_encode_decode_roundtrip(self) -> None:
         packet = encode_message("/cue/1/name", "Intro", 3, 1.5, True, False, None)
 

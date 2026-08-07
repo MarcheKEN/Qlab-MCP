@@ -23,7 +23,7 @@ from ..osc.addressing import (
     _workspace_address,
 )
 from ..runtime.read_cache import shared_read_cache
-from ..settings.light_commands import analyze_light_command_text
+from ..settings.light_commands import analyze_light_command_text, validate_light_command_text_limits
 from ..settings.summarizers import _collection_items
 from .allowlist import (
     COMMON_UPDATE_PROFILE,
@@ -8637,6 +8637,19 @@ def _normalize_batch_update_item_for_batch(raw_update: Any) -> dict[str, Any]:
         errors["confirm_gates"] = gate_error
     if "profile" not in errors:
         try:
+            raw_properties = raw_update.get("properties")
+            if isinstance(raw_properties, dict) and LIGHT_COMMAND_PROPERTY in raw_properties:
+                validate_light_command_text_limits(raw_properties[LIGHT_COMMAND_PROPERTY])
+            raw_operations = raw_update.get("operations")
+            if isinstance(raw_operations, list):
+                for raw_operation in raw_operations:
+                    if (
+                        isinstance(raw_operation, dict)
+                        and raw_operation.get("property") == LIGHT_COMMAND_PROPERTY
+                    ):
+                        raw_args = raw_operation.get("args")
+                        if isinstance(raw_args, dict) and "value" in raw_args:
+                            validate_light_command_text_limits(raw_args["value"])
             properties, operations = normalize_update_request(
                 profile,
                 raw_update.get("properties"),
@@ -8644,6 +8657,8 @@ def _normalize_batch_update_item_for_batch(raw_update: Any) -> dict[str, Any]:
             )
         except Exception as exc:
             errors["validation"] = str(exc)
+            if isinstance(exc, UnsafeWriteOperationError) and exc.error_code:
+                errors["error_code"] = exc.error_code
 
     return {
         "cue_ref": cue,
@@ -8924,6 +8939,13 @@ def _annotate_light_command_operation(
         try:
             helper_result = analyze_light_command_text(str(operation["args"][0]), light_patch)
             analysis = _summarize_light_command_analysis(helper_result)
+        except UnsafeWriteOperationError as exc:
+            analysis = _unavailable_light_command_analysis(
+                {
+                    "code": exc.error_code or "light_command_input_too_large",
+                    "message": str(exc),
+                }
+            )
         except Exception:
             analysis = _unavailable_light_command_analysis(
                 {
@@ -9084,6 +9106,12 @@ def _validate_phase4_light_real_write(
         }
     try:
         analysis = _summarize_light_command_analysis(analyze_light_command_text(requested, light_patch))
+    except UnsafeWriteOperationError as exc:
+        return {
+            LIGHT_COMMAND_PROPERTY: (
+                f"{exc.error_code or 'light_command_input_too_large'}: {exc}"
+            )
+        }
     except Exception:
         return {LIGHT_COMMAND_PROPERTY: "Internal LCL analyzer failed during Phase 4 preflight."}
     if analysis["overall_status"] != "valid":

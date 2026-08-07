@@ -427,8 +427,9 @@ Cue detail profiles are tiered:
 - `full_sensitive` / `exhaustive`: explicit large/sensitive reads; still no MCP
   implementation paths.
 
-Compact profiles truncate long text fields such as notes, memo text, script
-text, light commands, and network messages. Truncated fields return
+Compact profiles truncate long text fields such as notes, memo text, light
+commands, and network messages. Script source is excluded from compact
+profiles. Truncated fields return
 `field_truncated: true` and `original_length`.
 
 ## Query Filters

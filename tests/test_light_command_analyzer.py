@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from qlab_mcp.settings.light_commands import analyze_light_command_text
+from qlab_mcp.errors import UnsafeWriteOperationError
+from qlab_mcp.settings.light_commands import _light_command_line_count, analyze_light_command_text
 
 
 @pytest.fixture
@@ -48,6 +49,30 @@ def light_patch() -> dict:
 
 def analyze(command: str, light_patch: dict) -> dict:
     return analyze_light_command_text(command, light_patch)["results"][0]
+
+
+def test_light_command_text_byte_limit_rejects_without_truncation(light_patch: dict) -> None:
+    accepted = "x" * 65_536
+    analyze_light_command_text(accepted, light_patch)
+    with pytest.raises(UnsafeWriteOperationError, match="lightCommandText exceeds 65536 UTF-8 bytes"):
+        analyze_light_command_text(accepted + "x", light_patch)
+
+
+def test_light_command_text_line_limit_rejects_before_analysis(light_patch: dict) -> None:
+    analyze_light_command_text("\n".join("Front = 1" for _ in range(2_000)), light_patch)
+    with pytest.raises(UnsafeWriteOperationError, match="exceeds 2000 lines"):
+        analyze_light_command_text("\n".join("Front = 1" for _ in range(2_001)), light_patch)
+
+
+def test_light_command_text_counts_utf8_bytes(light_patch: dict) -> None:
+    command = "é" * 32_768
+    with pytest.raises(UnsafeWriteOperationError, match="65536 UTF-8 bytes"):
+        analyze_light_command_text(command + "é", light_patch)
+
+
+@pytest.mark.parametrize("command_text", ["", "Front = 1\n", "Front = 1\r\nBack = 2", "Front = 1\u2028Back = 2"])
+def test_light_command_line_limit_count_matches_splitlines(command_text: str) -> None:
+    assert _light_command_line_count(command_text) == len(command_text.splitlines())
 
 
 def test_empty_patch_returns_unknown_target() -> None:

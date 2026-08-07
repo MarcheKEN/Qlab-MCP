@@ -74,6 +74,22 @@ def test_write_modules_reuse_canonical_container_types_without_widening_placemen
     assert move_helpers._CART_PARENT_TYPES == {"Cue Cart", "Cart"}
 
 
+@pytest.mark.parametrize("value", [2_147_483_648, -2_147_483_649, 10**20, 10**309, 1e39, float("inf"), float("nan")])
+def test_numeric_write_values_outside_osc_wire_ranges_are_rejected(value: Any) -> None:
+    with pytest.raises(UnsafeWriteOperationError):
+        write_registry._number(value, "value must be an OSC-representable number")
+
+
+def test_numeric_write_values_at_osc_int32_boundaries_are_accepted() -> None:
+    assert write_registry._number(-2_147_483_648, "invalid") == -2_147_483_648
+    assert write_registry._number(2_147_483_647, "invalid") == 2_147_483_647
+
+
+def test_quaternion_reuses_osc_numeric_range_validation() -> None:
+    with pytest.raises(UnsafeWriteOperationError):
+        write_registry._quaternion([0, 0, 0, 1e39])
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
@@ -3160,6 +3176,27 @@ def test_update_cues_dry_run_reports_invalid_property_value_per_item() -> None:
     assert f"/workspace/ws-1/cue_id/{group_id}/valuesForKeys" not in addresses
     assert f"/workspace/ws-1/cue_id/{memo_id}/name" not in addresses
     assert f"/workspace/ws-1/cue_id/{group_id}/preWait" not in addresses
+
+
+def test_update_cues_dry_run_rejects_osc_unrepresentable_number_before_plan_or_setter() -> None:
+    cue_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Group", "preWait": 0}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "properties": {"preWait": 10**309}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert result["results"][0]["errors"]["error_code"] == "osc_value_out_of_range"
+    assert result["results"][0]["planned_operations"] == []
+    assert not any(address.endswith("/preWait") for address, _, _ in client.requests)
 
 
 def test_update_cues_dry_run_rejects_unknown_color_name_without_plan() -> None:
@@ -16853,6 +16890,34 @@ def test_update_cues_light_analyzer_failure_is_nonfatal(monkeypatch: pytest.Monk
     assert result["ok"] is True
     assert analysis["availability"] == "unavailable"
     assert analysis["error"]["code"] == "light_command_analyzer_failed"
+
+
+def test_update_cues_light_command_size_limit_rejects_before_reads_or_token() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Light", "lightCommandText": "Front = 20"}},
+        light_patch=normalized_light_patch_fixture(),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "light_basic",
+                "properties": {"lightCommandText": "x" * 65_537},
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert result["results"][0]["errors"]["error_code"] == "light_command_input_too_large"
+    assert result["results"][0]["planned_operations"] == []
+    assert client.requests == []
 
 
 def test_update_cues_light_non_command_updates_do_not_read_patch() -> None:

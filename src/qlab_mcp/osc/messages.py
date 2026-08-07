@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 import struct
 from typing import Any
 
@@ -36,10 +37,24 @@ def encode_message(address: str, *args: Any) -> bytes:
             tags.append("T" if arg else "F")
         elif isinstance(arg, int) and not isinstance(arg, bool):
             tags.append("i")
-            payload.extend(struct.pack(">i", arg))
+            try:
+                payload.extend(struct.pack(">i", arg))
+            except (OverflowError, struct.error) as exc:
+                raise OscProtocolError(
+                    "OSC integer argument is outside signed int32 range",
+                    error_code="osc_value_out_of_range",
+                ) from exc
         elif isinstance(arg, float):
+            if not math.isfinite(arg):
+                raise OscProtocolError("OSC float argument must be finite", error_code="osc_value_out_of_range")
             tags.append("f")
-            payload.extend(struct.pack(">f", arg))
+            try:
+                payload.extend(struct.pack(">f", arg))
+            except (OverflowError, struct.error) as exc:
+                raise OscProtocolError(
+                    "OSC float argument is outside float32 range",
+                    error_code="osc_value_out_of_range",
+                ) from exc
         elif isinstance(arg, str):
             tags.append("s")
             payload.extend(_encode_string(arg))

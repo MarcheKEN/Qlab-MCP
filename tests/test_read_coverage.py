@@ -13,7 +13,7 @@ def test_read_allowlist_coverage_snapshot_matches_qlab_dictionary() -> None:
     report = read_coverage_report(DICTIONARY_PATH.read_text())
 
     assert report["readable_route_count"] == 509
-    assert report["allowlisted_property_count"] == 292
+    assert report["allowlisted_property_count"] == 291
     assert report["gap_count"] == 190
     assert report["status_counts"] == {
         "covered_by_aggregate": 20,

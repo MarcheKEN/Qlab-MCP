@@ -96,7 +96,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "timeout": WORKSPACE_SETTINGS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["inventory", "patches", "qlab", "routing", "safe-read", "settings"],
-        "input_schema_hash": "5dfb80df0399045ef0399e5bf40541955ce01e67f94456f0a1d721d368ad5b9d",
+        "input_schema_hash": "d7267c1e7ab87ba58b13c0efadbd7d30ad9e431445844779f6656fec8ee1bca1",
         "output_schema_hash": "3c4381ac3b10af3e7655c8cb65240d8909bf89f3c0c58d04513299380781b8d0",
     },
     "qlab_get_workspace_status": {
@@ -112,7 +112,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "timeout": QUERY_CUES_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["details", "inventory", "qlab", "query", "safe-read"],
-        "input_schema_hash": "5dd4fc8fe6b29bb717c596e0c32c1b50dfb720b26fe0f1c71d145668b95ec65b",
+        "input_schema_hash": "500535ba62fbc315e4af2af2fcd7074e41e16e0389bc4496925804a80edeb511",
         "output_schema_hash": "16613ad3378154e2b01bb1dabe40ba6d56ff1394ffea2ad960ae14cd775549a5",
     },
     "qlab_update_cues": {
@@ -790,6 +790,10 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert settings.inputSchema["properties"]["profile"]["default"] == "safe"
     assert "enum" not in settings.inputSchema["properties"]["profile"]
     assert "requests" in settings.inputSchema["properties"]
+    requests_schema = settings.inputSchema["properties"]["requests"]
+    assert requests_schema["maxItems"] == 50
+    sections_schema = settings.inputSchema["properties"]["sections"]
+    assert sections_schema["maxItems"] == 6
     assert "available_detail_requests" in settings.outputSchema["properties"]
     assert "succeeded_count" in settings.outputSchema["properties"]
     assert "failed_count" in settings.outputSchema["properties"]
@@ -1076,6 +1080,92 @@ def test_public_tool_validation_returns_structured_json_error() -> None:
     assert "Traceback" not in json.dumps(payload)
 
 
+def test_workspace_settings_batch_limit_is_structured_and_pre_transport(monkeypatch) -> None:
+    class ExplodingReader:
+        def get_workspace_settings(self, **kwargs):
+            raise AssertionError("reader must not be constructed for an oversized batch")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: ExplodingReader())
+
+    result = qlab_get_workspace_settings(
+        "ws-1",
+        mode="details",
+        requests=[{"section": "light", "kind": "light_patch"}] * 51,
+    )
+    payload = result.model_dump()
+
+    assert payload["ok"] is False
+    assert payload["error_code"] == "workspace_detail_batch_too_large"
+    assert payload["received"] == {"request_count": 51}
+    assert payload["allowed"] == {"max_requests": 50}
+
+
+def test_workspace_settings_section_limit_is_structured_and_pre_transport(monkeypatch) -> None:
+    class ExplodingReader:
+        def get_workspace_settings(self, **kwargs):
+            raise AssertionError("reader must not be constructed for too many sections")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: ExplodingReader())
+
+    payload = qlab_get_workspace_settings(
+        "ws-1",
+        sections=["audio", "video", "network", "midi", "light", "general", "audio"],
+    ).model_dump()
+
+    assert payload["ok"] is False
+    assert payload["error_code"] == "workspace_sections_too_many"
+    assert payload["received"] == {"section_count": 7}
+    assert payload["allowed"] == {"max_sections": 6}
+
+
+def test_query_cues_rejects_exhaustive_profile_before_reader(monkeypatch) -> None:
+    class ExplodingReader:
+        def query_cues(self, **kwargs):
+            raise AssertionError("exhaustive query profile must be rejected before reading cues")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: ExplodingReader())
+
+    payload = qlab_query_cues("ws-1", "type", "Audio", profile="exhaustive").model_dump()
+
+    assert payload["ok"] is False
+    assert payload["error_code"] == "cue_profile_not_supported"
+    assert payload["received"]["profile"] == "exhaustive"
+
+
+def test_sensitive_cue_query_limit_rejects_large_result_count_before_reader(monkeypatch) -> None:
+    class ExplodingReader:
+        def query_cues(self, **kwargs):
+            raise AssertionError("large sensitive query must be rejected before reading cues")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: ExplodingReader())
+
+    payload = qlab_query_cues("ws-1", "type", "Audio", profile="full_sensitive", max_results=51).model_dump()
+
+    assert payload["ok"] is False
+    assert payload["error_code"] == "cue_payload_too_large"
+    assert payload["allowed"]["max_results"] == 50
+
+
+def test_create_numeric_range_error_is_structured_and_pre_transport(monkeypatch) -> None:
+    class FakeReader:
+        def create_cue(self, **kwargs):
+            raise AssertionError("reader must not be constructed for an invalid numeric value")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    payload = server_module.qlab_create_cue(
+        "ws-1",
+        "memo",
+        "11111111-1111-4111-8111-111111111111",
+        properties={"duration": 10**20},
+        dry_run=True,
+    ).model_dump()
+
+    assert payload["ok"] is False
+    assert payload["error_code"] == "osc_value_out_of_range"
+    assert payload["planned_operations"] == []
+
+
 def test_public_cue_details_reports_clear_batch_limit_as_structured_json(monkeypatch) -> None:
     class FakeReader:
         def get_cue_details(self, workspace_id, cue_ref, profile):
@@ -1089,7 +1179,8 @@ def test_public_cue_details_reports_clear_batch_limit_as_structured_json(monkeyp
     assert payload["ok"] is False
     assert payload["status"] == "error"
     assert payload["partial"] is False
-    assert payload["error_code"] == "validation_failed"
+    assert payload["error_code"] == "cue_batch_too_large"
+    assert payload["allowed"] == {"max_cues": 50}
     assert "cue_ref list can include at most 50 cues" in payload["message"]
     assert payload["requested_count"] == 51
     assert payload["failed_count"] == 51

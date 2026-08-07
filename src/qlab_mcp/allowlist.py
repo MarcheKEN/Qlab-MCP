@@ -248,7 +248,6 @@ TYPE_SPECIFIC_PROPERTIES = {
     "doTranslation",
     "stopTargetWhenSliceEnds",
     "scriptSource",
-    "scriptText",
     "alwaysCollate",
     "subcontroller",
 }

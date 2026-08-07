@@ -11,7 +11,7 @@ from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from .errors import QLabMcpError
+from .errors import QLabMcpError, UnsafeWriteOperationError
 from .models import (
     CreateCueResult,
     DeleteCuesResult,
@@ -31,7 +31,11 @@ from .models import (
     WorkspaceSettingsResult,
 )
 from .qlab import QLabReader
+from .cues.details import MAX_BATCH_CUE_DETAILS
+from .cues.limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES
+from .cues.query import MAX_SENSITIVE_QUERY_RESULTS
 from .sanitizer import sanitize_exception_message
+from .settings.workspace import MAX_WORKSPACE_DETAIL_REQUESTS, MAX_WORKSPACE_SETTINGS_SECTIONS
 from .server_responses import (
     cue_details_success_payload as _cue_details_success_payload,
     overview_success_payload as _overview_success_payload,
@@ -40,6 +44,7 @@ from .server_responses import (
     settings_success_payload as _settings_success_payload,
     structured_error_result as _structured_error_result,
 )
+from .write.allowlist import normalize_write_properties
 
 
 CueQueryProfile = Literal[
@@ -152,7 +157,7 @@ CueRefs = Annotated[
     Field(
         min_length=1,
         description="List of cue numbers, cue unique IDs, selected, playhead, playbackPosition, or active. Maximum 50.",
-        json_schema_extra={"maxItems": 50},
+        json_schema_extra={"maxItems": MAX_BATCH_CUE_DETAILS},
     ),
 ]
 READ_ONLY_QLAB_TOOL = ToolAnnotations(
@@ -330,6 +335,38 @@ def _query_error(workspace_id: Any, primary_filter: Any, profile: Any, max_resul
         "errors": {"validation": error["message"], "error_code": error["error_code"]},
     }
     return CueQueryResult.model_validate(payload)
+
+
+def _create_validation_error(
+    workspace_id: Any,
+    cue_type: Any,
+    dry_run: Any,
+    error_code: str,
+    message: str,
+) -> CreateCueResult:
+    return CreateCueResult.model_validate(
+        {
+            "ok": False,
+            "status": "preflight_failed",
+            "workspace_id": str(workspace_id or ""),
+            "cue_type": str(cue_type or ""),
+            "dry_run": True if dry_run is None else bool(dry_run),
+            "confirm_token": None,
+            "created_cue_id": None,
+            "placement": None,
+            "properties": {},
+            "planned_operations": [],
+            "executed_operations": [],
+            "verification": None,
+            "cleanup_required": False,
+            "cleanup": None,
+            "errors": {"validation": message, "error_code": error_code},
+            "warnings": ["Validation failed before any mutating OSC command or token was issued."],
+            "error_code": error_code,
+            "suggested_action": "Use OSC-representable numeric values and retry a fresh dry-run.",
+            "message": message,
+        }
+    )
 
 
 def _cue_details_error(workspace_id: Any, cue_ref: Any, profile: Any, **error: Any) -> CueDetailsResult | CueDetailsBatchResult:
@@ -602,6 +639,7 @@ def qlab_get_workspace_settings(
     sections: Annotated[
         list[str] | None,
         Field(
+            json_schema_extra={"maxItems": MAX_WORKSPACE_SETTINGS_SECTIONS},
             description=(
                 "Summary mode sections to inspect. Use audio, video, network, midi, light, and/or general. "
                 "When omitted in summary mode, all sections are read. Ignored in details mode."
@@ -611,6 +649,7 @@ def qlab_get_workspace_settings(
     requests: Annotated[
         list[WorkspaceSettingRequestInput] | None,
         Field(
+            json_schema_extra={"maxItems": MAX_WORKSPACE_DETAIL_REQUESTS},
             description=(
                 "Details mode requests. Each item has section, kind, and optional ref. "
                 "Examples: {'section':'audio','kind':'output_patch','ref':'Main'}, "
@@ -636,6 +675,30 @@ def qlab_get_workspace_settings(
     errors, and available_detail_requests. Details mode accepts one or more requests and returns independent
     per-request results; one failed request does not block other valid requests.
     """
+    if isinstance(requests, (list, tuple)) and len(requests) > MAX_WORKSPACE_DETAIL_REQUESTS:
+        return _settings_error(
+            workspace_id,
+            mode,
+            profile,
+            error_code="workspace_detail_batch_too_large",
+            message=(
+                f"workspace settings details can include at most {MAX_WORKSPACE_DETAIL_REQUESTS} requests"
+            ),
+            received={"request_count": len(requests)},
+            allowed={"max_requests": MAX_WORKSPACE_DETAIL_REQUESTS},
+        )
+    if isinstance(sections, (list, tuple)) and len(sections) > MAX_WORKSPACE_SETTINGS_SECTIONS:
+        return _settings_error(
+            workspace_id,
+            mode,
+            profile,
+            error_code="workspace_sections_too_many",
+            message=(
+                f"workspace settings sections can include at most {MAX_WORKSPACE_SETTINGS_SECTIONS} entries"
+            ),
+            received={"section_count": len(sections)},
+            allowed={"max_sections": MAX_WORKSPACE_SETTINGS_SECTIONS},
+        )
     try:
         return _run_tool(
             lambda reader: WorkspaceSettingsResult.model_validate(
@@ -783,7 +846,8 @@ def qlab_query_cues(
             description=(
                 "Read-only data profile to return for matching cues. Default basic_safe gives compact identity/status; "
                 "health/targets add warning, target, and file-target presence without paths; "
-                "technical/full_sensitive can expose notes, paths, scripts, or heavy stage payloads."
+                "technical can expose notes, paths, and diagnostic stage data; full_sensitive can additionally expose "
+                "scriptSource and other explicitly sensitive payloads."
             ),
         ),
     ] = "basic_safe",
@@ -807,6 +871,37 @@ def qlab_query_cues(
     500 returned matches and 500 scanned cue IDs by default so agents stay compact. Callers can explicitly
     raise either limit up to 5000 for large shows; truncation metadata reports incomplete scans or result caps.
     """
+    if str(profile).strip().lower() == "exhaustive":
+        return _query_error(
+            workspace_id,
+            primary_filter,
+            profile,
+            max_results,
+            max_cues_scanned,
+            error_code="cue_profile_not_supported",
+            message="profile='exhaustive' is supported only by qlab_get_cue_details",
+            received={"profile": profile},
+            allowed={
+                "query_profiles": list(CueQueryProfile.__args__)
+                if hasattr(CueQueryProfile, "__args__")
+                else None
+            },
+        )
+    if str(profile).strip().lower() == "full_sensitive" and max_results > MAX_SENSITIVE_QUERY_RESULTS:
+        return _query_error(
+            workspace_id,
+            primary_filter,
+            profile,
+            max_results,
+            max_cues_scanned,
+            error_code="cue_payload_too_large",
+            message=f"full_sensitive cue queries can return at most {MAX_SENSITIVE_QUERY_RESULTS} cues",
+            received={"max_results": max_results, "profile": profile},
+            allowed={
+                "max_results": MAX_SENSITIVE_QUERY_RESULTS,
+                "max_payload_bytes": MAX_SENSITIVE_CUE_RESPONSE_BYTES,
+            },
+        )
     try:
         return _run_tool(
             lambda reader: CueQueryResult.model_validate(
@@ -867,6 +962,16 @@ def qlab_get_cue_details(
     health for warnings, technical/full_sensitive only when justified, and exhaustive only for deep audits
     or load testing because it can expose large/sensitive payloads.
     """
+    if isinstance(cue_ref, list) and len(cue_ref) > MAX_BATCH_CUE_DETAILS:
+        return _cue_details_error(
+            workspace_id,
+            cue_ref,
+            profile,
+            error_code="cue_batch_too_large",
+            message=f"cue_ref list can include at most {MAX_BATCH_CUE_DETAILS} cues",
+            received={"cue_count": len(cue_ref)},
+            allowed={"max_cues": MAX_BATCH_CUE_DETAILS},
+        )
     try:
         return _run_tool(
             lambda reader: (
@@ -970,6 +1075,17 @@ def qlab_create_cue(
     dedicated token from the dry-run and an unchanged structural anchor snapshot.
     This tool never exposes playback control, raw OSC, target edits, scripts, routing, or media paths.
     """
+    try:
+        normalize_write_properties(properties)
+    except UnsafeWriteOperationError as exc:
+        if exc.error_code == "osc_value_out_of_range":
+            return _create_validation_error(
+                workspace_id,
+                cue_type,
+                dry_run,
+                exc.error_code,
+                str(exc),
+            )
     return _run_tool(
         lambda reader: CreateCueResult.model_validate(
             reader.create_cue(

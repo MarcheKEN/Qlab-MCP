@@ -8,6 +8,7 @@ from ..allowlist import properties_for_profile, validate_value_keys
 from ..osc.addressing import _clean_workspace_id
 from ..sanitizer import sanitize_exception_message, truncate_profile_payload
 from .editorial import _is_ambiguous_label, _is_empty_text
+from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES, sensitive_payload_size
 from .profiles import _coerce_qlab_bool, _derive_profile_fields, _is_positive_number
 from .refs import _bounded_cue_refs_from_shallow
 
@@ -106,6 +107,51 @@ QUERY_BASE_PROPERTIES = (
 QUERY_DEFAULT_OUTPUT_KEYS = QUERY_BASE_PROPERTIES
 
 MAX_VALUES_FOR_KEYS = 100
+MAX_SENSITIVE_QUERY_RESULTS = 50
+
+
+def _sensitive_query_limit_error(
+    workspace_id: str,
+    filters: list[dict[str, Any]],
+    profile: str,
+    max_results: int,
+    max_cues_scanned: int,
+    message: str,
+    *,
+    received: dict[str, Any],
+    payload_size: int | None = None,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "status": "error",
+        "error_code": "cue_payload_too_large",
+        "message": message,
+        "received": {**received, **({"payload_bytes": payload_size} if payload_size is not None else {})},
+        "allowed": {
+            "max_results": MAX_SENSITIVE_QUERY_RESULTS,
+            "max_payload_bytes": MAX_SENSITIVE_CUE_RESPONSE_BYTES,
+        },
+        "workspace_id": workspace_id,
+        "filters": filters,
+        "profile": profile,
+        "scanned_count": 0,
+        "matched_count": 0,
+        "returned_count": 0,
+        "total_cue_ids": 0,
+        "query_completeness": "failed",
+        "query_completeness_reasons": ["validation"],
+        "id_only_unscanned_count": 0,
+        "omitted_branches": [],
+        "partial_branches": [],
+        "truncated": False,
+        "truncation_reasons": [],
+        "scanned_all_cues": False,
+        "result_limited": False,
+        "limits": {"max_results": max_results, "max_cues_scanned": max_cues_scanned},
+        "cues": [],
+        "warnings": [message],
+        "errors": {"validation": message, "error_code": "cue_payload_too_large"},
+    }
 
 
 def _dedupe_preserve_order(values: list[str] | tuple[str, ...]) -> list[str]:
@@ -265,6 +311,8 @@ class CueQueryMixin:
         max_results: int = 500,
         max_cues_scanned: int = 500,
     ) -> dict[str, Any]:
+        if str(profile).strip().lower() == "exhaustive":
+            raise ValueError("profile='exhaustive' is supported only by qlab_get_cue_details")
         if max_results < 1:
             raise ValueError("max_results must be 1 or greater")
         if max_results > 5000:
@@ -278,6 +326,16 @@ class CueQueryMixin:
             _normalize_query_filter(primary_filter, primary_value),
             *_normalize_optional_filters(optional_filters),
         ]
+        if str(profile).strip().lower() == "full_sensitive" and max_results > MAX_SENSITIVE_QUERY_RESULTS:
+            return _sensitive_query_limit_error(
+                _clean_workspace_id(workspace_id),
+                filters,
+                profile,
+                max_results,
+                max_cues_scanned,
+                "full_sensitive cue queries can return at most 50 cues",
+                received={"max_results": max_results, "profile": profile},
+            )
         cacheable = not _query_uses_live_state(filters)
         try:
             resolved_workspace_id = self._resolve_workspace_id_strict(workspace_id)
@@ -312,6 +370,89 @@ class CueQueryMixin:
         matched_count = 0
         cues: list[dict[str, Any]] = []
         errors: dict[str, str] = {}
+
+        scanned_all_cues = not bounded["truncated"]
+        omitted_branches = [
+            {
+                "cue_ref": item.get("cue_ref"),
+                "number": item.get("number"),
+                "name": item.get("name"),
+                "type": item.get("type"),
+                "child_count": item.get("child_count"),
+                "child_count_source": item.get("child_count_source"),
+                "fallback_used": bool(item.get("fallback_used")),
+            }
+            for item in bounded.get("child_read_errors", [])
+        ]
+        id_only_unscanned_count = sum(
+            int(item.get("child_count") or 0)
+            for item in omitted_branches
+            if item.get("fallback_used") and item.get("child_count") is not None
+        )
+        base_truncation_reasons: list[str] = [
+            "max_cues_scanned" if reason == "max_cues" else reason
+            for reason in bounded["truncation_reasons"]
+        ]
+        query_completeness_reasons: list[str] = []
+        if "max_cues_scanned" in base_truncation_reasons:
+            query_completeness_reasons.append("max_cues_scanned")
+        if id_only_unscanned_count > 0:
+            query_completeness_reasons.append("id_only_unscanned")
+        query_completeness = "partial" if query_completeness_reasons else "complete"
+        warnings: list[str] = []
+        if id_only_unscanned_count > 0:
+            warnings.append(
+                "Query scanned only cues with metadata available from shallow traversal; "
+                "some ID-only branch children were counted but not searched."
+            )
+        if "max_cues_scanned" in query_completeness_reasons:
+            warnings.append(
+                "Query stopped at max_cues_scanned before all discoverable cue metadata was scanned."
+            )
+
+        def build_result() -> dict[str, Any]:
+            result_limited = matched_count > len(cues)
+            truncation_reasons = [*base_truncation_reasons]
+            if result_limited:
+                truncation_reasons.append("max_results")
+            return {
+                "workspace_id": resolved_workspace_id,
+                "filters": filters,
+                "profile": profile,
+                "scanned_count": scanned_count,
+                "matched_count": matched_count,
+                "returned_count": len(cues),
+                "total_cue_ids": len(cue_refs),
+                "query_completeness": query_completeness,
+                "query_completeness_reasons": query_completeness_reasons,
+                "id_only_unscanned_count": id_only_unscanned_count,
+                "omitted_branches": omitted_branches,
+                "partial_branches": omitted_branches,
+                "truncated": bool(truncation_reasons),
+                "truncation_reasons": truncation_reasons,
+                "scanned_all_cues": scanned_all_cues,
+                "result_limited": result_limited,
+                "limits": {
+                    "max_results": max_results,
+                    "max_cues_scanned": max_cues_scanned,
+                },
+                "cues": cues,
+                "warnings": warnings,
+                "errors": {**bounded["errors"], **errors} or None,
+            }
+
+        initial_payload_size = sensitive_payload_size(build_result(), profile)
+        if initial_payload_size is not None and initial_payload_size > MAX_SENSITIVE_CUE_RESPONSE_BYTES:
+            return _sensitive_query_limit_error(
+                resolved_workspace_id,
+                filters,
+                profile,
+                max_results,
+                max_cues_scanned,
+                f"sensitive cue query response exceeds {MAX_SENSITIVE_CUE_RESPONSE_BYTES} bytes",
+                received={"profile": profile},
+                payload_size=initial_payload_size,
+            )
 
         for cue_ref in cue_refs:
             cue_id = cue_ref.get("uniqueID")
@@ -350,71 +491,33 @@ class CueQueryMixin:
                 cue["depth"] = cue_ref.get("depth")
                 cue = truncate_profile_payload(profile, _derive_profile_fields(profile, cue))
                 cues.append(cue)
+                partial_size = sensitive_payload_size(build_result(), profile)
+                if partial_size is not None and partial_size > MAX_SENSITIVE_CUE_RESPONSE_BYTES:
+                    return _sensitive_query_limit_error(
+                        resolved_workspace_id,
+                        filters,
+                        profile,
+                        max_results,
+                        max_cues_scanned,
+                        (
+                            f"sensitive cue query response exceeds "
+                            f"{MAX_SENSITIVE_CUE_RESPONSE_BYTES} bytes"
+                        ),
+                        received={"profile": profile},
+                        payload_size=partial_size,
+                    )
 
-        scanned_all_cues = not bounded["truncated"]
-        omitted_branches = [
-            {
-                "cue_ref": item.get("cue_ref"),
-                "number": item.get("number"),
-                "name": item.get("name"),
-                "type": item.get("type"),
-                "child_count": item.get("child_count"),
-                "child_count_source": item.get("child_count_source"),
-                "fallback_used": bool(item.get("fallback_used")),
-            }
-            for item in bounded.get("child_read_errors", [])
-        ]
-        id_only_unscanned_count = sum(
-            int(item.get("child_count") or 0)
-            for item in omitted_branches
-            if item.get("fallback_used") and item.get("child_count") is not None
-        )
-        result_limited = matched_count > len(cues)
-        truncation_reasons: list[str] = [
-            "max_cues_scanned" if reason == "max_cues" else reason
-            for reason in bounded["truncation_reasons"]
-        ]
-        if result_limited:
-            truncation_reasons.append("max_results")
-        query_completeness_reasons: list[str] = []
-        if "max_cues_scanned" in truncation_reasons:
-            query_completeness_reasons.append("max_cues_scanned")
-        if id_only_unscanned_count > 0:
-            query_completeness_reasons.append("id_only_unscanned")
-        query_completeness = "partial" if query_completeness_reasons else "complete"
-        warnings: list[str] = []
-        if id_only_unscanned_count > 0:
-            warnings.append(
-                "Query scanned only cues with metadata available from shallow traversal; "
-                "some ID-only branch children were counted but not searched."
+        result = build_result()
+        payload_size = sensitive_payload_size(result, profile)
+        if payload_size is not None and payload_size > MAX_SENSITIVE_CUE_RESPONSE_BYTES:
+            return _sensitive_query_limit_error(
+                resolved_workspace_id,
+                filters,
+                profile,
+                max_results,
+                max_cues_scanned,
+                f"sensitive cue query response exceeds {MAX_SENSITIVE_CUE_RESPONSE_BYTES} bytes",
+                received={"profile": profile},
+                payload_size=payload_size,
             )
-        if "max_cues_scanned" in query_completeness_reasons:
-            warnings.append(
-                "Query stopped at max_cues_scanned before all discoverable cue metadata was scanned."
-            )
-        truncated = bool(truncation_reasons)
-        return {
-            "workspace_id": resolved_workspace_id,
-            "filters": filters,
-            "profile": profile,
-            "scanned_count": scanned_count,
-            "matched_count": matched_count,
-            "returned_count": len(cues),
-            "total_cue_ids": len(cue_refs),
-            "query_completeness": query_completeness,
-            "query_completeness_reasons": query_completeness_reasons,
-            "id_only_unscanned_count": id_only_unscanned_count,
-            "omitted_branches": omitted_branches,
-            "partial_branches": omitted_branches,
-            "truncated": truncated,
-            "truncation_reasons": truncation_reasons,
-            "scanned_all_cues": scanned_all_cues,
-            "result_limited": result_limited,
-            "limits": {
-                "max_results": max_results,
-                "max_cues_scanned": max_cues_scanned,
-            },
-            "cues": cues,
-            "warnings": warnings,
-            "errors": {**bounded["errors"], **errors} or None,
-        }
+        return result

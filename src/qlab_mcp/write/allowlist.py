@@ -21,22 +21,52 @@ from .registry import (
 )
 
 
-WRITABLE_CUE_TYPES: dict[str, str] = {
-    "memo": "Memo",
-    "group": "Group",
-    "wait": "Wait",
-    "audio": "Audio",
+CUE_TYPES: dict[str, str] = {
+    "memo": "memo",
+    "group": "group",
+    "wait": "wait",
+    "audio": "audio",
+    "mic": "mic",
+    "video": "video",
+    "camera": "camera",
+    "text": "text",
+    "light": "light",
+    "fade": "fade",
+    "network": "network",
+    "midi": "midi",
+    "midi_file": "midi file",
+    "timecode": "timecode",
+    "start": "start",
+    "stop": "stop",
+    "pause": "pause",
+    "load": "load",
+    "reset": "reset",
+    "devamp": "devamp",
+    "goto": "goto",
+    "target": "target",
+    "arm": "arm",
+    "disarm": "disarm",
 }
+
+# Compatibility name for callers that used the old allowlist constant.
+WRITABLE_CUE_TYPES = CUE_TYPES
 
 WRITABLE_CUE_PROPERTIES = tuple(profile_catalog()[COMMON_UPDATE_PROFILE]["properties"])
 
 
 def validate_writable_cue_type(cue_type: str) -> str:
     normalized = _normalize_token(cue_type)
-    if normalized not in WRITABLE_CUE_TYPES:
-        allowed = ", ".join(WRITABLE_CUE_TYPES)
+    if normalized not in CUE_TYPES:
+        allowed = ", ".join(CUE_TYPES)
         raise UnsafeWriteOperationError(f"cue_type is not allowed for write mode: {cue_type!r}; use one of: {allowed}")
-    return WRITABLE_CUE_TYPES[normalized]
+    return CUE_TYPES[normalized]
+
+
+def writable_cue_type_label(cue_type: str) -> str:
+    normalized = _normalize_token(cue_type)
+    if normalized not in CUE_TYPES:
+        validate_writable_cue_type(cue_type)
+    return {"midi": "MIDI", "midi_file": "MIDI File", "goto": "GoTo"}.get(normalized, normalized.title())
 
 
 def validate_write_properties(properties: dict[str, Any] | None) -> dict[str, Any]:

@@ -2,6 +2,14 @@
 
 Status: 2026-08-07
 
+## Current state snapshot
+
+The canonical dated inventory is [`current-state.md`](current-state.md).
+It records the exact Git/worktree state, full and focused test output, and the
+latest QLab runtime probe. At the snapshot time MCP reported `qlab_unreachable`,
+so the runtime section is explicitly unverified rather than reusing an older
+workspace snapshot.
+
 Current local verification: focused Create/server contract checks pass; the
 full-suite count is pending after the template-only Create change. The full
 suite includes wheel/sdist build and artifact-membership checks.
@@ -70,6 +78,15 @@ runtime support is not claimed.
   `/new` row/column placement. Experimental raw-OSC smoke in QLab 5.5.10
   confirmed Group index `0` and Cart request `0,0` with readback `1,1`;
   automatic cleanup and an AppleScript fallback remain outside this closure.
+  Structural `created` is separate from operational readiness: healthy,
+  broken, warning, or unknown health is returned as information, not treated
+  as failed Create. Active-state readback remains a safety failure.
+
+- Sequential Create and recursive Delete — `qlab_create_cues` chains each
+  verified UUID into the next `/new` and stops without rollback on the first
+  ambiguity. `qlab_delete_cues` can empty a container deepest-first with a
+  fresh token and readback while preserving the requested root. Broken or
+  warning anchors remain valid structural references when inactive.
 
 - Authenticated request/reply handling uses invocation-owned TCP sessions,
   fresh post-timeout verification sessions, and deterministic cleanup. Packet

@@ -50,6 +50,16 @@ CreateCueStatus = Literal[
     "workspace_ambiguous",
     "workspace_unavailable",
 ]
+CreateCuesStatus = Literal[
+    "dry_run",
+    "created",
+    "partial_failed",
+    "preflight_failed",
+    "verification_failed",
+    "workspace_not_found",
+    "workspace_ambiguous",
+    "workspace_unavailable",
+]
 UpdateCueStatus = Literal[
     "dry_run",
     "dry_run_preflight_failed",
@@ -355,7 +365,10 @@ class CreateCueResult(BaseModel):
     verification: dict[str, Any] | None = None
     cleanup_required: bool = Field(
         default=False,
-        description="True when creation may have mutated QLab but fresh identity, health, or structure verification did not complete.",
+        description=(
+            "True when creation may have mutated QLab but fresh identity, structural placement, "
+            "or inactive-state verification did not complete. Broken or warning health alone is informational."
+        ),
     )
     cleanup: dict[str, Any] | None = Field(
         default=None,
@@ -374,6 +387,28 @@ class CreateCueResult(BaseModel):
         default=None,
         description="Short next action for resolving failed creation or verification; null when ok is true.",
     )
+    message: str
+
+
+class CreateCuesResult(BaseModel):
+    """Result for an ordered, sequential multi-cue creation."""
+
+    ok: bool
+    status: CreateCuesStatus = Field(description="Machine-readable batch create status.")
+    workspace_id: str
+    dry_run: bool
+    requested_count: int
+    planned_count: int = 0
+    created_count: int = 0
+    results: list[dict[str, Any]] = Field(default_factory=list)
+    planned_operations: list[dict[str, Any]] = Field(default_factory=list)
+    executed_operations: list[dict[str, Any]] = Field(default_factory=list)
+    confirm_token: str | None = Field(
+        default=None,
+        description="Dedicated confirm:createCues:v1 token returned by dry-run.",
+    )
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
     message: str
 
 
@@ -535,7 +570,7 @@ DeleteCuesStatus = Literal[
 
 
 class DeleteCuesResult(BaseModel):
-    """Result for isolated, leaf-only cue deletion."""
+    """Result for explicit leaf deletion or recursive emptying of one container."""
 
     ok: bool
     status: DeleteCuesStatus
@@ -548,6 +583,10 @@ class DeleteCuesResult(BaseModel):
     timeout_confirmed_count: int = 0
     results: list[dict[str, Any]] = Field(default_factory=list)
     confirm_token: str | None = None
+    container_id: str | None = None
+    recursive: bool = False
+    preserved_container_id: str | None = None
+    expanded_count: int = 0
     errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
     message: str

@@ -11,6 +11,10 @@ dry-run-first.
 See [`SECURITY.md`](SECURITY.md) for the supported threat model, security
 invariants, accepted risks, and QLab 5.5.10 evidence boundary.
 
+For a dated, reproducible inventory of `HEAD`, worktree changes, test output,
+and QLab runtime evidence, see [`docs/status/current-state.md`](docs/status/current-state.md).
+The report distinguishes programmed structure from runtime validation and GO readiness.
+
 ## What It Does
 
 - Workspace overview and status: cue lists, groups, counts, Edit/Show mode,
@@ -136,11 +140,12 @@ Cue edit flow:
 | Tool | Purpose |
 | --- | --- |
 | `qlab_check_write_readiness` | Checks disabled-by-default write readiness without mutation. |
-| `qlab_create_cue` | Dry-runs or creates one blank allowlisted cue after an exact anchor using QLab Cue Template defaults. |
+| `qlab_create_cue` | Dry-runs or creates one template-based cue with exact anchor or empty-container placement; verifies identity and structure. |
+| `qlab_create_cues` | Creates an ordered template-based sequence with one verified `/new` per cue and no automatic rollback. |
 | `qlab_edit_cues` | Dry-runs or updates 1-50 concrete cues through the cue editing registry. |
 | `qlab_update_cues` | Compatibility alias for older prompts, tests, and clients. |
 | `qlab_move_cues` | Dry-runs or moves 1-10 exact UUID-addressed cues within or between Lists and Groups. |
-| `qlab_delete_cues` | Dry-runs or deletes 1-10 exact leaf-cue UUIDs; container and cascade deletion is blocked. |
+| `qlab_delete_cues` | Dry-runs explicit leaf deletion or empties one container deepest-first while preserving its root. |
 
 ## Read Model
 
@@ -203,17 +208,22 @@ Write mode is deliberately gated:
 - Operations without deterministic readback must be blocked or reported
   inconclusive, not clean success.
 
-Allowed cue creation is intentionally narrow:
+Allowed cue creation is intentionally structural:
 
 - Only blank cue creation is allowed in this preface; blank means Create has no
   initial-properties input, not that QLab templates or cue normalization are
   guaranteed to be empty.
-- Allowed cue types are `memo`, `group`, `wait`, and `audio`.
+- Generic Create types are `memo`, `group`, `wait`, `audio`, `mic`, `video`,
+  `camera`, `text`, `light`, `fade`, `network`, `midi`, `midi_file`,
+  `timecode`, `start`, `stop`, `pause`, `load`, `reset`, `devamp`, `goto`,
+  `target`, `arm`, and `disarm`. `script`, Cue Lists, and Cue Carts remain
+  outside this contract.
 - Create has no initial-properties argument and sends no property setters.
   QLab's Cue Template supplies each cue's default geometry, timing, routing,
   and other initial state.
-- `after_cue_id` creates immediately after a healthy inactive cue in a linear
-  Cue List or Group. `parent_container_id` creates the first cue in an empty
+- `after_cue_id` creates immediately after an inactive, structurally stable cue
+  in a linear Cue List or Group. Broken or warning flags on the anchor are
+  informational and do not block structural placement. `parent_container_id` creates the first cue in an empty
   container: Cue Lists use `currentCueListID` plus unanchored `/new`, Groups
   use `/new` anchored to the Group followed by one `/move`, and Cue Carts use
   `/new` with the Cart UUID and request coordinates `0,0`. QLab 5.5.10
@@ -222,12 +232,22 @@ Allowed cue creation is intentionally narrow:
   QLab retain their exact wire capitalization.
 - Real Create sends `/new` once at most. A timeout, invalid identity, failed
   Group move, or unconfirmed Cart position is indeterminate: no property
-  setter or retry is allowed. The result reports
+  setter or retry is allowed. Broken or warning health is reported, but does
+  not make structural creation fail. The result reports
   `created_cue_id`, `placement`, `verification`, `executed_operations`,
   `errors`, `warnings`, `cleanup_required`, and manual `cleanup` guidance.
+  Health is reported as `healthy`, `broken`, `warning`, or `unknown`; only an
+  active readback state (`isRunning`, `isPaused`, `isAuditioning`, or
+  `isActionRunning`) turns structural verification into manual review.
 - Experimental raw-OSC smoke evidence from QLab 5.5.10 covers the empty Cue
-  List, Group, and Cart routes (including Cart `0,0` -> readback `1,1`). Other
-  cue types and property families remain outside the Create route.
+  List, Group, and Cart routes (including Cart `0,0` -> readback `1,1`).
+  `created` means identity and placement were verified; it does not mean the
+  cue is ready for GO.
+- `qlab_create_cues` accepts an ordered sequence of the same generic cue types.
+  It creates one cue at a time, uses each verified UUID as the next anchor, and
+  stops on the first ambiguous or failed item. Earlier successful cues remain;
+  there is no automatic rollback. A sequence started in a Cue Cart is limited
+  to one cue because Cart cells have no linear order.
 
 Cue updates use concrete cue numbers or unique IDs. `selected`, `active`,
 `playhead`, and `playbackPosition` are rejected for updates.
@@ -396,21 +416,22 @@ of 2 and 10, and structural/property preservation.
 
 ### Delete cues
 
-`qlab_delete_cues` accepts one workspace UUID and 1–10 exact leaf-cue UUIDs.
-Dry-run returns `confirm:deleteCues:v1:`. Duplicate, invalid, active, container,
-parent/descendant, cascade, Group, Cue List, and Cue Cart requests are rejected.
-Deletes are sequential, stop on unresolved failure, use independent existence
-and neighbor readback, have no automatic rollback, and are destructive and
-non-idempotent.
+`qlab_delete_cues` accepts one workspace UUID and either 1–10 exact leaf-cue
+UUIDs or `container_id=<UUID>, recursive=true`. Recursive mode expands the
+container deepest-first, deletes leaves and then empty child containers, and
+preserves the requested root. Dry-run returns `confirm:deleteCues:v1:`.
+Duplicate, invalid, active, and ambiguous requests are rejected. Deletes are
+sequential, stop on unresolved failure, use independent existence and neighbor
+readback, have no automatic rollback, and are destructive and non-idempotent.
 
 Tokens bind workspace, requested UUID order, cue type, parent, sibling index,
 previous/next neighbors, parent-order and deletion-impact fingerprints,
 readiness/activity, operation version, and expiry. Deletion convergence polls
 over bounded 0–10 second window. Result states include `deleted_immediately`,
 `deleted_after_convergence`, `indeterminate`, `failed`, and `partial_failed`.
-Permanent container/descendant deletion remains out of scope. Local tests cover
-leaf/batch deletion, neighbor preservation, stale and wrong-family tokens,
-container guards, and no cascade.
+Local tests cover leaf/batch deletion, recursive post-order emptying,
+root preservation, neighbor preservation, stale and wrong-family tokens, and
+active/container guards.
 
 Runtime validation covers individual and sequential batch leaf deletion,
 approximately 4–10 second convergence, neighbor preservation, stale-token and
@@ -579,11 +600,12 @@ qlab_get_workspace_setting_details(workspace_id, section, kind=None, ref=None, p
 qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=None, profile="basic_safe", max_results=500, max_cues_scanned=500)
 qlab_get_cue_details(workspace_id, cue_ref, profile="auto")
 qlab_check_write_readiness(workspace_id)
-qlab_create_cue(workspace_id, cue_type, after_cue_id, dry_run=None, confirm_token=None)
+qlab_create_cue(workspace_id, cue_type, after_cue_id=None, parent_container_id=None, dry_run=None, confirm_token=None)
+qlab_create_cues(workspace_id, cue_types, after_cue_id=None, parent_container_id=None, dry_run=None, confirm_token=None)
 qlab_edit_cues(workspace_id, updates, dry_run=None)
 qlab_update_cues(workspace_id, updates, dry_run=None)  # compatibility alias
 qlab_move_cues(workspace_id, moves, dry_run=None, confirm_token=None)
-qlab_delete_cues(workspace_id, cue_ids, dry_run=None, confirm_token=None)
+qlab_delete_cues(workspace_id, cue_ids=None, container_id=None, recursive=False, dry_run=None, confirm_token=None)
 ```
 
 `qlab_edit_cues` update items use this shape:

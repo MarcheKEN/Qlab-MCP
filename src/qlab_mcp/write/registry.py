@@ -1994,8 +1994,13 @@ def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
     return {
         "create_cue": {
             "planned": True,
-            "cue_types": ["memo", "group", "wait", "audio"],
+            "cue_types": [
+                "memo", "group", "wait", "audio", "mic", "video", "camera", "text", "light",
+                "fade", "network", "midi", "midi_file", "timecode", "start", "stop", "pause",
+                "load", "reset", "devamp", "goto", "target", "arm", "disarm",
+            ],
             "initialization": "qlab_cue_template_defaults",
+            "operational_state": "reported_separately_from_structural_creation",
             "dry_run_default": dry_run_default,
             "placement": {
                 "after_cue_id": "exact_uuid_anchor_for_existing_cue",
@@ -2004,10 +2009,29 @@ def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
                 "cue_list": "currentCueListID_then_new_without_anchor",
                 "group": "new_after_group_then_move_to_index_zero",
                 "cue_cart": "new_inside_cart_request_0_0_readback_1_1_on_qlab_5_5_10",
+                "cue_cart_rejects": ["group"],
                 "parent_id": "verified_from_structural_snapshot",
                 "index": "anchor_index_plus_one_or_zero_for_empty_container",
                 "confirm_token": "confirm:createCue:v2",
             },
+        },
+        "create_cues": {
+            "planned": True,
+            "cue_types": [
+                "memo", "group", "wait", "audio", "mic", "video", "camera", "text", "light",
+                "fade", "network", "midi", "midi_file", "timecode", "start", "stop", "pause",
+                "load", "reset", "devamp", "goto", "target", "arm", "disarm",
+            ],
+            "sequence": {
+                "max_items": 50,
+                "one_new_per_item": True,
+                "anchor": "previous_created_cue_id",
+                "stops_on_ambiguity": True,
+                "rollback": False,
+            },
+            "initial_placement": "same_as_create_cue",
+            "initialization": "qlab_cue_template_defaults",
+            "properties": [],
         },
         "batch_update_cues": update_cues_capability,
         "edit_existing_cue": {

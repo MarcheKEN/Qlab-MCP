@@ -13,6 +13,7 @@ from pydantic import Field
 
 from .errors import QLabMcpError
 from .models import (
+    CreateCuesResult,
     CreateCueResult,
     DeleteCuesResult,
     CueDetailsBatchResult,
@@ -132,6 +133,26 @@ WritableCueType = Literal[
     "group",
     "wait",
     "audio",
+    "mic",
+    "video",
+    "camera",
+    "text",
+    "light",
+    "fade",
+    "network",
+    "midi",
+    "midi_file",
+    "timecode",
+    "start",
+    "stop",
+    "pause",
+    "load",
+    "reset",
+    "devamp",
+    "goto",
+    "target",
+    "arm",
+    "disarm",
 ]
 
 WorkspaceId = Annotated[
@@ -186,6 +207,7 @@ QUERY_CUES_TIMEOUT = 60.0
 CUE_DETAILS_TIMEOUT = 20.0
 WRITE_READINESS_TIMEOUT = 6.0
 CREATE_CUE_TIMEOUT = 30.0
+CREATE_CUES_TIMEOUT = 180.0
 UPDATE_CUES_TIMEOUT = 180.0
 DELETE_CUES_TIMEOUT = 180.0
 
@@ -201,7 +223,7 @@ Use these tools to read QLab 5 workspace and cue information over OSC.
 The seven inspector tools are read-only and intentionally avoid playback, editing, deletion, and raw OSC.
 Write mode is a separate gated preface: it is disabled unless QLAB_ENABLE_WRITE=true and defaults to dry-run.
 When write mode is ready, all update profiles may exist; safe properties can execute as real writes, while dangerous or high-risk properties require explicit per-item confirm_gates.
-Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect. It supports gated cue creation, cue editing, structural cue moves, and leaf-only cue deletion.
+Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect. It supports gated single/sequence cue creation, cue editing, structural cue moves, and explicit or recursive cue deletion.
 
 Start with qlab_check_connection to verify QLab, workspace candidates, passcode, and read access.
 
@@ -995,7 +1017,7 @@ def qlab_create_cue(
         WritableCueType,
         Field(
             description=(
-                "Cue type to create. This tool creates blank memo, group, wait, or audio cues from QLab's cue template/defaults."
+                "Cue type to create from QLab's cue template/defaults. Create verifies identity and placement; it does not configure targets, files, patches, or setters."
             ),
         ),
     ],
@@ -1034,7 +1056,7 @@ def qlab_create_cue(
         ),
     ] = None,
 ) -> CreateCueResult:
-    """Create one blank allowlisted cue or return a dry-run plan.
+    """Create one cue from QLab's template/defaults or return a dry-run plan.
 
     Real creation requires QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
     Supply exactly one of after_cue_id or parent_container_id. The latter
@@ -1042,7 +1064,7 @@ def qlab_create_cue(
     container-specific OSC route. Dry-run planning never sends mutating OSC.
     Real creation requires the exact dedicated token from the dry-run and an
     unchanged structural snapshot.
-    This tool never exposes playback control, raw OSC, target edits, scripts, routing, or media paths.
+    Structural creation is separate from operational readiness: a created cue may be broken or warning because it still needs a target, file, patch, or edit. Script and container cue types are excluded.
     """
     return _run_tool(
         lambda reader: CreateCueResult.model_validate(
@@ -1055,6 +1077,64 @@ def qlab_create_cue(
                 confirm_token=confirm_token,
             )
         )
+    )
+
+
+@mcp.tool(
+    title="Create QLab Cues",
+    tags={"qlab", "write-mode", "cue-create", "batch-create", "gated-write"},
+    annotations=GATED_CREATE_QLAB_TOOL,
+    timeout=CREATE_CUES_TIMEOUT,
+)
+def qlab_create_cues(
+    workspace_id: WorkspaceId,
+    cue_types: Annotated[
+        list[WritableCueType],
+        Field(
+            min_length=1,
+            max_length=50,
+            description=(
+                "Ordered cue types. The first cue uses exactly one of after_cue_id or "
+                "parent_container_id; every later cue is created after the UUID returned "
+                "for the previous cue."
+            ),
+        ),
+    ],
+    after_cue_id: Annotated[
+        str | None,
+        Field(description="Exact UUID anchor for the first cue; use exactly one initial placement selector."),
+    ] = None,
+    parent_container_id: Annotated[
+        str | None,
+        Field(description="Exact UUID of an empty Cue List, Group, or Cue Cart for the first cue."),
+    ] = None,
+    dry_run: Annotated[
+        bool | None,
+        Field(description="Plan without mutating OSC; omitted uses the configured dry-run default."),
+    ] = None,
+    confirm_token: Annotated[
+        str | None,
+        Field(description="Exact confirm:createCues:v1 token returned by the reviewed dry-run."),
+    ] = None,
+) -> CreateCuesResult:
+    """Create an ordered cue sequence with one verified /new per item.
+
+    Creation stops at the first timeout, ambiguous identity, placement mismatch, or
+    other failure. There is no automatic rollback; earlier successful items remain.
+    Create uses QLab template defaults and does not apply initial setters.
+    """
+    return _run_tool(
+        lambda reader: CreateCuesResult.model_validate(
+            reader.create_cues(
+                workspace_id=workspace_id,
+                cue_types=list(cue_types),
+                dry_run=dry_run,
+                after_cue_id=after_cue_id,
+                parent_container_id=parent_container_id,
+                confirm_token=confirm_token,
+            )
+        ),
+        timeout=CREATE_CUES_TIMEOUT,
     )
 
 
@@ -1203,16 +1283,24 @@ def qlab_move_cues(
 def qlab_delete_cues(
     workspace_id: WorkspaceId,
     cue_ids: Annotated[
-        list[UUID],
+        list[UUID] | None,
         Field(
-            min_length=1,
+            min_length=0,
             max_length=10,
             description=(
-                "One to ten exact leaf cue UUIDs. Groups, Cue Lists, Cue Carts, cues with children, "
-                "and parent/descendant batches are blocked; deletion is not cascading."
+                "Optional explicit leaf cue UUIDs. For recursive emptying, omit cue_ids and provide "
+                "container_id with recursive=true."
             ),
         ),
-    ],
+    ] = None,
+    container_id: Annotated[
+        UUID | None,
+        Field(description="Container UUID to empty recursively; the container itself is preserved."),
+    ] = None,
+    recursive: Annotated[
+        bool,
+        Field(description="When true with container_id, delete descendants deepest-first and preserve the root."),
+    ] = False,
     dry_run: Annotated[
         bool | None,
         Field(
@@ -1227,17 +1315,19 @@ def qlab_delete_cues(
         Field(description="Exact confirm:deleteCues:v1: token returned by a reviewed dry-run plan."),
     ] = None,
 ) -> DeleteCuesResult:
-    """Plan or execute one to ten sequential deletions of explicit leaf cues.
+    """Plan or execute sequential deletions of explicit leaf cues or safely empty one container.
 
     Real deletion requires write readiness, Edit Mode, zero activity, a fresh dedicated confirmation
-    token, leaf-only targets, and independent existence readback after every delete. Groups, Cue Lists,
-    Cue Carts, cascades, and ambiguous targets remain blocked. Deletion is sequential and not atomic.
+    token, and independent existence readback after every delete. Recursive mode deletes descendants
+    deepest-first and preserves the requested root container. Deletion is sequential and not atomic.
     """
     return _run_tool(
         lambda reader: DeleteCuesResult.model_validate(
             reader.delete_cues(
                 workspace_id=workspace_id,
-                cue_ids=[str(cue_id) for cue_id in cue_ids],
+                cue_ids=[str(cue_id) for cue_id in cue_ids] if cue_ids is not None else [],
+                container_id=str(container_id) if container_id is not None else None,
+                recursive=recursive,
                 dry_run=dry_run,
                 confirm_token=confirm_token,
             )

@@ -1,0 +1,4 @@
+interface:
+  display_name: "QClass Research"
+  short_description: "Investigación de transcriptos QClass de Figure 53"
+  default_prompt: "Usa $qclass-research para buscar evidencia en los transcriptos QClass locales y citar día, tema y timestamp."

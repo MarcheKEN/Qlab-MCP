@@ -15,6 +15,7 @@ from qlab_mcp.errors import OscTimeoutError, QLabReplyError
 from qlab_mcp.server import (
     CHECK_CONNECTION_TIMEOUT,
     CREATE_CUE_TIMEOUT,
+    CREATE_CUES_TIMEOUT,
     CUE_DETAILS_TIMEOUT,
     QUERY_CUES_TIMEOUT,
     UPDATE_CUES_TIMEOUT,
@@ -64,8 +65,21 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["cue-create", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "ada9d6677652009f719d8135824b6caa17b72693acda60b20ae143fe812e7d94",
-        "output_schema_hash": "8bb57eebc530e61f66eda84c74064b9216c283c836592ef9159e33fd18721fdf",
+        "input_schema_hash": "faa9110ad1e9ba3b77634190668c61f1f7f03addbb76aa85fcc88c4e8efded6d",
+        "output_schema_hash": "bb5ea5c46ac0b602557a64f66362903acafd2a02498cc1d39749dcf5eb06e4f5",
+    },
+    "qlab_create_cues": {
+        "title": "Create QLab Cues",
+        "timeout": CREATE_CUES_TIMEOUT,
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+        "tags": ["batch-create", "cue-create", "gated-write", "qlab", "write-mode"],
+        "input_schema_hash": "5797a769a3cd5c64c8e6635013ec0156e19914d864827922c181e935523b9b33",
+        "output_schema_hash": "e6e0ef7fdaf321850769bc0afe6a8cf1342c4cc22c38519e3483345eb8efb4f5",
     },
     "qlab_get_cue_details": {
         "title": "Get QLab Cue Details",
@@ -164,8 +178,8 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["cue-delete", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "d4c9037076e6af74d4a90e184d5e0905e2efd23bd26455ea486f9fb690068abf",
-        "output_schema_hash": "088ad8235eba896f24a405aa7332220b29d4f81675b0a88e3cca92996f47bed3",
+        "input_schema_hash": "d761f60fcb5e204262098c4d16fdf9b8cf2bc2875dd4c9114959975bbf10a270",
+        "output_schema_hash": "d1a1e6c0d3df47ee9f83366133c85d20f71e7356396acb61b3c6b29e57f24bd6",
     },
 }
 EXPECTED_DESCRIPTION_PHRASES = {
@@ -178,6 +192,7 @@ EXPECTED_DESCRIPTION_PHRASES = {
     "qlab_get_cue_details": ("editable for update capability discovery", "exhaustive only for deep audits"),
     "qlab_check_write_readiness": ("without sending any mutating OSC commands", "Edit Mode"),
     "qlab_create_cue": ("dry-run plan", "Dry-run planning never sends mutating OSC"),
+    "qlab_create_cues": ("one verified /new per item", "no automatic rollback"),
     "qlab_edit_cues": ("Dry-run planning never sends mutating OSC", "High-risk profiles"),
     "qlab_update_cues": ("Compatibility alias", "qlab_edit_cues"),
     "qlab_move_cues": ("sequential QLab cue moves", "never claims atomicity"),
@@ -270,7 +285,7 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
     tools = asyncio.run(list_tools())
     tool_names = {tool.name for tool in tools}
 
-    assert len(tools) == 13
+    assert len(tools) == 14
     assert tool_names == set(EXPECTED_FASTMCP_TOOL_CONTRACTS)
     forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
     assert all(
@@ -447,6 +462,57 @@ def test_create_cue_fastmcp_forwards_anchor_and_returns_structured_plan(monkeypa
     assert result.structured_content["executed_operations"] == []
 
 
+def test_create_cues_fastmcp_forwards_ordered_types_and_initial_anchor(monkeypatch) -> None:
+    class FakeReader:
+        def create_cues(self, workspace_id, cue_types, dry_run, after_cue_id, parent_container_id, confirm_token):
+            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            assert cue_types == ["memo", "audio", "video"]
+            assert dry_run is True
+            assert after_cue_id == "11111111-1111-4111-8111-111111111111"
+            assert parent_container_id is None
+            assert confirm_token is None
+            return {
+                "ok": True,
+                "status": "dry_run",
+                "workspace_id": workspace_id,
+                "dry_run": True,
+                "requested_count": 3,
+                "planned_count": 3,
+                "created_count": 0,
+                "results": [],
+                "planned_operations": [
+                    {"operation": "new", "args": ["memo", "<anchor>"]},
+                    {"operation": "new", "args": ["audio", "<previous_created_cue_id>"]},
+                    {"operation": "new", "args": ["video", "<previous_created_cue_id>"]},
+                ],
+                "executed_operations": [],
+                "confirm_token": "confirm:createCues:v1:payload:signature",
+                "errors": None,
+                "warnings": [],
+                "message": "planned",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_create_cues",
+                {
+                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "cue_types": ["memo", "audio", "video"],
+                    "after_cue_id": "11111111-1111-4111-8111-111111111111",
+                    "dry_run": True,
+                },
+            )
+
+    result = asyncio.run(call_tool())
+    assert result.is_error is False
+    assert result.structured_content["status"] == "dry_run"
+    assert result.structured_content["requested_count"] == 3
+    assert result.structured_content["confirm_token"].startswith("confirm:createCues:v1:")
+
+
 def test_delete_cues_fastmcp_schema_limits_and_nested_uuid_model() -> None:
     async def get_tool_schema() -> dict[str, Any]:
         async with Client(mcp) as client:
@@ -454,9 +520,9 @@ def test_delete_cues_fastmcp_schema_limits_and_nested_uuid_model() -> None:
         return next(tool.inputSchema for tool in tools if tool.name == "qlab_delete_cues")
 
     schema = asyncio.run(get_tool_schema())
-    cue_ids = schema["properties"]["cue_ids"]
+    cue_ids = schema["properties"]["cue_ids"]["anyOf"][0]
 
-    assert cue_ids["minItems"] == 1
+    assert cue_ids["minItems"] == 0
     assert cue_ids["maxItems"] == 10
     assert cue_ids["items"]["format"] == "uuid"
     assert "confirm_token" in schema["properties"]
@@ -464,11 +530,13 @@ def test_delete_cues_fastmcp_schema_limits_and_nested_uuid_model() -> None:
 
 def test_delete_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
     class FakeReader:
-        def delete_cues(self, workspace_id, cue_ids, dry_run, confirm_token):
+        def delete_cues(self, workspace_id, cue_ids, dry_run, confirm_token, container_id=None, recursive=False):
             assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
             assert cue_ids == ["11111111-1111-4111-8111-111111111111"]
             assert dry_run is True
             assert confirm_token is None
+            assert container_id is None
+            assert recursive is False
             return {
                 "ok": True,
                 "status": "planned",
@@ -504,6 +572,55 @@ def test_delete_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
     assert result.structured_content["confirm_token"].startswith("confirm:deleteCues:v1:")
 
 
+def test_delete_cues_fastmcp_forwards_recursive_container(monkeypatch) -> None:
+    class FakeReader:
+        def delete_cues(self, workspace_id, cue_ids, dry_run, confirm_token, container_id=None, recursive=False):
+            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            assert cue_ids == []
+            assert dry_run is True
+            assert confirm_token is None
+            assert container_id == "22222222-2222-4222-8222-222222222222"
+            assert recursive is True
+            return {
+                "ok": True,
+                "status": "planned",
+                "workspace_id": workspace_id,
+                "dry_run": True,
+                "requested_count": 1,
+                "planned_count": 2,
+                "deleted_count": 0,
+                "failed_count": 0,
+                "expanded_count": 2,
+                "container_id": container_id,
+                "recursive": True,
+                "preserved_container_id": container_id,
+                "results": [],
+                "confirm_token": "confirm:deleteCues:v1:payload:signature",
+                "errors": None,
+                "warnings": [],
+                "message": "planned",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_delete_cues",
+                {
+                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "container_id": "22222222-2222-4222-8222-222222222222",
+                    "recursive": True,
+                    "dry_run": True,
+                },
+            )
+
+    result = asyncio.run(call_tool())
+    assert result.is_error is False
+    assert result.structured_content["recursive"] is True
+    assert result.structured_content["preserved_container_id"] == "22222222-2222-4222-8222-222222222222"
+
+
 def test_fastmcp_tool_descriptions_keep_agent_safety_phrases() -> None:
     async def list_tools():
         async with Client(mcp) as client:
@@ -523,7 +640,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    write_tools = {"qlab_create_cue", "qlab_edit_cues", "qlab_update_cues", "qlab_move_cues", "qlab_delete_cues"}
+    write_tools = {"qlab_create_cue", "qlab_create_cues", "qlab_edit_cues", "qlab_update_cues", "qlab_move_cues", "qlab_delete_cues"}
     read_only_tools = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) - write_tools
 
     for tool_name in read_only_tools:
@@ -737,6 +854,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_get_cue_details",
         "qlab_check_write_readiness",
         "qlab_create_cue",
+        "qlab_create_cues",
         "qlab_edit_cues",
         "qlab_update_cues",
         "qlab_move_cues",
@@ -861,6 +979,26 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "group",
         "wait",
         "audio",
+        "mic",
+        "video",
+        "camera",
+        "text",
+        "light",
+        "fade",
+        "network",
+        "midi",
+        "midi_file",
+        "timecode",
+        "start",
+        "stop",
+        "pause",
+        "load",
+        "reset",
+        "devamp",
+        "goto",
+        "target",
+        "arm",
+        "disarm",
     ]
     assert "dry_run" in create.inputSchema["properties"]
     assert "workspace_id" in create.inputSchema["required"]
@@ -912,13 +1050,16 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
 
     delete = tools["qlab_delete_cues"]
     assert delete.title == "Delete QLab Cues"
-    assert "explicit leaf cues" in delete.description
+    assert "explicit leaf" in delete.description
     assert delete.annotations.readOnlyHint is False
     assert delete.annotations.destructiveHint is True
     assert delete.annotations.idempotentHint is False
-    assert delete.inputSchema["properties"]["cue_ids"]["minItems"] == 1
-    assert delete.inputSchema["properties"]["cue_ids"]["maxItems"] == 10
-    assert delete.inputSchema["properties"]["cue_ids"]["items"]["format"] == "uuid"
+    delete_cue_ids_schema = delete.inputSchema["properties"]["cue_ids"]["anyOf"][0]
+    assert delete_cue_ids_schema["minItems"] == 0
+    assert delete_cue_ids_schema["maxItems"] == 10
+    assert delete_cue_ids_schema["items"]["format"] == "uuid"
+    assert "container_id" in delete.inputSchema["properties"]
+    assert "recursive" in delete.inputSchema["properties"]
     assert "confirm:deleteCues:v1:" in delete.inputSchema["properties"]["confirm_token"]["description"]
     assert "verification_failed" in delete.outputSchema["properties"]["status"]["enum"]
 
@@ -947,7 +1088,8 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
                 "qlab_query_cues",
                 "qlab_get_cue_details",
                 "qlab_check_write_readiness",
-                "qlab_create_cue",
+        "qlab_create_cue",
+        "qlab_create_cues",
                 "qlab_edit_cues",
                 "qlab_update_cues",
             )
@@ -964,6 +1106,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
         "qlab_get_cue_details": CUE_DETAILS_TIMEOUT,
         "qlab_check_write_readiness": WRITE_READINESS_TIMEOUT,
         "qlab_create_cue": CREATE_CUE_TIMEOUT,
+        "qlab_create_cues": CREATE_CUES_TIMEOUT,
         "qlab_edit_cues": UPDATE_CUES_TIMEOUT,
         "qlab_update_cues": UPDATE_CUES_TIMEOUT,
     }

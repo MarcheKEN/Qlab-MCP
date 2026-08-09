@@ -5205,8 +5205,8 @@ class QLabReaderTests(unittest.TestCase):
             {"name": "Disconnected Camera", "uniqueID": "patch-2", "source_present": False},
         ]
         cases = [
-            ({"videoInputPatchID": "patch-1", "videoInputPatchNumber": 2}, "valid", "id"),
-            ({"videoInputPatchID": "", "videoInputPatchNumber": 1}, "valid", "number"),
+            ({"videoInputPatchID": "patch-1", "videoInputPatchNumber": 2}, "unknown", "id"),
+            ({"videoInputPatchID": "", "videoInputPatchNumber": 1}, "unknown", "number"),
             ({"videoInputPatchID": "missing", "videoInputPatchNumber": 1}, "invalid_reference", "id"),
             ({"videoInputPatchID": "", "videoInputPatchNumber": 99}, "invalid_reference", "number"),
             ({"cameraPatch": 1}, "deprecated_reference", "cameraPatch"),
@@ -5336,6 +5336,57 @@ class QLabReaderTests(unittest.TestCase):
         codes = {problem["code"] for problem in result["sections"]["video_summary"]["problems"]}
         self.assertIn("visual_cue_broken", codes)
         self.assertIn("video_file_target_missing", codes)
+
+    def test_video_empty_file_target_is_not_reported_as_available(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "video-id",
+                "type": "Video",
+                "isBroken": True,
+                "isWarning": False,
+                "hasFileTargets": True,
+                "fileTarget": "",
+                "stageID": "",
+                "stageNumber": 0,
+            },
+            "/workspace/ws-1/settings/video/inputPatchList": [],
+            "/workspace/ws-1/settings/video/routes": [],
+            "/workspace/ws-1/settings/video/stages": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+            result = reader.get_cue_details("ws-1", "10", "inspector_safe")
+
+        properties = result["properties"]
+        codes = {problem["code"] for problem in result["sections"]["video_summary"]["problems"]}
+        assert properties["fileTargetPresent"] is False
+        assert "video_file_target_missing" in codes
+        assert "video_file_target_unavailable" not in codes
+
+    def test_camera_patch_with_unknown_presence_is_not_reported_as_valid(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "camera-id",
+                "type": "Camera",
+                "isBroken": True,
+                "isWarning": False,
+                "videoInputPatchID": "patch-1",
+                "videoInputPatchNumber": 1,
+                "stageID": "stage-1",
+            },
+            "/workspace/ws-1/settings/video/inputPatchList": [
+                {"name": "Camera", "uniqueID": "patch-1"},
+            ],
+            "/workspace/ws-1/settings/video/routes": [],
+            "/workspace/ws-1/settings/video/stages": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+            result = reader.get_cue_details("ws-1", "10", "inspector_safe")
+
+        camera = result["sections"]["video_summary"]["camera_input"]
+        assert camera["status"] == "unknown"
+        assert camera["reason"] == "video_input_patch_presence_unknown"
 
     def test_video_stage_reusing_one_route_is_not_multi_output(self) -> None:
         route = {

@@ -446,6 +446,10 @@ INSPECTOR_SAFE_PROFILE = tuple(
             *tuple(sorted(TIMING_PROPERTIES)),
             *tuple(sorted(STATUS_PROPERTIES)),
             *tuple(sorted(TARGET_PROPERTIES - SENSITIVE_CUE_PROPERTIES)),
+            # Read internally so profile derivation can distinguish an empty
+            # target from QLab's target-capability flag; the raw path is
+            # redacted before this profile is returned.
+            "fileTarget",
             *tuple(sorted(GROUP_PROPERTIES)),
             *tuple(sorted(TYPE_SPECIFIC_PROPERTIES - SENSITIVE_CUE_PROPERTIES - HEAVY_CUE_PROPERTIES)),
             "cueSize",

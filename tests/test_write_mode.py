@@ -85,6 +85,22 @@ def test_numeric_write_values_at_osc_int32_boundaries_are_accepted() -> None:
     assert write_registry._number(2_147_483_647, "invalid") == 2_147_483_647
 
 
+def test_create_health_requires_explicit_safe_runtime_flags() -> None:
+    assert write_operations._create_health_matches({"uniqueID": "cue", "type": "Text"}) is False
+    assert write_operations._create_health_matches(
+        {
+            "uniqueID": "cue",
+            "type": "Text",
+            "isBroken": False,
+            "isWarning": False,
+            "isRunning": False,
+            "isPaused": False,
+            "isAuditioning": False,
+            "isActionRunning": False,
+        }
+    ) is True
+
+
 def test_quaternion_reuses_osc_numeric_range_validation() -> None:
     with pytest.raises(UnsafeWriteOperationError):
         write_registry._quaternion([0, 0, 0, 1e39])
@@ -669,6 +685,304 @@ class _CreateAnchorClient:
 
     def request(self, address: str, *args: Any, **kwargs: Any) -> Any:
         return self.request_handler(address, *args, **kwargs)
+
+
+class EmptyContainerReader(QLabReader):
+    workspace = "ws-empty"
+    list_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    cart_id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    created_id = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+
+    def __init__(self, container_type: str, *, real: bool = False) -> None:
+        self.container_type = container_type
+        self.client = _CreateAnchorClient(
+            QLabConfig(
+                enable_write=real,
+                passcode="server-pass" if real else None,
+                write_dry_run_default=not real,
+            )
+        )
+        self.client.request_handler = self._request
+        self._read_cache = shared_read_cache()
+        self._read_deadline = None
+        self.created = False
+        self.current_list_id = self.list_id
+        self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
+
+    @property
+    def target_id(self) -> str:
+        return {
+            "Cue List": self.list_id,
+            "Group": self.group_id,
+            "Cue Cart": self.cart_id,
+        }[self.container_type]
+
+    def _resolve_workspace_id_strict(self, workspace_id: str) -> str:
+        if workspace_id != self.workspace:
+            raise ValueError(f"Workspace not found: {workspace_id}")
+        return workspace_id
+
+    def _resolve_workspace_strict(self, workspaces: Any, workspace_id: str) -> dict[str, Any]:
+        del workspaces
+        if workspace_id != self.workspace:
+            raise ValueError(f"Workspace not found: {workspace_id}")
+        return {"uniqueID": self.workspace, "displayName": "empty-container"}
+
+    def get_workspaces(self) -> dict[str, Any]:
+        return {"workspaces": [{"uniqueID": self.workspace, "displayName": "empty-container"}]}
+
+    def get_cue_lists(self, *_: Any, **__: Any) -> dict[str, Any]:
+        return {"cue_lists": [{"uniqueID": self.list_id, "type": "Cue List"}]}
+
+    def get_cue_children(self, _workspace_id: str, cue_ref: str, **_: Any) -> dict[str, Any]:
+        if cue_ref == self.list_id:
+            if self.container_type == "Cue List":
+                children = [{"uniqueID": self.created_id, "type": "Memo"}] if self.created else []
+            else:
+                children = [{"uniqueID": self.target_id, "type": self.container_type}]
+            return {"children": children}
+        if cue_ref == self.group_id:
+            children = [{"uniqueID": self.created_id, "type": "Memo"}] if self.created else []
+            return {"children": children}
+        if cue_ref == self.cart_id:
+            children = [{"uniqueID": self.created_id, "type": "Memo"}] if self.created else []
+            return {"children": children}
+        raise AssertionError(f"Unexpected child read: {cue_ref}")
+
+    def get_running_cues(self, *_: Any, **__: Any) -> dict[str, Any]:
+        return {"running_cues": []}
+
+    def get_cue_details(self, _workspace_id: str, cue_ref: str, _profile: str = "auto") -> dict[str, Any]:
+        if cue_ref != self.created_id or not self.created:
+            raise QLabReplyError("error", "No cue found", cue_ref)
+        properties = {
+            "uniqueID": self.created_id,
+            "type": "Memo",
+            "isBroken": False,
+            "isWarning": False,
+            "isRunning": False,
+            "isPaused": False,
+            "isAuditioning": False,
+            "isActionRunning": False,
+        }
+        if self.container_type == "Cue Cart":
+            properties.update({"cartPosition": [1, 1]})
+        return {"ok": True, "status": "ok", "cue_ref": cue_ref, "cue_type": "Memo", "properties": properties}
+
+    def _request(
+        self,
+        address: str,
+        *args: Any,
+        workspace_id: str | None = None,
+        request_timeout: float | None = None,
+        reply_timeout: float | None = None,
+    ) -> Any:
+        del workspace_id, request_timeout, reply_timeout
+        self.requests.append((address, args, None))
+        if address == f"/workspace/{self.workspace}/connect":
+            return SimpleNamespace(data="ok:view|edit|control", status="ok")
+        if address == f"/workspace/{self.workspace}/showMode":
+            return SimpleNamespace(data=False, status="ok")
+        if address == f"/workspace/{self.workspace}/currentCueListID":
+            return SimpleNamespace(data=self.current_list_id, status="ok")
+        if address.startswith(f"/workspace/{self.workspace}/currentCueListID/"):
+            self.current_list_id = address.rsplit("/", 1)[-1]
+            return SimpleNamespace(data=None, status="ok")
+        if address == f"/workspace/{self.workspace}/new":
+            expected = {
+                "Cue List": ("Memo",),
+                "Group": ("Memo", self.group_id),
+                "Cue Cart": ("Memo", self.cart_id, 0, 0),
+            }[self.container_type]
+            assert args == expected
+            self.created = True
+            return SimpleNamespace(data={"uniqueID": self.created_id}, status="ok")
+        if address == f"/workspace/{self.workspace}/move/{self.created_id}":
+            assert self.container_type == "Group"
+            assert args == (0, self.group_id)
+            return SimpleNamespace(data=None, status="ok")
+        raise AssertionError(f"Unexpected empty-container request: {address} {args}")
+
+
+@pytest.mark.parametrize("container_type", ["Cue List", "Group", "Cue Cart"])
+def test_create_empty_container_dry_run_plans_container_specific_route(container_type: str) -> None:
+    reader = EmptyContainerReader(container_type)
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.target_id,
+    )
+
+    assert result["ok"] is True
+    assert result["placement"]["parent_container_id"] == reader.target_id
+    assert result["placement"]["expected_index"] == 0
+    assert result["confirm_token"].startswith("confirm:createCue:v2:")
+    assert result["executed_operations"] == []
+    operations = result["planned_operations"]
+    if container_type == "Cue List":
+        assert [operation["operation"] for operation in operations] == [
+            "set_current_cue_list",
+            "verify_current_cue_list",
+            "new",
+            "verify",
+            "verify_structure",
+        ]
+        assert operations[2]["args"] == ["Memo"]
+    elif container_type == "Group":
+        assert [operation["operation"] for operation in operations] == [
+            "new",
+            "move_into_container",
+            "verify",
+            "verify_structure",
+        ]
+        assert operations[0]["args"] == ["Memo", reader.group_id]
+        assert operations[1]["args"] == [0, reader.group_id]
+    else:
+        assert [operation["operation"] for operation in operations] == [
+            "new",
+            "verify",
+            "verify_structure",
+        ]
+        assert operations[0]["args"] == ["Memo", reader.cart_id, 0, 0]
+    assert not any(
+        address.endswith("/new") or "/move/" in address or "currentCueListID/" in address
+        for address, _, _ in reader.requests
+    )
+
+
+def test_create_empty_cue_list_real_selects_list_then_creates_first_child() -> None:
+    reader = EmptyContainerReader("Cue List", real=True)
+    planned = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.list_id,
+    )
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        parent_container_id=reader.list_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is True
+    assert result["verification"]["structure"]["parent_id"] == reader.list_id
+    assert result["verification"]["structure"]["index"] == 0
+    assert [address for address, _, _ in reader.requests].count(f"/workspace/{reader.workspace}/new") == 1
+    assert any(address.endswith(f"/currentCueListID/{reader.list_id}") for address, _, _ in reader.requests)
+
+
+def test_create_empty_group_anchors_new_then_moves_once() -> None:
+    reader = EmptyContainerReader("Group", real=True)
+    planned = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.group_id,
+    )
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        parent_container_id=reader.group_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is True
+    assert result["verification"]["structure"]["parent_id"] == reader.group_id
+    assert result["verification"]["structure"]["index"] == 0
+    assert [address for address, _, _ in reader.requests].count(f"/workspace/{reader.workspace}/new") == 1
+    assert [address for address, _, _ in reader.requests].count(
+        f"/workspace/{reader.workspace}/move/{reader.created_id}"
+    ) == 1
+
+
+def test_create_empty_group_preserves_wire_uuid_case() -> None:
+    reader = EmptyContainerReader("Group", real=True)
+    reader.group_id = reader.group_id.upper()
+    planned = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.group_id,
+    )
+
+    move_plan = next(item for item in planned["planned_operations"] if item["operation"] == "move_into_container")
+    assert move_plan["args"] == [0, reader.group_id]
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        parent_container_id=reader.group_id,
+        confirm_token=planned["confirm_token"],
+    )
+    assert result["ok"] is True
+
+
+def test_create_empty_cart_uses_direct_cart_coordinates_without_move() -> None:
+    reader = EmptyContainerReader("Cue Cart", real=True)
+    planned = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.cart_id,
+    )
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        parent_container_id=reader.cart_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is True
+    assert result["verification"]["structure"]["parent_id"] == reader.cart_id
+    assert result["verification"]["structure"]["index"] == 0
+    assert result["verification"]["structure"]["cart_row"] == 0
+    assert result["verification"]["structure"]["cart_column"] == 0
+    assert result["verification"]["structure"]["cart_readback_row"] == 1
+    assert result["verification"]["structure"]["cart_readback_column"] == 1
+    assert [address for address, _, _ in reader.requests].count(f"/workspace/{reader.workspace}/new") == 1
+    assert not any("/move/" in address for address, _, _ in reader.requests)
+
+
+def test_create_rejects_both_or_neither_placement_selectors() -> None:
+    reader = EmptyContainerReader("Cue List")
+    with pytest.raises(UnsafeWriteOperationError, match="exactly one"):
+        reader.create_cue(reader.workspace, "memo", dry_run=True)
+    with pytest.raises(UnsafeWriteOperationError, match="exactly one"):
+        reader.create_cue(
+            reader.workspace,
+            "memo",
+            dry_run=True,
+            after_cue_id=reader.list_id,
+            parent_container_id=reader.list_id,
+        )
+
+
+def test_create_rejects_nonempty_parent_container_before_new() -> None:
+    reader = EmptyContainerReader("Group")
+    reader.created = True
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.group_id,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert "empty container" in result["errors"]["preflight"]
+    assert not any(address.endswith("/new") for address, _, _ in reader.requests)
 
 
 class BatchFakeWriteClient:
@@ -2393,7 +2707,7 @@ def test_create_cue_disabled_blocks_before_osc() -> None:
     reader = QLabReader(client)  # type: ignore[arg-type]
 
     with pytest.raises(UnsafeWriteOperationError, match="Write mode is disabled"):
-        reader.create_cue("ws-1", "audio", properties={"name": "Intro"}, dry_run=False)
+        reader.create_cue("ws-1", "audio", dry_run=False)
 
     assert client.requests == []
 
@@ -2404,7 +2718,6 @@ def test_create_cue_dry_run_sends_no_mutating_osc() -> None:
     result = reader.create_cue(
         reader.workspace,
         "audio",
-        properties={"name": "Intro", "continueMode": "auto_follow"},
         dry_run=True,
         after_cue_id=reader.anchor_id,
     )
@@ -2413,12 +2726,10 @@ def test_create_cue_dry_run_sends_no_mutating_osc() -> None:
     assert result["status"] == "dry_run"
     assert result["dry_run"] is True
     assert result["cue_type"] == "Audio"
-    assert result["properties"]["continueMode"] == 2
+    assert result["properties"] == {}
     assert result["placement"]["after_cue_id"] == reader.anchor_id
     assert [operation["operation"] for operation in result["planned_operations"]] == [
         "new",
-        "set_property",
-        "set_property",
         "verify",
         "verify_structure",
     ]
@@ -2437,7 +2748,7 @@ def test_create_cue_031b_dry_run_returns_anchor_bound_token_and_structure() -> N
 
     assert result["ok"] is True
     assert result["status"] == "dry_run"
-    assert result["confirm_token"].startswith("confirm:createCue:v1:")
+    assert result["confirm_token"].startswith("confirm:createCue:v2:")
     assert result["placement"]["parent_id"] == reader.list_id
     assert result["placement"]["expected_index"] == 1
     assert result["planned_operations"][0]["args"] == ["Wait", reader.anchor_id]
@@ -2463,6 +2774,10 @@ def test_create_cue_031b_consumes_token_verifies_order_and_rejects_replay() -> N
     assert result["verification"]["structure"]["index"] == 1
     assert result["created_cue_id"] == reader.created_id
     assert [address for address, _, _ in reader.requests].count(f"/workspace/{reader.workspace}/new") == 1
+    assert all(
+        f"/cue_id/{reader.created_id}/" not in address or address.endswith("/valuesForKeys")
+        for address, _, _ in reader.requests
+    )
 
     replay = reader.create_cue(
         reader.workspace,
@@ -2478,7 +2793,7 @@ def test_create_cue_031b_consumes_token_verifies_order_and_rejects_replay() -> N
 
 def test_create_cue_031b_requires_an_exact_anchor_uuid() -> None:
     reader = CreateAnchorReader()
-    with pytest.raises(UnsafeWriteOperationError, match="after_cue_id is required"):
+    with pytest.raises(UnsafeWriteOperationError, match="exactly one of after_cue_id or parent_container_id"):
         reader.create_cue(reader.workspace, "wait", dry_run=True)
 
 
@@ -2520,35 +2835,6 @@ def test_create_cue_031b_rejects_expired_token(monkeypatch: pytest.MonkeyPatch) 
     assert not any(address.endswith("/new") for address, _, _ in reader.requests)
 
 
-def test_create_cue_031b_reports_manual_cleanup_after_partial_setter_failure() -> None:
-    reader = CreateAnchorReader(
-        config=QLabConfig(enable_write=True, passcode="server-pass", write_dry_run_default=False),
-        fail_set_property="name",
-    )
-    properties = {"name": "must not be silently lost"}
-    planned = reader.create_cue(
-        reader.workspace,
-        "wait",
-        properties=properties,
-        dry_run=True,
-        after_cue_id=reader.anchor_id,
-    )
-
-    result = reader.create_cue(
-        reader.workspace,
-        "wait",
-        properties=properties,
-        dry_run=False,
-        after_cue_id=reader.anchor_id,
-        confirm_token=planned["confirm_token"],
-    )
-
-    assert result["ok"] is False
-    assert result["status"] == "verification_failed"
-    assert result["cleanup_required"] is True
-    assert result["cleanup"]["created_cue_id"] == reader.created_id
-
-
 def test_create_cue_dry_run_invalid_workspace_has_no_plan() -> None:
     client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"))
     reader = QLabReader(client)  # type: ignore[arg-type]
@@ -2556,7 +2842,6 @@ def test_create_cue_dry_run_invalid_workspace_has_no_plan() -> None:
     result = reader.create_cue(
         "missing-ws",
         "memo",
-        properties={"name": "Nope"},
         dry_run=True,
     )
 
@@ -2606,24 +2891,6 @@ def test_create_cue_rejects_unallowlisted_cue_type_before_osc() -> None:
     assert client.requests == []
 
 
-def test_create_cue_rejects_unallowlisted_properties_before_osc() -> None:
-    client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"))
-    reader = QLabReader(client)  # type: ignore[arg-type]
-
-    with pytest.raises(UnsafeWriteOperationError, match="not allowlisted"):
-        reader.create_cue("ws-1", "audio", properties={"fileTarget": "/tmp/secret.wav"}, dry_run=True)
-
-    assert client.requests == []
-
-
-def test_create_cue_rejects_invalid_property_values_before_osc() -> None:
-    client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"))
-    reader = QLabReader(client)  # type: ignore[arg-type]
-
-    with pytest.raises(UnsafeWriteOperationError, match="duration must be a non-negative number"):
-        reader.create_cue("ws-1", "audio", properties={"duration": -1}, dry_run=True)
-
-    assert client.requests == []
 
 
 def test_create_cue_real_with_after_cue_id_fails_safely_without_passcode_leak() -> None:
@@ -2665,126 +2932,6 @@ def test_create_cue_real_blocks_in_show_mode() -> None:
     assert client.requests[-1][2] == "ws-1"
 
 
-def test_create_cue_real_creates_applies_properties_and_verifies_fresh_details() -> None:
-    shared_read_cache().clear()
-    cue_id = "11111111-1111-4111-8111-111111111111"
-    reader = CreateAnchorReader(
-        config=QLabConfig(enable_write=True, passcode="server-pass", cache_ttl=10, write_dry_run_default=False)
-    )
-    reader.created_id = cue_id
-    properties = {"name": "Created", "number": "1", "armed": True, "continueMode": 1}
-    planned = reader.create_cue(
-        reader.workspace, "memo", properties=properties, dry_run=True, after_cue_id=reader.anchor_id
-    )
-
-    result = reader.create_cue(
-        reader.workspace,
-        "memo",
-        properties=properties,
-        dry_run=False,
-        after_cue_id=reader.anchor_id,
-        confirm_token=planned["confirm_token"],
-    )
-
-    addresses = [request[0] for request in reader.requests]
-    assert result["ok"] is True
-    assert result["status"] == "created"
-    assert result["cue_type"] == "Memo"
-    assert result["created_cue_id"] == cue_id
-    assert result["verification"]["properties"]["name"] == "Created"
-    assert f"/workspace/{reader.workspace}/connect" in addresses
-    assert f"/workspace/{reader.workspace}/showMode" in addresses
-    assert f"/workspace/{reader.workspace}/new" in addresses
-    assert f"/workspace/{reader.workspace}/cue_id/{cue_id}/name" in addresses
-    assert f"/workspace/{reader.workspace}/cue_id/{cue_id}/number" in addresses
-    assert f"/workspace/{reader.workspace}/cue_id/{cue_id}/armed" in addresses
-    assert f"/workspace/{reader.workspace}/cue_id/{cue_id}/continueMode" in addresses
-    assert addresses.count(f"/workspace/{reader.workspace}/cue_id/{cue_id}/valuesForKeys") >= 2
-
-
-def test_create_and_edit_share_common_property_normalization_and_setter_shape() -> None:
-    cue_id = "11111111-1111-4111-8111-111111111111"
-    properties = {"name": "Created", "continueMode": " auto_follow "}
-
-    create_reader = CreateAnchorReader(
-        config=QLabConfig(enable_write=True, passcode="server-pass", write_dry_run_default=False)
-    )
-    create_reader.created_id = cue_id
-    planned = create_reader.create_cue(
-        create_reader.workspace, "memo", properties=properties, dry_run=True, after_cue_id=create_reader.anchor_id
-    )
-    created = create_reader.create_cue(
-        create_reader.workspace,
-        "memo",
-        properties=properties,
-        dry_run=False,
-        after_cue_id=create_reader.anchor_id,
-        confirm_token=planned["confirm_token"],
-    )
-
-    edit_client = FakeWriteClient(
-        QLabConfig(enable_write=True, passcode="server-pass"),
-        existing_cue_id=cue_id,
-    )
-    edit_reader = QLabReader(edit_client)  # type: ignore[arg-type]
-    edited = edit_reader.update_cue("ws-1", cue_id, properties=properties, dry_run=False)
-
-    assert created["properties"] == edited["properties"] == {"name": "Created", "continueMode": 2}
-    create_setters = [request for request in create_reader.requests if request[0].endswith(("/name", "/continueMode"))]
-    edit_setters = [request for request in edit_client.requests if request[0].endswith(("/name", "/continueMode"))]
-    assert [(request[0].rsplit("/", 1)[-1], request[1]) for request in create_setters] == [
-        (request[0].rsplit("/", 1)[-1], request[1]) for request in edit_setters
-    ]
-    assert created["verification"]["properties"]["name"] == edited["after"]["name"] == "Created"
-
-
-def test_create_and_edit_share_common_property_validation_error() -> None:
-    create_reader = QLabReader(FakeWriteClient(QLabConfig(enable_write=False)))  # type: ignore[arg-type]
-    edit_reader = QLabReader(FakeWriteClient(QLabConfig(enable_write=False)))  # type: ignore[arg-type]
-
-    with pytest.raises(UnsafeWriteOperationError) as create_error:
-        create_reader.create_cue("ws-1", "memo", properties={"continueMode": "not-a-mode"}, dry_run=True)
-    with pytest.raises(UnsafeWriteOperationError) as edit_error:
-        edit_reader.update_cue("ws-1", "1", properties={"continueMode": "not-a-mode"}, dry_run=True)
-
-    assert str(create_error.value).endswith("continueMode must be 0, 1, 2, do_not_continue, auto_continue, or auto_follow")
-    assert str(edit_error.value).endswith("continueMode must be 0, 1, 2, do_not_continue, auto_continue, or auto_follow")
-
-
-def test_create_and_edit_share_setter_timeout_readback_confirmation() -> None:
-    cue_id = "11111111-1111-4111-8111-111111111111"
-    properties = {"name": "Created"}
-    create_reader = CreateAnchorReader(
-        config=QLabConfig(enable_write=True, passcode="server-pass", write_dry_run_default=False),
-        timeout_set_property="name",
-    )
-    create_reader.created_id = cue_id
-    create_plan = create_reader.create_cue(
-        create_reader.workspace, "memo", properties=properties, dry_run=True, after_cue_id=create_reader.anchor_id
-    )
-    edit_client = FakeWriteClient(
-        QLabConfig(enable_write=True, passcode="server-pass"),
-        existing_cue_id=cue_id,
-        timeout_set_property="name",
-    )
-
-    created = create_reader.create_cue(
-        create_reader.workspace,
-        "memo",
-        properties=properties,
-        dry_run=False,
-        after_cue_id=create_reader.anchor_id,
-        confirm_token=create_plan["confirm_token"],
-    )
-    edited = QLabReader(edit_client).update_cue("ws-1", cue_id, properties=properties, dry_run=False)  # type: ignore[arg-type]
-
-    assert created["ok"] is True
-    assert created["warnings"]
-    assert edited["status"] == "updated"
-    assert edited["warnings"]
-    assert created["verification"]["properties"]["name"] == edited["after"]["name"] == "Created"
-
-
 def test_create_new_timeout_is_indeterminate_and_sends_no_setters(monkeypatch: pytest.MonkeyPatch) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     reader = CreateAnchorReader(
@@ -2795,14 +2942,12 @@ def test_create_new_timeout_is_indeterminate_and_sends_no_setters(monkeypatch: p
     plan = reader.create_cue(
         reader.workspace,
         "memo",
-        properties={"name": "Never blindly retried"},
         dry_run=True,
         after_cue_id=reader.anchor_id,
     )
     result = reader.create_cue(
         reader.workspace,
         "memo",
-        properties={"name": "Never blindly retried"},
         dry_run=False,
         after_cue_id=reader.anchor_id,
         confirm_token=plan["confirm_token"],
@@ -2811,7 +2956,7 @@ def test_create_new_timeout_is_indeterminate_and_sends_no_setters(monkeypatch: p
     assert result["ok"] is False
     assert result["cleanup_required"] is True
     assert result["error_code"] == "create_identity_indeterminate"
-    assert not any(address.endswith("/name") for address, _, _ in reader.requests)
+    assert not any("/cue_id/" in address for address, _, _ in reader.requests)
 
 
 def test_create_rejects_invalid_new_uuid_without_setters() -> None:
@@ -2822,14 +2967,12 @@ def test_create_rejects_invalid_new_uuid_without_setters() -> None:
     plan = reader.create_cue(
         reader.workspace,
         "memo",
-        properties={"name": "Never applied"},
         dry_run=True,
         after_cue_id=reader.anchor_id,
     )
     result = reader.create_cue(
         reader.workspace,
         "memo",
-        properties={"name": "Never applied"},
         dry_run=False,
         after_cue_id=reader.anchor_id,
         confirm_token=plan["confirm_token"],
@@ -2838,7 +2981,7 @@ def test_create_rejects_invalid_new_uuid_without_setters() -> None:
     assert result["ok"] is False
     assert result["error_code"] == "create_identity_invalid"
     assert result["cleanup_required"] is True
-    assert not any(address.endswith("/name") for address, _, _ in reader.requests)
+    assert not any("/cue_id/" in address for address, _, _ in reader.requests)
 
 
 def test_update_cue_dry_run_sends_no_mutating_osc() -> None:
@@ -17856,7 +17999,6 @@ def test_create_cue_dry_run_reviews_supported_and_unsupported_non_light_types() 
         result = supported_reader.create_cue(
             supported_reader.workspace,
             cue_type,
-            properties={"name": cue_type},
             dry_run=True,
             after_cue_id=supported_reader.anchor_id,
         )

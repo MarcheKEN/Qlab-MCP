@@ -345,7 +345,7 @@ class CreateCueResult(BaseModel):
     dry_run: bool
     confirm_token: str | None = Field(
         default=None,
-        description="Dedicated confirm:createCue:v1 token returned by dry-run and consumed by real creation.",
+        description="Dedicated confirm:createCue:v2 token returned by dry-run and consumed by real creation.",
     )
     created_cue_id: str | None = None
     placement: dict[str, Any] | None = None
@@ -355,7 +355,7 @@ class CreateCueResult(BaseModel):
     verification: dict[str, Any] | None = None
     cleanup_required: bool = Field(
         default=False,
-        description="True when creation may have mutated QLab but verification or later setters did not complete.",
+        description="True when creation may have mutated QLab but fresh identity, health, or structure verification did not complete.",
     )
     cleanup: dict[str, Any] | None = Field(
         default=None,
@@ -363,7 +363,7 @@ class CreateCueResult(BaseModel):
     )
     errors: dict[str, str] | None = Field(
         default=None,
-        description="Per-property or verification errors; null when no errors were detected.",
+        description="Verification or placement errors; null when no errors were detected.",
     )
     warnings: list[str] = Field(default_factory=list)
     error_code: str | None = Field(

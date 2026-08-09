@@ -42,8 +42,12 @@ Writes are disabled by default. Before any authorized write:
 6. Roll back with a new dry-run and new token when the workflow requires one.
 
 `qlab_create_cue` requires an exact `after_cue_id` anchor. Review its dry-run,
-then pass the returned dedicated `confirm:createCue:v1` token for real
-creation. Edit tokens belong to individual `updates[].confirm_gates`; Move and
+then pass the returned dedicated `confirm:createCue:v2` token for real
+creation. Use exactly one of `after_cue_id` or `parent_container_id`; the
+latter handles the first cue in an empty Cue List, Group, or Cue Cart with the
+container-specific OSC route. Cue Cart creation requests `0,0`; QLab 5.5.10
+reports that first cell as `1,1`, which is verified as the expected readback.
+Edit tokens belong to individual `updates[].confirm_gates`; Move and
 Delete use one dedicated tool-level token. Restarting the MCP invalidates
 process-bound tokens.
 

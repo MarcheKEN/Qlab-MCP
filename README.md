@@ -136,7 +136,7 @@ Cue edit flow:
 | Tool | Purpose |
 | --- | --- |
 | `qlab_check_write_readiness` | Checks disabled-by-default write readiness without mutation. |
-| `qlab_create_cue` | Dry-runs or creates one blank allowlisted cue after an exact anchor with safe initial properties. |
+| `qlab_create_cue` | Dry-runs or creates one blank allowlisted cue after an exact anchor using QLab Cue Template defaults. |
 | `qlab_edit_cues` | Dry-runs or updates 1-50 concrete cues through the cue editing registry. |
 | `qlab_update_cues` | Compatibility alias for older prompts, tests, and clients. |
 | `qlab_move_cues` | Dry-runs or moves 1-10 exact UUID-addressed cues within or between Lists and Groups. |
@@ -184,9 +184,10 @@ Write mode is deliberately gated:
 - Once real setters start, batch writes are not transactional. Later failures
   are reported per item and require normal readback or manual review.
 - Real writes bypass and clear the read cache before fresh verification.
-- `qlab_create_cue` requires an exact `after_cue_id` anchor and the exact fresh
-  `confirm:createCue:v1` token returned by its dry-run. The token binds the
-  reviewed workspace structure and is consumed before `/new`.
+- `qlab_create_cue` accepts exactly one of an exact `after_cue_id` anchor or a
+  `parent_container_id` for an empty Cue List, Group, or Cue Cart. It requires
+  the exact fresh `confirm:createCue:v2` token returned by its dry-run. The
+  token binds the reviewed workspace structure and is consumed before `/new`.
 - `qlab_edit_cues` may return tokens for individual planned high-risk
   operations. Copy each exact relevant `planned_operations[].confirm_token`
   into that update item's `confirm_gates`; there is no tool-level Edit token.
@@ -204,22 +205,29 @@ Write mode is deliberately gated:
 
 Allowed cue creation is intentionally narrow:
 
-- Only blank cue creation is allowed in this preface; blank means no initial
-  properties were supplied, not that QLab templates or cue normalization are
+- Only blank cue creation is allowed in this preface; blank means Create has no
+  initial-properties input, not that QLab templates or cue normalization are
   guaranteed to be empty.
 - Allowed cue types are `memo`, `group`, `wait`, and `audio`.
-- Safe initial properties are `name`, `number`, `armed`, `flagged`, `colorName`,
-  `preWait`, `postWait`, `duration`, and `continueMode`.
-- `after_cue_id` is required and is the only real placement mode currently
-  supported. It must identify a healthy inactive cue in a linear Cue List or
-  Group. Group-empty insertion, Cue Cart placement, `parent_id + position`,
-  and arbitrary index placement remain out of scope.
-- Real Create sends `/new` once at most. A timeout or invalid identity is
-  indeterminate: no property setter or retry is allowed. The result reports
+- Create has no initial-properties argument and sends no property setters.
+  QLab's Cue Template supplies each cue's default geometry, timing, routing,
+  and other initial state.
+- `after_cue_id` creates immediately after a healthy inactive cue in a linear
+  Cue List or Group. `parent_container_id` creates the first cue in an empty
+  container: Cue Lists use `currentCueListID` plus unanchored `/new`, Groups
+  use `/new` anchored to the Group followed by one `/move`, and Cue Carts use
+  `/new` with the Cart UUID and request coordinates `0,0`. QLab 5.5.10
+  accepts that request and reports the first cell as readback coordinates
+  `1,1`; verification accounts for this 1-based Cart readback. UUIDs sent to
+  QLab retain their exact wire capitalization.
+- Real Create sends `/new` once at most. A timeout, invalid identity, failed
+  Group move, or unconfirmed Cart position is indeterminate: no property
+  setter or retry is allowed. The result reports
   `created_cue_id`, `placement`, `verification`, `executed_operations`,
   `errors`, `warnings`, `cleanup_required`, and manual `cleanup` guidance.
-- Runtime proof currently covers only one blank anchored Wait. Other allowlisted
-  types and property families remain source/test-supported, not runtime-certified.
+- Experimental raw-OSC smoke evidence from QLab 5.5.10 covers the empty Cue
+  List, Group, and Cart routes (including Cart `0,0` -> readback `1,1`). Other
+  cue types and property families remain outside the Create route.
 
 Cue updates use concrete cue numbers or unique IDs. `selected`, `active`,
 `playhead`, and `playbackPosition` are rejected for updates.
@@ -285,8 +293,9 @@ Current specialized write support is intentionally token-gated:
   marker edits. Video FX real-write support is deliberately narrow and only
   applies when dry-run marks an exact scalar candidate such as the validated
   `videoEffectIndex/0/parameter/inputRadius` or `inputIntensity` paths.
-- `camera_basic`: supports safe camera `channels`; camera visual geometry and
-  I/O fields follow the same dry-run/confirm-token model as visual cue edits.
+- `camera_basic`: Camera I/O IDs and `channels`/`channelOffset` can be checked
+  in dry-run plans; visual geometry and I/O fields remain planned-only until
+  QLab exposes verifiable patch availability.
 - `text_basic`: text content, `fixedWidth`, alignment, `fontName`, `fontSize`,
   `lineSpacing`, text color, and shared visual geometry are gated candidates.
   Rich text shadows, decoration, and unreliable color/readback paths remain
@@ -570,7 +579,7 @@ qlab_get_workspace_setting_details(workspace_id, section, kind=None, ref=None, p
 qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=None, profile="basic_safe", max_results=500, max_cues_scanned=500)
 qlab_get_cue_details(workspace_id, cue_ref, profile="auto")
 qlab_check_write_readiness(workspace_id)
-qlab_create_cue(workspace_id, cue_type, after_cue_id, properties=None, dry_run=None, confirm_token=None)
+qlab_create_cue(workspace_id, cue_type, after_cue_id, dry_run=None, confirm_token=None)
 qlab_edit_cues(workspace_id, updates, dry_run=None)
 qlab_update_cues(workspace_id, updates, dry_run=None)  # compatibility alias
 qlab_move_cues(workspace_id, moves, dry_run=None, confirm_token=None)

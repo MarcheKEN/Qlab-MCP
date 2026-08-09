@@ -23,7 +23,7 @@ Hard limits:
 Public write-tool confirmation boundaries:
 
 - `qlab_create_cue`: review the dry-run first, pass the exact dedicated
-  `confirm:createCue:v1` token, and follow the separate
+  `confirm:createCue:v2` token, and follow the separate
   [`create-cues.md`](create-cues.md) checklist. It requires an exact
   `after_cue_id` anchor and never retries an ambiguous `/new`.
 - `qlab_edit_cues`: copy exact relevant

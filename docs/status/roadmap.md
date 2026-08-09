@@ -2,8 +2,9 @@
 
 Status: 2026-08-07
 
-Current local verification: `2479 passed, 41 subtests passed in 6.35s`; zero
-skips. The full suite includes wheel/sdist build and artifact-membership checks.
+Current local verification: focused Create/server contract checks pass; the
+full-suite count is pending after the template-only Create change. The full
+suite includes wheel/sdist build and artifact-membership checks.
 
 Evidence terms follow [Current Docs](README.md): documented,
 source-confirmed, runtime-proven, inferred, and unsupported. Runtime claims
@@ -58,14 +59,17 @@ runtime support is not claimed.
   invalidation remains a documented follow-up because no safe restart API was
   available.
 
-- Safe Create lifecycle (Workorder 031) — Create/Edit share property
-  normalization, validation, setter planning, timeout handling, and fresh
-  readback. QLab 5.5.10 runtime proof covers one blank anchored Wait: one
-  `/new`, `confirm:createCue:v1`, returned UUID/type/parent/health/inactivity,
-  immediate-after order, manual Delete with a fresh token, baseline restoration,
-  activity `0/0/0`, and unchanged DMX. Other cue types/property families,
-  Group-empty/Cue Cart/parent-index placement, live `/new` timeout recovery,
-  automatic cleanup, and an AppleScript fallback remain outside this closure.
+- Safe Create lifecycle (Workorder 031) — Create is template-only: it accepts
+  no initial properties, sends one `/new` at most, and performs fresh identity,
+  health, and structure readback. QLab 5.5.10 runtime proof covers one blank
+  anchored Wait: `confirm:createCue:v2`, returned UUID/type/parent/health/
+  inactivity, immediate-after order, manual Delete with a fresh token, baseline
+  restoration, activity `0/0/0`, and unchanged DMX. Empty-container Create now
+  routes Cue Lists through `currentCueListID` plus unanchored `/new`, Groups
+  through anchored `/new` plus one `/move`, and Cue Carts through direct
+  `/new` row/column placement. Experimental raw-OSC smoke in QLab 5.5.10
+  confirmed Group index `0` and Cart request `0,0` with readback `1,1`;
+  automatic cleanup and an AppleScript fallback remain outside this closure.
 
 - Authenticated request/reply handling uses invocation-owned TCP sessions,
   fresh post-timeout verification sessions, and deterministic cleanup. Packet
@@ -231,8 +235,9 @@ playback, `/live`, save, commit, or unrelated mutation was used.
 
 Public write-tool confirmation boundaries:
 
-- Create is dry-run-first, requires an exact `after_cue_id`, and uses a dedicated
-  `confirm:createCue:v1` token bound to the reviewed workspace structure.
+- Create is dry-run-first, requires exactly one of `after_cue_id` or
+  `parent_container_id`, and uses a dedicated `confirm:createCue:v2` token
+  bound to the reviewed workspace structure.
 - Edit uses exact per-operation dry-run tokens copied into each update item's
   `confirm_gates`; it has no tool-level token.
 - Eligible reviewed Move and Delete dry-runs each return a dedicated tool-level

@@ -64,8 +64,8 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["cue-create", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "ea020bbee21d28e0e554a44c90b2c599740f5c20e496109850359f0786a10ef4",
-        "output_schema_hash": "779ad46ef58546d76ad25fe5577516fb2aa660608653b5d684c044f34a790013",
+        "input_schema_hash": "ada9d6677652009f719d8135824b6caa17b72693acda60b20ae143fe812e7d94",
+        "output_schema_hash": "8bb57eebc530e61f66eda84c74064b9216c283c836592ef9159e33fd18721fdf",
     },
     "qlab_get_cue_details": {
         "title": "Get QLab Cue Details",
@@ -388,12 +388,12 @@ def test_move_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
 
 def test_create_cue_fastmcp_forwards_anchor_and_returns_structured_plan(monkeypatch) -> None:
     class FakeReader:
-        def create_cue(self, workspace_id, cue_type, properties, dry_run, after_cue_id, confirm_token):
+        def create_cue(self, workspace_id, cue_type, dry_run, after_cue_id, parent_container_id, confirm_token):
             assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
             assert cue_type == "wait"
-            assert properties is None
             assert dry_run is True
             assert after_cue_id == "11111111-1111-4111-8111-111111111111"
+            assert parent_container_id is None
             assert confirm_token is None
             return {
                 "ok": True,
@@ -401,7 +401,7 @@ def test_create_cue_fastmcp_forwards_anchor_and_returns_structured_plan(monkeypa
                 "workspace_id": workspace_id,
                 "cue_type": "Wait",
                 "dry_run": True,
-                "confirm_token": "confirm:createCue:v1:payload:signature",
+                "confirm_token": "confirm:createCue:v2:payload:signature",
                 "created_cue_id": None,
                 "placement": {
                     "after_cue_id": after_cue_id,
@@ -439,7 +439,7 @@ def test_create_cue_fastmcp_forwards_anchor_and_returns_structured_plan(monkeypa
     result = asyncio.run(call_tool())
     assert result.is_error is False
     assert result.structured_content["status"] == "dry_run"
-    assert result.structured_content["confirm_token"].startswith("confirm:createCue:v1:")
+    assert result.structured_content["confirm_token"].startswith("confirm:createCue:v2:")
     assert result.structured_content["planned_operations"][0]["args"] == [
         "Wait",
         "11111111-1111-4111-8111-111111111111",
@@ -865,7 +865,8 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "dry_run" in create.inputSchema["properties"]
     assert "workspace_id" in create.inputSchema["required"]
     assert "cue_type" in create.inputSchema["required"]
-    assert "after_cue_id" in create.inputSchema["required"]
+    assert "after_cue_id" not in create.inputSchema.get("required", [])
+    assert "parent_container_id" in create.inputSchema["properties"]
     assert create.outputSchema["properties"]["status"]["enum"] == [
         "dry_run",
         "preflight_failed",
@@ -920,6 +921,17 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert delete.inputSchema["properties"]["cue_ids"]["items"]["format"] == "uuid"
     assert "confirm:deleteCues:v1:" in delete.inputSchema["properties"]["confirm_token"]["description"]
     assert "verification_failed" in delete.outputSchema["properties"]["status"]["enum"]
+
+
+def test_create_tool_uses_qlab_template_defaults_without_property_input() -> None:
+    async def get_tool_schema() -> dict[str, Any]:
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+        return next(tool.inputSchema for tool in tools if tool.name == "qlab_create_cue")
+
+    schema = asyncio.run(get_tool_schema())
+
+    assert "properties" not in schema["properties"]
 
 
 def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
@@ -1017,7 +1029,7 @@ def test_write_tool_wrappers_do_not_pass_outer_reader_deadlines(monkeypatch) -> 
 
     monkeypatch.setattr(server_module, "_run_tool", capture)
 
-    assert server_module.qlab_create_cue("ws-1", "memo", "11111111-1111-4111-8111-111111111111") == "ok"
+    assert server_module.qlab_create_cue("ws-1", "memo", dry_run=True, after_cue_id="11111111-1111-4111-8111-111111111111") == "ok"
     assert server_module.qlab_edit_cues("ws-1", [], dry_run=True) == "ok"
     assert server_module.qlab_move_cues("ws-1", [], dry_run=True) == "ok"
     assert server_module.qlab_delete_cues("ws-1", [], dry_run=True) == "ok"
@@ -1144,26 +1156,6 @@ def test_sensitive_cue_query_limit_rejects_large_result_count_before_reader(monk
     assert payload["ok"] is False
     assert payload["error_code"] == "cue_payload_too_large"
     assert payload["allowed"]["max_results"] == 50
-
-
-def test_create_numeric_range_error_is_structured_and_pre_transport(monkeypatch) -> None:
-    class FakeReader:
-        def create_cue(self, **kwargs):
-            raise AssertionError("reader must not be constructed for an invalid numeric value")
-
-    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
-
-    payload = server_module.qlab_create_cue(
-        "ws-1",
-        "memo",
-        "11111111-1111-4111-8111-111111111111",
-        properties={"duration": 10**20},
-        dry_run=True,
-    ).model_dump()
-
-    assert payload["ok"] is False
-    assert payload["error_code"] == "osc_value_out_of_range"
-    assert payload["planned_operations"] == []
 
 
 def test_public_cue_details_reports_clear_batch_limit_as_structured_json(monkeypatch) -> None:

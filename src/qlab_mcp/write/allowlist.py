@@ -6,9 +6,7 @@ from typing import Any
 
 from ..errors import UnsafeWriteOperationError
 from .registry import (
-    AUDIO_BASIC_UPDATE_PROFILE,
     COMMON_UPDATE_PROFILE,
-    TEXT_BASIC_UPDATE_PROFILE,
     VIDEO_PHASE2_DRY_RUN_PROPERTY_NAMES,
     UPDATE_PROFILE_NAMES,
     UPDATE_PROFILES,
@@ -48,7 +46,7 @@ def validate_write_properties(properties: dict[str, Any] | None) -> dict[str, An
 def normalize_write_properties(
     properties: dict[str, Any] | None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Normalize Create's common properties through the Edit registry once."""
+    """Normalize common Edit properties through the registry once."""
     if properties is None:
         return {}, []
     normalized_properties, operations = normalize_update_request(COMMON_UPDATE_PROFILE, properties, None)
@@ -56,7 +54,7 @@ def normalize_write_properties(
     if blocked:
         blocked_text = ", ".join(blocked)
         raise UnsafeWriteOperationError(
-            f"cue create property is not allowlisted for real create writes; blocked: {blocked_text}"
+            f"cue edit property is not allowlisted for real writes; blocked: {blocked_text}"
         )
     return normalized_properties, operations
 

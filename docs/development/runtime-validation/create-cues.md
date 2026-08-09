@@ -1,14 +1,18 @@
 # `qlab_create_cue` Runtime Checklist
 
 Use this checklist only in a disposable editable QLab workspace. Workorder 031
-runtime proof is limited to one blank anchored Wait cue.
+runtime proof covers one blank anchored Wait cue. Create uses only QLab's Cue
+Template defaults; it does not accept initial properties or send setters.
+First-cue creation also supports an empty Cue List, Group, or Cue Cart through
+the container-specific OSC route.
 
 ## Hard limits
 
 - Use only QLab MCP tools; do not send raw OSC.
-- Use an explicit workspace UUID and an exact anchor cue UUID.
-- Require Edit Mode, a healthy inactive anchor inside a linear Cue List or
-  Group, and `running/paused/auditioning = 0/0/0`.
+- Use an explicit workspace UUID and exactly one placement selector: an exact
+  anchor cue UUID or an exact empty-container UUID.
+- Require Edit Mode, a healthy empty target (or healthy inactive anchor inside
+  a linear Cue List or Group), and `running/paused/auditioning = 0/0/0`.
 - Record DMX Output before writing and verify it is unchanged afterward.
 - Do not use GO, playback, Audition, Stop, Panic, `/live`, workspace save, or
   automatic cleanup.
@@ -26,25 +30,26 @@ runtime proof is limited to one blank anchored Wait cue.
    qlab_create_cue(
        workspace_id=<workspace UUID>,
        cue_type="wait",
-       after_cue_id=<anchor UUID>,
+       after_cue_id=<anchor UUID>,  # or parent_container_id=<empty UUID>
        dry_run=true,
    )
    ```
 
 4. Require structured content, `status="dry_run"`, a fresh
-   `confirm:createCue:v1` token, an anchored placement plan, parent/order
-   fingerprints, and `executed_operations=[]`.
+   `confirm:createCue:v2` token, a container-specific placement plan,
+   parent/order fingerprints, and `executed_operations=[]`.
 5. Execute exactly one real Create with the exact token. Require
    `status="created"`, a valid `created_cue_id`, and
    `cleanup_required=false`.
 6. Perform fresh readback of the created UUID/`uniqueID`, type, parent, health,
-   `isRunning`, `isPaused`, `isAuditioning`, and sibling order. Confirm the new
-   cue is immediately after the anchor and that no unexpected cue exists.
+   `isRunning`, `isPaused`, `isAuditioning`, and placement. Confirm either
+   immediate-after anchor order, container index `0`, or Cart request `0,0`
+   with QLab 5.5.10 readback coordinates `1,1`.
 
 Stop immediately on timeout ambiguity, structural drift, missing structured
 content, invalid identity/type, wrong parent/order, failed health/activity
-verification, or any unexpected extra cue. Do not apply properties after an
-ambiguous `/new` result.
+verification, or any unexpected extra cue. Never send setters or retry after
+an ambiguous `/new` result.
 
 ## Manual cleanup
 
@@ -66,11 +71,12 @@ key or public AppleScript fallback backend.
 
 ## Evidence boundary
 
-The allowlist currently includes blank `memo`, `group`, `wait`, and `audio`, but
-031 runtime evidence certifies only blank `Wait`. It does not certify new cue
-types or property families. Real placement is limited to `after_cue_id`; Group-
-empty insertion, Cue Cart row/column placement, `parent_id + position`, and
-arbitrary index placement require separate workorders. “Blank” means no initial
-properties were supplied; Cue Templates and QLab Wait normalization may affect
-readback.
-
+Real Create includes only blank `memo`, `group`, `wait`, and `audio` cues. 031
+runtime evidence certifies only blank `Wait`; it does not certify other cue
+types or property families. Empty-container placement is limited to the
+  documented Cue List, Group, and Cart routes above. An experimental raw-OSC
+  smoke in disposable QLab 5.5.10 confirmed Group index `0` and Cart request
+  `0,0` with readback `1,1`; this is transport evidence, not a replacement for
+  the MCP-tool checklist above.
+“Blank” means Create does not provide an initial-properties input; Cue
+Templates and QLab normalization may affect readback.

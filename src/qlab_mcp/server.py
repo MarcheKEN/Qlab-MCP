@@ -11,7 +11,7 @@ from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from .errors import QLabMcpError, UnsafeWriteOperationError
+from .errors import QLabMcpError
 from .models import (
     CreateCueResult,
     DeleteCuesResult,
@@ -44,7 +44,6 @@ from .server_responses import (
     settings_success_payload as _settings_success_payload,
     structured_error_result as _structured_error_result,
 )
-from .write.allowlist import normalize_write_properties
 
 
 CueQueryProfile = Literal[
@@ -216,7 +215,7 @@ Use qlab_get_workspace_settings(mode="details", requests=[...]) after settings w
 
 Use qlab_query_cues for filtered cue searches across up to 500 cues by default, or up to 5000 cues when a caller explicitly raises the scan limit, then qlab_get_cue_details for one cue that needs deeper inspection.
 
-For write preflight, call qlab_check_write_readiness with an explicit workspace_id and always review a dry-run first. qlab_create_cue requires an exact after_cue_id anchor and a dedicated confirm:createCue:v1 token bound to the reviewed workspace structure; real creation still requires write readiness, an explicit workspace_id, a configured passcode, edit permission, and Edit Mode. qlab_edit_cues may return confirmation tokens for individual planned high-risk operations; copy the exact relevant planned_operations[].confirm_token values into that update item's confirm_gates, not one tool-level token. qlab_move_cues returns a dedicated tool-level confirm_token bound to the reviewed workspace structure and planned move batch, and real execution must receive that exact token. qlab_delete_cues returns a dedicated tool-level confirm_token bound to the reviewed deletion plan and fresh workspace structure, and real execution must receive that exact token. Create, Move, and Delete tokens are process-bound, so restarting the MCP invalidates tokens issued by the previous process. This server does not expose GO, stop, panic, raw OSC, or playback control.
+For write preflight, call qlab_check_write_readiness with an explicit workspace_id and always review a dry-run first. qlab_create_cue accepts exactly one of an exact after_cue_id anchor or a parent_container_id for an empty Cue List, Group, or Cue Cart, and returns a dedicated confirm:createCue:v2 token bound to the reviewed workspace structure; real creation still requires write readiness, an explicit workspace_id, a configured passcode, edit permission, and Edit Mode. qlab_edit_cues may return confirmation tokens for individual planned high-risk operations; copy the exact relevant planned_operations[].confirm_token values into that update item's confirm_gates, not one tool-level token. qlab_move_cues returns a dedicated tool-level confirm_token bound to the reviewed workspace structure and planned move batch, and real execution must receive that exact token. qlab_delete_cues returns a dedicated tool-level confirm_token bound to the reviewed deletion plan and fresh workspace structure, and real execution must receive that exact token. Create, Move, and Delete tokens are process-bound, so restarting the MCP invalidates tokens issued by the previous process. This server does not expose GO, stop, panic, raw OSC, or playback control.
 """,
 )
 
@@ -335,38 +334,6 @@ def _query_error(workspace_id: Any, primary_filter: Any, profile: Any, max_resul
         "errors": {"validation": error["message"], "error_code": error["error_code"]},
     }
     return CueQueryResult.model_validate(payload)
-
-
-def _create_validation_error(
-    workspace_id: Any,
-    cue_type: Any,
-    dry_run: Any,
-    error_code: str,
-    message: str,
-) -> CreateCueResult:
-    return CreateCueResult.model_validate(
-        {
-            "ok": False,
-            "status": "preflight_failed",
-            "workspace_id": str(workspace_id or ""),
-            "cue_type": str(cue_type or ""),
-            "dry_run": True if dry_run is None else bool(dry_run),
-            "confirm_token": None,
-            "created_cue_id": None,
-            "placement": None,
-            "properties": {},
-            "planned_operations": [],
-            "executed_operations": [],
-            "verification": None,
-            "cleanup_required": False,
-            "cleanup": None,
-            "errors": {"validation": message, "error_code": error_code},
-            "warnings": ["Validation failed before any mutating OSC command or token was issued."],
-            "error_code": error_code,
-            "suggested_action": "Use OSC-representable numeric values and retry a fresh dry-run.",
-            "message": message,
-        }
-    )
 
 
 def _cue_details_error(workspace_id: Any, cue_ref: Any, profile: Any, **error: Any) -> CueDetailsResult | CueDetailsBatchResult:
@@ -1028,24 +995,23 @@ def qlab_create_cue(
         WritableCueType,
         Field(
             description=(
-                "Cue type to create. This preface allows only blank memo, group, wait, or audio cues."
+                "Cue type to create. This tool creates blank memo, group, wait, or audio cues from QLab's cue template/defaults."
             ),
         ),
     ],
     after_cue_id: Annotated[
-        str,
+        str | None,
         Field(
             description=(
-                "Required exact UUID anchor. The new cue is created immediately after this cue."
+                "Exact UUID anchor for the existing-cue route. Use exactly one of after_cue_id or parent_container_id."
             ),
         ),
-    ],
-    properties: Annotated[
-        dict[str, Any] | None,
+    ] = None,
+    parent_container_id: Annotated[
+        str | None,
         Field(
             description=(
-                "Optional safe initial properties. Allowed keys: name, number, armed, flagged, colorName, "
-                "preWait, postWait, duration, and continueMode."
+                "Exact UUID of an empty Cue List, Group, or Cue Cart for first-cue creation. Cue Lists select currentCueListID, Groups use one move to index 0, and Carts request row/column 0,0. Use exactly one of after_cue_id or parent_container_id."
             ),
         ),
     ] = None,
@@ -1062,7 +1028,7 @@ def qlab_create_cue(
         str | None,
         Field(
             description=(
-                "Exact confirm:createCue:v1 token returned by the reviewed dry-run. "
+                "Exact confirm:createCue:v2 token returned by the reviewed dry-run. "
                 "Required for real creation."
             ),
         ),
@@ -1071,29 +1037,21 @@ def qlab_create_cue(
     """Create one blank allowlisted cue or return a dry-run plan.
 
     Real creation requires QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
-    Dry-run planning never sends mutating OSC. Real creation requires the exact
-    dedicated token from the dry-run and an unchanged structural anchor snapshot.
+    Supply exactly one of after_cue_id or parent_container_id. The latter
+    creates the first cue in an empty Cue List, Group, or Cue Cart using the
+    container-specific OSC route. Dry-run planning never sends mutating OSC.
+    Real creation requires the exact dedicated token from the dry-run and an
+    unchanged structural snapshot.
     This tool never exposes playback control, raw OSC, target edits, scripts, routing, or media paths.
     """
-    try:
-        normalize_write_properties(properties)
-    except UnsafeWriteOperationError as exc:
-        if exc.error_code == "osc_value_out_of_range":
-            return _create_validation_error(
-                workspace_id,
-                cue_type,
-                dry_run,
-                exc.error_code,
-                str(exc),
-            )
     return _run_tool(
         lambda reader: CreateCueResult.model_validate(
             reader.create_cue(
                 workspace_id=workspace_id,
                 cue_type=cue_type,
-                properties=properties,
                 dry_run=dry_run,
                 after_cue_id=after_cue_id,
+                parent_container_id=parent_container_id,
                 confirm_token=confirm_token,
             )
         )

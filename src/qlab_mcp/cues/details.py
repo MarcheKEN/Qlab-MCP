@@ -16,6 +16,7 @@ from .profiles import (
     _derive_profile_fields,
     _empty_auto_sections,
     _is_active_cue_ref,
+    _profile_needs_internal_file_target,
 )
 from .coverage import default_read_coverage_report
 from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES, sensitive_payload_size
@@ -282,6 +283,8 @@ class CueDetailsMixin:
     def _get_auto_cue_details(self, workspace_id: str, cue_ref: str) -> dict[str, Any]:
         errors: dict[str, str] = {}
         common_keys = list(properties_for_profile("auto"))
+        if _profile_needs_internal_file_target("auto"):
+            common_keys.append("fileTarget")
         if _is_active_cue_ref(cue_ref):
             try:
                 active_values = self.read_cue_values(
@@ -299,10 +302,16 @@ class CueDetailsMixin:
                     return self._empty_active_details(workspace_id, cue_ref, "auto")
                 raise
         else:
-            values = self._read_cue_values_with_fallback(workspace_id, cue_ref, common_keys, errors, profile="auto")
+            values = self._read_cue_values_with_fallback(
+                workspace_id,
+                cue_ref,
+                common_keys,
+                errors,
+                profile="auto",
+                cacheable=False,
+            )
         if _looks_unresolved(values, errors):
             errors = _compact_unresolved_errors()
-        values = truncate_profile_payload("auto", _derive_profile_fields("auto", values))
 
         type_specific_keys = [
             key for key in _auto_type_specific_keys(values.get("type")) if key not in values
@@ -320,7 +329,12 @@ class CueDetailsMixin:
             )
             values.update(type_specific_values)
             self._fill_missing_slice_detail_values(workspace_id, cue_ref, type_specific_keys, values, errors)
-            values = truncate_profile_payload("auto", _derive_profile_fields("auto", values))
+        if values.get("hasFileTargets") is True and "fileTarget" not in values:
+            try:
+                values["fileTarget"] = self.read_cue_property(workspace_id, cue_ref, "fileTarget")["value"]
+            except Exception as exc:
+                errors["fileTarget"] = sanitize_exception_message(exc)
+        values = truncate_profile_payload("auto", _derive_profile_fields("auto", values))
 
         result: dict[str, Any] = {
             "workspace_id": _clean_workspace_id(workspace_id),
@@ -366,6 +380,8 @@ class CueDetailsMixin:
             return result
 
         keys = list(properties_for_profile(profile))
+        if _profile_needs_internal_file_target(profile):
+            keys.append("fileTarget")
         errors: dict[str, str] = {}
         if _is_active_cue_ref(cue_ref):
             try:
@@ -389,7 +405,8 @@ class CueDetailsMixin:
                 keys,
                 errors,
                 profile=profile,
-                cacheable=normalized_profile != "exhaustive",
+                cacheable=normalized_profile != "exhaustive"
+                and not _profile_needs_internal_file_target(profile),
             )
         if _looks_unresolved(values, errors):
             errors = _compact_unresolved_errors()

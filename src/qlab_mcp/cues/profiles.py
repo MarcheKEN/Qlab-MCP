@@ -265,6 +265,14 @@ def _coerce_qlab_bool(value: Any) -> bool | None:
             return False
     return None
 
+
+_INTERNAL_FILE_TARGET_PROFILES = frozenset({"auto", "health", "targets", "inspector_safe", "full"})
+
+
+def _profile_needs_internal_file_target(profile: str) -> bool:
+    return profile.strip().lower() in _INTERNAL_FILE_TARGET_PROFILES
+
+
 def _is_positive_number(value: Any) -> bool:
     if isinstance(value, bool) or value in (None, ""):
         return False

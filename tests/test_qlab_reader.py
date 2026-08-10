@@ -192,6 +192,15 @@ def override_addresses() -> list[str]:
     return [f"/overrides/{endpoint}" for endpoint in OVERRIDE_ENDPOINTS.values()]
 
 
+def requested_values_for_keys(server: FakeQlabOscServer) -> list[str]:
+    return [
+        key
+        for address, args in zip(server.received, server.received_args, strict=True)
+        if address.endswith("/valuesForKeys") and args
+        for key in json.loads(args[0])
+    ]
+
+
 def empty_settings_summary_responses() -> dict[str, Any]:
     return {
         "/workspace/ws-1/settings/audio/patchList": [],
@@ -1114,6 +1123,37 @@ class QLabReaderTests(unittest.TestCase):
 
         self.assertEqual(client.requests.count("/workspace/ws-1/selectedCues/shallow"), 2)
         self.assertEqual(client.requests.count("/workspace/ws-1/runningOrPausedCues/shallow"), 2)
+        self.assertEqual(client.requests.count(f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys"), 2)
+
+    def test_internal_file_target_reads_are_not_cached_for_safe_profiles(self) -> None:
+        cue_id = "11111111-1111-4111-8111-111111111111"
+
+        class CountingClient:
+            config = QLabConfig(cache_ttl=10)
+
+            def __init__(self) -> None:
+                self.requests: list[str] = []
+
+            def request(self, address: str, *args: Any, workspace_id: str | None = None) -> Any:
+                self.requests.append(address)
+                if address == "/workspaces":
+                    return SimpleNamespace(data=[{"uniqueID": "ws-1"}], status="ok")
+                return SimpleNamespace(
+                    data={
+                        "uniqueID": cue_id,
+                        "type": "Audio",
+                        "hasFileTargets": True,
+                        "fileTarget": "/private/media.wav",
+                    },
+                    status="ok",
+                )
+
+        client = CountingClient()
+        reader = QLabReader(client)  # type: ignore[arg-type]
+
+        reader.get_cue_details("ws-1", cue_id, "health")
+        reader.get_cue_details("ws-1", cue_id, "health")
+
         self.assertEqual(client.requests.count(f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys"), 2)
 
     def test_query_cues_bypasses_cache_for_live_state_filters(self) -> None:
@@ -3961,6 +4001,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["cues"][0]["hasFileTargets"])
         self.assertTrue(result["cues"][0]["fileTargetPresent"])
         self.assertNotIn("fileTarget", result["cues"][0])
+        self.assertIn("fileTarget", requested_values_for_keys(server))
         self.assertEqual(result["cues"][0]["health_summary"]["status"], "broken")
         self.assertIn("File target exists", result["cues"][0]["health_summary"]["messages"][0])
 
@@ -3993,6 +4034,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["cues"][0]["hasFileTargets"])
         self.assertTrue(result["cues"][0]["fileTargetPresent"])
         self.assertNotIn("fileTarget", result["cues"][0])
+        self.assertIn("fileTarget", requested_values_for_keys(server))
 
     def test_running_cues_variants(self) -> None:
         with FakeQlabOscServer({"/workspace/ws-1/runningOrPausedCues/shallow": []}) as server:
@@ -4220,6 +4262,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertNotIn("scriptSource", result["properties"])
         self.assertNotIn("stage", result["properties"])
         self.assertNotIn("stage/regions", result["properties"])
+        self.assertIn("fileTarget", requested_values_for_keys(server))
         self.assertTrue(all("/children" not in address for address in server.received))
 
     def test_inspector_safe_profile_covers_audio_light_and_group_without_children(self) -> None:
@@ -4363,6 +4406,7 @@ class QLabReaderTests(unittest.TestCase):
                 self.assertNotIn("scriptSource", result["properties"])
                 self.assertNotIn("stage", result["properties"])
                 self.assertNotIn("stage/regions", result["properties"])
+                self.assertIn("fileTarget", requested_values_for_keys(server))
                 if expected_value is None:
                     self.assertNotIn(key, result["sections"][section_name])
                 else:
@@ -6075,6 +6119,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["properties"]["hasFileTargets"])
         self.assertTrue(result["properties"]["fileTargetPresent"])
         self.assertNotIn("fileTarget", result["properties"])
+        self.assertIn("fileTarget", requested_values_for_keys(server))
         self.assertEqual(result["properties"]["health_summary"]["status"], "broken")
         self.assertIn("file_target_present_but_broken", result["properties"]["health_summary"]["probable_causes"])
         self.assertEqual(result["properties"]["health_summary"]["confidence"], "derived")
@@ -6097,6 +6142,41 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["properties"]["hasFileTargets"])
         self.assertTrue(result["properties"]["fileTargetPresent"])
         self.assertNotIn("fileTarget", result["properties"])
+        self.assertIn("fileTarget", requested_values_for_keys(server))
+
+    def test_file_target_presence_stays_unknown_when_target_read_is_missing(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "type": "Audio",
+                "hasFileTargets": True,
+            },
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "health")
+
+        self.assertIsNone(result["properties"]["fileTargetPresent"])
+        self.assertIn("fileTarget", requested_values_for_keys(server))
+
+    def test_auto_profile_falls_back_to_uncached_file_target_read(self) -> None:
+        responses = {
+            "/workspace/ws-1/cue/10/valuesForKeys": {
+                "uniqueID": "cue-id",
+                "type": "Audio",
+                "hasFileTargets": True,
+            },
+            "/workspace/ws-1/cue/10/fileTarget": "/private/audio.wav",
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_cue_details("ws-1", "10", "auto")
+
+        self.assertTrue(result["properties"]["fileTargetPresent"])
+        self.assertNotIn("fileTarget", result["properties"])
+        self.assertIn("/workspace/ws-1/cue/10/fileTarget", server.received)
 
     def test_health_summary_covers_container_network_and_clean_cues(self) -> None:
         cases = [

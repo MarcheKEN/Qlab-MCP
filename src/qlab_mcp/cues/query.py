@@ -9,7 +9,12 @@ from ..osc.addressing import _clean_workspace_id
 from ..sanitizer import sanitize_exception_message, truncate_profile_payload
 from .editorial import _is_ambiguous_label, _is_empty_text
 from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES, sensitive_payload_size
-from .profiles import _coerce_qlab_bool, _derive_profile_fields, _is_positive_number
+from .profiles import (
+    _coerce_qlab_bool,
+    _derive_profile_fields,
+    _is_positive_number,
+    _profile_needs_internal_file_target,
+)
 from .refs import _bounded_cue_refs_from_shallow
 
 
@@ -336,7 +341,7 @@ class CueQueryMixin:
                 "full_sensitive cue queries can return at most 50 cues",
                 received={"max_results": max_results, "profile": profile},
             )
-        cacheable = not _query_uses_live_state(filters)
+        cacheable = not _query_uses_live_state(filters) and not _profile_needs_internal_file_target(profile)
         try:
             resolved_workspace_id = self._resolve_workspace_id_strict(workspace_id)
         except Exception as exc:
@@ -364,6 +369,9 @@ class CueQueryMixin:
         for query_filter in filters:
             filter_keys.extend(QUERY_FILTER_PROPERTIES[query_filter["filter"]])
         keys = _dedupe_preserve_order([*QUERY_BASE_PROPERTIES, *profile_keys, *filter_keys])
+        if _profile_needs_internal_file_target(profile):
+            keys.append("fileTarget")
+            keys = _dedupe_preserve_order(keys)
         key_chunks = [validate_value_keys(chunk) for chunk in _chunk_keys(keys)]
 
         scanned_count = 0

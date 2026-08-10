@@ -1,0 +1,18 @@
+{
+  "skill": "qlab-5-5-10-reference",
+  "verified_qlab_version": "5.5.10",
+  "retrieval_date": "2026-08-01",
+  "canonical_url": "https://reference.qlab.app/docs/v5/",
+  "pdf_url": "https://reference.qlab.app/docs/QLab_5_Reference_Manual.pdf",
+  "version_evidence": "The official manual page states: Updated April 23, 2026 for QLab 5.5.10.",
+  "local_snapshot": {
+    "path": "docs/sources/qlab-5.5.10/reference/QLab_5_Reference_Manual.local-snapshot.pdf",
+    "sha256": "257350552c08b730830ba0b2b61941088b25f53173f555cac7a50a778f6aa533",
+    "pdf_creation_date": "2025-11-25",
+    "status": "supporting snapshot; predates 5.5.10 and is not treated as independent version evidence"
+  },
+  "omissions_or_discrepancies": [
+    "The current official HTML page is authoritative for 5.5.10.",
+    "The local PDF snapshot predates the 5.5.10 release; version-specific claims must be checked against the canonical page or change log."
+  ]
+}

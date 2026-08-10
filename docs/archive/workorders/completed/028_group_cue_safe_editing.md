@@ -1,10 +1,11 @@
 # Group Cue Safe Editing
 
-Archive note: this document preserves the completed implementation and runtime
-evidence. Remaining safe edge validation lives in
-[`030_group_edge_runtime_validation.md`](../../../status/workorders/active/030_group_edge_runtime_validation.md).
+Archive note: this document preserves the completed implementation and core
+runtime evidence. Bounded Group edge validation is archived in
+[`030_group_edge_runtime_validation.md`](030_group_edge_runtime_validation.md).
 
-Status: runtime-validated QLab 5.5 subset; edge validation remains.
+Status: runtime-validated QLab 5.5 subset; Workorder 030 closed with explicit
+follow-up limitations.
 
 ## Scope
 
@@ -84,10 +85,15 @@ copied incorrectly failed signature validation with zero setters; that was
 caller input error, not an accepted replay or MCP mutation. Final confirmed
 runtime activity was running/paused/auditioning `0/0/0`.
 
-Still not runtime-validated: around 200 direct children, Loop with a
-zero-duration child, crossfade longer than the shortest child, minimum
-crossfade duration, playback, active/auditioning Groups,
-warning-but-not-broken Groups, and token expiry in a live MCP process.
+Workorder 030 subsequently runtime-validated the disposable `378`-child
+ordered snapshot, finite and mixed zero/finite Playlist Loop, exact-UUID
+single-setter timeout/readback/rollback, consumed-token replay, and
+crossfade-over-shortest preflight rejection. QLab 5.5.10 retained/read back
+`3 s` for requested `1 s` and `2 s` crossfade durations in that fixture; this
+is not a documented global minimum, so short/equal active crossfade behavior
+remains unconfirmed. Live MCP restart invalidation and live token expiry were
+not exercised because no safe restart API was available. All-zero-child Loop,
+warning-only Groups, and active/auditioning Groups remain follow-up limits.
 
 ## Runtime validation contract
 

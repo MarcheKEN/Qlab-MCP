@@ -13,6 +13,7 @@ from pydantic import Field
 
 from .errors import QLabMcpError
 from .models import (
+    CreateCuesResult,
     CreateCueResult,
     DeleteCuesResult,
     CueDetailsBatchResult,
@@ -31,7 +32,11 @@ from .models import (
     WorkspaceSettingsResult,
 )
 from .qlab import QLabReader
+from .cues.details import MAX_BATCH_CUE_DETAILS
+from .cues.limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES
+from .cues.query import MAX_SENSITIVE_QUERY_RESULTS
 from .sanitizer import sanitize_exception_message
+from .settings.workspace import MAX_WORKSPACE_DETAIL_REQUESTS, MAX_WORKSPACE_SETTINGS_SECTIONS
 from .server_responses import (
     cue_details_success_payload as _cue_details_success_payload,
     overview_success_payload as _overview_success_payload,
@@ -128,6 +133,26 @@ WritableCueType = Literal[
     "group",
     "wait",
     "audio",
+    "mic",
+    "video",
+    "camera",
+    "text",
+    "light",
+    "fade",
+    "network",
+    "midi",
+    "midi_file",
+    "timecode",
+    "start",
+    "stop",
+    "pause",
+    "load",
+    "reset",
+    "devamp",
+    "goto",
+    "target",
+    "arm",
+    "disarm",
 ]
 
 WorkspaceId = Annotated[
@@ -152,7 +177,7 @@ CueRefs = Annotated[
     Field(
         min_length=1,
         description="List of cue numbers, cue unique IDs, selected, playhead, playbackPosition, or active. Maximum 50.",
-        json_schema_extra={"maxItems": 50},
+        json_schema_extra={"maxItems": MAX_BATCH_CUE_DETAILS},
     ),
 ]
 READ_ONLY_QLAB_TOOL = ToolAnnotations(
@@ -182,6 +207,7 @@ QUERY_CUES_TIMEOUT = 60.0
 CUE_DETAILS_TIMEOUT = 20.0
 WRITE_READINESS_TIMEOUT = 6.0
 CREATE_CUE_TIMEOUT = 30.0
+CREATE_CUES_TIMEOUT = 180.0
 UPDATE_CUES_TIMEOUT = 180.0
 DELETE_CUES_TIMEOUT = 180.0
 
@@ -197,7 +223,7 @@ Use these tools to read QLab 5 workspace and cue information over OSC.
 The seven inspector tools are read-only and intentionally avoid playback, editing, deletion, and raw OSC.
 Write mode is a separate gated preface: it is disabled unless QLAB_ENABLE_WRITE=true and defaults to dry-run.
 When write mode is ready, all update profiles may exist; safe properties can execute as real writes, while dangerous or high-risk properties require explicit per-item confirm_gates.
-Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect. It supports gated cue creation, cue editing, structural cue moves, and leaf-only cue deletion.
+Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect. It supports gated single/sequence cue creation, cue editing, structural cue moves, and explicit or recursive cue deletion.
 
 Start with qlab_check_connection to verify QLab, workspace candidates, passcode, and read access.
 
@@ -211,7 +237,7 @@ Use qlab_get_workspace_settings(mode="details", requests=[...]) after settings w
 
 Use qlab_query_cues for filtered cue searches across up to 500 cues by default, or up to 5000 cues when a caller explicitly raises the scan limit, then qlab_get_cue_details for one cue that needs deeper inspection.
 
-For write preflight, call qlab_check_write_readiness with an explicit workspace_id and always review a dry-run first. qlab_create_cue accepts no confirm_token; real creation still requires write readiness, an explicit workspace_id, a configured passcode, edit permission, and Edit Mode. qlab_edit_cues may return confirmation tokens for individual planned high-risk operations; copy the exact relevant planned_operations[].confirm_token values into that update item's confirm_gates, not one tool-level token. qlab_move_cues returns a dedicated tool-level confirm_token bound to the reviewed workspace structure and planned move batch, and real execution must receive that exact token. qlab_delete_cues returns a dedicated tool-level confirm_token bound to the reviewed deletion plan and fresh workspace structure, and real execution must receive that exact token. Move and Delete tokens are process-bound, so restarting the MCP invalidates tokens issued by the previous process. This server does not expose GO, stop, panic, raw OSC, or playback control.
+For write preflight, call qlab_check_write_readiness with an explicit workspace_id and always review a dry-run first. qlab_create_cue accepts exactly one of an exact after_cue_id anchor or a parent_container_id for an empty Cue List, Group, or Cue Cart, and returns a dedicated confirm:createCue:v2 token bound to the reviewed workspace structure; real creation still requires write readiness, an explicit workspace_id, a configured passcode, edit permission, and Edit Mode. qlab_edit_cues may return confirmation tokens for individual planned high-risk operations; copy the exact relevant planned_operations[].confirm_token values into that update item's confirm_gates, not one tool-level token. qlab_move_cues returns a dedicated tool-level confirm_token bound to the reviewed workspace structure and planned move batch, and real execution must receive that exact token. qlab_delete_cues returns a dedicated tool-level confirm_token bound to the reviewed deletion plan and fresh workspace structure, and real execution must receive that exact token. Create, Move, and Delete tokens are process-bound, so restarting the MCP invalidates tokens issued by the previous process. This server does not expose GO, stop, panic, raw OSC, or playback control.
 """,
 )
 
@@ -602,6 +628,7 @@ def qlab_get_workspace_settings(
     sections: Annotated[
         list[str] | None,
         Field(
+            json_schema_extra={"maxItems": MAX_WORKSPACE_SETTINGS_SECTIONS},
             description=(
                 "Summary mode sections to inspect. Use audio, video, network, midi, light, and/or general. "
                 "When omitted in summary mode, all sections are read. Ignored in details mode."
@@ -611,6 +638,7 @@ def qlab_get_workspace_settings(
     requests: Annotated[
         list[WorkspaceSettingRequestInput] | None,
         Field(
+            json_schema_extra={"maxItems": MAX_WORKSPACE_DETAIL_REQUESTS},
             description=(
                 "Details mode requests. Each item has section, kind, and optional ref. "
                 "Examples: {'section':'audio','kind':'output_patch','ref':'Main'}, "
@@ -636,6 +664,30 @@ def qlab_get_workspace_settings(
     errors, and available_detail_requests. Details mode accepts one or more requests and returns independent
     per-request results; one failed request does not block other valid requests.
     """
+    if isinstance(requests, (list, tuple)) and len(requests) > MAX_WORKSPACE_DETAIL_REQUESTS:
+        return _settings_error(
+            workspace_id,
+            mode,
+            profile,
+            error_code="workspace_detail_batch_too_large",
+            message=(
+                f"workspace settings details can include at most {MAX_WORKSPACE_DETAIL_REQUESTS} requests"
+            ),
+            received={"request_count": len(requests)},
+            allowed={"max_requests": MAX_WORKSPACE_DETAIL_REQUESTS},
+        )
+    if isinstance(sections, (list, tuple)) and len(sections) > MAX_WORKSPACE_SETTINGS_SECTIONS:
+        return _settings_error(
+            workspace_id,
+            mode,
+            profile,
+            error_code="workspace_sections_too_many",
+            message=(
+                f"workspace settings sections can include at most {MAX_WORKSPACE_SETTINGS_SECTIONS} entries"
+            ),
+            received={"section_count": len(sections)},
+            allowed={"max_sections": MAX_WORKSPACE_SETTINGS_SECTIONS},
+        )
     try:
         return _run_tool(
             lambda reader: WorkspaceSettingsResult.model_validate(
@@ -783,7 +835,8 @@ def qlab_query_cues(
             description=(
                 "Read-only data profile to return for matching cues. Default basic_safe gives compact identity/status; "
                 "health/targets add warning, target, and file-target presence without paths; "
-                "technical/full_sensitive can expose notes, paths, scripts, or heavy stage payloads."
+                "technical can expose notes, paths, and diagnostic stage data; full_sensitive can additionally expose "
+                "scriptSource and other explicitly sensitive payloads."
             ),
         ),
     ] = "basic_safe",
@@ -807,6 +860,37 @@ def qlab_query_cues(
     500 returned matches and 500 scanned cue IDs by default so agents stay compact. Callers can explicitly
     raise either limit up to 5000 for large shows; truncation metadata reports incomplete scans or result caps.
     """
+    if str(profile).strip().lower() == "exhaustive":
+        return _query_error(
+            workspace_id,
+            primary_filter,
+            profile,
+            max_results,
+            max_cues_scanned,
+            error_code="cue_profile_not_supported",
+            message="profile='exhaustive' is supported only by qlab_get_cue_details",
+            received={"profile": profile},
+            allowed={
+                "query_profiles": list(CueQueryProfile.__args__)
+                if hasattr(CueQueryProfile, "__args__")
+                else None
+            },
+        )
+    if str(profile).strip().lower() == "full_sensitive" and max_results > MAX_SENSITIVE_QUERY_RESULTS:
+        return _query_error(
+            workspace_id,
+            primary_filter,
+            profile,
+            max_results,
+            max_cues_scanned,
+            error_code="cue_payload_too_large",
+            message=f"full_sensitive cue queries can return at most {MAX_SENSITIVE_QUERY_RESULTS} cues",
+            received={"max_results": max_results, "profile": profile},
+            allowed={
+                "max_results": MAX_SENSITIVE_QUERY_RESULTS,
+                "max_payload_bytes": MAX_SENSITIVE_CUE_RESPONSE_BYTES,
+            },
+        )
     try:
         return _run_tool(
             lambda reader: CueQueryResult.model_validate(
@@ -867,6 +951,16 @@ def qlab_get_cue_details(
     health for warnings, technical/full_sensitive only when justified, and exhaustive only for deep audits
     or load testing because it can expose large/sensitive payloads.
     """
+    if isinstance(cue_ref, list) and len(cue_ref) > MAX_BATCH_CUE_DETAILS:
+        return _cue_details_error(
+            workspace_id,
+            cue_ref,
+            profile,
+            error_code="cue_batch_too_large",
+            message=f"cue_ref list can include at most {MAX_BATCH_CUE_DETAILS} cues",
+            received={"cue_count": len(cue_ref)},
+            allowed={"max_cues": MAX_BATCH_CUE_DETAILS},
+        )
     try:
         return _run_tool(
             lambda reader: (
@@ -923,16 +1017,23 @@ def qlab_create_cue(
         WritableCueType,
         Field(
             description=(
-                "Cue type to create. This preface allows only blank memo, group, wait, or audio cues."
+                "Cue type to create from QLab's cue template/defaults. Create verifies identity and placement; it does not configure targets, files, patches, or setters."
             ),
         ),
     ],
-    properties: Annotated[
-        dict[str, Any] | None,
+    after_cue_id: Annotated[
+        str | None,
         Field(
             description=(
-                "Optional safe initial properties. Allowed keys: name, number, armed, flagged, colorName, "
-                "preWait, postWait, duration, and continueMode."
+                "Exact UUID anchor for the existing-cue route. Use exactly one of after_cue_id or parent_container_id."
+            ),
+        ),
+    ] = None,
+    parent_container_id: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Exact UUID of an empty Cue List, Group, or Cue Cart for first-cue creation. Cue Lists select currentCueListID, Groups use one move to index 0, and Carts request row/column 0,0. Use exactly one of after_cue_id or parent_container_id."
             ),
         ),
     ] = None,
@@ -945,32 +1046,95 @@ def qlab_create_cue(
             ),
         ),
     ] = None,
-    after_cue_id: Annotated[
+    confirm_token: Annotated[
         str | None,
         Field(
             description=(
-                "Optional future placement target. In this preface it is accepted for dry-run planning only; "
-                "real creation with after_cue_id fails safely."
+                "Exact confirm:createCue:v2 token returned by the reviewed dry-run. "
+                "Required for real creation."
             ),
         ),
     ] = None,
 ) -> CreateCueResult:
-    """Create one blank allowlisted cue or return a dry-run plan.
+    """Create one cue from QLab's template/defaults or return a dry-run plan.
 
     Real creation requires QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
-    Dry-run planning never sends mutating OSC.
-    This tool never exposes playback control, raw OSC, target edits, scripts, routing, or media paths.
+    Supply exactly one of after_cue_id or parent_container_id. The latter
+    creates the first cue in an empty Cue List, Group, or Cue Cart using the
+    container-specific OSC route. Dry-run planning never sends mutating OSC.
+    Real creation requires the exact dedicated token from the dry-run and an
+    unchanged structural snapshot.
+    Structural creation is separate from operational readiness: a created cue may be broken or warning because it still needs a target, file, patch, or edit. Script and container cue types are excluded.
     """
     return _run_tool(
         lambda reader: CreateCueResult.model_validate(
             reader.create_cue(
                 workspace_id=workspace_id,
                 cue_type=cue_type,
-                properties=properties,
                 dry_run=dry_run,
                 after_cue_id=after_cue_id,
+                parent_container_id=parent_container_id,
+                confirm_token=confirm_token,
             )
         )
+    )
+
+
+@mcp.tool(
+    title="Create QLab Cues",
+    tags={"qlab", "write-mode", "cue-create", "batch-create", "gated-write"},
+    annotations=GATED_CREATE_QLAB_TOOL,
+    timeout=CREATE_CUES_TIMEOUT,
+)
+def qlab_create_cues(
+    workspace_id: WorkspaceId,
+    cue_types: Annotated[
+        list[WritableCueType],
+        Field(
+            min_length=1,
+            max_length=50,
+            description=(
+                "Ordered cue types. The first cue uses exactly one of after_cue_id or "
+                "parent_container_id; every later cue is created after the UUID returned "
+                "for the previous cue."
+            ),
+        ),
+    ],
+    after_cue_id: Annotated[
+        str | None,
+        Field(description="Exact UUID anchor for the first cue; use exactly one initial placement selector."),
+    ] = None,
+    parent_container_id: Annotated[
+        str | None,
+        Field(description="Exact UUID of an empty Cue List, Group, or Cue Cart for the first cue."),
+    ] = None,
+    dry_run: Annotated[
+        bool | None,
+        Field(description="Plan without mutating OSC; omitted uses the configured dry-run default."),
+    ] = None,
+    confirm_token: Annotated[
+        str | None,
+        Field(description="Exact confirm:createCues:v1 token returned by the reviewed dry-run."),
+    ] = None,
+) -> CreateCuesResult:
+    """Create an ordered cue sequence with one verified /new per item.
+
+    Creation stops at the first timeout, ambiguous identity, placement mismatch, or
+    other failure. There is no automatic rollback; earlier successful items remain.
+    Create uses QLab template defaults and does not apply initial setters.
+    """
+    return _run_tool(
+        lambda reader: CreateCuesResult.model_validate(
+            reader.create_cues(
+                workspace_id=workspace_id,
+                cue_types=list(cue_types),
+                dry_run=dry_run,
+                after_cue_id=after_cue_id,
+                parent_container_id=parent_container_id,
+                confirm_token=confirm_token,
+            )
+        ),
+        timeout=CREATE_CUES_TIMEOUT,
     )
 
 
@@ -1119,16 +1283,24 @@ def qlab_move_cues(
 def qlab_delete_cues(
     workspace_id: WorkspaceId,
     cue_ids: Annotated[
-        list[UUID],
+        list[UUID] | None,
         Field(
-            min_length=1,
+            min_length=0,
             max_length=10,
             description=(
-                "One to ten exact leaf cue UUIDs. Groups, Cue Lists, Cue Carts, cues with children, "
-                "and parent/descendant batches are blocked; deletion is not cascading."
+                "Optional explicit leaf cue UUIDs. For recursive emptying, omit cue_ids and provide "
+                "container_id with recursive=true."
             ),
         ),
-    ],
+    ] = None,
+    container_id: Annotated[
+        UUID | None,
+        Field(description="Container UUID to empty recursively; the container itself is preserved."),
+    ] = None,
+    recursive: Annotated[
+        bool,
+        Field(description="When true with container_id, delete descendants deepest-first and preserve the root."),
+    ] = False,
     dry_run: Annotated[
         bool | None,
         Field(
@@ -1143,17 +1315,19 @@ def qlab_delete_cues(
         Field(description="Exact confirm:deleteCues:v1: token returned by a reviewed dry-run plan."),
     ] = None,
 ) -> DeleteCuesResult:
-    """Plan or execute one to ten sequential deletions of explicit leaf cues.
+    """Plan or execute sequential deletions of explicit leaf cues or safely empty one container.
 
     Real deletion requires write readiness, Edit Mode, zero activity, a fresh dedicated confirmation
-    token, leaf-only targets, and independent existence readback after every delete. Groups, Cue Lists,
-    Cue Carts, cascades, and ambiguous targets remain blocked. Deletion is sequential and not atomic.
+    token, and independent existence readback after every delete. Recursive mode deletes descendants
+    deepest-first and preserves the requested root container. Deletion is sequential and not atomic.
     """
     return _run_tool(
         lambda reader: DeleteCuesResult.model_validate(
             reader.delete_cues(
                 workspace_id=workspace_id,
-                cue_ids=[str(cue_id) for cue_id in cue_ids],
+                cue_ids=[str(cue_id) for cue_id in cue_ids] if cue_ids is not None else [],
+                container_id=str(container_id) if container_id is not None else None,
+                recursive=recursive,
                 dry_run=dry_run,
                 confirm_token=confirm_token,
             )

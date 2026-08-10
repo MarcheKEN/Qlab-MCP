@@ -30,6 +30,8 @@ from .summarizers import (
 
 
 WORKSPACE_SETTINGS_SECTIONS = ("audio", "video", "network", "midi", "light", "general")
+MAX_WORKSPACE_DETAIL_REQUESTS = 50
+MAX_WORKSPACE_SETTINGS_SECTIONS = len(WORKSPACE_SETTINGS_SECTIONS)
 WORKSPACE_SETTINGS_MODES = {"summary", "details"}
 WORKSPACE_SETTINGS_PROFILES = {"safe", "technical", "exhaustive"}
 SUMMARY_PROFILE_WARNING = (
@@ -118,6 +120,11 @@ def _normalize_workspace_settings_sections(sections: list[str] | tuple[str, ...]
     else:
         raw_sections = [str(item).strip() for item in sections]
 
+    if len(raw_sections) > MAX_WORKSPACE_SETTINGS_SECTIONS:
+        raise ValueError(
+            f"workspace settings sections can include at most {MAX_WORKSPACE_SETTINGS_SECTIONS} entries"
+        )
+
     normalized_sections: list[str] = []
     for item in raw_sections:
         if not item:
@@ -205,6 +212,10 @@ def _raw_detail_requests(requests: Any) -> list[Any]:
     if isinstance(requests, (list, tuple)):
         if not requests:
             raise ValueError("requests must include at least one detail request when mode='details'")
+        if len(requests) > MAX_WORKSPACE_DETAIL_REQUESTS:
+            raise ValueError(
+                f"workspace settings details can include at most {MAX_WORKSPACE_DETAIL_REQUESTS} requests"
+            )
         return list(requests)
     raise ValueError("requests must be a detail request object or a list of request objects")
 
@@ -1066,6 +1077,18 @@ class WorkspaceSettingsMixin:
     ) -> dict[str, Any]:
         normalized_mode = _normalize_workspace_settings_mode(mode)
         normalized_profile = _normalize_workspace_settings_profile(profile)
+        if isinstance(sections, str) and len(sections.split(",")) > MAX_WORKSPACE_SETTINGS_SECTIONS:
+            raise ValueError(
+                f"workspace settings sections can include at most {MAX_WORKSPACE_SETTINGS_SECTIONS} entries"
+            )
+        if isinstance(sections, (list, tuple)) and len(sections) > MAX_WORKSPACE_SETTINGS_SECTIONS:
+            raise ValueError(
+                f"workspace settings sections can include at most {MAX_WORKSPACE_SETTINGS_SECTIONS} entries"
+            )
+        if isinstance(requests, (list, tuple)) and len(requests) > MAX_WORKSPACE_DETAIL_REQUESTS:
+            raise ValueError(
+                f"workspace settings details can include at most {MAX_WORKSPACE_DETAIL_REQUESTS} requests"
+            )
         try:
             resolved_workspace_id = self._resolve_workspace_id_strict(workspace_id)
         except Exception as exc:

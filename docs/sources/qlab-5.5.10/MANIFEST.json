@@ -1,0 +1,35 @@
+{
+  "retrieval_date": "2026-08-01",
+  "project_skill_root": "skills/",
+  "reference": {
+    "title": "The QLab 5 Manual",
+    "qlab_version": "5.5.10",
+    "canonical_url": "https://reference.qlab.app/docs/v5/",
+    "version_evidence": "Official page verified as updated April 23, 2026 for QLab 5.5.10.",
+    "pdf_url": "https://reference.qlab.app/docs/QLab_5_Reference_Manual.pdf",
+    "local_files": [
+      {
+        "path": "reference/QLab_5_Reference_Manual.local-snapshot.pdf",
+        "sha256": "257350552c08b730830ba0b2b61941088b25f53173f555cac7a50a778f6aa533",
+        "status": "supporting local snapshot; PDF creation date 2025-11-25, therefore predates 5.5.10"
+      },
+      {
+        "path": "reference/manual-topic-index.md",
+        "status": "retrieval index generated from verified official HTML topic links; not a replacement for the manual"
+      }
+    ]
+  },
+  "osc": {
+    "title": "QLab's OSC Dictionary",
+    "canonical_url": "https://reference.qlab.app/docs/v5/scripting/osc-dictionary-v5/",
+    "repository_version": "QLab 5; exact patch unknown",
+    "local_files": [
+      {
+        "path": "osc/qlab_osc_dictionary.repository.md",
+        "sha256": "946f7f88d94b475e13658ec978a24ac02febba22db672956558364814360e8d9"
+      }
+    ],
+    "selection_reason": "Only complete OSC Dictionary copy found in this repository."
+  },
+  "policy": "The official website remains authoritative. Do not silently promote the local PDF or imported OSC copy to a patch-specific source when the patch cannot be proven."
+}

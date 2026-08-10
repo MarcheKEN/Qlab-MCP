@@ -63,10 +63,16 @@ exceptions are listed in Current Invariants.
   readback is classified `updated_with_confirmed_timeouts`; no mutating retry
   occurs. Expected child order, `continueMode`, and `postWait` changes are
   reported in `side_effects` and `group_child_readback`.
-- Group runtime edge validation remains pending for around 200 direct children,
-  Loop with a zero-duration child, crossfade longer than the shortest child,
-  minimum crossfade duration, playback, active/auditioning Groups,
-  warning-but-not-broken Groups, and token expiry in a live MCP process.
+- Group edge runtime validation is closed for the disposable `378`-child
+  ordered snapshot, finite and mixed zero/finite Playlist Loop, exact-UUID
+  timeout/readback/rollback behavior, consumed-token replay, and preflight
+  rejection of crossfade above the shortest child. QLab 5.5.10 retained/read
+  back `3 s` for requested `1 s` and `2 s` crossfade durations; this is an
+  observed fixture/version mismatch, not a documented global minimum, so
+  short/equal active crossfade behavior remains a follow-up. Live MCP restart
+  invalidation and live token expiry remain untested because no safe restart
+  API was available. All-zero-child Loop, warning-only Groups, and
+  active/auditioning Groups remain outside this bounded closure.
 - Playlist navigation, `/shuffle`, deprecated aliases, crossfade curve shapes,
   and Timeline UI pseudo-properties remain non-real-write surfaces.
 - `cueTargetID`, `cueTargetNumber`, and temporary target refs require target resolution before real writes.

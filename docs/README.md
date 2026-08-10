@@ -18,6 +18,7 @@ Start here, then follow the folder index nearest to the work you are doing.
 
 - [Development index](development/README.md)
 - [Architecture](development/architecture.md)
+- [Runtime checklist for `qlab_create_cue`](development/runtime-validation/create-cues.md)
 - [Runtime checklist for `qlab_edit_cues`](development/runtime-validation/edit-cues.md)
 
 ## References
@@ -28,6 +29,7 @@ source is regenerated.
 - [Reference index](references/README.md)
 - [QLab OSC dictionary](references/qlab_osc_dictionary.md)
 - [OSC queries](references/osc_queries.md)
+- [QLab AppleScript dictionary](references/qlab_applescript_dictionary.md)
 - [QClass transcripts](qclass/README.md)
 
 ## Archive

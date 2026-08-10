@@ -43,7 +43,18 @@ WriteReadinessStatus = Literal[
 ]
 CreateCueStatus = Literal[
     "dry_run",
+    "preflight_failed",
     "created",
+    "verification_failed",
+    "workspace_not_found",
+    "workspace_ambiguous",
+    "workspace_unavailable",
+]
+CreateCuesStatus = Literal[
+    "dry_run",
+    "created",
+    "partial_failed",
+    "preflight_failed",
     "verification_failed",
     "workspace_not_found",
     "workspace_ambiguous",
@@ -342,15 +353,30 @@ class CreateCueResult(BaseModel):
     workspace_id: str
     cue_type: str
     dry_run: bool
+    confirm_token: str | None = Field(
+        default=None,
+        description="Dedicated confirm:createCue:v2 token returned by dry-run and consumed by real creation.",
+    )
     created_cue_id: str | None = None
     placement: dict[str, Any] | None = None
     properties: dict[str, Any] = Field(default_factory=dict)
     planned_operations: list[dict[str, Any]] = Field(default_factory=list)
     executed_operations: list[dict[str, Any]] = Field(default_factory=list)
     verification: dict[str, Any] | None = None
+    cleanup_required: bool = Field(
+        default=False,
+        description=(
+            "True when creation may have mutated QLab but fresh identity, structural placement, "
+            "or inactive-state verification did not complete. Broken or warning health alone is informational."
+        ),
+    )
+    cleanup: dict[str, Any] | None = Field(
+        default=None,
+        description="Manual cleanup guidance and any non-authoritative candidate cue IDs.",
+    )
     errors: dict[str, str] | None = Field(
         default=None,
-        description="Per-property or verification errors; null when no errors were detected.",
+        description="Verification or placement errors; null when no errors were detected.",
     )
     warnings: list[str] = Field(default_factory=list)
     error_code: str | None = Field(
@@ -361,6 +387,28 @@ class CreateCueResult(BaseModel):
         default=None,
         description="Short next action for resolving failed creation or verification; null when ok is true.",
     )
+    message: str
+
+
+class CreateCuesResult(BaseModel):
+    """Result for an ordered, sequential multi-cue creation."""
+
+    ok: bool
+    status: CreateCuesStatus = Field(description="Machine-readable batch create status.")
+    workspace_id: str
+    dry_run: bool
+    requested_count: int
+    planned_count: int = 0
+    created_count: int = 0
+    results: list[dict[str, Any]] = Field(default_factory=list)
+    planned_operations: list[dict[str, Any]] = Field(default_factory=list)
+    executed_operations: list[dict[str, Any]] = Field(default_factory=list)
+    confirm_token: str | None = Field(
+        default=None,
+        description="Dedicated confirm:createCues:v1 token returned by dry-run.",
+    )
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
     message: str
 
 
@@ -522,7 +570,7 @@ DeleteCuesStatus = Literal[
 
 
 class DeleteCuesResult(BaseModel):
-    """Result for isolated, leaf-only cue deletion."""
+    """Result for explicit leaf deletion or recursive emptying of one container."""
 
     ok: bool
     status: DeleteCuesStatus
@@ -535,6 +583,10 @@ class DeleteCuesResult(BaseModel):
     timeout_confirmed_count: int = 0
     results: list[dict[str, Any]] = Field(default_factory=list)
     confirm_token: str | None = None
+    container_id: str | None = None
+    recursive: bool = False
+    preserved_container_id: str | None = None
+    expanded_count: int = 0
     errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
     message: str

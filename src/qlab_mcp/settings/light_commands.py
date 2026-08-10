@@ -5,8 +5,14 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ..errors import UnsafeWriteOperationError
+
 
 _NUMBER = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)")
+_LINE_BREAK = re.compile(r"\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]")
+MAX_LIGHT_COMMAND_TEXT_BYTES = 65_536
+MAX_LIGHT_COMMAND_LINES = 2_000
+MAX_LIGHT_ANALYSIS_RESULTS = 2_000
 
 
 def _issue(code: str, message: str) -> dict[str, str]:
@@ -224,15 +230,49 @@ def _analyze_line(
     return result
 
 
+def _light_command_line_count(command_text: str) -> int:
+    if not command_text:
+        return 0
+    break_count = 0
+    last_break_end = 0
+    for match in _LINE_BREAK.finditer(command_text):
+        break_count += 1
+        last_break_end = match.end()
+    return break_count if break_count and last_break_end == len(command_text) else break_count + 1
+
+
+def validate_light_command_text_limits(command_text: str) -> None:
+    if not isinstance(command_text, str):
+        raise TypeError("command_text must be a string")
+    encoded_size = len(command_text.encode("utf-8"))
+    if encoded_size > MAX_LIGHT_COMMAND_TEXT_BYTES:
+        raise UnsafeWriteOperationError(
+            f"lightCommandText exceeds {MAX_LIGHT_COMMAND_TEXT_BYTES} UTF-8 bytes",
+            error_code="light_command_input_too_large",
+        )
+    line_count = _light_command_line_count(command_text)
+    if line_count > MAX_LIGHT_COMMAND_LINES:
+        raise UnsafeWriteOperationError(
+            f"lightCommandText exceeds {MAX_LIGHT_COMMAND_LINES} lines",
+            error_code="light_command_input_too_large",
+        )
+
+
 def analyze_light_command_text(command_text: str, light_patch: dict[str, Any]) -> dict[str, Any]:
-    """Analyze simple LCL assignments against normalized safe Light Patch details."""
+    """Analyze the MVP LCL subset; ``valid`` means MVP-subset-valid, not QLab execution validity."""
 
     if not isinstance(command_text, str):
         raise TypeError("command_text must be a string")
     if not isinstance(light_patch, dict):
         raise TypeError("light_patch must be a dictionary")
 
+    validate_light_command_text_limits(command_text)
     lines = command_text.splitlines()
+    if sum(1 for source in lines if source.strip()) > MAX_LIGHT_ANALYSIS_RESULTS:
+        raise UnsafeWriteOperationError(
+            f"lightCommandText analysis exceeds {MAX_LIGHT_ANALYSIS_RESULTS} results",
+            error_code="light_command_input_too_large",
+        )
     targets = _targets(light_patch)
     instruments = {
         instrument["name"]: instrument

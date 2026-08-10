@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "source_url": "https://qlab.app/docs/v5/scripting/applescript-dictionary-v5/",
+  "documented_qlab_version": "QLab 5; exact patch unknown",
+  "retrieval_date": "2026-08-02",
+  "files": [
+    {
+      "path": "docs/references/qlab_applescript_dictionary.md",
+      "sha256": "19d01b6cbf2d2a02008ff121180dbb3fda33e641b3c73f2cfd524765e9d5a909"
+    },
+    {
+      "path": "skills/qlab-5-applescript/references/qlab_applescript_dictionary.md",
+      "sha256": "19d01b6cbf2d2a02008ff121180dbb3fda33e641b3c73f2cfd524765e9d5a909"
+    }
+  ]
+}

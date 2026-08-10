@@ -265,6 +265,14 @@ def _coerce_qlab_bool(value: Any) -> bool | None:
             return False
     return None
 
+
+_INTERNAL_FILE_TARGET_PROFILES = frozenset({"auto", "health", "targets", "inspector_safe", "full"})
+
+
+def _profile_needs_internal_file_target(profile: str) -> bool:
+    return profile.strip().lower() in _INTERNAL_FILE_TARGET_PROFILES
+
+
 def _is_positive_number(value: Any) -> bool:
     if isinstance(value, bool) or value in (None, ""):
         return False
@@ -276,13 +284,26 @@ def _is_positive_number(value: Any) -> bool:
 def _derive_profile_fields(profile: str, values: dict[str, Any]) -> dict[str, Any]:
     normalized = profile.strip().lower()
     derived = dict(values)
+    if "scriptText" in derived:
+        if normalized in {"full_sensitive", "exhaustive"} and "scriptSource" not in derived:
+            derived["scriptSource"] = derived["scriptText"]
+        derived.pop("scriptText", None)
     if "sliceMarkers" in derived:
         if derived.get("sliceMarkers") is None:
             derived["sliceMarkers"] = []
         else:
             derived["sliceMarkers"] = _normalize_slice_markers(derived.get("sliceMarkers"))
-    if "hasFileTargets" in derived:
-        derived["fileTargetPresent"] = bool(_coerce_qlab_bool(derived.get("hasFileTargets")))
+    if "fileTarget" in derived:
+        target = derived.get("fileTarget")
+        if isinstance(target, str):
+            derived["fileTargetPresent"] = bool(target.strip())
+        else:
+            derived["fileTargetPresent"] = target not in (None, "")
+    elif "hasFileTargets" in derived:
+        # QLab can report the target-capable property even when no target is assigned.
+        # Preserve that distinction instead of treating capability as a usable file.
+        has_targets = _coerce_qlab_bool(derived.get("hasFileTargets"))
+        derived["fileTargetPresent"] = False if has_targets is False else None
     if "continueMode" in derived:
         derived["continueModeLabel"] = _continue_mode_label(derived.get("continueMode"))
     if normalized == "auto":
@@ -358,7 +379,7 @@ def _health_summary(values: dict[str, Any]) -> dict[str, Any] | None:
 
     is_broken = _coerce_qlab_bool(values.get("isBroken")) is True
     is_warning = _coerce_qlab_bool(values.get("isWarning")) is True
-    file_target_present = _coerce_qlab_bool(values.get("fileTargetPresent")) is True
+    file_target_present = _coerce_qlab_bool(values.get("fileTargetPresent"))
     cue_type = str(values.get("type") or "").strip()
     normalized_type = cue_type.casefold()
     messages: list[str] = []
@@ -374,14 +395,18 @@ def _health_summary(values: dict[str, Any]) -> dict[str, Any] | None:
     if has_warning:
         evidence.append(f"isWarning={str(is_warning).lower()}")
     if "fileTargetPresent" in values:
-        evidence.append(f"fileTargetPresent={str(file_target_present).lower()}")
+        evidence.append(
+            f"fileTargetPresent={str(file_target_present).lower()}"
+            if file_target_present is not None
+            else "fileTargetPresent=unknown"
+        )
 
     if is_broken and normalized_type in {"cue list", "cue cart", "group"}:
         messages.append("Container reports a broken state, likely inherited from one or more broken child cues.")
         probable_causes.append("broken_child_cue_likely")
         diagnostic_hints.append("Query or expand child cues with isBroken=true before editing the container.")
         needs_human_check.append("Open QLab Workspace Status or expand the container to confirm which child cue is broken.")
-    elif is_broken and file_target_present:
+    elif is_broken and file_target_present is True:
         messages.append("File target exists but the cue is broken; likely missing, unavailable, or incompatible media.")
         probable_causes.append("file_target_present_but_broken")
         diagnostic_hints.append("Inspect the cue with profile='technical' only if the exact media path is needed.")
@@ -650,6 +675,14 @@ def _camera_input_summary(
 
     result["input_patch"] = match
     result["match_method"] = match_method
+    if (
+        match.get("device_presence_known") is not True
+        and match.get("source_presence_known") is not True
+        and "connected" not in match
+        and "available" not in match
+    ):
+        result.update(status="unknown", reason="video_input_patch_presence_unknown")
+        return result
     explicitly_disconnected = match.get("connected") is False or match.get("available") is False
     explicitly_disconnected = explicitly_disconnected or (
         match.get("device_presence_known") is True and match.get("device_present") is False
@@ -691,6 +724,8 @@ def _visual_problems(values: dict[str, Any], stage: dict[str, Any], camera_input
             problems.append({"code": "video_file_target_missing"})
         elif has_target is True and is_broken:
             problems.append({"code": "video_file_target_unavailable"})
+        elif has_target is None and is_broken:
+            problems.append({"code": "video_file_target_unknown"})
     return problems
 
 

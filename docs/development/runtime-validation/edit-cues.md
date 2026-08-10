@@ -22,8 +22,10 @@ Hard limits:
 
 Public write-tool confirmation boundaries:
 
-- `qlab_create_cue`: review dry-run first; there is no `confirm_token`
-  argument.
+- `qlab_create_cue` / `qlab_create_cues`: review the dry-run first, pass the
+  exact dedicated token, and follow the separate [`create-cues.md`](create-cues.md)
+  checklist. Anchors must be inactive and structurally stable, but may be
+  broken or warning; ambiguous `/new` results are never retried.
 - `qlab_edit_cues`: copy exact relevant
   `planned_operations[].confirm_token` values into the same update item's
   `confirm_gates`; there is no tool-level Edit token.
@@ -126,10 +128,15 @@ Playlist Group smoke:
 Crossfade curve shapes remain blocked because the local OSC dictionary has no
 documented deterministic setter/readback. Timeline inspector gestures are
 child edits, not Group scalar properties, and are outside this smoke check.
-Around 200 children, zero-duration Loop children, crossfades beyond the
-shortest child, minimum crossfade duration, playback, active/auditioning
-Groups, warning-but-not-broken Groups, and runtime token expiry require
-separate explicit authorization and remain unvalidated edge cases.
+Workorder 030 closed the bounded QLab 5.5.10 cases with a disposable
+`378`-child Group, finite and mixed zero/finite Playlist Loop, exact-UUID
+single-setter timeout/readback/rollback, consumed-token replay, and
+crossfade-over-shortest preflight rejection. Requested `1 s` and `2 s`
+crossfade durations retained/read back as `3 s` in that fixture; this is an
+observed fixture/version mismatch, not a documented global minimum, so
+short/equal active crossfade behavior remains unconfirmed. All-zero-child
+Loop, warning-only Groups, active/auditioning Groups, live token expiry, and
+live MCP restart invalidation remain separate follow-up limits.
 
 Mic input routing smoke:
 
@@ -164,23 +171,29 @@ Editable duration smoke:
 Target resolution smoke:
 
 1. Pick one disposable target cue and one disposable Start/Stop/Pause/Load/GoTo/Arm/Disarm cue.
-2. Run `qlab_edit_cues(..., dry_run=true)` for `cueTargetID`.
-3. Copy the exact `planned_operations[].confirm_token` for `cueTargetID` into
+2. If the source is initially untargeted and QLab reports it broken solely
+   because the saved target is empty, verify `cueTargetID==""`,
+   `isWarning==false`, and inactive activity flags. This is the only broken
+   source allowed for initial assignment.
+3. Run `qlab_edit_cues(..., dry_run=true)` for `cueTargetID`.
+4. Copy the exact `planned_operations[].confirm_token` for `cueTargetID` into
    `updates[].confirm_gates`, then run the same with `dry_run=false`.
-4. Expected real write:
+5. Expected real write:
    - preflight reads the target cue before setters
    - setter uses `/cue_id/{uniqueID}/cueTargetID`
    - read-after-write confirms target ID
-5. Repeat with a missing target ID.
-6. Expected block:
+6. Repeat with a missing target ID.
+7. Expected block:
    - no `/cueTargetID` setter is sent
    - error says target could not be resolved
-7. Repeat with `cueTargetName`.
-8. Expected block:
+8. Repeat with `cueTargetName`.
+9. Expected block:
    - no `/cueTargetName` setter is sent
    - Utility real writes allow only `cueTargetID`; `cueTargetName` and
      `cueTargetNumber` remain blocked
    - both source `cue_ref` and requested target must be exact UUIDs
+10. Repeat with an already-targeted or warning/broken source; it must remain
+    blocked before any setter.
 
 Network OSC Message smoke:
 

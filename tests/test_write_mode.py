@@ -30,6 +30,7 @@ import qlab_mcp.write.video_translation as video_translation
 from qlab_mcp.cues import refs as cue_refs
 from qlab_mcp.cues import overview as cue_overview
 from qlab_mcp.write.moves import _build_plan, move_cues, simulate_move_batch
+from qlab_mcp.write.allowlist import CUE_TYPES, validate_writable_cue_type
 from qlab_mcp.write.registry import QLAB_BLEND_MODES, UPDATE_PROFILE_NAMES, profile_catalog
 from qlab_mcp.write.network_patch_types import classify_network_patch_type
 
@@ -72,6 +73,233 @@ def test_write_modules_reuse_canonical_container_types_without_widening_placemen
     assert move_helpers.CONTAINER_CUE_TYPES is cue_refs.CONTAINER_CUE_TYPES
     assert move_helpers._LINEAR_PARENT_TYPES == {"Cue List", "Group"}
     assert move_helpers._CART_PARENT_TYPES == {"Cue Cart", "Cart"}
+
+
+@pytest.mark.parametrize("value", [2_147_483_648, -2_147_483_649, 10**20, 10**309, 1e39, float("inf"), float("nan")])
+def test_numeric_write_values_outside_osc_wire_ranges_are_rejected(value: Any) -> None:
+    with pytest.raises(UnsafeWriteOperationError):
+        write_registry._number(value, "value must be an OSC-representable number")
+
+
+def test_numeric_write_values_at_osc_int32_boundaries_are_accepted() -> None:
+    assert write_registry._number(-2_147_483_648, "invalid") == -2_147_483_648
+    assert write_registry._number(2_147_483_647, "invalid") == 2_147_483_647
+
+
+@pytest.mark.parametrize(
+    ("properties", "status", "active"),
+    [
+        ({"isBroken": False, "isWarning": False}, "healthy", False),
+        ({"isBroken": True, "isWarning": False}, "broken", False),
+        ({"isBroken": False, "isWarning": True}, "warning", False),
+        ({}, "unknown", False),
+        ({"isBroken": False, "isRunning": True}, "unknown", True),
+    ],
+)
+def test_create_health_is_informational_except_for_active_state(
+    properties: dict[str, Any], status: str, active: bool
+) -> None:
+    health = write_operations._read_create_health(properties)
+    assert health["status"] == status
+    assert health["active"] is active
+
+
+def test_create_cue_type_map_matches_osc_wire_names() -> None:
+    expected = {
+        "memo": "memo", "group": "group", "wait": "wait", "audio": "audio",
+        "mic": "mic", "video": "video", "camera": "camera", "text": "text",
+        "light": "light", "fade": "fade", "network": "network", "midi": "midi",
+        "midi_file": "midi file", "timecode": "timecode", "start": "start",
+        "stop": "stop", "pause": "pause", "load": "load", "reset": "reset",
+        "devamp": "devamp", "goto": "goto", "target": "target", "arm": "arm",
+        "disarm": "disarm",
+    }
+    assert CUE_TYPES == expected
+    assert {key: validate_writable_cue_type(key) for key in expected} == expected
+
+
+def test_create_preflight_allows_broken_inactive_anchor(monkeypatch: pytest.MonkeyPatch) -> None:
+    anchor = "11111111-1111-4111-8111-111111111111"
+    parent = "22222222-2222-4222-8222-222222222222"
+    snapshot = {
+        "nodes": {
+            parent: {"uniqueID": parent, "type": "Cue List", "isBroken": True},
+            anchor: {"uniqueID": anchor, "type": "Video", "isBroken": True, "isWarning": True},
+        },
+        "parent_by_child": {anchor: parent},
+        "children_by_parent": {parent: [anchor]},
+    }
+    monkeypatch.setattr(write_operations, "_read_structural_snapshot", lambda *_: snapshot)
+    monkeypatch.setattr(
+        write_operations,
+        "_structural_activity_snapshot",
+        lambda *_: {"active_count": 0, "active_cue_ids": []},
+    )
+
+    _, _, placement, error = write_operations._create_preflight(
+        object(), "ws-1", "anchored", anchor
+    )
+
+    assert error is None
+    assert placement["after_cue_id"] == anchor
+    assert placement["expected_index"] == 1
+
+
+def test_create_preflight_rejects_active_anchor_even_when_broken(monkeypatch: pytest.MonkeyPatch) -> None:
+    anchor = "11111111-1111-4111-8111-111111111111"
+    parent = "22222222-2222-4222-8222-222222222222"
+    snapshot = {
+        "nodes": {
+            parent: {"uniqueID": parent, "type": "Cue List"},
+            anchor: {"uniqueID": anchor, "type": "Video", "isBroken": True, "isRunning": True},
+        },
+        "parent_by_child": {anchor: parent},
+        "children_by_parent": {parent: [anchor]},
+    }
+    monkeypatch.setattr(write_operations, "_read_structural_snapshot", lambda *_: snapshot)
+    monkeypatch.setattr(
+        write_operations,
+        "_structural_activity_snapshot",
+        lambda *_: {"active_count": 0, "active_cue_ids": []},
+    )
+
+    _, _, placement, error = write_operations._create_preflight(
+        object(), "ws-1", "anchored", anchor
+    )
+
+    assert placement is None
+    assert "inactive" in (error or "")
+
+
+def test_create_cues_chains_verified_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+    anchor = "11111111-1111-4111-8111-111111111111"
+    parent = "22222222-2222-4222-8222-222222222222"
+    snapshot = {
+        "nodes": {
+            parent: {"uniqueID": parent, "type": "Cue List"},
+            anchor: {"uniqueID": anchor, "type": "Memo", "isBroken": True},
+        },
+        "parent_by_child": {anchor: parent},
+        "children_by_parent": {parent: [anchor]},
+    }
+    monkeypatch.setattr(write_operations, "_create_preflight", lambda *_: (
+        snapshot,
+        {"active_count": 0, "active_cue_ids": []},
+        {
+            "mode": "anchored", "after_cue_id": anchor, "anchor_osc_id": anchor,
+            "new_args": [anchor], "parent_id": parent, "parent_type": "Cue List",
+            "anchor_index": 0, "expected_index": 1, "parent_children": [anchor],
+            "parent_fingerprint": write_operations._structural_fingerprint([anchor]),
+            "tree_fingerprint": write_operations._create_tree_fingerprint(snapshot),
+            "status": "anchored",
+        },
+        None,
+    ))
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: "ws-1")
+
+    class Stub:
+        client = SimpleNamespace(config=SimpleNamespace(write_dry_run_default=True))
+
+        @staticmethod
+        def _resolve_workspace_id_strict(workspace_id: str) -> str:
+            return workspace_id
+
+    calls: list[tuple[str, str | None, bool]] = []
+    created = iter([
+        "33333333-3333-4333-8333-333333333333",
+        "44444444-4444-4444-8444-444444444444",
+    ])
+
+    def fake_create_cue(_workspace, cue_type, dry_run=None, after_cue_id=None, parent_container_id=None, confirm_token=None):
+        del parent_container_id, confirm_token
+        calls.append((cue_type, after_cue_id, bool(dry_run)))
+        if dry_run:
+            return {"ok": True, "confirm_token": "item-token"}
+        cue_id = next(created)
+        return {"ok": True, "status": "created", "created_cue_id": cue_id, "executed_operations": [{"operation": "new"}]}
+
+    stub = Stub()
+    stub.create_cue = fake_create_cue
+    planned = write_operations.QLabWriteMixin.create_cues(
+        stub, "ws-1", ["memo", "audio"], dry_run=True, after_cue_id=anchor
+    )
+    assert planned["status"] == "dry_run"
+    assert any(
+        item.get("operation") == "new" and item.get("anchor_from_previous") is True
+        for item in planned["planned_operations"]
+    )
+    result = write_operations.QLabWriteMixin.create_cues(
+        stub, "ws-1", ["memo", "audio"], dry_run=False,
+        after_cue_id=anchor, confirm_token=planned["confirm_token"],
+    )
+    assert result["status"] == "created"
+    assert [call[:2] for call in calls] == [
+        ("memo", anchor), ("memo", anchor),
+        ("audio", "33333333-3333-4333-8333-333333333333"),
+        ("audio", "33333333-3333-4333-8333-333333333333"),
+    ]
+
+
+def test_create_cues_stops_before_the_next_item_after_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    anchor = "11111111-1111-4111-8111-111111111111"
+    parent = "22222222-2222-4222-8222-222222222222"
+    snapshot = {
+        "nodes": {
+            parent: {"uniqueID": parent, "type": "Cue List"},
+            anchor: {"uniqueID": anchor, "type": "Memo"},
+        },
+        "parent_by_child": {anchor: parent},
+        "children_by_parent": {parent: [anchor]},
+    }
+    placement = {
+        "mode": "anchored", "after_cue_id": anchor, "anchor_osc_id": anchor,
+        "new_args": [anchor], "parent_id": parent, "parent_type": "Cue List",
+        "anchor_index": 0, "expected_index": 1, "parent_children": [anchor],
+        "parent_fingerprint": write_operations._structural_fingerprint([anchor]),
+        "tree_fingerprint": write_operations._create_tree_fingerprint(snapshot),
+        "status": "anchored",
+    }
+    monkeypatch.setattr(write_operations, "_create_preflight", lambda *_: (
+        snapshot, {"active_count": 0, "active_cue_ids": []}, placement, None
+    ))
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: "ws-1")
+
+    class Stub:
+        client = SimpleNamespace(config=SimpleNamespace(write_dry_run_default=True))
+
+        @staticmethod
+        def _resolve_workspace_id_strict(workspace_id: str) -> str:
+            return workspace_id
+
+    calls: list[tuple[str, bool, str | None]] = []
+    created_id = "33333333-3333-4333-8333-333333333333"
+
+    def fake_create_cue(_workspace, cue_type, dry_run=None, after_cue_id=None, parent_container_id=None, confirm_token=None):
+        del parent_container_id, confirm_token
+        calls.append((cue_type, bool(dry_run), after_cue_id))
+        if dry_run:
+            return {"ok": True, "confirm_token": f"item-{cue_type}"}
+        if cue_type == "audio":
+            return {"ok": False, "status": "verification_failed", "errors": {"new": "failed"}, "message": "failed"}
+        return {"ok": True, "status": "created", "created_cue_id": created_id, "executed_operations": [{"operation": "new"}]}
+
+    stub = Stub()
+    stub.create_cue = fake_create_cue
+    planned = write_operations.QLabWriteMixin.create_cues(
+        stub, "ws-1", ["memo", "audio", "wait"], dry_run=True, after_cue_id=anchor
+    )
+    result = write_operations.QLabWriteMixin.create_cues(
+        stub, "ws-1", ["memo", "audio", "wait"], dry_run=False,
+        after_cue_id=anchor, confirm_token=planned["confirm_token"],
+    )
+
+    assert result["status"] == "partial_failed"
+    assert [call[0] for call in calls] == ["memo", "memo", "audio", "audio"]
+
+
+def test_quaternion_reuses_osc_numeric_range_validation() -> None:
+    with pytest.raises(UnsafeWriteOperationError):
+        write_registry._quaternion([0, 0, 0, 1e39])
 
 
 @pytest.mark.parametrize(
@@ -535,6 +763,441 @@ class FakeWriteClient:
             if address.startswith(prefix):
                 return address.removeprefix(prefix)
         return address.removeprefix("/workspace/ws-1/cue/1/")
+
+
+class CreateAnchorReader(QLabReader):
+    """Small structural fake for the anchored Create 031B contract."""
+
+    workspace = "ws-1"
+    list_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    anchor_id = "22222222-2222-4222-8222-222222222222"
+    created_id = "33333333-3333-4333-8333-333333333333"
+
+    def __init__(
+        self,
+        *,
+        config: QLabConfig | None = None,
+        timeout_new: bool = False,
+        timeout_set_property: str | None = None,
+        fail_set_property: str | None = None,
+        health_overrides: dict[str, Any] | None = None,
+    ) -> None:
+        self.client = _CreateAnchorClient(
+            config or QLabConfig(enable_write=True, passcode="server-pass", write_dry_run_default=True)
+        )
+        self.client.request_handler = self._request
+        self._read_cache = shared_read_cache()
+        self._read_deadline = None
+        self.children = [self.anchor_id]
+        self.extra_children: list[str] = []
+        self.created = False
+        self.created_type = "Wait"
+        self.cue_values: dict[str, Any] = {}
+        self.timeout_new = timeout_new
+        self.timeout_set_property = timeout_set_property
+        self.fail_set_property = fail_set_property
+        self.health_overrides = health_overrides or {}
+        self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
+
+    def _resolve_workspace_id_strict(self, workspace_id: str) -> str:
+        if workspace_id != self.workspace:
+            raise ValueError(f"Workspace not found: {workspace_id}")
+        return workspace_id
+
+    def get_cue_lists(self, *_: Any, **__: Any) -> dict[str, Any]:
+        return {"cue_lists": [{"uniqueID": self.list_id, "type": "Cue List"}]}
+
+    def get_cue_children(self, _workspace_id: str, cue_ref: str, **_: Any) -> dict[str, Any]:
+        assert cue_ref == self.list_id
+        children = [{"uniqueID": self.anchor_id, "type": "Memo"}]
+        children.extend({"uniqueID": cue_id, "type": "Memo"} for cue_id in self.extra_children)
+        if self.created:
+            children.append({"uniqueID": self.created_id, "type": self.created_type})
+        return {"children": children}
+
+    def get_running_cues(self, *_: Any, **__: Any) -> dict[str, Any]:
+        return {"running_cues": []}
+
+    def get_cue_details(self, _workspace_id: str, cue_ref: str, _profile: str = "auto") -> dict[str, Any]:
+        if cue_ref == self.created_id and self.created:
+            return {
+                "ok": True,
+                "status": "ok",
+                "cue_ref": cue_ref,
+                "cue_type": self.created_type,
+                "properties": dict(self.cue_values),
+            }
+        raise QLabReplyError("error", "No cue found", cue_ref)
+
+    def _request(
+        self,
+        address: str,
+        *args: Any,
+        workspace_id: str | None = None,
+        request_timeout: float | None = None,
+        reply_timeout: float | None = None,
+    ) -> Any:
+        del request_timeout, reply_timeout
+        self.requests.append((address, args, workspace_id))
+        if address == "/workspaces":
+            return SimpleNamespace(data=[{"uniqueID": self.workspace}], status="ok")
+        if address == f"/workspace/{self.workspace}/connect":
+            return SimpleNamespace(data="ok:view|edit|control", status="ok")
+        if address == f"/workspace/{self.workspace}/showMode":
+            return SimpleNamespace(data=False, status="ok")
+        if address == f"/workspace/{self.workspace}/new":
+            assert args[1:] == (self.anchor_id,)
+            if self.timeout_new:
+                raise OscTimeoutError("new timed out")
+            self.created_type = str(args[0])
+            self.created = True
+            self.cue_values = {
+                "uniqueID": self.created_id,
+                "type": self.created_type,
+                "isBroken": False,
+                "isWarning": False,
+                "isRunning": False,
+                "isPaused": False,
+                "isAuditioning": False,
+                "isActionRunning": False,
+            }
+            self.cue_values.update(self.health_overrides)
+            return SimpleNamespace(data={"uniqueID": self.created_id}, status="ok")
+        cue_prefix = f"/workspace/{self.workspace}/cue_id/{self.created_id}/"
+        if address.startswith(cue_prefix):
+            property_name = address.removeprefix(cue_prefix)
+            if property_name == "valuesForKeys":
+                return SimpleNamespace(data=dict(self.cue_values), status="ok")
+            self.cue_values[property_name] = args[0] if args else None
+            if property_name == self.fail_set_property:
+                raise QLabReplyError("error", f"Failed setting {property_name}", address)
+            if property_name == self.timeout_set_property:
+                raise OscTimeoutError(f"Timed out waiting for QLab reply to {address}")
+            return SimpleNamespace(data=None, status="ok")
+        raise AssertionError(f"Unexpected fake create request: {address}")
+
+
+class _CreateAnchorClient:
+    def __init__(self, config: QLabConfig) -> None:
+        self.config = config
+        self.request_handler: Any = None
+
+    def request(self, address: str, *args: Any, **kwargs: Any) -> Any:
+        return self.request_handler(address, *args, **kwargs)
+
+
+class EmptyContainerReader(QLabReader):
+    workspace = "ws-empty"
+    list_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    cart_id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    created_id = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+
+    def __init__(self, container_type: str, *, real: bool = False) -> None:
+        self.container_type = container_type
+        self.client = _CreateAnchorClient(
+            QLabConfig(
+                enable_write=real,
+                passcode="server-pass" if real else None,
+                write_dry_run_default=not real,
+            )
+        )
+        self.client.request_handler = self._request
+        self._read_cache = shared_read_cache()
+        self._read_deadline = None
+        self.created = False
+        self.current_list_id = self.list_id
+        self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
+
+    @property
+    def target_id(self) -> str:
+        return {
+            "Cue List": self.list_id,
+            "Group": self.group_id,
+            "Cue Cart": self.cart_id,
+        }[self.container_type]
+
+    def _resolve_workspace_id_strict(self, workspace_id: str) -> str:
+        if workspace_id != self.workspace:
+            raise ValueError(f"Workspace not found: {workspace_id}")
+        return workspace_id
+
+    def _resolve_workspace_strict(self, workspaces: Any, workspace_id: str) -> dict[str, Any]:
+        del workspaces
+        if workspace_id != self.workspace:
+            raise ValueError(f"Workspace not found: {workspace_id}")
+        return {"uniqueID": self.workspace, "displayName": "empty-container"}
+
+    def get_workspaces(self) -> dict[str, Any]:
+        return {"workspaces": [{"uniqueID": self.workspace, "displayName": "empty-container"}]}
+
+    def get_cue_lists(self, *_: Any, **__: Any) -> dict[str, Any]:
+        return {"cue_lists": [{"uniqueID": self.list_id, "type": "Cue List"}]}
+
+    def get_cue_children(self, _workspace_id: str, cue_ref: str, **_: Any) -> dict[str, Any]:
+        if cue_ref == self.list_id:
+            if self.container_type == "Cue List":
+                children = [{"uniqueID": self.created_id, "type": "Memo"}] if self.created else []
+            else:
+                children = [{"uniqueID": self.target_id, "type": self.container_type}]
+            return {"children": children}
+        if cue_ref == self.group_id:
+            children = [{"uniqueID": self.created_id, "type": "Memo"}] if self.created else []
+            return {"children": children}
+        if cue_ref == self.cart_id:
+            children = [{"uniqueID": self.created_id, "type": "Memo"}] if self.created else []
+            return {"children": children}
+        raise AssertionError(f"Unexpected child read: {cue_ref}")
+
+    def get_running_cues(self, *_: Any, **__: Any) -> dict[str, Any]:
+        return {"running_cues": []}
+
+    def get_cue_details(self, _workspace_id: str, cue_ref: str, _profile: str = "auto") -> dict[str, Any]:
+        if cue_ref != self.created_id or not self.created:
+            raise QLabReplyError("error", "No cue found", cue_ref)
+        properties = {
+            "uniqueID": self.created_id,
+            "type": "Memo",
+            "isBroken": False,
+            "isWarning": False,
+            "isRunning": False,
+            "isPaused": False,
+            "isAuditioning": False,
+            "isActionRunning": False,
+        }
+        if self.container_type == "Cue Cart":
+            properties.update({"cartPosition": [1, 1]})
+        return {"ok": True, "status": "ok", "cue_ref": cue_ref, "cue_type": "Memo", "properties": properties}
+
+    def _request(
+        self,
+        address: str,
+        *args: Any,
+        workspace_id: str | None = None,
+        request_timeout: float | None = None,
+        reply_timeout: float | None = None,
+    ) -> Any:
+        del workspace_id, request_timeout, reply_timeout
+        self.requests.append((address, args, None))
+        if address == f"/workspace/{self.workspace}/connect":
+            return SimpleNamespace(data="ok:view|edit|control", status="ok")
+        if address == f"/workspace/{self.workspace}/showMode":
+            return SimpleNamespace(data=False, status="ok")
+        if address == f"/workspace/{self.workspace}/currentCueListID":
+            return SimpleNamespace(data=self.current_list_id, status="ok")
+        if address.startswith(f"/workspace/{self.workspace}/currentCueListID/"):
+            self.current_list_id = address.rsplit("/", 1)[-1]
+            return SimpleNamespace(data=None, status="ok")
+        if address == f"/workspace/{self.workspace}/new":
+            expected = {
+                "Cue List": ("memo",),
+                "Group": ("memo", self.group_id),
+                "Cue Cart": ("memo", self.cart_id, 0, 0),
+            }[self.container_type]
+            assert args == expected
+            self.created = True
+            return SimpleNamespace(data={"uniqueID": self.created_id}, status="ok")
+        if address == f"/workspace/{self.workspace}/move/{self.created_id}":
+            assert self.container_type == "Group"
+            assert args == (0, self.group_id)
+            return SimpleNamespace(data=None, status="ok")
+        raise AssertionError(f"Unexpected empty-container request: {address} {args}")
+
+
+@pytest.mark.parametrize("container_type", ["Cue List", "Group", "Cue Cart"])
+def test_create_empty_container_dry_run_plans_container_specific_route(container_type: str) -> None:
+    reader = EmptyContainerReader(container_type)
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.target_id,
+    )
+
+    assert result["ok"] is True
+    assert result["placement"]["parent_container_id"] == reader.target_id
+    assert result["placement"]["expected_index"] == 0
+    assert result["confirm_token"].startswith("confirm:createCue:v2:")
+    assert result["executed_operations"] == []
+    operations = result["planned_operations"]
+    if container_type == "Cue List":
+        assert [operation["operation"] for operation in operations] == [
+            "set_current_cue_list",
+            "verify_current_cue_list",
+            "new",
+            "verify",
+            "verify_structure",
+        ]
+        assert operations[2]["args"] == ["memo"]
+    elif container_type == "Group":
+        assert [operation["operation"] for operation in operations] == [
+            "new",
+            "move_into_container",
+            "verify",
+            "verify_structure",
+        ]
+        assert operations[0]["args"] == ["memo", reader.group_id]
+        assert operations[1]["args"] == [0, reader.group_id]
+    else:
+        assert [operation["operation"] for operation in operations] == [
+            "new",
+            "verify",
+            "verify_structure",
+        ]
+        assert operations[0]["args"] == ["memo", reader.cart_id, 0, 0]
+    assert not any(
+        address.endswith("/new") or "/move/" in address or "currentCueListID/" in address
+        for address, _, _ in reader.requests
+    )
+
+
+def test_create_empty_cue_list_real_selects_list_then_creates_first_child() -> None:
+    reader = EmptyContainerReader("Cue List", real=True)
+    planned = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.list_id,
+    )
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        parent_container_id=reader.list_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is True
+    assert result["verification"]["structure"]["parent_id"] == reader.list_id
+    assert result["verification"]["structure"]["index"] == 0
+    assert [address for address, _, _ in reader.requests].count(f"/workspace/{reader.workspace}/new") == 1
+    assert any(address.endswith(f"/currentCueListID/{reader.list_id}") for address, _, _ in reader.requests)
+
+
+def test_create_empty_group_anchors_new_then_moves_once() -> None:
+    reader = EmptyContainerReader("Group", real=True)
+    planned = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.group_id,
+    )
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        parent_container_id=reader.group_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is True
+    assert result["verification"]["structure"]["parent_id"] == reader.group_id
+    assert result["verification"]["structure"]["index"] == 0
+    assert [address for address, _, _ in reader.requests].count(f"/workspace/{reader.workspace}/new") == 1
+    assert [address for address, _, _ in reader.requests].count(
+        f"/workspace/{reader.workspace}/move/{reader.created_id}"
+    ) == 1
+
+
+def test_create_empty_group_preserves_wire_uuid_case() -> None:
+    reader = EmptyContainerReader("Group", real=True)
+    reader.group_id = reader.group_id.upper()
+    planned = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.group_id,
+    )
+
+    move_plan = next(item for item in planned["planned_operations"] if item["operation"] == "move_into_container")
+    assert move_plan["args"] == [0, reader.group_id]
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        parent_container_id=reader.group_id,
+        confirm_token=planned["confirm_token"],
+    )
+    assert result["ok"] is True
+
+
+def test_create_empty_cart_uses_direct_cart_coordinates_without_move() -> None:
+    reader = EmptyContainerReader("Cue Cart", real=True)
+    planned = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.cart_id,
+    )
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        parent_container_id=reader.cart_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is True
+    assert result["verification"]["structure"]["parent_id"] == reader.cart_id
+    assert result["verification"]["structure"]["index"] == 0
+    assert result["verification"]["structure"]["cart_row"] == 0
+    assert result["verification"]["structure"]["cart_column"] == 0
+    assert result["verification"]["structure"]["cart_readback_row"] == 1
+    assert result["verification"]["structure"]["cart_readback_column"] == 1
+    assert [address for address, _, _ in reader.requests].count(f"/workspace/{reader.workspace}/new") == 1
+    assert not any("/move/" in address for address, _, _ in reader.requests)
+
+
+def test_create_group_in_empty_cart_is_rejected_before_new() -> None:
+    reader = EmptyContainerReader("Cue Cart")
+    result = reader.create_cue(
+        reader.workspace,
+        "group",
+        dry_run=True,
+        parent_container_id=reader.cart_id,
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "preflight_failed"
+    assert "cannot be created inside a Cue Cart" in result["errors"]["preflight"]
+    assert result["planned_operations"] == []
+    assert result["executed_operations"] == []
+
+
+def test_create_rejects_both_or_neither_placement_selectors() -> None:
+    reader = EmptyContainerReader("Cue List")
+    with pytest.raises(UnsafeWriteOperationError, match="exactly one"):
+        reader.create_cue(reader.workspace, "memo", dry_run=True)
+    with pytest.raises(UnsafeWriteOperationError, match="exactly one"):
+        reader.create_cue(
+            reader.workspace,
+            "memo",
+            dry_run=True,
+            after_cue_id=reader.list_id,
+            parent_container_id=reader.list_id,
+        )
+
+
+def test_create_rejects_nonempty_parent_container_before_new() -> None:
+    reader = EmptyContainerReader("Group")
+    reader.created = True
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.group_id,
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert "empty container" in result["errors"]["preflight"]
+    assert not any(address.endswith("/new") for address, _, _ in reader.requests)
 
 
 class BatchFakeWriteClient:
@@ -2259,37 +2922,175 @@ def test_create_cue_disabled_blocks_before_osc() -> None:
     reader = QLabReader(client)  # type: ignore[arg-type]
 
     with pytest.raises(UnsafeWriteOperationError, match="Write mode is disabled"):
-        reader.create_cue("ws-1", "audio", properties={"name": "Intro"}, dry_run=False)
+        reader.create_cue("ws-1", "audio", dry_run=False)
 
     assert client.requests == []
 
 
 def test_create_cue_dry_run_sends_no_mutating_osc() -> None:
-    client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None))
-    reader = QLabReader(client)  # type: ignore[arg-type]
+    reader = CreateAnchorReader(config=QLabConfig(enable_write=False, passcode=None))
 
     result = reader.create_cue(
-        "ws-1",
+        reader.workspace,
         "audio",
-        properties={"name": "Intro", "continueMode": "auto_follow"},
         dry_run=True,
-        after_cue_id="cue-before",
+        after_cue_id=reader.anchor_id,
     )
 
     assert result["ok"] is True
     assert result["status"] == "dry_run"
     assert result["dry_run"] is True
     assert result["cue_type"] == "Audio"
-    assert result["properties"]["continueMode"] == 2
-    assert result["placement"]["after_cue_id"] == "cue-before"
+    assert result["properties"] == {}
+    assert result["placement"]["after_cue_id"] == reader.anchor_id
     assert [operation["operation"] for operation in result["planned_operations"]] == [
         "new",
-        "move_after",
-        "set_property",
-        "set_property",
         "verify",
+        "verify_structure",
     ]
-    assert client.requests == []
+    assert reader.requests == []
+
+
+def test_create_cue_031b_dry_run_returns_anchor_bound_token_and_structure() -> None:
+    reader = CreateAnchorReader()
+
+    result = reader.create_cue(
+        reader.workspace,
+        "wait",
+        dry_run=True,
+        after_cue_id=reader.anchor_id,
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "dry_run"
+    assert result["confirm_token"].startswith("confirm:createCue:v2:")
+    assert result["placement"]["parent_id"] == reader.list_id
+    assert result["placement"]["expected_index"] == 1
+    assert result["planned_operations"][0]["args"] == ["wait", reader.anchor_id]
+    assert not any(operation["operation"] == "move_after" for operation in result["planned_operations"])
+    assert reader.requests == []
+
+
+def test_create_cue_031b_consumes_token_verifies_order_and_rejects_replay() -> None:
+    reader = CreateAnchorReader(config=QLabConfig(enable_write=True, passcode="server-pass", write_dry_run_default=False))
+    planned = reader.create_cue(reader.workspace, "wait", dry_run=True, after_cue_id=reader.anchor_id)
+
+    result = reader.create_cue(
+        reader.workspace,
+        "wait",
+        dry_run=False,
+        after_cue_id=reader.anchor_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "created"
+    assert result["verification"]["structure"]["parent_id"] == reader.list_id
+    assert result["verification"]["structure"]["index"] == 1
+    assert result["created_cue_id"] == reader.created_id
+    assert [address for address, _, _ in reader.requests].count(f"/workspace/{reader.workspace}/new") == 1
+    assert all(
+        f"/cue_id/{reader.created_id}/" not in address or address.endswith("/valuesForKeys")
+        for address, _, _ in reader.requests
+    )
+
+    replay = reader.create_cue(
+        reader.workspace,
+        "wait",
+        dry_run=False,
+        after_cue_id=reader.anchor_id,
+        confirm_token=planned["confirm_token"],
+    )
+    assert replay["ok"] is False
+    assert replay["status"] == "preflight_failed"
+    assert "already been used" in replay["errors"]["confirm_token"]
+
+
+@pytest.mark.parametrize(
+    ("health_overrides", "status"),
+    [
+        ({"isBroken": True}, "broken"),
+        ({"isWarning": True}, "warning"),
+        ({"isBroken": "missing"}, "unknown"),
+    ],
+)
+def test_create_accepts_operational_health_states_when_structurally_verified(
+    health_overrides: dict[str, Any], status: str
+) -> None:
+    reader = CreateAnchorReader(health_overrides=health_overrides)
+    planned = reader.create_cue(reader.workspace, "wait", dry_run=True, after_cue_id=reader.anchor_id)
+    result = reader.create_cue(
+        reader.workspace,
+        "wait",
+        dry_run=False,
+        after_cue_id=reader.anchor_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "created"
+    assert result["cleanup_required"] is False
+    assert result["verification"]["health"]["status"] == status
+
+
+def test_create_active_readback_requires_manual_review() -> None:
+    reader = CreateAnchorReader(health_overrides={"isRunning": True})
+    planned = reader.create_cue(reader.workspace, "wait", dry_run=True, after_cue_id=reader.anchor_id)
+    result = reader.create_cue(
+        reader.workspace,
+        "wait",
+        dry_run=False,
+        after_cue_id=reader.anchor_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is False
+    assert result["cleanup_required"] is True
+    assert result["verification"]["health"]["active"] is True
+
+
+def test_create_cue_031b_requires_an_exact_anchor_uuid() -> None:
+    reader = CreateAnchorReader()
+    with pytest.raises(UnsafeWriteOperationError, match="exactly one of after_cue_id or parent_container_id"):
+        reader.create_cue(reader.workspace, "wait", dry_run=True)
+
+
+def test_create_cue_031b_rejects_structural_drift_before_new(monkeypatch: pytest.MonkeyPatch) -> None:
+    reader = CreateAnchorReader(config=QLabConfig(enable_write=True, passcode="server-pass", write_dry_run_default=False))
+    planned = reader.create_cue(reader.workspace, "wait", dry_run=True, after_cue_id=reader.anchor_id)
+    reader.extra_children = ["44444444-4444-4444-8444-444444444444"]
+
+    result = reader.create_cue(
+        reader.workspace,
+        "wait",
+        dry_run=False,
+        after_cue_id=reader.anchor_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert "structure" in result["errors"]["confirm_token"]
+    assert not any(address.endswith("/new") for address, _, _ in reader.requests)
+
+
+def test_create_cue_031b_rejects_expired_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    reader = CreateAnchorReader(config=QLabConfig(enable_write=True, passcode="server-pass", write_dry_run_default=False))
+    planned = reader.create_cue(reader.workspace, "wait", dry_run=True, after_cue_id=reader.anchor_id)
+    monkeypatch.setattr(write_operations.time, "time", lambda: 10**10)
+
+    result = reader.create_cue(
+        reader.workspace,
+        "wait",
+        dry_run=False,
+        after_cue_id=reader.anchor_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "preflight_failed"
+    assert "expired" in result["errors"]["confirm_token"]
+    assert not any(address.endswith("/new") for address, _, _ in reader.requests)
 
 
 def test_create_cue_dry_run_invalid_workspace_has_no_plan() -> None:
@@ -2299,7 +3100,6 @@ def test_create_cue_dry_run_invalid_workspace_has_no_plan() -> None:
     result = reader.create_cue(
         "missing-ws",
         "memo",
-        properties={"name": "Nope"},
         dry_run=True,
     )
 
@@ -2336,7 +3136,7 @@ def test_workspace_resolution_statuses_validate_for_create_cue_model() -> None:
         assert result.executed_operations == []
 
 
-def test_create_cue_rejects_unallowlisted_cue_type_before_osc() -> None:
+def test_create_cue_rejects_script_and_container_types_before_osc() -> None:
     client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"))
     reader = QLabReader(client)  # type: ignore[arg-type]
 
@@ -2344,29 +3144,11 @@ def test_create_cue_rejects_unallowlisted_cue_type_before_osc() -> None:
         reader.create_cue("ws-1", "script", dry_run=True)
 
     with pytest.raises(UnsafeWriteOperationError, match="cue_type is not allowed"):
-        reader.create_cue("ws-1", "video", dry_run=True)
+        reader.create_cue("ws-1", "cue list", dry_run=True)
 
     assert client.requests == []
 
 
-def test_create_cue_rejects_unallowlisted_properties_before_osc() -> None:
-    client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"))
-    reader = QLabReader(client)  # type: ignore[arg-type]
-
-    with pytest.raises(UnsafeWriteOperationError, match="not allowlisted"):
-        reader.create_cue("ws-1", "audio", properties={"fileTarget": "/tmp/secret.wav"}, dry_run=True)
-
-    assert client.requests == []
-
-
-def test_create_cue_rejects_invalid_property_values_before_osc() -> None:
-    client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"))
-    reader = QLabReader(client)  # type: ignore[arg-type]
-
-    with pytest.raises(UnsafeWriteOperationError, match="duration must be a non-negative number"):
-        reader.create_cue("ws-1", "audio", properties={"duration": -1}, dry_run=True)
-
-    assert client.requests == []
 
 
 def test_create_cue_real_with_after_cue_id_fails_safely_without_passcode_leak() -> None:
@@ -2378,9 +3160,9 @@ def test_create_cue_real_with_after_cue_id_fails_safely_without_passcode_leak() 
         reader.create_cue("ws-1", "audio", dry_run=False, after_cue_id="cue-before")
 
     message = str(exc_info.value)
-    assert "after_cue_id" in message
+    assert "exact cue UUID" in message
     assert secret not in message
-    assert client.requests == []
+    assert not any(address.endswith("/new") for address, _, _ in client.requests)
 
 
 def test_create_cue_real_blocks_without_confirmed_edit() -> None:
@@ -2408,39 +3190,56 @@ def test_create_cue_real_blocks_in_show_mode() -> None:
     assert client.requests[-1][2] == "ws-1"
 
 
-def test_create_cue_real_creates_applies_properties_and_verifies_fresh_details() -> None:
-    shared_read_cache().clear()
+def test_create_new_timeout_is_indeterminate_and_sends_no_setters(monkeypatch: pytest.MonkeyPatch) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
-    client = FakeWriteClient(
-        QLabConfig(enable_write=True, passcode="server-pass", cache_ttl=10),
-        created_cue_id=cue_id,
+    reader = CreateAnchorReader(
+        config=QLabConfig(enable_write=True, passcode="server-pass", write_dry_run_default=False),
+        timeout_new=True,
     )
-    reader = QLabReader(client)  # type: ignore[arg-type]
-    stale = reader.get_cue_details("ws-1", cue_id, "auto")
-    assert stale["properties"]["name"] == "Stale"
-
-    result = reader.create_cue(
-        "ws-1",
+    reader.created_id = cue_id
+    plan = reader.create_cue(
+        reader.workspace,
         "memo",
-        properties={"name": "Created", "number": "1", "armed": True, "continueMode": 1},
-        dry_run=False,
+        dry_run=True,
+        after_cue_id=reader.anchor_id,
     )
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        after_cue_id=reader.anchor_id,
+        confirm_token=plan["confirm_token"],
+    )  # type: ignore[arg-type]
 
-    addresses = [request[0] for request in client.requests]
-    assert result["ok"] is True
-    assert result["status"] == "created"
-    assert result["cue_type"] == "Memo"
-    assert result["created_cue_id"] == cue_id
-    assert result["verification"]["properties"]["name"] == "Created"
-    assert "/workspace/ws-1/connect" in addresses
-    assert "/workspace/ws-1/showMode" in addresses
-    assert next(request[2] for request in client.requests if request[0] == "/workspace/ws-1/showMode") == "ws-1"
-    assert "/workspace/ws-1/new" in addresses
-    assert f"/workspace/ws-1/cue_id/{cue_id}/name" in addresses
-    assert f"/workspace/ws-1/cue_id/{cue_id}/number" in addresses
-    assert f"/workspace/ws-1/cue_id/{cue_id}/armed" in addresses
-    assert f"/workspace/ws-1/cue_id/{cue_id}/continueMode" in addresses
-    assert addresses.count(f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys") >= 2
+    assert result["ok"] is False
+    assert result["cleanup_required"] is True
+    assert result["error_code"] == "create_identity_indeterminate"
+    assert not any("/cue_id/" in address for address, _, _ in reader.requests)
+
+
+def test_create_rejects_invalid_new_uuid_without_setters() -> None:
+    reader = CreateAnchorReader(
+        config=QLabConfig(enable_write=True, passcode="server-pass", write_dry_run_default=False),
+    )
+    reader.created_id = "not-a-uuid"
+    plan = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        after_cue_id=reader.anchor_id,
+    )
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        after_cue_id=reader.anchor_id,
+        confirm_token=plan["confirm_token"],
+    )  # type: ignore[arg-type]
+
+    assert result["ok"] is False
+    assert result["error_code"] == "create_identity_invalid"
+    assert result["cleanup_required"] is True
+    assert not any("/cue_id/" in address for address, _, _ in reader.requests)
 
 
 def test_update_cue_dry_run_sends_no_mutating_osc() -> None:
@@ -2778,6 +3577,27 @@ def test_update_cues_dry_run_reports_invalid_property_value_per_item() -> None:
     assert f"/workspace/ws-1/cue_id/{group_id}/valuesForKeys" not in addresses
     assert f"/workspace/ws-1/cue_id/{memo_id}/name" not in addresses
     assert f"/workspace/ws-1/cue_id/{group_id}/preWait" not in addresses
+
+
+def test_update_cues_dry_run_rejects_osc_unrepresentable_number_before_plan_or_setter() -> None:
+    cue_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Group", "preWait": 0}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": cue_id, "properties": {"preWait": 10**309}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert result["results"][0]["errors"]["error_code"] == "osc_value_out_of_range"
+    assert result["results"][0]["planned_operations"] == []
+    assert not any(address.endswith("/preWait") for address, _, _ in client.requests)
 
 
 def test_update_cues_dry_run_rejects_unknown_color_name_without_plan() -> None:
@@ -3453,6 +4273,155 @@ def _safe_group_fixture(
     )
 
 
+def test_group_playlist_large_child_snapshot_preserves_all_ordered_children() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    first_child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, first_child_id, mode=6, duration=1.0)
+    child_ids = [first_child_id]
+    for index in range(1, 200):
+        child_id = f"00000000-2222-4222-8222-{index:012x}"
+        cues[child_id] = dict(cues[first_child_id], uniqueID=child_id)
+        child_ids.append(child_id)
+    children[group_id] = child_ids
+
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}
+
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    setter = planned_setters(plan["results"][0])["playlist/doLoop"]
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [setter["confirm_token"]]}],
+        dry_run=False,
+    )
+
+    item = result["results"][0]
+    assert result["status"] == "updated"
+    assert [child["uniqueID"] for child in item["group_child_readback"]["ordered_children"]] == child_ids
+    assert len(item["group_child_readback"]["ordered_children"]) == 200
+    assert sum(address.endswith("/playlist/doLoop") for address, _, _ in client.requests) == 1
+
+
+def test_group_warning_but_not_broken_fails_closed_before_setter() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    cues[group_id]["isWarning"] = True
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"]["mode"] == "Group real writes require fresh isWarning=false."
+    assert result["results"][0]["executed_operations"] == []
+    assert all(not address.endswith("/mode") for address, _, _ in client.requests)
+
+
+def test_group_playlist_crossfade_accepts_exact_shortest_child_duration() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6, duration=3.0)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doCrossfade": True}}
+
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["playlist/doCrossfade"]["confirm_token"]
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["playlist/doCrossfade"] is True
+    assert sum(address.endswith("/playlist/doCrossfade") for address, _, _ in client.requests) == 1
+
+
+def test_group_playlist_crossfade_accepts_zero_duration_candidate() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6, duration=3.0)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {
+        "cue_ref": group_id,
+        "profile": "group_basic",
+        "properties": {"playlist/crossfade/duration": 0.0},
+    }
+
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["playlist/crossfade/duration"]["confirm_token"]
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["playlist/crossfade/duration"] == 0.0
+    assert sum(address.endswith("/playlist/crossfade/duration") for address, _, _ in client.requests) == 1
+
+
+def test_group_token_from_previous_process_fails_signature_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    monkeypatch.setattr(group_helpers, "_GROUP_TOKEN_SECRET", b"simulated-new-process-secret")
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"]["mode"] == "groupMode confirm_token signature is invalid."
+    assert result["results"][0]["executed_operations"] == []
+    assert all(not address.endswith("/mode") for address, _, _ in client.requests)
+
+
 def test_group_mode_dry_run_emits_dedicated_expiring_confirm_token() -> None:
     workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     group_id = "11111111-1111-4111-8111-111111111111"
@@ -3741,6 +4710,51 @@ def test_group_mode_timeout_with_matching_fresh_readback_is_confirmed() -> None:
     assert debug["setter_send_count"] == 1
     assert debug["setter_elapsed_seconds"]["mode"] >= 0
     assert debug["confirmation_reason"] == "fresh_readback_matched"
+    modeled = UpdateCuesResult.model_validate(result)
+    assert modeled.results[0].executed_operations[0]["property"] == "mode"
+
+
+def test_group_mode_ignored_setter_reports_structured_verification_failure_without_retry() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        ignore_set_property=(group_id, "mode"),
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 6}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    item = result["results"][0]
+
+    assert result["status"] == "verification_failed"
+    assert item["status"] == "verification_failed"
+    assert item["after"]["mode"] == 3
+    assert len(item["executed_operations"]) == 1
+    assert item["executed_operations"][0]["address"].endswith("/mode")
+    assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
+    modeled = UpdateCuesResult.model_validate(result)
+    assert modeled.results[0].status == "verification_failed"
+
+    replay = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    assert replay["status"] == "preflight_failed"
+    assert "consumed" in replay["results"][0]["errors"]["mode"]
+    assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
 
 
 def test_group_mode_token_is_rejected_after_rollback_restores_baseline() -> None:
@@ -3905,6 +4919,41 @@ def test_consumed_group_token_cannot_retry_after_qlab_error() -> None:
     assert replay["status"] == "preflight_failed"
     assert "consumed" in replay["results"][0]["errors"]["mode"]
     assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
+    modeled = UpdateCuesResult.model_validate(first)
+    assert modeled.results[0].executed_operations[0]["property"] == "mode"
+
+
+def test_group_mode_qlab_error_before_apply_reports_structured_partial_failure() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        fail_set_property=(group_id, "mode"),
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 6}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    item = result["results"][0]
+
+    assert result["status"] == "partial_failed"
+    assert item["after"]["mode"] == 3
+    assert len(item["executed_operations"]) == 1
+    assert item["errors"]["mode"]
+    assert sum(address.endswith("/mode") for address, _, _ in client.requests) == 1
+    modeled = UpdateCuesResult.model_validate(result)
+    assert modeled.status == "partial_failed"
 
 
 def test_group_continue_mode_real_change_and_rollback_use_integer_setter_once() -> None:
@@ -4150,6 +5199,49 @@ def test_group_playlist_timeout_is_confirmed_and_sends_one_setter() -> None:
 
     assert result["status"] == "updated_with_confirmed_timeouts"
     assert result["results"][0]["after"]["playlist/doLoop"] is True
+    assert sum(address.endswith("/playlist/doLoop") for address, _, _ in client.requests) == 1
+
+
+def test_group_playlist_ignored_setter_reports_structured_verification_failure_without_retry() -> None:
+    workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    group_id = "11111111-1111-4111-8111-111111111111"
+    child_id = "22222222-2222-4222-8222-222222222222"
+    cues, children = _safe_group_fixture(group_id, child_id, mode=6)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues=cues,
+        children_by_parent=children,
+        ignore_set_property=(group_id, "playlist/doLoop"),
+        workspace_id=workspace_id,
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}
+    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    token = planned_setters(plan["results"][0])["playlist/doLoop"]["confirm_token"]
+
+    result = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    item = result["results"][0]
+
+    assert result["status"] == "verification_failed"
+    assert item["status"] == "verification_failed"
+    assert item["after"]["playlist/doLoop"] is False
+    assert len(item["executed_operations"]) == 1
+    assert item["executed_operations"][0]["address"].endswith("/playlist/doLoop")
+    assert sum(address.endswith("/playlist/doLoop") for address, _, _ in client.requests) == 1
+    modeled = UpdateCuesResult.model_validate(result)
+    assert modeled.results[0].status == "verification_failed"
+
+    replay = reader.update_cues(
+        workspace_id,
+        [{**update, "confirm_gates": [token]}],
+        dry_run=False,
+    )
+    assert replay["status"] == "preflight_failed"
+    assert "consumed" in replay["results"][0]["errors"]["playlist/doLoop"]
     assert sum(address.endswith("/playlist/doLoop") for address, _, _ in client.requests) == 1
 
 
@@ -6552,6 +7644,91 @@ def test_update_cues_real_blocks_target_refs_before_osc() -> None:
     assert result["status"] == "preflight_failed"
     assert "dry-run only" in result["results"][0]["errors"]["cueTargetID"]
     assert client.requests == []
+
+
+def test_update_cues_utility_target_initial_assignment_allows_broken_empty_source() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={
+            source_id: {
+                "type": "Start", "cueTargetID": "", "hasCueTargets": True,
+                "isBroken": True, "isWarning": False, "isRunning": False,
+                "isPaused": False, "isAuditioning": False,
+            },
+            target_id: {
+                "type": "Memo", "isBroken": False, "isWarning": False,
+                "isRunning": False, "isPaused": False, "isAuditioning": False,
+            },
+        },
+        property_outcomes={(source_id, "cueTargetID", target_id): {"isBroken": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    request = {"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": target_id}}
+
+    dry = reader.update_cues("ws-1", [request], dry_run=True)
+    operation = planned_setters(dry["results"][0])["cueTargetID"]
+    result = reader.update_cues(
+        "ws-1", [{**request, "confirm_gates": [operation["confirm_token"]]}], dry_run=False
+    )
+
+    assert result["status"] == "updated"
+    assert result["results"][0]["after"]["cueTargetID"] == target_id
+    assert result["results"][0]["after"]["isBroken"] is False
+    assert sum(address.endswith("/cueTargetID") for address, _, _ in client.requests) == 1
+
+
+@pytest.mark.parametrize(
+    "source_values",
+    [
+        {"cueTargetID": "22222222-2222-4222-8222-222222222222", "isBroken": True},
+        {"cueTargetID": "", "isBroken": True, "isWarning": True},
+    ],
+)
+def test_update_cues_utility_target_initial_assignment_preserves_broken_source_guards(
+    source_values: dict[str, Any],
+) -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    target_id = "22222222-2222-4222-8222-222222222222"
+    source = {
+        "type": "Start", "cueTargetID": "", "hasCueTargets": True,
+        "isBroken": False, "isWarning": False, "isRunning": False,
+        "isPaused": False, "isAuditioning": False,
+    }
+    source.update(source_values)
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={source_id: source, target_id: {"type": "Memo", "isBroken": False, "isWarning": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": target_id}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "healthy source" in result["results"][0]["errors"]["cueTargetID"]
+    assert not any(address.endswith("/cueTargetID") for address, _, _ in client.requests)
+
+
+def test_update_cues_utility_target_initial_assignment_requires_exact_target_uuid() -> None:
+    source_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=True, passcode="server-pass"),
+        cues={source_id: {"type": "Start", "cueTargetID": "", "hasCueTargets": True, "isBroken": True, "isWarning": False}},
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+    result = reader.update_cues(
+        "ws-1",
+        [{"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": "target-id"}}],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["errors"] == {"cueTargetID": "cueTargetID requires an exact target cue UUID."}
+    assert not any(address.endswith("/cueTargetID") for address, _, _ in client.requests)
 
 
 @pytest.mark.parametrize(
@@ -16116,6 +17293,34 @@ def test_update_cues_light_analyzer_failure_is_nonfatal(monkeypatch: pytest.Monk
     assert analysis["error"]["code"] == "light_command_analyzer_failed"
 
 
+def test_update_cues_light_command_size_limit_rejects_before_reads_or_token() -> None:
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    client = BatchFakeWriteClient(
+        QLabConfig(enable_write=False),
+        cues={cue_id: {"type": "Light", "lightCommandText": "Front = 20"}},
+        light_patch=normalized_light_patch_fixture(),
+    )
+    reader = QLabReader(client)  # type: ignore[arg-type]
+
+    result = reader.update_cues(
+        "ws-1",
+        [
+            {
+                "cue_ref": cue_id,
+                "profile": "light_basic",
+                "properties": {"lightCommandText": "x" * 65_537},
+            }
+        ],
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert result["results"][0]["status"] == "dry_run_preflight_failed"
+    assert result["results"][0]["errors"]["error_code"] == "light_command_input_too_large"
+    assert result["results"][0]["planned_operations"] == []
+    assert client.requests == []
+
+
 def test_update_cues_light_non_command_updates_do_not_read_patch() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
@@ -17046,22 +18251,49 @@ def test_update_cues_wait_and_memo_invalid_common_values_have_no_plan() -> None:
     assert all(item["planned_operations"] == [] for item in result["results"])
 
 
-def test_create_cue_dry_run_reviews_supported_and_unsupported_non_light_types() -> None:
-    supported_client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None))
-    supported_reader = QLabReader(supported_client)  # type: ignore[arg-type]
-    for cue_type in ("memo", "group", "wait", "audio"):
-        result = supported_reader.create_cue("ws-1", cue_type, properties={"name": cue_type}, dry_run=True)
+def test_create_cue_dry_run_reviews_generic_types_and_exclusions() -> None:
+    for cue_type in (
+        "memo", "group", "wait", "audio", "mic", "video", "camera", "text", "light",
+        "fade", "network", "midi", "midi_file", "timecode", "start", "stop", "pause",
+        "load", "reset", "devamp", "goto", "target", "arm", "disarm",
+    ):
+        supported_reader = CreateAnchorReader(config=QLabConfig(enable_write=False, passcode=None))
+        result = supported_reader.create_cue(
+            supported_reader.workspace,
+            cue_type,
+            dry_run=True,
+            after_cue_id=supported_reader.anchor_id,
+        )
         assert result["ok"] is True
         assert result["status"] == "dry_run"
         assert result["planned_operations"][0]["operation"] == "new"
-    assert supported_client.requests == []
 
     unsupported_client = FakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"))
     unsupported_reader = QLabReader(unsupported_client)  # type: ignore[arg-type]
-    for cue_type in ("mic", "midi", "midi file", "network", "script", "timecode"):
+    for cue_type in ("script", "list", "cart", "custom"):
         with pytest.raises(UnsafeWriteOperationError, match="cue_type is not allowed"):
             unsupported_reader.create_cue("ws-1", cue_type, dry_run=True)
     assert unsupported_client.requests == []
+
+
+@pytest.mark.parametrize("cue_type", list(CUE_TYPES))
+def test_create_generic_types_send_one_new_and_no_setters(cue_type: str) -> None:
+    reader = CreateAnchorReader()
+    planned = reader.create_cue(reader.workspace, cue_type, dry_run=True, after_cue_id=reader.anchor_id)
+    result = reader.create_cue(
+        reader.workspace,
+        cue_type,
+        dry_run=False,
+        after_cue_id=reader.anchor_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is True
+    assert [address for address, _, _ in reader.requests].count(f"/workspace/{reader.workspace}/new") == 1
+    assert not any(
+        "/cue_id/" in address and not address.endswith("/valuesForKeys")
+        for address, _, _ in reader.requests
+    )
 
 
 @pytest.mark.parametrize(

@@ -1,10 +1,18 @@
 # Active Roadmap
 
-Status: 2026-07-28
+Status: 2026-08-07
 
-Current local verification: `2446 passed, 41 subtests passed in 10.03s`;
-zero skips. The full suite includes wheel/sdist build and artifact-membership
-checks.
+## Current state snapshot
+
+The canonical dated inventory is [`current-state.md`](current-state.md).
+It records the exact Git/worktree state, full and focused test output, and the
+latest QLab runtime probe. At the snapshot time MCP reported `qlab_unreachable`,
+so the runtime section is explicitly unverified rather than reusing an older
+workspace snapshot.
+
+Current local verification: focused Create/server contract checks pass; the
+full-suite count is pending after the template-only Create change. The full
+suite includes wheel/sdist build and artifact-membership checks.
 
 Evidence terms follow [Current Docs](README.md): documented,
 source-confirmed, runtime-proven, inferred, and unsupported. Runtime claims
@@ -13,12 +21,26 @@ snapshot is documented QLab 5 material with unknown exact patch and retrieval
 date; its first repository import date is inferred provenance only. QLab 5.6.x
 runtime support is not claimed.
 
+## Security hardening status
+
+- PR-1 through PR-4 are implemented and validated locally and against the
+  documented QLab 5.5.10 runtime evidence: settings batches are bounded,
+  numeric OSC values are wire-format validated, script profiles use canonical
+  `scriptSource` rules, and `lightCommandText` analysis is bounded.
+- The repository threat model and accepted risks are defined in the root
+  [`SECURITY.md`](../../SECURITY.md). The local caller may provide malformed or
+  oversized arguments; QLab, `QLAB_HOST`, and the operator are trusted, and a
+  hostile same-network process is outside the initial scope.
+- UDP source-port filtering is intentionally pending. QLab 5.5.10 packet
+  capture could not be completed because macOS capture permissions were
+  unavailable. A fake-UDP test for delayed same-address replies is the next
+  transport investigation and is separate from source-port authenticity.
+- No new schema limits, AppleScript fallback, raw OSC, playback, GO, Dashboard,
+  or broad write surface is planned from this security pass without new
+  evidence and an explicit compatibility decision.
+
 ## Locally implemented; runtime validation pending
 
-- [Group edge validation](workorders/active/030_group_edge_runtime_validation.md)
-  covers the bounded inactive-cue cases: around 200 direct children, Loop with
-  a zero-duration child, crossfade bounds, warning-but-not-broken Groups,
-  consumed-token error ordering, and token expiry in a live MCP process.
 - [Video audio validation](workorders/active/029_video_audio_runtime_validation.md)
   covers `clockType`, Integrated Fade checkboxes, and bounded channel
   mute/solo candidates.
@@ -31,6 +53,40 @@ runtime support is not claimed.
   deletion.
 
 ## Closed
+
+- Group edge runtime validation — QLab 5.5.10 runtime evidence for exact-UUID
+  Group `mode 3 -> 6 -> 3`, one-setter timeout/readback handling, structured
+  MCP results, child `continueMode` side effects, fresh-token rollback,
+  finite and mixed zero/finite Playlist Loop, and complete ordered snapshots
+  of `378` direct Wait children. Consumed-token replay is rejected with zero
+  setters; isolated fresh-process tests reject old tokens by signature.
+  Crossfade requests for `1 s` and `2 s` retained/read back as `3 s` in the
+  named QLab 5.5.10 fixture, while an effective duration above the shortest
+  child was rejected during dry-run with zero setters. These are observed
+  fixture/version results, not a global API minimum. Live MCP restart
+  invalidation remains a documented follow-up because no safe restart API was
+  available.
+
+- Safe Create lifecycle (Workorder 031) — Create is template-only: it accepts
+  no initial properties, sends one `/new` at most, and performs fresh identity,
+  health, and structure readback. QLab 5.5.10 runtime proof covers one blank
+  anchored Wait: `confirm:createCue:v2`, returned UUID/type/parent/health/
+  inactivity, immediate-after order, manual Delete with a fresh token, baseline
+  restoration, activity `0/0/0`, and unchanged DMX. Empty-container Create now
+  routes Cue Lists through `currentCueListID` plus unanchored `/new`, Groups
+  through anchored `/new` plus one `/move`, and Cue Carts through direct
+  `/new` row/column placement. Experimental raw-OSC smoke in QLab 5.5.10
+  confirmed Group index `0` and Cart request `0,0` with readback `1,1`;
+  automatic cleanup and an AppleScript fallback remain outside this closure.
+  Structural `created` is separate from operational readiness: healthy,
+  broken, warning, or unknown health is returned as information, not treated
+  as failed Create. Active-state readback remains a safety failure.
+
+- Sequential Create and recursive Delete — `qlab_create_cues` chains each
+  verified UUID into the next `/new` and stops without rollback on the first
+  ambiguity. `qlab_delete_cues` can empty a container deepest-first with a
+  fresh token and readback while preserving the requested root. Broken or
+  warning anchors remain valid structural references when inactive.
 
 - Authenticated request/reply handling uses invocation-owned TCP sessions,
   fresh post-timeout verification sessions, and deterministic cleanup. Packet
@@ -196,7 +252,9 @@ playback, `/live`, save, commit, or unrelated mutation was used.
 
 Public write-tool confirmation boundaries:
 
-- Create is dry-run-first and has no `confirm_token` argument.
+- Create is dry-run-first, requires exactly one of `after_cue_id` or
+  `parent_container_id`, and uses a dedicated `confirm:createCue:v2` token
+  bound to the reviewed workspace structure.
 - Edit uses exact per-operation dry-run tokens copied into each update item's
   `confirm_gates`; it has no tool-level token.
 - Eligible reviewed Move and Delete dry-runs each return a dedicated tool-level
@@ -207,8 +265,13 @@ Utility cue editing (runtime validated and closed):
 
 - only the local `cueTargetID` gate for `Start`, `Stop`, `Pause`, `Load`, `Reset`,
   `Goto`, `Arm`, and `Disarm`, using `confirm:utilityTarget:v1:`
-- exact source/target UUIDs only; one healthy inactive source and target; saved
-  mode; fresh baseline/readback; fresh-token rollback
+- exact source/target UUIDs only; one inactive source and healthy inactive
+  target; initial assignment may clear the source's broken state only when its
+  saved target is empty and it has no warning; saved mode; fresh
+  baseline/readback; fresh-token rollback; already-targeted or otherwise broken
+  sources remain blocked
+- initial broken-empty assignment is locally and live covered; the active MCP
+  process must be restarted to expose the updated guard to other clients
 - Wait and Memo remain Basics-only
 - target names/numbers, temporary targets, Reset patch/map targets, target
   mode, actions, `/live`, playback, raw OSC, batch/multi-property writes, and

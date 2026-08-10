@@ -225,6 +225,98 @@ def test_delete_cues_rejects_parent_and_descendant_batch() -> None:
     assert reader.requests == []
 
 
+def test_recursive_container_delete_expands_post_order_and_preserves_root() -> None:
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    reader.children[LIST_ID] = [GROUP_ID, THIRD_ID]
+    reader.children[GROUP_ID] = [NESTED_ID, SECOND_ID]
+    reader.children[NESTED_ID] = [FIRST_ID]
+    reader.nodes[NESTED_ID] = {"uniqueID": NESTED_ID, "type": "Group"}
+
+    planned = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        recursive=True,
+        dry_run=True,
+    )
+    payload, error = deletes._decode_token(planned["confirm_token"])
+
+    assert error is None
+    assert [item["cue_id"] for item in planned["results"]] == [FIRST_ID, NESTED_ID, SECOND_ID]
+    assert GROUP_ID not in [item["cue_id"] for item in planned["results"]]
+    assert payload["binding"]["container_id"] == GROUP_ID
+    assert payload["binding"]["recursive"] is True
+    assert reader.requests == []
+
+
+def test_recursive_empty_container_is_verified_noop(monkeypatch: pytest.MonkeyPatch) -> None:
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    monkeypatch.setattr(deletes, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    planned = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        recursive=True,
+        dry_run=True,
+    )
+    result = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        recursive=True,
+        dry_run=False,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["status"] == "deleted_immediately"
+    assert result["planned_count"] == 0
+    assert result["preserved_container_id"] == GROUP_ID
+    assert GROUP_ID in reader.nodes
+    assert [address for address, _ in reader.requests if "/delete_id/" in address] == []
+
+
+def test_recursive_container_delete_executes_post_order_and_keeps_container(monkeypatch: pytest.MonkeyPatch) -> None:
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    reader.children[LIST_ID] = [GROUP_ID, THIRD_ID]
+    reader.children[GROUP_ID] = [NESTED_ID, SECOND_ID]
+    reader.children[NESTED_ID] = [FIRST_ID]
+    reader.nodes[NESTED_ID] = {"uniqueID": NESTED_ID, "type": "Group"}
+    monkeypatch.setattr(deletes, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    monkeypatch.setattr(deletes.time, "sleep", lambda _: None)
+
+    planned = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        recursive=True,
+        dry_run=True,
+    )
+    result = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        recursive=True,
+        dry_run=False,
+        confirm_token=planned["confirm_token"],
+    )
+
+    delete_requests = [address for address, _ in reader.requests if "/delete_id/" in address]
+    assert result["status"] == "deleted_immediately"
+    assert delete_requests == [
+        f"/workspace/{WORKSPACE_ID}/delete_id/{FIRST_ID}",
+        f"/workspace/{WORKSPACE_ID}/delete_id/{NESTED_ID}",
+        f"/workspace/{WORKSPACE_ID}/delete_id/{SECOND_ID}",
+    ]
+    assert GROUP_ID in reader.nodes
+    assert reader.children[GROUP_ID] == []
+
+
 def test_delete_cues_executes_in_order_and_confirms_fresh_absence_readback(monkeypatch: pytest.MonkeyPatch) -> None:
     from qlab_mcp.write import deletes
 

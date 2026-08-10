@@ -14,6 +14,10 @@ class OscTimeoutError(QLabMcpError):
 class OscProtocolError(QLabMcpError):
     """Raised when an OSC packet cannot be encoded, decoded, or matched."""
 
+    def __init__(self, message: str, *, error_code: str | None = None):
+        self.error_code = error_code
+        super().__init__(message)
+
 
 class QLabReplyError(QLabMcpError):
     """Raised when QLab returns an error or denied reply."""
@@ -36,3 +40,7 @@ class UnsafeCuePropertyError(QLabMcpError):
 
 class UnsafeWriteOperationError(QLabMcpError):
     """Raised when write-mode safety gates block a mutating operation."""
+
+    def __init__(self, message: str, *, error_code: str | None = None):
+        self.error_code = error_code
+        super().__init__(message)

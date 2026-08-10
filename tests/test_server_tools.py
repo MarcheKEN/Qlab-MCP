@@ -15,6 +15,7 @@ from qlab_mcp.errors import OscTimeoutError, QLabReplyError
 from qlab_mcp.server import (
     CHECK_CONNECTION_TIMEOUT,
     CREATE_CUE_TIMEOUT,
+    CREATE_CUES_TIMEOUT,
     CUE_DETAILS_TIMEOUT,
     QUERY_CUES_TIMEOUT,
     UPDATE_CUES_TIMEOUT,
@@ -64,8 +65,21 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["cue-create", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "17535dbb35cb97e9105385195bcb5176d8f248ec9a0f6261a30b18e89554a771",
-        "output_schema_hash": "d30743735833e36fe06c57738953f52ebf8c8911d0824e43d4e0f402890042c5",
+        "input_schema_hash": "faa9110ad1e9ba3b77634190668c61f1f7f03addbb76aa85fcc88c4e8efded6d",
+        "output_schema_hash": "bb5ea5c46ac0b602557a64f66362903acafd2a02498cc1d39749dcf5eb06e4f5",
+    },
+    "qlab_create_cues": {
+        "title": "Create QLab Cues",
+        "timeout": CREATE_CUES_TIMEOUT,
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+        "tags": ["batch-create", "cue-create", "gated-write", "qlab", "write-mode"],
+        "input_schema_hash": "5797a769a3cd5c64c8e6635013ec0156e19914d864827922c181e935523b9b33",
+        "output_schema_hash": "e6e0ef7fdaf321850769bc0afe6a8cf1342c4cc22c38519e3483345eb8efb4f5",
     },
     "qlab_get_cue_details": {
         "title": "Get QLab Cue Details",
@@ -96,7 +110,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "timeout": WORKSPACE_SETTINGS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["inventory", "patches", "qlab", "routing", "safe-read", "settings"],
-        "input_schema_hash": "5dfb80df0399045ef0399e5bf40541955ce01e67f94456f0a1d721d368ad5b9d",
+        "input_schema_hash": "d7267c1e7ab87ba58b13c0efadbd7d30ad9e431445844779f6656fec8ee1bca1",
         "output_schema_hash": "3c4381ac3b10af3e7655c8cb65240d8909bf89f3c0c58d04513299380781b8d0",
     },
     "qlab_get_workspace_status": {
@@ -112,7 +126,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "timeout": QUERY_CUES_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["details", "inventory", "qlab", "query", "safe-read"],
-        "input_schema_hash": "5dd4fc8fe6b29bb717c596e0c32c1b50dfb720b26fe0f1c71d145668b95ec65b",
+        "input_schema_hash": "500535ba62fbc315e4af2af2fcd7074e41e16e0389bc4496925804a80edeb511",
         "output_schema_hash": "16613ad3378154e2b01bb1dabe40ba6d56ff1394ffea2ad960ae14cd775549a5",
     },
     "qlab_update_cues": {
@@ -164,8 +178,8 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["cue-delete", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "d4c9037076e6af74d4a90e184d5e0905e2efd23bd26455ea486f9fb690068abf",
-        "output_schema_hash": "088ad8235eba896f24a405aa7332220b29d4f81675b0a88e3cca92996f47bed3",
+        "input_schema_hash": "d761f60fcb5e204262098c4d16fdf9b8cf2bc2875dd4c9114959975bbf10a270",
+        "output_schema_hash": "d1a1e6c0d3df47ee9f83366133c85d20f71e7356396acb61b3c6b29e57f24bd6",
     },
 }
 EXPECTED_DESCRIPTION_PHRASES = {
@@ -178,6 +192,7 @@ EXPECTED_DESCRIPTION_PHRASES = {
     "qlab_get_cue_details": ("editable for update capability discovery", "exhaustive only for deep audits"),
     "qlab_check_write_readiness": ("without sending any mutating OSC commands", "Edit Mode"),
     "qlab_create_cue": ("dry-run plan", "Dry-run planning never sends mutating OSC"),
+    "qlab_create_cues": ("one verified /new per item", "no automatic rollback"),
     "qlab_edit_cues": ("Dry-run planning never sends mutating OSC", "High-risk profiles"),
     "qlab_update_cues": ("Compatibility alias", "qlab_edit_cues"),
     "qlab_move_cues": ("sequential QLab cue moves", "never claims atomicity"),
@@ -270,7 +285,7 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
     tools = asyncio.run(list_tools())
     tool_names = {tool.name for tool in tools}
 
-    assert len(tools) == 13
+    assert len(tools) == 14
     assert tool_names == set(EXPECTED_FASTMCP_TOOL_CONTRACTS)
     forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
     assert all(
@@ -386,6 +401,118 @@ def test_move_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
     assert result.structured_content["confirm_token"].startswith("confirm:moveCues:v1:")
 
 
+def test_create_cue_fastmcp_forwards_anchor_and_returns_structured_plan(monkeypatch) -> None:
+    class FakeReader:
+        def create_cue(self, workspace_id, cue_type, dry_run, after_cue_id, parent_container_id, confirm_token):
+            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            assert cue_type == "wait"
+            assert dry_run is True
+            assert after_cue_id == "11111111-1111-4111-8111-111111111111"
+            assert parent_container_id is None
+            assert confirm_token is None
+            return {
+                "ok": True,
+                "status": "dry_run",
+                "workspace_id": workspace_id,
+                "cue_type": "Wait",
+                "dry_run": True,
+                "confirm_token": "confirm:createCue:v2:payload:signature",
+                "created_cue_id": None,
+                "placement": {
+                    "after_cue_id": after_cue_id,
+                    "expected_index": 1,
+                    "status": "anchored",
+                },
+                "planned_operations": [
+                    {"operation": "new", "args": ["Wait", after_cue_id]},
+                    {"operation": "verify"},
+                    {"operation": "verify_structure"},
+                ],
+                "executed_operations": [],
+                "verification": None,
+                "cleanup_required": False,
+                "cleanup": None,
+                "errors": None,
+                "warnings": ["Dry run only."],
+                "message": "Cue create batch planned.",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_create_cue",
+                {
+                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "cue_type": "wait",
+                    "after_cue_id": "11111111-1111-4111-8111-111111111111",
+                    "dry_run": True,
+                },
+            )
+
+    result = asyncio.run(call_tool())
+    assert result.is_error is False
+    assert result.structured_content["status"] == "dry_run"
+    assert result.structured_content["confirm_token"].startswith("confirm:createCue:v2:")
+    assert result.structured_content["planned_operations"][0]["args"] == [
+        "Wait",
+        "11111111-1111-4111-8111-111111111111",
+    ]
+    assert result.structured_content["executed_operations"] == []
+
+
+def test_create_cues_fastmcp_forwards_ordered_types_and_initial_anchor(monkeypatch) -> None:
+    class FakeReader:
+        def create_cues(self, workspace_id, cue_types, dry_run, after_cue_id, parent_container_id, confirm_token):
+            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            assert cue_types == ["memo", "audio", "video"]
+            assert dry_run is True
+            assert after_cue_id == "11111111-1111-4111-8111-111111111111"
+            assert parent_container_id is None
+            assert confirm_token is None
+            return {
+                "ok": True,
+                "status": "dry_run",
+                "workspace_id": workspace_id,
+                "dry_run": True,
+                "requested_count": 3,
+                "planned_count": 3,
+                "created_count": 0,
+                "results": [],
+                "planned_operations": [
+                    {"operation": "new", "args": ["memo", "<anchor>"]},
+                    {"operation": "new", "args": ["audio", "<previous_created_cue_id>"]},
+                    {"operation": "new", "args": ["video", "<previous_created_cue_id>"]},
+                ],
+                "executed_operations": [],
+                "confirm_token": "confirm:createCues:v1:payload:signature",
+                "errors": None,
+                "warnings": [],
+                "message": "planned",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_create_cues",
+                {
+                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "cue_types": ["memo", "audio", "video"],
+                    "after_cue_id": "11111111-1111-4111-8111-111111111111",
+                    "dry_run": True,
+                },
+            )
+
+    result = asyncio.run(call_tool())
+    assert result.is_error is False
+    assert result.structured_content["status"] == "dry_run"
+    assert result.structured_content["requested_count"] == 3
+    assert result.structured_content["confirm_token"].startswith("confirm:createCues:v1:")
+
+
 def test_delete_cues_fastmcp_schema_limits_and_nested_uuid_model() -> None:
     async def get_tool_schema() -> dict[str, Any]:
         async with Client(mcp) as client:
@@ -393,9 +520,9 @@ def test_delete_cues_fastmcp_schema_limits_and_nested_uuid_model() -> None:
         return next(tool.inputSchema for tool in tools if tool.name == "qlab_delete_cues")
 
     schema = asyncio.run(get_tool_schema())
-    cue_ids = schema["properties"]["cue_ids"]
+    cue_ids = schema["properties"]["cue_ids"]["anyOf"][0]
 
-    assert cue_ids["minItems"] == 1
+    assert cue_ids["minItems"] == 0
     assert cue_ids["maxItems"] == 10
     assert cue_ids["items"]["format"] == "uuid"
     assert "confirm_token" in schema["properties"]
@@ -403,11 +530,13 @@ def test_delete_cues_fastmcp_schema_limits_and_nested_uuid_model() -> None:
 
 def test_delete_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
     class FakeReader:
-        def delete_cues(self, workspace_id, cue_ids, dry_run, confirm_token):
+        def delete_cues(self, workspace_id, cue_ids, dry_run, confirm_token, container_id=None, recursive=False):
             assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
             assert cue_ids == ["11111111-1111-4111-8111-111111111111"]
             assert dry_run is True
             assert confirm_token is None
+            assert container_id is None
+            assert recursive is False
             return {
                 "ok": True,
                 "status": "planned",
@@ -443,6 +572,55 @@ def test_delete_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
     assert result.structured_content["confirm_token"].startswith("confirm:deleteCues:v1:")
 
 
+def test_delete_cues_fastmcp_forwards_recursive_container(monkeypatch) -> None:
+    class FakeReader:
+        def delete_cues(self, workspace_id, cue_ids, dry_run, confirm_token, container_id=None, recursive=False):
+            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+            assert cue_ids == []
+            assert dry_run is True
+            assert confirm_token is None
+            assert container_id == "22222222-2222-4222-8222-222222222222"
+            assert recursive is True
+            return {
+                "ok": True,
+                "status": "planned",
+                "workspace_id": workspace_id,
+                "dry_run": True,
+                "requested_count": 1,
+                "planned_count": 2,
+                "deleted_count": 0,
+                "failed_count": 0,
+                "expanded_count": 2,
+                "container_id": container_id,
+                "recursive": True,
+                "preserved_container_id": container_id,
+                "results": [],
+                "confirm_token": "confirm:deleteCues:v1:payload:signature",
+                "errors": None,
+                "warnings": [],
+                "message": "planned",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_delete_cues",
+                {
+                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "container_id": "22222222-2222-4222-8222-222222222222",
+                    "recursive": True,
+                    "dry_run": True,
+                },
+            )
+
+    result = asyncio.run(call_tool())
+    assert result.is_error is False
+    assert result.structured_content["recursive"] is True
+    assert result.structured_content["preserved_container_id"] == "22222222-2222-4222-8222-222222222222"
+
+
 def test_fastmcp_tool_descriptions_keep_agent_safety_phrases() -> None:
     async def list_tools():
         async with Client(mcp) as client:
@@ -462,7 +640,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    write_tools = {"qlab_create_cue", "qlab_edit_cues", "qlab_update_cues", "qlab_move_cues", "qlab_delete_cues"}
+    write_tools = {"qlab_create_cue", "qlab_create_cues", "qlab_edit_cues", "qlab_update_cues", "qlab_move_cues", "qlab_delete_cues"}
     read_only_tools = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) - write_tools
 
     for tool_name in read_only_tools:
@@ -589,6 +767,77 @@ def test_qlab_edit_cues_fastmcp_response_keeps_fade_basic_token(monkeypatch) -> 
     assert result.structured_content["results"][0]["executed_operations"] == []
 
 
+def test_qlab_edit_cues_fastmcp_response_keeps_structured_group_failure(monkeypatch) -> None:
+    workspace_uuid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    cue_id = "11111111-1111-4111-8111-111111111111"
+    update = {
+        "cue_ref": cue_id,
+        "profile": "group_basic",
+        "properties": {"mode": 6},
+    }
+
+    class FakeReader:
+        def edit_cues(self, *, workspace_id: str, updates, dry_run):
+            assert workspace_id == workspace_uuid
+            assert dry_run is False
+            assert updates[0]["properties"] == {"mode": 6}
+            return {
+                "ok": False,
+                "status": "verification_failed",
+                "workspace_id": workspace_uuid,
+                "dry_run": False,
+                "requested_count": 1,
+                "planned_count": 1,
+                "updated_count": 0,
+                "failed_count": 1,
+                "timeout_confirmed_count": 0,
+                "results": [
+                    {
+                        "cue_ref": cue_id,
+                        "cue_id": cue_id,
+                        "profile": "group_basic",
+                        "status": "verification_failed",
+                        "properties": {"mode": 6},
+                        "before": {"mode": 3},
+                        "after": {"mode": 3},
+                        "executed_operations": [
+                            {
+                                "operation": "set_property",
+                                "property": "mode",
+                                "address": f"/workspace/{workspace_uuid}/cue_id/{cue_id}/mode",
+                                "args": [6],
+                                "mode": "saved",
+                                "status": "ok",
+                            }
+                        ],
+                        "errors": {"verification": "Fresh readback did not match requested mode."},
+                        "warnings": [],
+                    }
+                ],
+                "message": "Group write was not confirmed by fresh readback.",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_edit_cues",
+                {"workspace_id": workspace_uuid, "updates": [update], "dry_run": False},
+            )
+
+    result = asyncio.run(call_tool())
+    payload = result.structured_content
+    item = payload["results"][0]
+
+    assert result.is_error is False
+    assert payload["status"] == "verification_failed"
+    assert item["status"] == "verification_failed"
+    assert len(item["executed_operations"]) == 1
+    assert item["executed_operations"][0]["address"].endswith("/mode")
+    assert item["after"]["mode"] == 3
+
+
 def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -> None:
     async def list_tools():
         async with Client(mcp) as client:
@@ -605,6 +854,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_get_cue_details",
         "qlab_check_write_readiness",
         "qlab_create_cue",
+        "qlab_create_cues",
         "qlab_edit_cues",
         "qlab_update_cues",
         "qlab_move_cues",
@@ -658,6 +908,10 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert settings.inputSchema["properties"]["profile"]["default"] == "safe"
     assert "enum" not in settings.inputSchema["properties"]["profile"]
     assert "requests" in settings.inputSchema["properties"]
+    requests_schema = settings.inputSchema["properties"]["requests"]
+    assert requests_schema["maxItems"] == 50
+    sections_schema = settings.inputSchema["properties"]["sections"]
+    assert sections_schema["maxItems"] == 6
     assert "available_detail_requests" in settings.outputSchema["properties"]
     assert "succeeded_count" in settings.outputSchema["properties"]
     assert "failed_count" in settings.outputSchema["properties"]
@@ -725,18 +979,42 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "group",
         "wait",
         "audio",
+        "mic",
+        "video",
+        "camera",
+        "text",
+        "light",
+        "fade",
+        "network",
+        "midi",
+        "midi_file",
+        "timecode",
+        "start",
+        "stop",
+        "pause",
+        "load",
+        "reset",
+        "devamp",
+        "goto",
+        "target",
+        "arm",
+        "disarm",
     ]
     assert "dry_run" in create.inputSchema["properties"]
     assert "workspace_id" in create.inputSchema["required"]
     assert "cue_type" in create.inputSchema["required"]
+    assert "after_cue_id" not in create.inputSchema.get("required", [])
+    assert "parent_container_id" in create.inputSchema["properties"]
     assert create.outputSchema["properties"]["status"]["enum"] == [
         "dry_run",
+        "preflight_failed",
         "created",
         "verification_failed",
         "workspace_not_found",
         "workspace_ambiguous",
         "workspace_unavailable",
     ]
+    assert "cleanup_required" in create.outputSchema["properties"]
 
     edit = tools["qlab_edit_cues"]
     assert edit.title == "Edit QLab Cues"
@@ -772,15 +1050,29 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
 
     delete = tools["qlab_delete_cues"]
     assert delete.title == "Delete QLab Cues"
-    assert "explicit leaf cues" in delete.description
+    assert "explicit leaf" in delete.description
     assert delete.annotations.readOnlyHint is False
     assert delete.annotations.destructiveHint is True
     assert delete.annotations.idempotentHint is False
-    assert delete.inputSchema["properties"]["cue_ids"]["minItems"] == 1
-    assert delete.inputSchema["properties"]["cue_ids"]["maxItems"] == 10
-    assert delete.inputSchema["properties"]["cue_ids"]["items"]["format"] == "uuid"
+    delete_cue_ids_schema = delete.inputSchema["properties"]["cue_ids"]["anyOf"][0]
+    assert delete_cue_ids_schema["minItems"] == 0
+    assert delete_cue_ids_schema["maxItems"] == 10
+    assert delete_cue_ids_schema["items"]["format"] == "uuid"
+    assert "container_id" in delete.inputSchema["properties"]
+    assert "recursive" in delete.inputSchema["properties"]
     assert "confirm:deleteCues:v1:" in delete.inputSchema["properties"]["confirm_token"]["description"]
     assert "verification_failed" in delete.outputSchema["properties"]["status"]["enum"]
+
+
+def test_create_tool_uses_qlab_template_defaults_without_property_input() -> None:
+    async def get_tool_schema() -> dict[str, Any]:
+        async with Client(mcp) as client:
+            tools = await client.list_tools()
+        return next(tool.inputSchema for tool in tools if tool.name == "qlab_create_cue")
+
+    schema = asyncio.run(get_tool_schema())
+
+    assert "properties" not in schema["properties"]
 
 
 def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
@@ -796,7 +1088,8 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
                 "qlab_query_cues",
                 "qlab_get_cue_details",
                 "qlab_check_write_readiness",
-                "qlab_create_cue",
+        "qlab_create_cue",
+        "qlab_create_cues",
                 "qlab_edit_cues",
                 "qlab_update_cues",
             )
@@ -813,6 +1106,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
         "qlab_get_cue_details": CUE_DETAILS_TIMEOUT,
         "qlab_check_write_readiness": WRITE_READINESS_TIMEOUT,
         "qlab_create_cue": CREATE_CUE_TIMEOUT,
+        "qlab_create_cues": CREATE_CUES_TIMEOUT,
         "qlab_edit_cues": UPDATE_CUES_TIMEOUT,
         "qlab_update_cues": UPDATE_CUES_TIMEOUT,
     }
@@ -878,7 +1172,7 @@ def test_write_tool_wrappers_do_not_pass_outer_reader_deadlines(monkeypatch) -> 
 
     monkeypatch.setattr(server_module, "_run_tool", capture)
 
-    assert server_module.qlab_create_cue("ws-1", "memo") == "ok"
+    assert server_module.qlab_create_cue("ws-1", "memo", dry_run=True, after_cue_id="11111111-1111-4111-8111-111111111111") == "ok"
     assert server_module.qlab_edit_cues("ws-1", [], dry_run=True) == "ok"
     assert server_module.qlab_move_cues("ws-1", [], dry_run=True) == "ok"
     assert server_module.qlab_delete_cues("ws-1", [], dry_run=True) == "ok"
@@ -941,6 +1235,72 @@ def test_public_tool_validation_returns_structured_json_error() -> None:
     assert "Traceback" not in json.dumps(payload)
 
 
+def test_workspace_settings_batch_limit_is_structured_and_pre_transport(monkeypatch) -> None:
+    class ExplodingReader:
+        def get_workspace_settings(self, **kwargs):
+            raise AssertionError("reader must not be constructed for an oversized batch")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: ExplodingReader())
+
+    result = qlab_get_workspace_settings(
+        "ws-1",
+        mode="details",
+        requests=[{"section": "light", "kind": "light_patch"}] * 51,
+    )
+    payload = result.model_dump()
+
+    assert payload["ok"] is False
+    assert payload["error_code"] == "workspace_detail_batch_too_large"
+    assert payload["received"] == {"request_count": 51}
+    assert payload["allowed"] == {"max_requests": 50}
+
+
+def test_workspace_settings_section_limit_is_structured_and_pre_transport(monkeypatch) -> None:
+    class ExplodingReader:
+        def get_workspace_settings(self, **kwargs):
+            raise AssertionError("reader must not be constructed for too many sections")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: ExplodingReader())
+
+    payload = qlab_get_workspace_settings(
+        "ws-1",
+        sections=["audio", "video", "network", "midi", "light", "general", "audio"],
+    ).model_dump()
+
+    assert payload["ok"] is False
+    assert payload["error_code"] == "workspace_sections_too_many"
+    assert payload["received"] == {"section_count": 7}
+    assert payload["allowed"] == {"max_sections": 6}
+
+
+def test_query_cues_rejects_exhaustive_profile_before_reader(monkeypatch) -> None:
+    class ExplodingReader:
+        def query_cues(self, **kwargs):
+            raise AssertionError("exhaustive query profile must be rejected before reading cues")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: ExplodingReader())
+
+    payload = qlab_query_cues("ws-1", "type", "Audio", profile="exhaustive").model_dump()
+
+    assert payload["ok"] is False
+    assert payload["error_code"] == "cue_profile_not_supported"
+    assert payload["received"]["profile"] == "exhaustive"
+
+
+def test_sensitive_cue_query_limit_rejects_large_result_count_before_reader(monkeypatch) -> None:
+    class ExplodingReader:
+        def query_cues(self, **kwargs):
+            raise AssertionError("large sensitive query must be rejected before reading cues")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: ExplodingReader())
+
+    payload = qlab_query_cues("ws-1", "type", "Audio", profile="full_sensitive", max_results=51).model_dump()
+
+    assert payload["ok"] is False
+    assert payload["error_code"] == "cue_payload_too_large"
+    assert payload["allowed"]["max_results"] == 50
+
+
 def test_public_cue_details_reports_clear_batch_limit_as_structured_json(monkeypatch) -> None:
     class FakeReader:
         def get_cue_details(self, workspace_id, cue_ref, profile):
@@ -954,7 +1314,8 @@ def test_public_cue_details_reports_clear_batch_limit_as_structured_json(monkeyp
     assert payload["ok"] is False
     assert payload["status"] == "error"
     assert payload["partial"] is False
-    assert payload["error_code"] == "validation_failed"
+    assert payload["error_code"] == "cue_batch_too_large"
+    assert payload["allowed"] == {"max_cues": 50}
     assert "cue_ref list can include at most 50 cues" in payload["message"]
     assert payload["requested_count"] == 51
     assert payload["failed_count"] == 51

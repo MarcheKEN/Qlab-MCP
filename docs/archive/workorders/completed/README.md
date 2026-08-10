@@ -25,6 +25,8 @@ current implementation instructions. Use the
 - [026 — Fade cue safe editing](026_fade_cue_safe_editing.md)
 - [027 — Move cues safe editing](027_move_cues_safe_editing.md)
 - [028 — Group cue safe editing](028_group_cue_safe_editing.md)
+- [030 — Group edge runtime validation](030_group_edge_runtime_validation.md)
+- [031 — Safe Create lifecycle runtime validation](031_cue_creation_safe_runtime_validation.md)
 
 Research supporting Utility, Devamp/Network, and Fade is archived separately
 under [`docs/archive/research/cue-editing/`](../../research/cue-editing/).

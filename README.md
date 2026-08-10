@@ -8,6 +8,13 @@ settings, patches, and routes. They do not expose playback or mutation controls.
 Optional write-mode tools are separate, disabled unless explicitly gated, and
 dry-run-first.
 
+See [`SECURITY.md`](SECURITY.md) for the supported threat model, security
+invariants, accepted risks, and QLab 5.5.10 evidence boundary.
+
+For a dated, reproducible inventory of `HEAD`, worktree changes, test output,
+and QLab runtime evidence, see [`docs/status/current-state.md`](docs/status/current-state.md).
+The report distinguishes programmed structure from runtime validation and GO readiness.
+
 ## What It Does
 
 - Workspace overview and status: cue lists, groups, counts, Edit/Show mode,
@@ -31,6 +38,12 @@ dry-run-first.
 - No ungated high-risk writes. High-risk families require dry-run review plus
   exact `planned_operations[].confirm_token` values when supported, or they
   remain blocked.
+
+The initial security model is local: QLab, `QLAB_HOST`, and the operator are
+trusted, while MCP arguments are treated as untrusted. A hostile process on the
+same network is outside the initial scope. UDP replies are matched by sender IP
+and OSC address; source-port filtering is intentionally deferred pending real
+QLab 5.5.10 packet evidence.
 
 ## Quick Start
 
@@ -127,11 +140,12 @@ Cue edit flow:
 | Tool | Purpose |
 | --- | --- |
 | `qlab_check_write_readiness` | Checks disabled-by-default write readiness without mutation. |
-| `qlab_create_cue` | Dry-runs or creates one blank allowlisted cue with safe initial properties. |
+| `qlab_create_cue` | Dry-runs or creates one template-based cue with exact anchor or empty-container placement; verifies identity and structure. |
+| `qlab_create_cues` | Creates an ordered template-based sequence with one verified `/new` per cue and no automatic rollback. |
 | `qlab_edit_cues` | Dry-runs or updates 1-50 concrete cues through the cue editing registry. |
 | `qlab_update_cues` | Compatibility alias for older prompts, tests, and clients. |
 | `qlab_move_cues` | Dry-runs or moves 1-10 exact UUID-addressed cues within or between Lists and Groups. |
-| `qlab_delete_cues` | Dry-runs or deletes 1-10 exact leaf-cue UUIDs; container and cascade deletion is blocked. |
+| `qlab_delete_cues` | Dry-runs explicit leaf deletion or empties one container deepest-first while preserving its root. |
 
 ## Read Model
 
@@ -149,6 +163,8 @@ at once.
   settings items.
 - `technical`, `full_sensitive`, and `exhaustive` are explicit audit modes, not
   normal defaults.
+- Details batches accept at most 50 requests and six sections. Over-limit
+  input returns a structured error before workspace resolution or OSC traffic.
 
 For large shows, `qlab_query_cues` defaults to `max_results=500` and
 `max_cues_scanned=500`. Callers can raise either limit up to `5000`. Results
@@ -173,8 +189,10 @@ Write mode is deliberately gated:
 - Once real setters start, batch writes are not transactional. Later failures
   are reported per item and require normal readback or manual review.
 - Real writes bypass and clear the read cache before fresh verification.
-- `qlab_create_cue` has no `confirm_token` argument. Review its dry-run before
-  real creation.
+- `qlab_create_cue` accepts exactly one of an exact `after_cue_id` anchor or a
+  `parent_container_id` for an empty Cue List, Group, or Cue Cart. It requires
+  the exact fresh `confirm:createCue:v2` token returned by its dry-run. The
+  token binds the reviewed workspace structure and is consumed before `/new`.
 - `qlab_edit_cues` may return tokens for individual planned high-risk
   operations. Copy each exact relevant `planned_operations[].confirm_token`
   into that update item's `confirm_gates`; there is no tool-level Edit token.
@@ -190,13 +208,46 @@ Write mode is deliberately gated:
 - Operations without deterministic readback must be blocked or reported
   inconclusive, not clean success.
 
-Allowed cue creation is intentionally narrow:
+Allowed cue creation is intentionally structural:
 
-- Only blank cue creation is allowed in this preface.
-- Allowed cue types are `memo`, `group`, `wait`, and `audio`.
-- Safe initial properties are `name`, `number`, `armed`, `flagged`, `colorName`,
-  `preWait`, `postWait`, `duration`, and `continueMode`.
-- `after_cue_id` placement is dry-run planning only.
+- Only blank cue creation is allowed in this preface; blank means Create has no
+  initial-properties input, not that QLab templates or cue normalization are
+  guaranteed to be empty.
+- Generic Create types are `memo`, `group`, `wait`, `audio`, `mic`, `video`,
+  `camera`, `text`, `light`, `fade`, `network`, `midi`, `midi_file`,
+  `timecode`, `start`, `stop`, `pause`, `load`, `reset`, `devamp`, `goto`,
+  `target`, `arm`, and `disarm`. `script`, Cue Lists, and Cue Carts remain
+  outside this contract.
+- Create has no initial-properties argument and sends no property setters.
+  QLab's Cue Template supplies each cue's default geometry, timing, routing,
+  and other initial state.
+- `after_cue_id` creates immediately after an inactive, structurally stable cue
+  in a linear Cue List or Group. Broken or warning flags on the anchor are
+  informational and do not block structural placement. `parent_container_id` creates the first cue in an empty
+  container: Cue Lists use `currentCueListID` plus unanchored `/new`, Groups
+  use `/new` anchored to the Group followed by one `/move`, and Cue Carts use
+  `/new` with the Cart UUID and request coordinates `0,0`. QLab 5.5.10
+  accepts that request and reports the first cell as readback coordinates
+  `1,1`; verification accounts for this 1-based Cart readback. UUIDs sent to
+  QLab retain their exact wire capitalization.
+- Real Create sends `/new` once at most. A timeout, invalid identity, failed
+  Group move, or unconfirmed Cart position is indeterminate: no property
+  setter or retry is allowed. Broken or warning health is reported, but does
+  not make structural creation fail. The result reports
+  `created_cue_id`, `placement`, `verification`, `executed_operations`,
+  `errors`, `warnings`, `cleanup_required`, and manual `cleanup` guidance.
+  Health is reported as `healthy`, `broken`, `warning`, or `unknown`; only an
+  active readback state (`isRunning`, `isPaused`, `isAuditioning`, or
+  `isActionRunning`) turns structural verification into manual review.
+- Experimental raw-OSC smoke evidence from QLab 5.5.10 covers the empty Cue
+  List, Group, and Cart routes (including Cart `0,0` -> readback `1,1`).
+  `created` means identity and placement were verified; it does not mean the
+  cue is ready for GO.
+- `qlab_create_cues` accepts an ordered sequence of the same generic cue types.
+  It creates one cue at a time, uses each verified UUID as the next anchor, and
+  stops on the first ambiguous or failed item. Earlier successful cues remain;
+  there is no automatic rollback. A sequence started in a Cue Cart is limited
+  to one cue because Cart cells have no linear order.
 
 Cue updates use concrete cue numbers or unique IDs. `selected`, `active`,
 `playhead`, and `playbackPosition` are rejected for updates.
@@ -245,10 +296,15 @@ Current specialized write support is intentionally token-gated:
   and `group_child_readback`. Setter timeout with matching fresh readback is
   `updated_with_confirmed_timeouts`, with no mutating retry. Timeline UI edits,
   Playlist navigation/actions, deprecated aliases, and crossfade curve shapes
-  are not real-write surfaces. Large Groups around 200 children, zero-duration
-  loop children, crossfades beyond the shortest child, minimum crossfade
-  duration, playback, active/auditioning Groups, warning-but-not-broken Groups,
-  and runtime token expiry still lack QLab 5.5 validation.
+  are not real-write surfaces. QLab 5.5.10 runtime validation now covers the
+  disposable `378`-child ordered snapshot, finite and mixed zero/finite
+  Playlist Loop, one-setter timeout/readback/rollback behavior, consumed-token
+  replay, and preflight rejection when crossfade exceeds the shortest child.
+  Requests for `1 s` and `2 s` crossfade retained/read back as `3 s` in the
+  named fixture; this is fixture/version-specific evidence, not a global API
+  minimum, so short/equal active crossfade behavior remains unconfirmed.
+  All-zero-child Loop, warning-only Groups, active/auditioning Groups, live
+  token expiry, and live MCP restart invalidation remain follow-up limits.
 - `video_basic`: safe cue metadata is the only normal real-write surface.
   Visual, embedded-audio, and slice edits are dry-run-first candidates with
   specialized confirm tokens. This includes opacity, translation, anchor/scale
@@ -257,8 +313,9 @@ Current specialized write support is intentionally token-gated:
   marker edits. Video FX real-write support is deliberately narrow and only
   applies when dry-run marks an exact scalar candidate such as the validated
   `videoEffectIndex/0/parameter/inputRadius` or `inputIntensity` paths.
-- `camera_basic`: supports safe camera `channels`; camera visual geometry and
-  I/O fields follow the same dry-run/confirm-token model as visual cue edits.
+- `camera_basic`: Camera I/O IDs and `channels`/`channelOffset` can be checked
+  in dry-run plans; visual geometry and I/O fields remain planned-only until
+  QLab exposes verifiable patch availability.
 - `text_basic`: text content, `fixedWidth`, alignment, `fontName`, `fontSize`,
   `lineSpacing`, text color, and shared visual geometry are gated candidates.
   Rich text shadows, decoration, and unreliable color/readback paths remain
@@ -300,6 +357,12 @@ Utility real writes support only saved `cueTargetID` assignment for exact-UUID
 source and target cues through `confirm:utilityTarget:v1:`. `cueTargetNumber`,
 `cueTargetName`, temporary targets, Reset patch/map targets, and target actions
 remain blocked.
+
+An initially untargeted source may be `isBroken=true` only for this first
+assignment when its saved `cueTargetID` is empty and the requested target is an
+exact UUID. The source must still be inactive and warning-free, the target must
+be healthy and inactive, and the normal fresh-token/readback gate still applies.
+Already-targeted or otherwise broken sources remain blocked.
 
 Network OSC Message `customString` is runtime validated for an exact healthy,
 inactive cue whose current patch is freshly classified as `OSC Message`. It
@@ -353,21 +416,22 @@ of 2 and 10, and structural/property preservation.
 
 ### Delete cues
 
-`qlab_delete_cues` accepts one workspace UUID and 1–10 exact leaf-cue UUIDs.
-Dry-run returns `confirm:deleteCues:v1:`. Duplicate, invalid, active, container,
-parent/descendant, cascade, Group, Cue List, and Cue Cart requests are rejected.
-Deletes are sequential, stop on unresolved failure, use independent existence
-and neighbor readback, have no automatic rollback, and are destructive and
-non-idempotent.
+`qlab_delete_cues` accepts one workspace UUID and either 1–10 exact leaf-cue
+UUIDs or `container_id=<UUID>, recursive=true`. Recursive mode expands the
+container deepest-first, deletes leaves and then empty child containers, and
+preserves the requested root. Dry-run returns `confirm:deleteCues:v1:`.
+Duplicate, invalid, active, and ambiguous requests are rejected. Deletes are
+sequential, stop on unresolved failure, use independent existence and neighbor
+readback, have no automatic rollback, and are destructive and non-idempotent.
 
 Tokens bind workspace, requested UUID order, cue type, parent, sibling index,
 previous/next neighbors, parent-order and deletion-impact fingerprints,
 readiness/activity, operation version, and expiry. Deletion convergence polls
 over bounded 0–10 second window. Result states include `deleted_immediately`,
 `deleted_after_convergence`, `indeterminate`, `failed`, and `partial_failed`.
-Permanent container/descendant deletion remains out of scope. Local tests cover
-leaf/batch deletion, neighbor preservation, stale and wrong-family tokens,
-container guards, and no cascade.
+Local tests cover leaf/batch deletion, recursive post-order emptying,
+root preservation, neighbor preservation, stale and wrong-family tokens, and
+active/container guards.
 
 Runtime validation covers individual and sequential batch leaf deletion,
 approximately 4–10 second convergence, neighbor preservation, stale-token and
@@ -404,9 +468,20 @@ Cue detail profiles are tiered:
 - `full_sensitive` / `exhaustive`: explicit large/sensitive reads; still no MCP
   implementation paths.
 
-Compact profiles truncate long text fields such as notes, memo text, script
-text, light commands, and network messages. Truncated fields return
+Sensitive cue queries return at most 50 cues and 1 MiB of serialized response.
+`qlab_query_cues(profile="exhaustive")` is rejected; `exhaustive` is reserved
+for cue details. `scriptSource` is the only public script-content field, and
+only explicit sensitive profiles may expose it. `scriptText` is not sent as an
+independent OSC key or returned by normal profiles.
+
+Compact profiles truncate long text fields such as notes, memo text, light
+commands, and network messages. Script source is excluded from compact
+profiles. Truncated fields return
 `field_truncated: true` and `original_length`.
+
+`lightCommandText` analysis rejects input over 65,536 UTF-8 bytes, 2,000 lines,
+or 2,000 analysis results. Numeric values outside the OSC int32/float32 wire
+format are rejected; they are never clamped or rounded.
 
 ## Query Filters
 
@@ -473,6 +548,9 @@ Notes:
 
 - QLab listens for OSC on port `53000` by default.
 - QLab sends UDP replies to `53001` by default.
+- `QLAB_REPLY_PORT` is the local destination on which the client receives
+  replies. It is not evidence of QLab's outgoing source port, which remains
+  unverified.
 - `QLAB_REPLY_PORT=0` is useful for automated tests with a fake OSC server.
 - `QLAB_CACHE_TTL=0` disables the short read cache.
 - Live selected/running/active state bypasses the cache.
@@ -522,11 +600,12 @@ qlab_get_workspace_setting_details(workspace_id, section, kind=None, ref=None, p
 qlab_query_cues(workspace_id, primary_filter, primary_value, optional_filters=None, profile="basic_safe", max_results=500, max_cues_scanned=500)
 qlab_get_cue_details(workspace_id, cue_ref, profile="auto")
 qlab_check_write_readiness(workspace_id)
-qlab_create_cue(workspace_id, cue_type, properties=None, dry_run=None, after_cue_id=None)
+qlab_create_cue(workspace_id, cue_type, after_cue_id=None, parent_container_id=None, dry_run=None, confirm_token=None)
+qlab_create_cues(workspace_id, cue_types, after_cue_id=None, parent_container_id=None, dry_run=None, confirm_token=None)
 qlab_edit_cues(workspace_id, updates, dry_run=None)
 qlab_update_cues(workspace_id, updates, dry_run=None)  # compatibility alias
 qlab_move_cues(workspace_id, moves, dry_run=None, confirm_token=None)
-qlab_delete_cues(workspace_id, cue_ids, dry_run=None, confirm_token=None)
+qlab_delete_cues(workspace_id, cue_ids=None, container_id=None, recursive=False, dry_run=None, confirm_token=None)
 ```
 
 `qlab_edit_cues` update items use this shape:
@@ -591,6 +670,7 @@ Compact examples:
 References:
 
 - [Documentation index](docs/README.md)
+- [Security policy](SECURITY.md)
 - [QLab edit cues runtime checklist](docs/development/runtime-validation/edit-cues.md)
 - [OSC coverage snapshot](docs/status/coverage/osc_coverage_snapshot.md)
 - [QLab OSC dictionary](docs/references/qlab_osc_dictionary.md)

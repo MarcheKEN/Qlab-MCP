@@ -41,9 +41,33 @@ Writes are disabled by default. Before any authorized write:
 5. Send one intended setter and require fresh readback.
 6. Roll back with a new dry-run and new token when the workflow requires one.
 
-`qlab_create_cue` has no confirmation-token argument. Edit tokens belong to
-individual `updates[].confirm_gates`. Move and Delete use one dedicated
-tool-level token. Restarting the MCP invalidates process-bound tokens.
+`qlab_create_cue` requires exactly one of an exact `after_cue_id` anchor or an
+empty `parent_container_id`. The anchor must be structurally stable and
+inactive; it may be broken or warning. Review its dry-run, then pass the returned
+dedicated `confirm:createCue:v2` token for real creation. The result certifies
+identity and placement, not readiness for GO; broken or warning health is
+reported separately as `healthy`, `broken`, `warning`, or `unknown`. Use exactly
+one of `after_cue_id` or `parent_container_id`; the
+latter handles the first cue in an empty Cue List, Group, or Cue Cart with the
+container-specific OSC route. Cue Cart creation requests `0,0`; QLab 5.5.10
+reports that first cell as `1,1`, which is verified as the expected readback.
+Edit tokens belong to individual `updates[].confirm_gates`; Move and
+Delete use one dedicated tool-level token. Restarting the MCP invalidates
+process-bound tokens.
 
-See the [13 public tools](tools.md) and the
+`qlab_create_cues` accepts an ordered list and chains each verified created UUID
+as the next `after_cue_id`; it sends one `/new` per item and stops without
+rollback on the first failure. Create sends `/new` at most once per item. If QLab times out or returns an identity that
+cannot be proven, stop without applying properties or retrying. The result may
+set `cleanup_required=true`; inspect the workspace manually and use a fresh
+Delete dry-run/token only after the created UUID is unambiguous. Create has no
+automatic cleanup or fallback backend. Workorder 031 runtime evidence covers
+only one blank anchored Wait; the generic route is table-driven for the other
+enabled types, while operational readiness remains a separate QLab readback.
+
+`qlab_delete_cues` can also empty a container with `container_id` and
+`recursive=true`; it deletes descendants deepest-first and preserves the root.
+
+See the [14 public tools](tools.md), the
+[runtime Create checklist](../development/runtime-validation/create-cues.md), and the
 [runtime edit checklist](../development/runtime-validation/edit-cues.md).

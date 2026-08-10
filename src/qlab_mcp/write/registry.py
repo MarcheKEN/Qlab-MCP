@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import struct
 from dataclasses import dataclass, replace
 from string import Formatter
 from typing import Any
@@ -1993,14 +1994,44 @@ def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
     return {
         "create_cue": {
             "planned": True,
-            "cue_types": ["memo", "group", "wait", "audio"],
-            "properties": [prop.name for prop in COMMON_PROPERTIES],
+            "cue_types": [
+                "memo", "group", "wait", "audio", "mic", "video", "camera", "text", "light",
+                "fade", "network", "midi", "midi_file", "timecode", "start", "stop", "pause",
+                "load", "reset", "devamp", "goto", "target", "arm", "disarm",
+            ],
+            "initialization": "qlab_cue_template_defaults",
+            "operational_state": "reported_separately_from_structural_creation",
             "dry_run_default": dry_run_default,
             "placement": {
-                "after_cue_id": "dry_run_only_in_this_preface",
-                "parent_id": "planned_later",
-                "index": "planned_later",
+                "after_cue_id": "exact_uuid_anchor_for_existing_cue",
+                "parent_container_id": "exact_uuid_for_empty_cue_list_group_or_cart",
+                "selection": "exactly_one_of_after_cue_id_or_parent_container_id",
+                "cue_list": "currentCueListID_then_new_without_anchor",
+                "group": "new_after_group_then_move_to_index_zero",
+                "cue_cart": "new_inside_cart_request_0_0_readback_1_1_on_qlab_5_5_10",
+                "cue_cart_rejects": ["group"],
+                "parent_id": "verified_from_structural_snapshot",
+                "index": "anchor_index_plus_one_or_zero_for_empty_container",
+                "confirm_token": "confirm:createCue:v2",
             },
+        },
+        "create_cues": {
+            "planned": True,
+            "cue_types": [
+                "memo", "group", "wait", "audio", "mic", "video", "camera", "text", "light",
+                "fade", "network", "midi", "midi_file", "timecode", "start", "stop", "pause",
+                "load", "reset", "devamp", "goto", "target", "arm", "disarm",
+            ],
+            "sequence": {
+                "max_items": 50,
+                "one_new_per_item": True,
+                "anchor": "previous_created_cue_id",
+                "stops_on_ambiguity": True,
+                "rollback": False,
+            },
+            "initial_placement": "same_as_create_cue",
+            "initialization": "qlab_cue_template_defaults",
+            "properties": [],
         },
         "batch_update_cues": update_cues_capability,
         "edit_existing_cue": {
@@ -2347,7 +2378,7 @@ def _validate_named_value(name: str, validator: str, value: Any) -> Any:
             message = message.replace("opacity must", f"{name} must", 1)
         elif message.startswith("colorName must"):
             message = message.replace("colorName must", f"{name} must", 1)
-        raise UnsafeWriteOperationError(message) from exc
+        raise UnsafeWriteOperationError(message, error_code=exc.error_code) from exc
 
 
 def _group_mode(value: Any) -> int:
@@ -2360,8 +2391,16 @@ def _group_mode(value: Any) -> int:
 def _number(value: Any, message: str) -> int | float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise UnsafeWriteOperationError(message)
-    if not math.isfinite(float(value)):
-        raise UnsafeWriteOperationError(message)
+    if isinstance(value, int):
+        if not -(2**31) <= value <= 2**31 - 1:
+            raise UnsafeWriteOperationError(message, error_code="osc_value_out_of_range")
+        return value
+    if not math.isfinite(value):
+        raise UnsafeWriteOperationError(message, error_code="osc_value_out_of_range")
+    try:
+        struct.pack(">f", value)
+    except (OverflowError, struct.error) as exc:
+        raise UnsafeWriteOperationError(message, error_code="osc_value_out_of_range") from exc
     return value
 
 
@@ -2370,11 +2409,7 @@ def _quaternion(value: Any) -> list[int | float]:
         raise UnsafeWriteOperationError("value must be an array of exactly four finite numbers")
     quaternion: list[int | float] = []
     for component in value:
-        if isinstance(component, bool) or not isinstance(component, (int, float)):
-            raise UnsafeWriteOperationError("value must be an array of exactly four finite numbers")
-        if not math.isfinite(float(component)):
-            raise UnsafeWriteOperationError("value must be an array of exactly four finite numbers")
-        quaternion.append(component)
+        quaternion.append(_number(component, "value must be an array of exactly four finite numbers"))
     return quaternion
 
 
@@ -2382,7 +2417,7 @@ def _decibel(value: Any) -> int | float | str:
     if isinstance(value, bool):
         raise UnsafeWriteOperationError("value must be a number or '-inf'")
     if isinstance(value, (int, float)):
-        return value
+        return _number(value, "value must be a number or '-inf'")
     if isinstance(value, str) and value.strip().casefold() == "-inf":
         return "-inf"
     raise UnsafeWriteOperationError("value must be a number or '-inf'")
@@ -2391,6 +2426,8 @@ def _decibel(value: Any) -> int | float | str:
 def _int(value: Any, message: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise UnsafeWriteOperationError(message)
+    if not -(2**31) <= value <= 2**31 - 1:
+        raise UnsafeWriteOperationError(message, error_code="osc_value_out_of_range")
     return value
 
 

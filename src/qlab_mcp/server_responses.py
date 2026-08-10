@@ -26,10 +26,14 @@ def safe_tool_error_message(exc: QLabMcpError | ValueError) -> str:
     if isinstance(exc, OscTimeoutError):
         return "Timed out waiting for QLab to reply over OSC. Check that QLab is running and OSC is enabled."
     if isinstance(exc, OscProtocolError):
+        if exc.error_code:
+            return f"{exc.error_code}: {exc}"
         return "QLab returned an invalid or unexpected OSC reply."
     if isinstance(exc, UnsafeCuePropertyError):
         return "The requested cue property or profile is not allowed for read-only access."
     if isinstance(exc, UnsafeWriteOperationError):
+        if exc.error_code:
+            return f"{exc.error_code}: {exc}"
         return str(exc)
     return sanitize_exception_message(exc)
 

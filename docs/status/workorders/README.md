@@ -14,7 +14,6 @@ Active:
 - [021 — Video audio time and loops](active/021_video_audio_time_loops.md)
 - [022 — Audio/Video slice markers](active/022_slice_markers_audio_video.md)
 - [029 — Video audio runtime validation](active/029_video_audio_runtime_validation.md)
-- [030 — Group edge runtime validation](active/030_group_edge_runtime_validation.md)
 
 Blocked:
 

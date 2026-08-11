@@ -889,11 +889,21 @@ class _CreateAnchorClient:
 class EmptyContainerReader(QLabReader):
     workspace = "ws-empty"
     list_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    initial_current_list_id = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
     group_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
     cart_id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
     created_id = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
 
-    def __init__(self, container_type: str, *, real: bool = False) -> None:
+    def __init__(
+        self,
+        container_type: str,
+        *,
+        real: bool = False,
+        current_list_id: str | None = None,
+        timeout_current_list_setter: bool = False,
+        apply_current_list_on_timeout: bool = False,
+        timeout_current_list_readback: bool = False,
+    ) -> None:
         self.container_type = container_type
         self.client = _CreateAnchorClient(
             QLabConfig(
@@ -906,7 +916,11 @@ class EmptyContainerReader(QLabReader):
         self._read_cache = shared_read_cache()
         self._read_deadline = None
         self.created = False
-        self.current_list_id = self.list_id
+        self.current_list_id = current_list_id or self.initial_current_list_id
+        self.current_list_setter_attempts = 0
+        self.timeout_current_list_setter = timeout_current_list_setter
+        self.apply_current_list_on_timeout = apply_current_list_on_timeout
+        self.timeout_current_list_readback = timeout_current_list_readback
         self.requests: list[tuple[str, tuple[Any, ...], str | None]] = []
 
     @property
@@ -984,9 +998,17 @@ class EmptyContainerReader(QLabReader):
         if address == f"/workspace/{self.workspace}/showMode":
             return SimpleNamespace(data=False, status="ok")
         if address == f"/workspace/{self.workspace}/currentCueListID":
+            if self.timeout_current_list_readback and self.current_list_setter_attempts:
+                raise OscTimeoutError("current list readback timed out")
             return SimpleNamespace(data=self.current_list_id, status="ok")
         if address.startswith(f"/workspace/{self.workspace}/currentCueListID/"):
-            self.current_list_id = address.rsplit("/", 1)[-1]
+            self.current_list_setter_attempts += 1
+            target_id = address.rsplit("/", 1)[-1]
+            if self.timeout_current_list_setter:
+                if self.apply_current_list_on_timeout:
+                    self.current_list_id = target_id
+                raise OscTimeoutError("current list setter timed out")
+            self.current_list_id = target_id
             return SimpleNamespace(data=None, status="ok")
         if address == f"/workspace/{self.workspace}/new":
             expected = {
@@ -1053,7 +1075,11 @@ def test_create_empty_container_dry_run_plans_container_specific_route(container
 
 
 def test_create_empty_cue_list_real_selects_list_then_creates_first_child() -> None:
-    reader = EmptyContainerReader("Cue List", real=True)
+    reader = EmptyContainerReader(
+        "Cue List",
+        real=True,
+        current_list_id=EmptyContainerReader.initial_current_list_id,
+    )
     planned = reader.create_cue(
         reader.workspace,
         "memo",
@@ -1074,6 +1100,100 @@ def test_create_empty_cue_list_real_selects_list_then_creates_first_child() -> N
     assert result["verification"]["structure"]["index"] == 0
     assert [address for address, _, _ in reader.requests].count(f"/workspace/{reader.workspace}/new") == 1
     assert any(address.endswith(f"/currentCueListID/{reader.list_id}") for address, _, _ in reader.requests)
+
+
+def _empty_cue_list_real_counts(reader: EmptyContainerReader, start: int) -> dict[str, int]:
+    requests = reader.requests[start:]
+    setter = f"/workspace/{reader.workspace}/currentCueListID/{reader.list_id}"
+    getter = f"/workspace/{reader.workspace}/currentCueListID"
+    new = f"/workspace/{reader.workspace}/new"
+    setter_index = next(index for index, (address, _, _) in enumerate(requests) if address == setter)
+    after_setter = [address for address, _, _ in requests[setter_index:]]
+    return {
+        "setter": after_setter.count(setter),
+        "getter": after_setter.count(getter),
+        "new": after_setter.count(new),
+    }
+
+
+def _planned_empty_cue_list_create(reader: EmptyContainerReader) -> dict[str, Any]:
+    return reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=True,
+        parent_container_id=reader.list_id,
+    )
+
+
+def test_create_empty_cue_list_timeout_then_matching_readback_creates_once() -> None:
+    reader = EmptyContainerReader(
+        "Cue List",
+        real=True,
+        timeout_current_list_setter=True,
+        apply_current_list_on_timeout=True,
+    )
+    planned = _planned_empty_cue_list_create(reader)
+    start = len(reader.requests)
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        parent_container_id=reader.list_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "created"
+    assert "setter_timeout_but_readback_matched" in result["warnings"]
+    assert not any(item["operation"] == "set_current_cue_list" for item in result["executed_operations"])
+    assert _empty_cue_list_real_counts(reader, start) == {"setter": 1, "getter": 1, "new": 1}
+
+
+def test_create_empty_cue_list_timeout_then_old_readback_blocks_new() -> None:
+    reader = EmptyContainerReader("Cue List", real=True, timeout_current_list_setter=True)
+    planned = _planned_empty_cue_list_create(reader)
+    start = len(reader.requests)
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        parent_container_id=reader.list_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "verification_failed"
+    assert result["error_code"] == "current_cue_list_failed"
+    assert result["cleanup_required"] is False
+    assert "current_cue_list_may_have_changed" in result["warnings"]
+    assert _empty_cue_list_real_counts(reader, start) == {"setter": 1, "getter": 1, "new": 0}
+
+
+def test_create_empty_cue_list_timeout_then_readback_timeout_blocks_new() -> None:
+    reader = EmptyContainerReader(
+        "Cue List",
+        real=True,
+        timeout_current_list_setter=True,
+        timeout_current_list_readback=True,
+    )
+    planned = _planned_empty_cue_list_create(reader)
+    start = len(reader.requests)
+
+    result = reader.create_cue(
+        reader.workspace,
+        "memo",
+        dry_run=False,
+        parent_container_id=reader.list_id,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "verification_failed"
+    assert result["error_code"] == "current_cue_list_failed"
+    assert "current_cue_list_may_have_changed" in result["warnings"]
+    assert _empty_cue_list_real_counts(reader, start) == {"setter": 1, "getter": 1, "new": 0}
 
 
 def test_create_empty_group_anchors_new_then_moves_once() -> None:

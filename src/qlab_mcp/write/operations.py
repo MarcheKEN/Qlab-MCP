@@ -634,31 +634,13 @@ class QLabWriteMixin:
                 workspace,
                 f"currentCueListID/{parent_osc_id}",
             )
+            setter_timed_out = False
+            setter_timeout_error: str | None = None
             try:
                 current_reply = self.client.request(current_list_address)
-                executed_operations.append(
-                    {
-                        "operation": "set_current_cue_list",
-                        "address": current_list_address,
-                        "args": [],
-                        "status": current_reply.status,
-                        "cue_list_id": placement["parent_id"],
-                    }
-                )
-                current_id = _read_current_cue_list_id(self, workspace)
-                if current_id != placement["parent_id"]:
-                    raise UnsafeWriteOperationError(
-                        "QLab did not confirm the requested current Cue List."
-                    )
-                executed_operations.append(
-                    {
-                        "operation": "verify_current_cue_list",
-                        "address": _workspace_address(workspace, "currentCueListID"),
-                        "args": [],
-                        "status": "ok",
-                        "cue_list_id": current_id,
-                    }
-                )
+            except OscTimeoutError as exc:
+                setter_timed_out = True
+                setter_timeout_error = str(exc)
             except Exception as exc:
                 errors["current_cue_list"] = str(exc)
                 return _create_failure(
@@ -671,8 +653,75 @@ class QLabWriteMixin:
                     executed_operations=executed_operations,
                     error_code="current_cue_list_failed",
                     errors=errors,
+                    warnings=warnings,
                     message="Create was stopped because the target Cue List could not be selected and verified.",
                 )
+            else:
+                executed_operations.append(
+                    {
+                        "operation": "set_current_cue_list",
+                        "address": current_list_address,
+                        "args": [],
+                        "status": current_reply.status,
+                        "cue_list_id": placement["parent_id"],
+                    }
+                )
+            try:
+                current_id = _read_current_cue_list_id(self, workspace)
+            except Exception as exc:
+                errors["current_cue_list"] = (
+                    f"{setter_timeout_error}; fresh readback failed: {exc}"
+                    if setter_timed_out
+                    else str(exc)
+                )
+                if setter_timed_out:
+                    warnings.append("current_cue_list_may_have_changed")
+                return _create_failure(
+                    workspace,
+                    qlab_cue_type,
+                    normalized_properties,
+                    dry_run=False,
+                    placement=placement,
+                    planned_operations=planned_operations,
+                    executed_operations=executed_operations,
+                    error_code="current_cue_list_failed",
+                    errors=errors,
+                    warnings=warnings,
+                    message="Create was stopped because the target Cue List could not be selected and verified.",
+                )
+            if current_id != placement["parent_id"]:
+                errors["current_cue_list"] = (
+                    f"{setter_timeout_error}; fresh readback returned {current_id!r}, "
+                    f"expected {placement['parent_id']!r}."
+                    if setter_timed_out
+                    else "QLab did not confirm the requested current Cue List."
+                )
+                if setter_timed_out:
+                    warnings.append("current_cue_list_may_have_changed")
+                return _create_failure(
+                    workspace,
+                    qlab_cue_type,
+                    normalized_properties,
+                    dry_run=False,
+                    placement=placement,
+                    planned_operations=planned_operations,
+                    executed_operations=executed_operations,
+                    error_code="current_cue_list_failed",
+                    errors=errors,
+                    warnings=warnings,
+                    message="Create was stopped because the target Cue List could not be selected and verified.",
+                )
+            if setter_timed_out:
+                warnings.append("setter_timeout_but_readback_matched")
+            executed_operations.append(
+                {
+                    "operation": "verify_current_cue_list",
+                    "address": _workspace_address(workspace, "currentCueListID"),
+                    "args": [],
+                    "status": "ok",
+                    "cue_list_id": current_id,
+                }
+            )
 
         new_args = [osc_cue_type, *placement.get("new_args", [])]
         try:
@@ -3719,6 +3768,7 @@ def _create_failure(
     executed_operations: list[dict[str, Any]] | None = None,
     error_code: str,
     errors: dict[str, str],
+    warnings: list[str] | None = None,
     message: str,
 ) -> dict[str, Any]:
     return {
@@ -3737,7 +3787,7 @@ def _create_failure(
         "cleanup_required": False,
         "cleanup": None,
         "errors": errors,
-        "warnings": [],
+        "warnings": list(warnings or []),
         "error_code": error_code,
         "suggested_action": "Review the fresh workspace snapshot and run a new dry-run before retrying.",
         "message": message,

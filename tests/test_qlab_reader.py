@@ -3573,6 +3573,73 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["cues"][0]["continueMode"], "auto_follow")
         self.assertEqual(result["cues"][0]["continueModeLabel"], "auto_follow")
 
+    def test_query_cues_continue_mode_matches_numeric_zero_string(self) -> None:
+        list_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        cue_ids = [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        ]
+        responses = {
+            "/workspace/ws-1/cueLists/uniqueIDs": [
+                {"uniqueID": list_id, "cues": [{"uniqueID": cue_id, "cues": []} for cue_id in cue_ids]}
+            ],
+            f"/workspace/ws-1/cue_id/{list_id}/valuesForKeys": {
+                "uniqueID": list_id,
+                "number": "",
+                "name": "Main",
+                "displayName": "Main",
+                "type": "Cue List",
+            },
+        }
+        for mode, cue_id in enumerate(cue_ids):
+            responses[f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys"] = {
+                "uniqueID": cue_id,
+                "number": str(mode + 1),
+                "name": f"Mode {mode}",
+                "displayName": f"{mode + 1} Mode {mode}",
+                "type": "Wait",
+                "continueMode": mode,
+                "armed": True,
+                "flagged": False,
+                "isBroken": False,
+                "isWarning": False,
+            }
+
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+            for expected, expected_mode in (
+                (0, 0),
+                ("0", 0),
+                ("do_not_continue", 0),
+                ("DO NOT CONTINUE", 0),
+                (1, 1),
+                ("1", 1),
+                ("auto_continue", 1),
+                ("auto-continue", 1),
+                (2, 2),
+                ("2", 2),
+                ("auto_follow", 2),
+                (" AUTO-FOLLOW ", 2),
+            ):
+                result = reader.query_cues(
+                    "ws-1",
+                    "continueMode",
+                    expected,
+                    optional_filters=[{"filter": "type", "value": "Wait"}],
+                )
+                self.assertEqual(result["matched_count"], 1, (expected, result))
+                self.assertEqual(result["cues"][0]["continueMode"], expected_mode)
+
+            for invalid in ("", None, False, "banana", 3):
+                with self.assertRaisesRegex(ValueError, "continueMode"):
+                    reader.query_cues(
+                        "ws-1",
+                        "continueMode",
+                        invalid,
+                        optional_filters=[{"filter": "type", "value": "Wait"}],
+                    )
+
     def test_query_cues_supports_editorial_health_filters(self) -> None:
         cue_1 = "11111111-1111-4111-8111-111111111111"
         cue_2 = "22222222-2222-4222-8222-222222222222"

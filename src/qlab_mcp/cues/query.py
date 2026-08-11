@@ -172,6 +172,8 @@ def _normalize_query_filter(filter_name: str, value: Any) -> dict[str, Any]:
     if normalized not in QUERY_FILTERS:
         allowed = ", ".join(sorted(QUERY_FILTERS))
         raise ValueError(f"Unknown cue query filter {filter_name!r}; use one of: {allowed}")
+    if normalized == "continueMode":
+        _validate_continue_mode_filter(value)
     return {"filter": normalized, "value": value}
 
 def _normalize_optional_filters(filters: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
@@ -204,6 +206,40 @@ def _parse_bool_filter(value: Any) -> bool:
 def _string_equals(actual: Any, expected: Any) -> bool:
     return str(actual or "").casefold() == str(expected or "").casefold()
 
+
+_CONTINUE_MODE_QUERY_VALUES = {
+    "0": 0,
+    "do_not_continue": 0,
+    "1": 1,
+    "auto_continue": 1,
+    "autocontinue": 1,
+    "2": 2,
+    "auto_follow": 2,
+    "autofollow": 2,
+}
+
+
+def _canonical_continue_mode(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value in {0, 1, 2} else None
+    if isinstance(value, float) and value.is_integer():
+        integer = int(value)
+        return integer if integer in {0, 1, 2} else None
+    if isinstance(value, str):
+        normalized = value.strip().casefold().replace("-", "_").replace(" ", "_")
+        return _CONTINUE_MODE_QUERY_VALUES.get(normalized)
+    return None
+
+
+def _validate_continue_mode_filter(value: Any) -> None:
+    if _canonical_continue_mode(value) is None:
+        raise ValueError(
+            "continueMode must be 0, 1, 2, do_not_continue, auto_continue, or auto_follow"
+        )
+
+
 def _matches_bool_filter(actual: Any, expected: Any) -> bool:
     normalized = _coerce_qlab_bool(actual)
     return normalized is not None and normalized is _parse_bool_filter(expected)
@@ -233,7 +269,9 @@ def _cue_matches_filter(cue: dict[str, Any], cue_ref: dict[str, Any], query_filt
     if filter_name in {"type", "colorName"}:
         return _string_equals(cue.get(filter_name), expected)
     if filter_name == "continueMode":
-        return _string_equals(cue.get("continueMode"), expected)
+        actual_mode = _canonical_continue_mode(cue.get("continueMode"))
+        expected_mode = _canonical_continue_mode(expected)
+        return actual_mode is not None and actual_mode == expected_mode
     if filter_name == "hasPreWait":
         return _is_positive_number(cue.get("preWait")) is _parse_bool_filter(expected)
     if filter_name == "hasPostWait":

@@ -1,6 +1,6 @@
 # QLab MCP
 
-QLab MCP `0.2.0` is a FastMCP server for safely inspecting QLab 5 workspaces
+QLab MCP `0.3.0` is a FastMCP server for safely inspecting QLab 5 workspaces
 over OSC.
 
 **Read-only by default.** The normal tools inspect workspace state, cues,
@@ -143,7 +143,6 @@ Cue edit flow:
 | `qlab_create_cue` | Dry-runs or creates one template-based cue with exact anchor or empty-container placement; verifies identity and structure. |
 | `qlab_create_cues` | Creates an ordered template-based sequence with one verified `/new` per cue and no automatic rollback. |
 | `qlab_edit_cues` | Dry-runs or updates 1-50 concrete cues through the cue editing registry. |
-| `qlab_update_cues` | Compatibility alias for older prompts, tests, and clients. |
 | `qlab_move_cues` | Dry-runs or moves 1-10 exact UUID-addressed cues within or between Lists and Groups. |
 | `qlab_delete_cues` | Dry-runs explicit leaf deletion or empties one container deepest-first while preserving its root. |
 
@@ -559,7 +558,7 @@ Notes:
 - Sensitive `technical`, `full_sensitive`, and `exhaustive` reads bypass the
   cache.
 - `QLAB_UPDATE_DEBUG=true` adds per-item diagnostics to real
-  `qlab_edit_cues`/`qlab_update_cues` results, including requested and readback
+  `qlab_edit_cues` results, including requested and readback
   values. It is off by default, requires an MCP restart after changing the
   environment, and does not weaken write gates or verification.
 
@@ -603,7 +602,6 @@ qlab_check_write_readiness(workspace_id)
 qlab_create_cue(workspace_id, cue_type, after_cue_id=None, parent_container_id=None, dry_run=None, confirm_token=None)
 qlab_create_cues(workspace_id, cue_types, after_cue_id=None, parent_container_id=None, dry_run=None, confirm_token=None)
 qlab_edit_cues(workspace_id, updates, dry_run=None)
-qlab_update_cues(workspace_id, updates, dry_run=None)  # compatibility alias
 qlab_move_cues(workspace_id, moves, dry_run=None, confirm_token=None)
 qlab_delete_cues(workspace_id, cue_ids=None, container_id=None, recursive=False, dry_run=None, confirm_token=None)
 ```

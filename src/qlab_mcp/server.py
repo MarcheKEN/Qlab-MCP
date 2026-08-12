@@ -937,7 +937,7 @@ def qlab_get_cue_details(
                 "Read-only detail profile. Use auto for safe type-aware sections, health for warnings/broken cues, "
                 "inspector_safe for broader QLab Inspector-style details without file paths or scripts, "
                 "targets for target IDs without file paths, technical for notes/targets/routing/paths, "
-                "editable for safe details plus qlab_update_cues profile/property capabilities, "
+                "editable for safe details plus qlab_edit_cues profile/property capabilities, "
                 "full_sensitive for deep audits, and exhaustive for the deepest allowlisted read-only read "
                 "including heavy/sensitive payloads; exhaustive may be large."
             )
@@ -1185,43 +1185,6 @@ def qlab_edit_cues(
             )
         )
     )
-
-
-@mcp.tool(
-    title="Update QLab Cues (compatibility alias)",
-    tags={"qlab", "write-mode", "cue-update", "batch-update", "gated-write", "deprecated-alias"},
-    annotations=GATED_CREATE_QLAB_TOOL,
-    timeout=UPDATE_CUES_TIMEOUT,
-)
-def qlab_update_cues(
-    workspace_id: WorkspaceId,
-    updates: Annotated[
-        list[CueUpdateInput],
-        Field(
-            min_length=1,
-            max_length=50,
-            description=(
-                "Compatibility alias for qlab_edit_cues. Prefer qlab_edit_cues for new work. "
-                "Each item has cue_ref, profile, properties, operations, and optional confirm_gates "
-                "containing exact confirm_token values from reviewed dry-run planned_operations."
-            ),
-        ),
-    ],
-    dry_run: Annotated[
-        bool | None,
-        Field(
-            description=(
-                "When true, plan and diff the update but send no mutating commands. "
-                "When omitted, QLAB_WRITE_DRY_RUN_DEFAULT is used and defaults to true."
-            ),
-        ),
-    ] = None,
-) -> UpdateCuesResult:
-    """Compatibility alias for qlab_edit_cues.
-
-    Dry-run planning never sends mutating OSC. Prefer qlab_edit_cues for new work.
-    """
-    return qlab_edit_cues(workspace_id=workspace_id, updates=updates, dry_run=dry_run)
 
 
 @mcp.tool(

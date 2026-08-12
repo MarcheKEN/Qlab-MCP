@@ -1,7 +1,6 @@
 # qlab_edit_cues Runtime Checklist
 
-`qlab_edit_cues` is the preferred public tool name. `qlab_update_cues` remains a
-compatibility alias for older prompts, tests, and clients.
+`qlab_edit_cues` is the only public cue-edit tool.
 
 Use this checklist only on a disposable editable QLab test workspace.
 

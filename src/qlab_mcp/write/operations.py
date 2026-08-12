@@ -1105,7 +1105,7 @@ class QLabWriteMixin:
         operations: list[dict[str, Any]] | None = None,
         confirm_gates: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Compatibility wrapper for local Python callers; MCP exposes qlab_update_cues."""
+        """Compatibility wrapper for local Python callers; MCP exposes qlab_edit_cues."""
         raw_update = {
             "cue_ref": cue_ref,
             "profile": profile or COMMON_UPDATE_PROFILE,
@@ -1832,7 +1832,7 @@ class QLabWriteMixin:
         updates: list[dict[str, Any]],
         dry_run: bool | None = None,
     ) -> dict[str, Any]:
-        """Compatibility-forward alias; MCP exposes qlab_edit_cues and keeps qlab_update_cues."""
+        """Canonical batch-edit wrapper used by the qlab_edit_cues MCP tool."""
         return self.update_cues(workspace_id, updates, dry_run=dry_run)
 
 

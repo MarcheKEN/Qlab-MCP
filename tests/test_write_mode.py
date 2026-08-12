@@ -2910,7 +2910,6 @@ def test_check_write_readiness_reports_disabled_without_osc() -> None:
     assert result["passcode_configured"] is True
     assert result["capabilities"]["create_cue"]["dry_run_default"] is True
     assert result["capabilities"]["batch_update_cues"]["tool"] == "qlab_edit_cues"
-    assert result["capabilities"]["batch_update_cues"]["legacy_tool_aliases"] == ["qlab_update_cues"]
     assert result["capabilities"]["batch_update_cues"]["batch"] == {
         "min_items": 1,
         "max_items": 50,
@@ -2919,7 +2918,6 @@ def test_check_write_readiness_reports_disabled_without_osc() -> None:
         "preflight_before_any_setter": True,
         "setter_target": "cue_id",
     }
-    assert result["capabilities"]["edit_existing_cue"]["legacy_alias_for"] == "batch_update_cues"
     assert client.requests == []
 
 

@@ -1,6 +1,7 @@
 # Video Audio Runtime Validation
 
-Status: active; runtime validation pending after MCP restart.
+Status: active; runtime validation pending after MCP restart. This remains real
+work and is outside the 0.3.0 preparation.
 
 Historical research and completed Phase 8B/9A–9C evidence remain in
 [`020_video_embedded_audio_research.md`](../../../archive/workorders/research/020_video_embedded_audio_research.md).

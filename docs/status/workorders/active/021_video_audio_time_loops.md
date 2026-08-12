@@ -1,8 +1,8 @@
 # Video Phase 8B - Video Embedded Audio Time & Loops
 
-Status: status audit needed. This workorder records Phase 8B implementation and
-runtime-safety scope; confirm current validation status in
-`docs/status/roadmap.md`.
+Status: implemented locally; runtime validation pending. This workorder records
+Phase 8B implementation and runtime-safety scope; no new runtime probe is part
+of the 0.3.0 preparation.
 
 ## Sources
 

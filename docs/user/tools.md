@@ -1,6 +1,6 @@
 # Public MCP Tools
 
-QLab MCP 0.2.0 exposes exactly 14 tools. This page is a human index; the
+QLab MCP 0.3.0 exposes exactly 13 tools. This page is a human index; the
 decorated functions, generated schemas, and `tests/test_server_tools.py` are
 the source of truth for exact annotations and constraints.
 
@@ -17,7 +17,6 @@ the source of truth for exact annotations and constraints.
 | `qlab_create_cue` | `workspace_id`, `cue_type`, exactly one of `after_cue_id` or `parent_container_id`, `dry_run=None`, `confirm_token=None` | `CreateCueResult` | Gated structural write |
 | `qlab_create_cues` | `workspace_id`, ordered `cue_types`, exactly one initial placement selector, `dry_run=None`, `confirm_token=None` | `CreateCuesResult` | Gated sequential structural write |
 | `qlab_edit_cues` | `workspace_id`, `updates`, `dry_run=None` | `UpdateCuesResult` | Gated write |
-| `qlab_update_cues` | Same arguments and defaults as `qlab_edit_cues` | `UpdateCuesResult` | Compatible alias |
 | `qlab_move_cues` | `workspace_id`, `moves`, `dry_run=None`, `confirm_token=None` | `MoveCuesResult` | Gated structural write |
 | `qlab_delete_cues` | `workspace_id`, `cue_ids` or `container_id` + `recursive=true`, `dry_run=None`, `confirm_token=None` | `DeleteCuesResult` | Gated destructive write |
 
@@ -49,8 +48,7 @@ Recursive Delete accepts a container UUID, deletes descendants deepest-first,
 and preserves the root. Both Delete modes are sequential and non-atomic; real
 deletion requires its exact fresh `confirm:deleteCues:v1` token.
 
-`qlab_update_cues` calls `qlab_edit_cues` directly and remains available for
-older clients. Move and Delete are intentional public additions, not aliases.
+Move and Delete are intentional public additions, not aliases.
 
 Generate the current machine-readable schemas with:
 

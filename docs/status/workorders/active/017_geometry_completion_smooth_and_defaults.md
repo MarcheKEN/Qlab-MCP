@@ -1,8 +1,8 @@
 # Workorder 017 - Geometry Completion: Smooth and Defaults
 
-Status: status audit needed. This workorder records the local `smooth`
-implementation; confirm current runtime validation status in
-`docs/status/roadmap.md` before treating it as open or closed.
+Status: implemented locally; QLab runtime validation pending. This workorder
+records the local `smooth` implementation; no new runtime probe is part of the
+0.3.0 preparation.
 
 ## Research Summary
 

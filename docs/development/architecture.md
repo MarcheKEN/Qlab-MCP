@@ -1,7 +1,6 @@
 # Current Architecture
 
-This describes QLab MCP 0.2.0 at the security-hardened baseline
-`8a5a92c195e2cdab30cb381c124f2d726c0b4def`. Historical graphs and refactor
+This describes QLab MCP 0.3.0 at the security-hardened baseline. Historical graphs and refactor
 analysis live under [`docs/archive/`](../archive/README.md).
 
 The supported threat model and accepted risks are defined in the repository

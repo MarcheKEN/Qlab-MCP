@@ -8,12 +8,22 @@ import sys
 import tomllib
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / "docs/references/qlab_applescript_dictionary.md"
 HTML = ROOT / "docs/sources/qlab-5-applescript/applescript_dictionary_v5.local.html"
 SKILL_COPY = ROOT / "skills/qlab-5-applescript/references/qlab_applescript_dictionary.md"
 SKILL_MANIFEST = ROOT / "skills/qlab-5-applescript/references/source-manifest.json"
+AGENT_FILES = (
+    ROOT / ".codex/agents/qlab-applescript-researcher.toml",
+    ROOT / ".codex/agents/qlab-osc-researcher.toml",
+)
+LOCAL_AGENT_FIXTURES = pytest.mark.skipif(
+    not all(path.is_file() for path in AGENT_FILES),
+    reason="project-local .codex/agents fixtures are not part of the repository",
+)
 
 
 _EXTRACTOR_SPEC = importlib.util.spec_from_file_location(
@@ -79,6 +89,7 @@ def test_portable_skill_copy_and_manifest_are_consistent() -> None:
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
 
 
+@LOCAL_AGENT_FIXTURES
 def test_skill_and_agent_metadata_point_to_the_reference() -> None:
     skill = (ROOT / "skills/qlab-5-applescript/SKILL.md").read_text(encoding="utf-8")
     metadata = (ROOT / "skills/qlab-5-applescript/agents/openai.yaml").read_text(encoding="utf-8")
@@ -91,6 +102,7 @@ def test_skill_and_agent_metadata_point_to_the_reference() -> None:
     assert "qlab_applescript_dictionary.md" in agent["developer_instructions"]
 
 
+@LOCAL_AGENT_FIXTURES
 def test_dictionary_agents_explicitly_load_their_skills() -> None:
     apple = (ROOT / ".codex/agents/qlab-applescript-researcher.toml").read_text(encoding="utf-8")
     osc = (ROOT / ".codex/agents/qlab-osc-researcher.toml").read_text(encoding="utf-8")

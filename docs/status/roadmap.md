@@ -1,18 +1,17 @@
 # Active Roadmap
 
-Status: 2026-08-07
+Status: 2026-08-13 — 0.3.0 preparation
 
 ## Current state snapshot
 
-The canonical dated inventory is [`current-state.md`](current-state.md).
-It records the exact Git/worktree state, full and focused test output, and the
-latest QLab runtime probe. At the snapshot time MCP reported `qlab_unreachable`,
-so the runtime section is explicitly unverified rather than reusing an older
-workspace snapshot.
+The canonical dated inventory is [`current-state.md`](current-state.md). The
+current snapshot is provisional on the preparation branch; a docs-only PR will
+replace it after the 0.3.0 merge into `main` and before the release tag.
 
-Current local verification: focused Create/server contract checks pass; the
-full-suite count is pending after the template-only Create change. The full
-suite includes wheel/sdist build and artifact-membership checks.
+Current local verification: `2563 passed, 41 subtests passed` outside the
+managed socket sandbox. FastMCP inspection reports 13 tools and wheel/sdist
+builds report `0.3.0`. Linux CI remains the release gate. The suite includes
+wheel/sdist build and artifact-membership checks.
 
 Evidence terms follow [Current Docs](README.md): documented,
 source-confirmed, runtime-proven, inferred, and unsupported. Runtime claims
@@ -338,8 +337,7 @@ Video Phase 7F — Smooth Geometry:
 
 Cue I/O Phase 8A — Edit Cues and cue-level I/O selection:
 
-- local implementation exposes preferred `qlab_edit_cues` while keeping
-  `qlab_update_cues` as a compatibility alias
+- local implementation exposes `qlab_edit_cues` as the only public cue-edit tool
 - adds saved ID-only I/O real-write candidates using `confirm:videoIO:v1:`
 - `Video`: `stageID`, `audioOutputPatchID`
 - `Camera`: `stageID`, `audioOutputPatchID`, `videoInputPatchID`,
@@ -602,12 +600,13 @@ See:
 - `workorders/completed/014_rotation_quaternion_shutter_geometry.md`
 - `workorders/completed/015_quaternion_geometry_write.md`
 - `workorders/completed/016_safe_reset_rotation.md`
-- `workorders/017_geometry_completion_smooth_and_defaults.md`
+- `workorders/active/017_geometry_completion_smooth_and_defaults.md`
 - `workorders/completed/018_blend_mode_audit_and_completion.md`
-- `workorders/019_video_io_selection_edit_cues.md`
+- `workorders/active/019_video_io_selection_edit_cues.md`
 - `workorders/020_video_embedded_audio_research.md`
-- `workorders/021_video_audio_time_loops.md`
-- `workorders/022_slice_markers_audio_video.md`
+- `workorders/active/021_video_audio_time_loops.md`
+- `workorders/active/022_slice_markers_audio_video.md`
+- `workorders/active/029_video_audio_runtime_validation.md`
 
 ## Safety boundary
 

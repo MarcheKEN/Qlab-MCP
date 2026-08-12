@@ -86,7 +86,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "timeout": CUE_DETAILS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["details", "diagnostics", "qlab", "safe-read"],
-        "input_schema_hash": "9a8109c01c69e0241cdc3b062f128dfc64f322f7180589bfb534997f964ca704",
+        "input_schema_hash": "5a71f63ffc5db72a1b7f270fc16a03fe6942155a4eb8b22ef9bab4e0f8862925",
         "output_schema_hash": "f5d340a970b906607ed9c3a2015c17a8da6f3eee5d70b36971c26920aa14da72",
     },
     "qlab_get_workspace_overview": {
@@ -128,19 +128,6 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "tags": ["details", "inventory", "qlab", "query", "safe-read"],
         "input_schema_hash": "500535ba62fbc315e4af2af2fcd7074e41e16e0389bc4496925804a80edeb511",
         "output_schema_hash": "16613ad3378154e2b01bb1dabe40ba6d56ff1394ffea2ad960ae14cd775549a5",
-    },
-    "qlab_update_cues": {
-        "title": "Update QLab Cues (compatibility alias)",
-        "timeout": UPDATE_CUES_TIMEOUT,
-        "annotations": {
-            "readOnlyHint": False,
-            "destructiveHint": False,
-            "idempotentHint": False,
-            "openWorldHint": True,
-        },
-        "tags": ["batch-update", "cue-update", "deprecated-alias", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "1c6a057ebffa0ddc96500efad31a48663a392d288371d7c2fdb5b9ee46647ab9",
-        "output_schema_hash": "016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d",
     },
     "qlab_edit_cues": {
         "title": "Edit QLab Cues",
@@ -194,7 +181,6 @@ EXPECTED_DESCRIPTION_PHRASES = {
     "qlab_create_cue": ("dry-run plan", "Dry-run planning never sends mutating OSC"),
     "qlab_create_cues": ("one verified /new per item", "no automatic rollback"),
     "qlab_edit_cues": ("Dry-run planning never sends mutating OSC", "High-risk profiles"),
-    "qlab_update_cues": ("Compatibility alias", "qlab_edit_cues"),
     "qlab_move_cues": ("sequential QLab cue moves", "never claims atomicity"),
     "qlab_delete_cues": ("sequential deletions", "not atomic"),
 }
@@ -285,7 +271,7 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
     tools = asyncio.run(list_tools())
     tool_names = {tool.name for tool in tools}
 
-    assert len(tools) == 14
+    assert len(tools) == 13
     assert tool_names == set(EXPECTED_FASTMCP_TOOL_CONTRACTS)
     forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
     assert all(
@@ -640,7 +626,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    write_tools = {"qlab_create_cue", "qlab_create_cues", "qlab_edit_cues", "qlab_update_cues", "qlab_move_cues", "qlab_delete_cues"}
+    write_tools = {"qlab_create_cue", "qlab_create_cues", "qlab_edit_cues", "qlab_move_cues", "qlab_delete_cues"}
     read_only_tools = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) - write_tools
 
     for tool_name in read_only_tools:
@@ -665,11 +651,11 @@ def test_update_cues_fastmcp_schema_keeps_batch_contract() -> None:
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    update_schema = tools["qlab_update_cues"].inputSchema
+    update_schema = tools["qlab_edit_cues"].inputSchema
     update_properties = update_schema["properties"]
     update_items = update_properties["updates"]["items"]
     update_item_properties = update_items["properties"]
-    update_output = tools["qlab_update_cues"].outputSchema
+    update_output = tools["qlab_edit_cues"].outputSchema
 
     assert update_schema["required"] == ["workspace_id", "updates"]
     assert set(update_properties) == {"workspace_id", "updates", "dry_run"}
@@ -856,7 +842,6 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_create_cue",
         "qlab_create_cues",
         "qlab_edit_cues",
-        "qlab_update_cues",
         "qlab_move_cues",
         "qlab_delete_cues",
     }
@@ -1021,30 +1006,29 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "Dry-run planning" in edit.description
     assert "batch-edit" in edit.meta["fastmcp"]["tags"]
 
-    update = tools["qlab_update_cues"]
-    assert update.title == "Update QLab Cues (compatibility alias)"
-    assert "Dry-run planning" in update.description
-    assert "Compatibility alias" in update.description
-    assert "batch-update" in update.meta["fastmcp"]["tags"]
-    assert update.annotations.readOnlyHint is False
-    assert update.annotations.destructiveHint is False
-    assert update.annotations.idempotentHint is False
-    assert "workspace_id" in update.inputSchema["required"]
-    assert "updates" in update.inputSchema["required"]
-    assert "cue_ref" not in update.inputSchema["properties"]
-    assert update.inputSchema["properties"]["updates"]["minItems"] == 1
-    assert update.inputSchema["properties"]["updates"]["maxItems"] == 50
-    update_item = update.inputSchema["properties"]["updates"]["items"]["properties"]
-    assert update_item["cue_ref"]["minLength"] == 1
-    assert "Ambiguous refs" in update_item["cue_ref"]["description"]
-    assert "qlab_get_cue_details" in update_item["profile"]["description"]
-    assert "enum" not in update_item["profile"]
-    assert "updated_with_confirmed_timeouts" in update.outputSchema["properties"]["status"]["enum"]
-    assert "workspace_not_found" in update.outputSchema["properties"]["status"]["enum"]
-    assert "workspace_ambiguous" in update.outputSchema["properties"]["status"]["enum"]
-    assert "workspace_unavailable" in update.outputSchema["properties"]["status"]["enum"]
-    assert "per cue item" in update.outputSchema["properties"]["timeout_confirmed_count"]["description"]
-    result_item = update.outputSchema["properties"]["results"]["items"]["properties"]
+    edit = tools["qlab_edit_cues"]
+    assert edit.title == "Edit QLab Cues"
+    assert "Dry-run planning" in edit.description
+    assert "batch-edit" in edit.meta["fastmcp"]["tags"]
+    assert edit.annotations.readOnlyHint is False
+    assert edit.annotations.destructiveHint is False
+    assert edit.annotations.idempotentHint is False
+    assert "workspace_id" in edit.inputSchema["required"]
+    assert "updates" in edit.inputSchema["required"]
+    assert "cue_ref" not in edit.inputSchema["properties"]
+    assert edit.inputSchema["properties"]["updates"]["minItems"] == 1
+    assert edit.inputSchema["properties"]["updates"]["maxItems"] == 50
+    edit_item = edit.inputSchema["properties"]["updates"]["items"]["properties"]
+    assert edit_item["cue_ref"]["minLength"] == 1
+    assert "Ambiguous refs" in edit_item["cue_ref"]["description"]
+    assert "qlab_get_cue_details" in edit_item["profile"]["description"]
+    assert "enum" not in edit_item["profile"]
+    assert "updated_with_confirmed_timeouts" in edit.outputSchema["properties"]["status"]["enum"]
+    assert "workspace_not_found" in edit.outputSchema["properties"]["status"]["enum"]
+    assert "workspace_ambiguous" in edit.outputSchema["properties"]["status"]["enum"]
+    assert "workspace_unavailable" in edit.outputSchema["properties"]["status"]["enum"]
+    assert "per cue item" in edit.outputSchema["properties"]["timeout_confirmed_count"]["description"]
+    result_item = edit.outputSchema["properties"]["results"]["items"]["properties"]
     assert "dry_run_preflight_failed" in result_item["status"]["enum"]
     assert "QLAB_UPDATE_DEBUG" in result_item["debug"]["description"]
 
@@ -1088,10 +1072,9 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
                 "qlab_query_cues",
                 "qlab_get_cue_details",
                 "qlab_check_write_readiness",
-        "qlab_create_cue",
-        "qlab_create_cues",
+                "qlab_create_cue",
+                "qlab_create_cues",
                 "qlab_edit_cues",
-                "qlab_update_cues",
             )
         }
 
@@ -1108,7 +1091,6 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
         "qlab_create_cue": CREATE_CUE_TIMEOUT,
         "qlab_create_cues": CREATE_CUES_TIMEOUT,
         "qlab_edit_cues": UPDATE_CUES_TIMEOUT,
-        "qlab_update_cues": UPDATE_CUES_TIMEOUT,
     }
 
 

@@ -9,6 +9,16 @@
 - Records delayed UDP reply correlation as a separate follow-up from source-port
   authenticity.
 
+## 0.3.0
+
+- Establishes the 13-tool public FastMCP contract for QLab inspection and gated
+  Create, Edit, Move, and Delete workflows.
+- Removes the breaking `qlab_update_cues` compatibility alias; use
+  `qlab_edit_cues` for cue edits.
+- Carries forward sequential Create, recursive Delete, hardened write/readback
+  behavior, and release CI/packaging checks without adding new QLab runtime
+  claims.
+
 ## 0.2.0
 
 - Exposes 13 public MCP tools for QLab inspection and gated cue creation,

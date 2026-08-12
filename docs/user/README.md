@@ -1,6 +1,6 @@
 # User Guide
 
-QLab MCP 0.2.0 inspects QLab 5 and provides narrowly gated write workflows. It
+QLab MCP 0.3.0 inspects QLab 5 and provides narrowly gated write workflows. It
 does not expose playback or raw OSC.
 
 ## Start
@@ -68,6 +68,6 @@ enabled types, while operational readiness remains a separate QLab readback.
 `qlab_delete_cues` can also empty a container with `container_id` and
 `recursive=true`; it deletes descendants deepest-first and preserves the root.
 
-See the [14 public tools](tools.md), the
+See the [13 public tools](tools.md), the
 [runtime Create checklist](../development/runtime-validation/create-cues.md), and the
 [runtime edit checklist](../development/runtime-validation/edit-cues.md).

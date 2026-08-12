@@ -10,9 +10,9 @@ en `main`, antes del tag `v0.3.0`.
 
 ```text
 branch: codex/docs
-HEAD: ccb2f45ed5e55e60c83aa2ba568b765726b3c86d
+HEAD: preparación local; consultar `git rev-parse HEAD`
 base: HEAD == origin/main, divergencia local 0/0 en la verificación inicial
-worktree: cambios de preparación 0.3.0 en curso
+worktree: commit local de preparación 0.3.0; snapshot aún provisional
 ```
 
 La referencia remota se verificó con `git fetch origin` y

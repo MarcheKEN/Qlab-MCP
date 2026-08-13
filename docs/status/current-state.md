@@ -11,7 +11,7 @@ en `main`, antes del tag `v0.3.0`.
 ```text
 branch: codex/docs
 HEAD: preparación local; consultar `git rev-parse HEAD`
-base: HEAD == origin/main, divergencia local 0/0 en la verificación inicial
+base: origin/main verificado antes de iniciar; la rama contiene commits locales de preparación
 worktree: commit local de preparación 0.3.0; snapshot aún provisional
 ```
 
@@ -31,16 +31,12 @@ La referencia remota se verificó con `git fetch origin` y
 
 Los entornos temporales `pip install -e ".[dev]"` y
 `uv sync --locked --no-editable --python 3.11 --extra dev` instalaron
-correctamente en la comparación inicial. La suite completa de 0.3.0 pasó fuera
-del sandbox, donde los tests UDP pueden abrir sockets:
-
-```text
-2563 passed, 41 subtests passed
-```
+correctamente en la comparación inicial. La suite enfocada de contrato MCP y
+write pasó con `2226 passed`; la suite completa de release y la verificación
+Linux de CI siguen pendientes.
 
 La inspección FastMCP reportó 13 tools y `uv build` generó wheel y sdist
-`0.3.0`. La verificación Linux de CI y el snapshot final posterior al merge
-siguen pendientes.
+`0.3.0`. El snapshot final posterior al merge sigue pendiente.
 
 ## Workorders activos
 
@@ -52,6 +48,9 @@ QLab ni convierte implementación local en evidencia runtime.
 La auditoría arquitectónica acotada está documentada en
 [`architecture-audit-0.3.0.md`](architecture-audit-0.3.0.md) y concluye
 `no extraction for 0.3.0`.
+
+La investigación agent-facing y de limpieza de Edit está documentada en
+[`2026-08-13-mcp-agent-ux-and-edit-cleanup.md`](../development/research/2026-08-13-mcp-agent-ux-and-edit-cleanup.md).
 
 ## Límite de evidencia
 

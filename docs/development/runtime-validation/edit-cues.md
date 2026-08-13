@@ -4,7 +4,7 @@
 
 Use this checklist only on a disposable editable QLab test workspace.
 
-Hard limits:
+## Hard limits
 
 - Use only QLab MCP tools.
 - Use explicit `workspace_id` on every tool call.
@@ -19,7 +19,7 @@ Hard limits:
   the intended test media root.
 - Run `dry_run=true` before any `dry_run=false` write.
 
-Public write-tool confirmation boundaries:
+## Public write-tool confirmation boundaries
 
 - `qlab_create_cue` / `qlab_create_cues`: review the dry-run first, pass the
   exact dedicated token, and follow the separate [`create-cues.md`](create-cues.md)
@@ -32,7 +32,7 @@ Public write-tool confirmation boundaries:
   pass its exact dedicated tool-level `confirm_token`. Restarting the MCP
   invalidates previously issued Move and Delete tokens.
 
-Preflight:
+## Preflight
 
 1. `qlab_check_connection(require_read_access=true)`.
 2. Select a clearly disposable/test workspace. Stop if ambiguous.
@@ -44,7 +44,7 @@ Preflight:
    - `/showMode` reports Edit Mode
    - `blockers=[]`
 
-Batch timeout smoke:
+## Batch timeout smoke
 
 1. Pick 20-50 existing disposable test cues with concrete cue IDs.
 2. Read current `flagged` and `colorName` with `qlab_get_cue_details(profile="basic_safe")`.
@@ -67,7 +67,7 @@ Batch timeout smoke:
    - Each timed-out setter has `status="timeout_pending_verification"`.
    - Each result `after` confirms requested values.
 
-Rollback smoke:
+## Rollback smoke
 
 1. Run `qlab_edit_cues(..., dry_run=true)` with the exact before values.
 2. Expected rollback dry-run:
@@ -82,7 +82,7 @@ Rollback smoke:
    - `failed_count=0`
 5. Verify final values with `qlab_get_cue_details(profile="basic_safe")`.
 
-Safety block smoke:
+## Safety block smoke
 
 1. Pick one returned `dry_run_only_properties` field from
    `qlab_get_cue_details(profile="editable")`, preferably a clear test cue.
@@ -97,7 +97,7 @@ Safety block smoke:
    - no mutating setter execution
    - no playback/control/raw OSC
 
-Playlist Group smoke:
+## Playlist Group smoke
 
 1. Use only a disposable workspace and explicit workspace/cue UUIDs. The Group
    and every direct child must be inactive; do not use GO, playback, audition,
@@ -137,7 +137,7 @@ short/equal active crossfade behavior remains unconfirmed. All-zero-child
 Loop, warning-only Groups, active/auditioning Groups, live token expiry, and
 live MCP restart invalidation remain separate follow-up limits.
 
-Mic input routing smoke:
+## Mic input routing smoke
 
 1. Run `qlab_edit_cues(..., dry_run=true)` for `mic_basic.channelOffset`.
 2. Expected dry-run:
@@ -149,7 +149,7 @@ Mic input routing smoke:
    - no `/channelOffset` setter is sent
    - error names `patch_routing`
 
-Editable duration smoke:
+## Editable duration smoke
 
 1. Pick one disposable Wait or Memo cue where
    `qlab_get_cue_details(profile="editable")` reports
@@ -167,7 +167,7 @@ Editable duration smoke:
    - setter uses `/cue_id/{uniqueID}/duration`
    - read-after-write confirms value within numeric tolerance
 
-Target resolution smoke:
+## Target resolution smoke
 
 1. Pick one disposable target cue and one disposable Start/Stop/Pause/Load/GoTo/Arm/Disarm cue.
 2. If the source is initially untargeted and QLab reports it broken solely
@@ -194,7 +194,7 @@ Target resolution smoke:
 10. Repeat with an already-targeted or warning/broken source; it must remain
     blocked before any setter.
 
-Network OSC Message smoke:
+## Network OSC Message smoke
 
 1. Pick one disposable, healthy, inactive Network cue whose current patch is
    freshly classified as `OSC Message`.
@@ -205,7 +205,7 @@ Network OSC Message smoke:
 5. Treat `networkPatchID` reassignment as blocked/planned-only. Do not execute
    it: the tested reassignment left the cue broken.
 
-`QLAB_UPDATE_DEBUG` diagnostics:
+## `QLAB_UPDATE_DEBUG` diagnostics
 
 - Default is `false`. Set `QLAB_UPDATE_DEBUG=true` before starting the MCP only
   for deliberate Edit diagnostics.
@@ -215,7 +215,7 @@ Network OSC Message smoke:
 - This flag changes result diagnostics only; it does not weaken readiness,
   confirmation, health, activity, or readback gates.
 
-Capability gate smoke:
+## Capability gate smoke
 
 1. Pick one disposable cue and one high-risk property whose
    `planned_operations[]` includes a `capability_gate`.
@@ -232,7 +232,7 @@ Capability gate smoke:
    - fresh read-after-write verifies the requested value when the property is readable
    - report any property that cannot be read back as inconclusive, not passed
 
-Recommended dry-run capability labels to exercise on a dummy workspace:
+### Recommended dry-run capability labels
 
 - `cue_behavior`
 - `target_resolution`
@@ -251,7 +251,7 @@ Recommended dry-run capability labels to exercise on a dummy workspace:
 - `midi_output`
 - `script_compile`
 
-Report:
+## Report
 
 - workspace name and ID
 - cue count and cue IDs tested

@@ -39,6 +39,10 @@ Linux de CI sigue pendiente.
 La inspección FastMCP reportó 13 tools y `uv build` generó wheel y sdist
 `0.3.0`. El snapshot final posterior al merge sigue pendiente.
 
+Un checkout limpio generado con `git archive` pasó el flujo reproducible con
+`2580 passed, 4 skipped, 41 subtests passed`; los skips corresponden a fixtures
+locales `.codex/agents/` ausentes. Este resultado local no sustituye GitHub CI.
+
 ## Workorders activos
 
 Los workorders 017, 019, 021 y 022 quedan clasificados como implementación local

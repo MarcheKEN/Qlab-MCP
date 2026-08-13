@@ -14,6 +14,11 @@ passed` outside the managed socket sandbox. FastMCP inspection reports 13 tools
 and wheel/sdist builds report `0.3.0`; Linux CI remains the external release
 gate. Artifact-membership checks passed locally.
 
+A clean `git archive` checkout also passed `uv sync --locked`, lock validation,
+the suite (`2580 passed, 4 skipped, 41 subtests passed`), and the package build;
+the four skips are intentionally local `.codex/agents/` fixtures. This is local
+clean-checkout evidence, not GitHub CI.
+
 Evidence terms follow [Current Docs](README.md): documented,
 source-confirmed, runtime-proven, inferred, and unsupported. Runtime claims
 below apply only to their named QLab version and procedure. The local reference

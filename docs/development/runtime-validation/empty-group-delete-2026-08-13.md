@@ -47,6 +47,11 @@ fingerprint, and deletion-impact fingerprint. Real execution remains one
 sequential mutator followed by fresh absence and neighbor readback; no retry or
 automatic rollback was added.
 
+The internal removal of `QLabReader.update_cues()` was completed in the
+preceding Agent UX/Edit cleanup iteration; this Empty Group Delete task did not
+modify that architecture. Earlier research reports retain their historical
+baseline and are not rewritten.
+
 ## Runtime evidence
 
 For each fixture the same fresh MCP session performed:
@@ -80,9 +85,9 @@ deletions). The final status scan reported `running_count=0` and
 
 ## Verification
 
-- Focused Delete suite: `20 passed`
-- Server contract + write-mode tests: `2242 passed`
-- Full local suite: `2589 passed, 41 subtests passed`
+- Focused Delete suite: `27 passed`
+- Server contract + write-mode tests: `2269 passed`
+- Full local suite: `2593 passed, 41 subtests passed`
 - FastMCP inspect: 13 tools, version `0.3.0`
 - `uv lock --check`: passed
 - `uv build`: wheel and sdist `0.3.0`

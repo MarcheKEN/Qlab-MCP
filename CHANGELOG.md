@@ -17,6 +17,8 @@
   `qlab_edit_cues` for cue edits.
 - Removes the duplicate `batch_update_cues` readiness capability key; use
   `edit_existing_cue` as the canonical Edit capability.
+- Marks Edit and Move as conservatively destructive MCP metadata hints; runtime
+  safety gates, confirmation tokens, execution, and QLab behavior are unchanged.
 - Carries forward sequential Create, recursive Delete, hardened write/readback
   behavior, and release CI/packaging checks without adding new QLab runtime
   claims.

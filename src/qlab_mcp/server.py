@@ -193,7 +193,7 @@ GATED_CREATE_QLAB_TOOL = ToolAnnotations(
     idempotentHint=False,
     openWorldHint=True,
 )
-GATED_DELETE_QLAB_TOOL = ToolAnnotations(
+GATED_DESTRUCTIVE_QLAB_TOOL = ToolAnnotations(
     readOnlyHint=False,
     destructiveHint=True,
     idempotentHint=False,
@@ -1153,7 +1153,7 @@ def qlab_create_cues(
 @mcp.tool(
     title="Edit QLab Cues",
     tags={"qlab", "write-mode", "cue-edit", "batch-edit", "gated-write"},
-    annotations=GATED_CREATE_QLAB_TOOL,
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
     timeout=UPDATE_CUES_TIMEOUT,
 )
 def qlab_edit_cues(
@@ -1206,7 +1206,7 @@ def qlab_edit_cues(
 @mcp.tool(
     title="Move QLab Cues",
     tags={"qlab", "write-mode", "cue-move", "gated-write"},
-    annotations=GATED_CREATE_QLAB_TOOL,
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
     timeout=UPDATE_CUES_TIMEOUT,
 )
 def qlab_move_cues(
@@ -1259,7 +1259,7 @@ def qlab_move_cues(
 @mcp.tool(
     title="Delete QLab Cues",
     tags={"qlab", "write-mode", "cue-delete", "gated-write"},
-    annotations=GATED_DELETE_QLAB_TOOL,
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
     timeout=DELETE_CUES_TIMEOUT,
 )
 def qlab_delete_cues(

@@ -134,7 +134,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "timeout": UPDATE_CUES_TIMEOUT,
         "annotations": {
             "readOnlyHint": False,
-            "destructiveHint": False,
+            "destructiveHint": True,
             "idempotentHint": False,
             "openWorldHint": True,
         },
@@ -147,7 +147,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "timeout": UPDATE_CUES_TIMEOUT,
         "annotations": {
             "readOnlyHint": False,
-            "destructiveHint": False,
+            "destructiveHint": True,
             "idempotentHint": False,
             "openWorldHint": True,
         },
@@ -707,7 +707,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
 
     for tool_name in write_tools:
         assert tools[tool_name].annotations.readOnlyHint is False, f"{tool_name} was marked read-only"
-        if tool_name == "qlab_delete_cues":
+        if tool_name in {"qlab_edit_cues", "qlab_move_cues", "qlab_delete_cues"}:
             assert tools[tool_name].annotations.destructiveHint is True
         else:
             assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
@@ -1089,7 +1089,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "Dry-run planning" in edit.description
     assert "batch-edit" in edit.meta["fastmcp"]["tags"]
     assert edit.annotations.readOnlyHint is False
-    assert edit.annotations.destructiveHint is False
+    assert edit.annotations.destructiveHint is True
     assert edit.annotations.idempotentHint is False
     assert "workspace_id" in edit.inputSchema["required"]
     assert "updates" in edit.inputSchema["required"]
@@ -1111,6 +1111,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "QLAB_UPDATE_DEBUG" in result_item["debug"]["description"]
 
     move = tools["qlab_move_cues"]
+    assert move.annotations.destructiveHint is True
     move_item = move.inputSchema["properties"]["moves"]["items"]["properties"]
     assert "Exact source cue UUID" in move_item["cue_id"]["description"]
     assert "exactly one linear placement field" in move_item["destination_index"]["description"]

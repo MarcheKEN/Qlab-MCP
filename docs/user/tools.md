@@ -1,56 +1,45 @@
 # Public MCP Tools
 
-QLab MCP 0.3.0 exposes exactly 13 tools. This page is a human index; the
-decorated functions, generated schemas, and `tests/test_server_tools.py` are
-the source of truth for exact annotations and constraints.
+QLab MCP 0.3.0 exposes exactly 13 tools. This page is a compact human
+catalogue; decorated functions, generated schemas, and
+`tests/test_server_tools.py` remain the source of truth for exact parameters,
+annotations, and result models.
 
-| Tool | Arguments and defaults | Return | Mode |
+| Tool | Purpose | Not for | Workflow |
 | --- | --- | --- | --- |
-| `qlab_check_connection` | `workspace_id=None`, `require_read_access=True` | `QlabConnectionCheckResult` | Read-only |
-| `qlab_get_workspace_overview` | `workspace_id=None`, `max_depth=2`, `max_cues=1000`, `include_live_state=False`, `include_cue_index=True`, `max_index_cues=5000`, `cue_index_profile="minimal"`, `include_global_count=False` | `WorkspaceOverviewResult` | Read-only |
-| `qlab_get_workspace_status` | `workspace_id`, `profile="summary"`, `include_timecode=True`, `max_cues_scanned=1000`, `sample_limit=10` | `WorkspaceStatusResult` | Read-only |
-| `qlab_get_workspace_settings` | `workspace_id`, `mode="summary"`, `sections=None`, `requests=None`, `profile="safe"` | `WorkspaceSettingsResult` | Read-only |
-| `qlab_get_workspace_setting_details` | `workspace_id`, `section`, `kind=None`, `ref=None`, `profile="safe"` | `WorkspaceSettingDetailsResult` | Read-only compatibility wrapper |
-| `qlab_query_cues` | `workspace_id`, `primary_filter`, `primary_value`, `optional_filters=None`, `profile="basic_safe"`, `max_results=500`, `max_cues_scanned=500` | `CueQueryResult` | Read-only |
-| `qlab_get_cue_details` | `workspace_id`, `cue_ref`, `profile="auto"` | `CueDetailsResult` or `CueDetailsBatchResult` | Read-only |
-| `qlab_check_write_readiness` | `workspace_id` | `WriteReadinessResult` | Read-only preflight |
-| `qlab_create_cue` | `workspace_id`, `cue_type`, exactly one of `after_cue_id` or `parent_container_id`, `dry_run=None`, `confirm_token=None` | `CreateCueResult` | Gated structural write |
-| `qlab_create_cues` | `workspace_id`, ordered `cue_types`, exactly one initial placement selector, `dry_run=None`, `confirm_token=None` | `CreateCuesResult` | Gated sequential structural write |
-| `qlab_edit_cues` | `workspace_id`, `updates`, `dry_run=None` | `UpdateCuesResult` | Gated write |
-| `qlab_move_cues` | `workspace_id`, `moves`, `dry_run=None`, `confirm_token=None` | `MoveCuesResult` | Gated structural write |
-| `qlab_delete_cues` | `workspace_id`, `cue_ids` or `container_id` + `recursive=true`, `dry_run=None`, `confirm_token=None` | `DeleteCuesResult` | Gated destructive write |
+| `qlab_check_connection` | Reachability, workspace candidates, scopes, and mode | Write readiness or cue details | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_overview` | Bounded cue-list/group/cart structure | Deep properties or operational status | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_status` | Derived status, warnings, and timecode context | A full QLab Status-window clone | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_settings` | Settings summary or independent detail requests | Mutating patches/routes | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_setting_details` | One settings detail request | Batch settings discovery | [Read](agent-workflows.md#read-sequence) |
+| `qlab_query_cues` | Bounded filtered cue discovery | Full Inspector payloads | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_cue_details` | Exact cue properties and health | Ambiguous write target resolution | [Read](agent-workflows.md#read-sequence) |
+| `qlab_check_write_readiness` | Read-only preflight before any write | Confirmation or authorization alone | [Common write gate](agent-workflows.md#common-write-gate) |
+| `qlab_create_cue` | One template-backed structural creation | Initial setters, playback, or GO | [Create](agent-workflows.md#create-one-cue) |
+| `qlab_create_cues` | Ordered sequential creation, 1–50 items | Atomic transaction or rollback | [Create batch](agent-workflows.md#create-a-sequence) |
+| `qlab_edit_cues` | Allowlisted property/operation edits, 1–50 items | Create, Move, Delete, playback, or raw OSC | [Edit](agent-workflows.md#edit-existing-cues) |
+| `qlab_move_cues` | Sequential structural moves, 1–10 UUID targets | Playback or unproven Cart writes | [Move](agent-workflows.md#move-existing-cues) |
+| `qlab_delete_cues` | Explicit leaf deletion or root-preserving recursive emptying | Root deletion or automatic rollback | [Delete](agent-workflows.md#delete-cues) |
 
-`dry_run=None` follows `QLAB_WRITE_DRY_RUN_DEFAULT`, which defaults to dry-run.
-Create accepts the generic cue types exposed by the Create input enum (memo,
-group, wait, audio, mic, video, camera, text, light, fade, network, midi,
-midi_file, timecode, start, stop, pause, load, reset, devamp, goto, target, arm,
-or disarm). Script and container cues remain outside the contract. It has no
-initial properties argument and sends no property setters: QLab's Cue Template
-supplies the cue's default state. Real Create requires a fresh `confirm:createCue:v2`
-token bound to the workspace structure and returns a structured
-`CreateCueResult` with the created UUID, placement, fresh verification,
-executed operations, warnings/errors, and `cleanup_required`/manual cleanup
-guidance. `after_cue_id` uses the anchored route. `parent_container_id` uses
-`currentCueListID` plus unanchored `/new` for an empty Cue List, `/new` plus
-one `/move` for an empty Group, and direct `/new` with Cart request coordinates
-`0,0` for an empty Cue Cart. In QLab 5.5.10 the first Cart cell is reported as
-readback coordinates `1,1`; the verifier handles that runtime normalization.
-An ambiguous `/new` timeout is never retried and receives no setters. A cue can
-be created successfully while QLab reports it broken or warning; `created` does
-not mean ready for GO. Health readback is `healthy`, `broken`, `warning`, or
-`unknown`; active-state flags remain safety failures.
-`qlab_create_cues` creates one item per `/new`, chains the verified UUID into the
-next item, and stops without rollback on the first ambiguity or failure. Edit
-accepts 1–50 updates; a sequence started in an empty Cue Cart is limited to one
-cue because Cart cells have no linear order. Explicit Delete accepts 1–10 exact
-UUID targets.
-Recursive Delete accepts a container UUID, deletes descendants deepest-first,
-and preserves the root. Both Delete modes are sequential and non-atomic; real
-deletion requires its exact fresh `confirm:deleteCues:v1` token.
+## Shared contract
 
-Move and Delete are intentional public additions, not aliases.
+- Writes default to dry-run and require readiness, exact targets, fresh
+  confirmation, and post-write readback.
+- Edit confirmation is per planned operation; Create, Move, and Delete use
+  dedicated token families.
+- Batches are sequential/non-transactional unless a tool description says
+  otherwise. Timeout or identity ambiguity means inspect first; do not retry.
+- `destructiveHint` is MCP metadata, not authorization. Runtime gates remain
+  authoritative.
+- The server intentionally exposes no GO, stop, panic, playback, Audition,
+  raw OSC, AppleScript write, or `/live` workflow.
 
-Generate the current machine-readable schemas with:
+For full examples and failure handling, use the
+[agent workflow guide](agent-workflows.md). For maintainer evidence, use the
+[Create](../development/runtime-validation/create-cues.md) and
+[Edit](../development/runtime-validation/edit-cues.md) checklists.
+
+Inspect the generated contract without connecting to QLab:
 
 ```bash
 uv run fastmcp inspect fastmcp.json

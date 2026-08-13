@@ -1,4 +1,4 @@
-"""Gated deletion of explicit leaves or one recursively emptied container."""
+"""Gated deletion of explicit leaves, one empty Group, or one emptied container."""
 
 from __future__ import annotations
 

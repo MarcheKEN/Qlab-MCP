@@ -17,6 +17,8 @@ SECOND_ID = "55555555-5555-4555-8555-555555555555"
 THIRD_ID = "66666666-6666-4666-8666-666666666666"
 NESTED_ID = "77777777-7777-4777-8777-777777777777"
 CART_ID = "88888888-8888-4888-8888-888888888888"
+OTHER_GROUP_ID = "99999999-9999-4999-8999-999999999999"
+MISSING_GROUP_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 
 
 def test_delete_mode_reuses_canonical_container_types() -> None:
@@ -340,6 +342,90 @@ def test_delete_cues_rejects_active_empty_group_before_mutation() -> None:
     assert result["status"] == "preflight_failed"
     assert "active" in str(result["errors"]).lower()
     assert reader.requests == []
+
+
+def test_delete_cues_rejects_missing_or_wrong_token_for_empty_group(monkeypatch: pytest.MonkeyPatch) -> None:
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    monkeypatch.setattr(deletes, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    planned = deletes.delete_cues(reader, WORKSPACE_ID, container_id=GROUP_ID, dry_run=True)
+
+    missing = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        dry_run=False,
+        confirm_token=None,
+    )
+    wrong = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        dry_run=False,
+        confirm_token=planned["confirm_token"] + "wrong",
+    )
+
+    assert missing["status"] == "preflight_failed"
+    assert "required" in str(missing["errors"]).lower()
+    assert wrong["status"] == "preflight_failed"
+    assert "invalid" in str(wrong["errors"]).lower()
+    assert [address for address, _ in reader.requests if "/delete_id/" in address] == []
+
+
+def test_delete_cues_rejects_group_token_replay_for_different_group(monkeypatch: pytest.MonkeyPatch) -> None:
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    reader.children[LIST_ID].append(OTHER_GROUP_ID)
+    reader.nodes[OTHER_GROUP_ID] = {"uniqueID": OTHER_GROUP_ID, "type": "Group"}
+    monkeypatch.setattr(deletes, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    planned = deletes.delete_cues(reader, WORKSPACE_ID, container_id=GROUP_ID, dry_run=True)
+
+    result = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=OTHER_GROUP_ID,
+        dry_run=False,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "does not match" in str(result["errors"]).lower()
+    assert GROUP_ID in reader.nodes
+    assert OTHER_GROUP_ID in reader.nodes
+    assert [address for address, _ in reader.requests if "/delete_id/" in address] == []
+
+
+def test_delete_cues_rejects_nonexistent_direct_group() -> None:
+    from qlab_mcp.write.deletes import delete_cues
+
+    reader = DeleteReader()
+    result = delete_cues(reader, WORKSPACE_ID, container_id=MISSING_GROUP_ID, dry_run=True)
+
+    assert result["status"] == "preflight_failed"
+    assert "does not resolve" in str(result["errors"]).lower()
+    assert reader.requests == []
+
+
+def test_delete_cues_keeps_empty_cue_list_and_cart_direct_delete_blocked() -> None:
+    from qlab_mcp.write.deletes import delete_cues
+
+    empty_list_reader = DeleteReader()
+    empty_list_reader.children[LIST_ID] = []
+    empty_list = delete_cues(empty_list_reader, WORKSPACE_ID, container_id=LIST_ID, dry_run=True)
+
+    empty_cart_reader = DeleteReader()
+    empty_cart_reader.children[LIST_ID].append(CART_ID)
+    empty_cart_reader.nodes[CART_ID] = {"uniqueID": CART_ID, "type": "Cue Cart"}
+    empty_cart = delete_cues(empty_cart_reader, WORKSPACE_ID, container_id=CART_ID, dry_run=True)
+
+    assert empty_list["status"] == "preflight_failed"
+    assert "only an empty group" in str(empty_list["errors"]).lower()
+    assert empty_cart["status"] == "preflight_failed"
+    assert "only an empty group" in str(empty_cart["errors"]).lower()
+    assert empty_list_reader.requests == []
+    assert empty_cart_reader.requests == []
 
 
 def test_delete_cues_rejects_parent_and_descendant_batch() -> None:

@@ -33,7 +33,7 @@ Los entornos temporales `pip install -e ".[dev]"` y
 `uv sync --locked --no-editable --python 3.11 --extra dev` instalaron
 correctamente en la comparación inicial. La suite enfocada de contrato MCP y
 write pasó con `2242 passed`; la suite completa local pasó con
-`2589 passed, 41 subtests passed` fuera del sandbox gestionado. La verificación
+`2593 passed, 41 subtests passed` fuera del sandbox gestionado. La verificación
 Linux de CI sigue pendiente.
 
 La inspección FastMCP reportó 13 tools y `uv build` generó wheel y sdist

@@ -20,7 +20,7 @@ schemas or the server-side safety checks.
 | Create an ordered sequence | `qlab_create_cues` | Atomic transactions or automatic rollback |
 | Edit allowlisted properties and operations | `qlab_edit_cues` | Create, Move, Delete, playback, or raw OSC |
 | Move existing cues structurally | `qlab_move_cues` | Playback or Cart writes not runtime-proven |
-| Delete leaves or empty one preserved container | `qlab_delete_cues` | Deleting the requested root or automatic rollback |
+| Delete leaves, one empty Group, or empty one preserved container | `qlab_delete_cues` | Deleting the requested root or automatic rollback |
 
 ## Read sequence
 

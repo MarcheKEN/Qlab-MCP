@@ -32,8 +32,9 @@ La referencia remota se verificó con `git fetch origin` y
 Los entornos temporales `pip install -e ".[dev]"` y
 `uv sync --locked --no-editable --python 3.11 --extra dev` instalaron
 correctamente en la comparación inicial. La suite enfocada de contrato MCP y
-write pasó con `2226 passed`; la suite completa de release y la verificación
-Linux de CI siguen pendientes.
+write pasó con `2245 passed, 1 skipped`; la suite completa local pasó con
+`2584 passed, 41 subtests passed` fuera del sandbox gestionado. La verificación
+Linux de CI sigue pendiente.
 
 La inspección FastMCP reportó 13 tools y `uv build` generó wheel y sdist
 `0.3.0`. El snapshot final posterior al merge sigue pendiente.

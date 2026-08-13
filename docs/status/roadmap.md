@@ -8,10 +8,11 @@ The canonical dated inventory is [`current-state.md`](current-state.md). The
 current snapshot is provisional on the preparation branch; a docs-only PR will
 replace it after the 0.3.0 merge into `main` and before the release tag.
 
-Current focused verification: `2226 passed` for the MCP/write contract suite.
-FastMCP inspection reports 13 tools and wheel/sdist builds report `0.3.0`. The
-full release suite and Linux CI remain release gates. Artifact-membership checks
-are part of that release verification.
+Current focused verification: `2245 passed, 1 skipped` for the MCP/write
+contract suite. The full local suite passed with `2584 passed, 41 subtests
+passed` outside the managed socket sandbox. FastMCP inspection reports 13 tools
+and wheel/sdist builds report `0.3.0`; Linux CI remains the external release
+gate. Artifact-membership checks passed locally.
 
 Evidence terms follow [Current Docs](README.md): documented,
 source-confirmed, runtime-proven, inferred, and unsupported. Runtime claims

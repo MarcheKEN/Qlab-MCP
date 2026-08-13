@@ -246,6 +246,28 @@ def test_fastmcp_json_points_to_stdio_server_without_write_env() -> None:
     assert "QLAB_WRITE_DRY_RUN_DEFAULT" not in deployment_env
 
 
+def test_fastmcp_initialization_reports_project_version_and_universal_guidance() -> None:
+    async def initialize():
+        async with Client(mcp) as client:
+            return client.initialize_result
+
+    initialize_result = asyncio.run(initialize())
+    assert initialize_result.serverInfo.version == "0.3.0"
+    instructions = initialize_result.instructions
+    assert instructions
+    for phrase in (
+        "exact UUIDs",
+        "qlab_check_write_readiness",
+        "dry-run",
+        "fresh readback",
+        "Do not retry",
+        "GO-ready",
+        "QLab 5.5.10",
+    ):
+        assert phrase in instructions
+    assert "seven inspector tools" not in instructions
+
+
 def test_fastmcp_tool_contract_snapshot_matches_current_public_surface() -> None:
     assert asyncio.run(_tool_contract_snapshot()) == EXPECTED_FASTMCP_TOOL_CONTRACTS
 

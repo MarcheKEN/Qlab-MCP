@@ -11,6 +11,7 @@ from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from . import __version__
 from .errors import QLabMcpError
 from .models import (
     CreateCuesResult,
@@ -216,28 +217,18 @@ T = TypeVar("T")
 
 mcp = FastMCP(
     "QLab Workspace Inspector",
+    version=__version__,
     mask_error_details=True,
     instructions="""
-Use these tools to read QLab 5 workspace and cue information over OSC.
+QLab MCP 0.3.0 exposes eight read-only tools plus five gated structural write tools over OSC.
+Write mode requires QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; it remains dry-run first.
+This server does not expose GO, stop, panic, playback, audition, /live writes, AppleScript writes, or raw OSC passthrough.
 
-The seven inspector tools are read-only and intentionally avoid playback, editing, deletion, and raw OSC.
-Write mode is a separate gated preface: it is disabled unless QLAB_ENABLE_WRITE=true and defaults to dry-run.
-When write mode is ready, all update profiles may exist; safe properties can execute as real writes, while dangerous or high-risk properties require explicit per-item confirm_gates.
-Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect. It supports gated single/sequence cue creation, cue editing, structural cue moves, and explicit or recursive cue deletion.
+Orient first with qlab_check_connection, then use a bounded workspace overview/status or settings read, qlab_query_cues, and qlab_get_cue_details as needed. Resolve one exact workspace before any write. Use exact UUIDs for workspace and cue writes; never infer a workspace or target from selection, playhead, or active state.
 
-Start with qlab_check_connection to verify QLab, workspace candidates, passcode, and read access.
+For every real write, call qlab_check_write_readiness, inspect an explicit dry-run, review warnings/errors/planned operations, supply only the exact fresh confirmation token required by that operation, execute once, and require fresh readback. Do not retry a mutation after a timeout or identity ambiguity. Batches are not automatically transactional.
 
-Then use qlab_get_workspace_overview for a bounded show map.
-
-Use qlab_get_workspace_status for compact operational status derived from documented read-only OSC reads: cue warnings, trigger/timecode summaries, settings summary, and explicit not_exposed sections for Workspace Status data QLab does not expose over OSC.
-
-Use qlab_get_workspace_settings(mode="summary") when you need compact infrastructure/settings inventory such as patches, stages, routes, MIDI, network, or light availability. It returns available_detail_requests and avoids heavy light-patch dumps.
-
-Use qlab_get_workspace_settings(mode="details", requests=[...]) after settings when you need one or more specific patches, stages, routes, maps, MIDI/network items, or the light patch. Use profile="safe" first for compact normalized details; use profile="technical" or profile="exhaustive" only when raw routing/device diagnostics are justified. qlab_get_workspace_setting_details remains as a single-request compatibility wrapper.
-
-Use qlab_query_cues for filtered cue searches across up to 500 cues by default, or up to 5000 cues when a caller explicitly raises the scan limit, then qlab_get_cue_details for one cue that needs deeper inspection.
-
-For write preflight, call qlab_check_write_readiness with an explicit workspace_id and always review a dry-run first. qlab_create_cue accepts exactly one of an exact after_cue_id anchor or a parent_container_id for an empty Cue List, Group, or Cue Cart, and returns a dedicated confirm:createCue:v2 token bound to the reviewed workspace structure; real creation still requires write readiness, an explicit workspace_id, a configured passcode, edit permission, and Edit Mode. qlab_edit_cues may return confirmation tokens for individual planned high-risk operations; copy the exact relevant planned_operations[].confirm_token values into that update item's confirm_gates, not one tool-level token. qlab_move_cues returns a dedicated tool-level confirm_token bound to the reviewed workspace structure and planned move batch, and real execution must receive that exact token. qlab_delete_cues returns a dedicated tool-level confirm_token bound to the reviewed deletion plan and fresh workspace structure, and real execution must receive that exact token. Create, Move, and Delete tokens are process-bound, so restarting the MCP invalidates tokens issued by the previous process. This server does not expose GO, stop, panic, raw OSC, or playback control.
+Create, Edit, Move, and Delete have different token, atomicity, rollback, and postcondition rules; follow each tool's description and output fields. A structural result is not runtime validation: created or edited structure is not necessarily GO-ready. Runtime evidence in this project is bounded to QLab 5.5.10.
 """,
 )
 

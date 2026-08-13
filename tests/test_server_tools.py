@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import json
 from pathlib import Path
+import re
 from typing import Any
 
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
 from fastmcp.utilities.mcp_server_config.v1.mcp_server_config import MCPServerConfig
+import pytest
 
 import qlab_mcp.server as server_module
 from qlab_mcp.errors import OscTimeoutError, QLabReplyError
@@ -169,56 +172,20 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "output_schema_hash": "d1a1e6c0d3df47ee9f83366133c85d20f71e7356396acb61b3c6b29e57f24bd6",
     },
 }
-EXPECTED_DESCRIPTION_PHRASES = {
-    "qlab_check_connection": ("passcode", "/connect permission scopes", "qlab_check_write_readiness"),
+EXPECTED_TOOL_CONCEPTS = {
+    "qlab_check_connection": ("passcode", "permission scopes", "write authorization"),
     "qlab_get_workspace_overview": ("first structural read", "bounded and shallow", "qlab_query_cues"),
-    "qlab_get_workspace_status": ("Workspace Status", "not expose", "derived operational status"),
-    "qlab_get_workspace_settings": ("Summary mode", "one failed request does not block", 'mode="details"'),
-    "qlab_get_workspace_setting_details": ("Backwards-compatible wrapper", "safe profile", "single request"),
-    "qlab_query_cues": ("optional AND filters", "truncation metadata", "qlab_get_cue_details"),
+    "qlab_get_workspace_status": ("workspace status", "full workspace status window clone", "derived operational status"),
+    "qlab_get_workspace_settings": ("summary mode", "one failed request does not block", 'mode="details"'),
+    "qlab_get_workspace_setting_details": ("backwards-compatible wrapper", "safe profile", "single request"),
+    "qlab_query_cues": ("optional and filters", "truncation metadata", "qlab_get_cue_details"),
     "qlab_get_cue_details": ("editable for update capability discovery", "exhaustive only for deep audits", "qlab_query_cues"),
-    "qlab_check_write_readiness": ("without sending any mutating OSC commands", "Edit Mode", "read-only preflight"),
-    "qlab_create_cue": ("dry-run plan", "Dry-run planning never sends mutating OSC"),
-    "qlab_create_cues": ("one verified /new per item", "no automatic rollback"),
-    "qlab_edit_cues": ("Dry-run planning never sends mutating OSC", "High-risk profiles"),
-    "qlab_move_cues": ("sequential QLab cue moves", "never claims atomicity"),
-    "qlab_delete_cues": ("sequential deletions", "not atomic"),
-}
-EXPECTED_WRITE_WORKFLOW_PHRASES = {
-    "qlab_create_cue": (
-        "qlab_check_write_readiness",
-        "confirm:createCue:v2",
-        "fresh identity/placement",
-    ),
-    "qlab_create_cues": (
-        "qlab_check_write_readiness",
-        "confirm:createCues:v1",
-        "not interchangeable",
-        "fresh identity/placement",
-        "Do not retry",
-    ),
-    "qlab_edit_cues": (
-        "exact cue UUID",
-        "per-operation confirm gates",
-        "non-atomic",
-        "fresh readback",
-        "Do not retry",
-    ),
-    "qlab_move_cues": (
-        "UUID-only",
-        "confirm:moveCues:v1",
-        "non-atomic",
-        "fresh parent/order readback",
-        "Cart execution remains runtime-blocked",
-    ),
-    "qlab_delete_cues": (
-        "confirm:deleteCues:v1",
-        "deepest-first",
-        "no automatic rollback",
-        "Do not retry",
-        "verify disappearance",
-        "preservation of the root",
-    ),
+    "qlab_check_write_readiness": ("without sending any mutating osc commands", "edit mode", "read-only preflight"),
+    "qlab_create_cue": ("dry-run plan", "dry-run planning never sends mutating osc", "confirm:createcue:v2"),
+    "qlab_create_cues": ("one verified /new per item", "no automatic rollback", "confirm:createcues:v1", "do not retry"),
+    "qlab_edit_cues": ("dry-run planning never sends mutating osc", "high-risk profiles", "exact cue uuid", "per-operation confirm gates", "non-atomic", "fresh readback", "do not retry"),
+    "qlab_move_cues": ("sequential qlab cue moves", "never claims atomicity", "uuid-only", "confirm:movecues:v1", "fresh parent/order readback"),
+    "qlab_delete_cues": ("sequential deletions", "not atomic", "confirm:deletecues:v1", "deepest-first", "no automatic rollback", "verify disappearance", "preservation of the root"),
 }
 
 
@@ -265,6 +232,23 @@ async def _tool_contract_snapshot() -> dict[str, dict[str, Any]]:
     return snapshot
 
 
+def _tool_context_size_report(tools: list[Any], instructions: str) -> dict[str, Any]:
+    def encoded_size(value: Any) -> int:
+        return len(json.dumps(value, sort_keys=True, separators=(",", ":")).encode())
+
+    return {
+        "server_instructions_bytes": len(instructions.encode()),
+        "tools": {
+            tool.name: {
+                "description_bytes": len((tool.description or "").encode()),
+                "input_schema_bytes": encoded_size(tool.inputSchema),
+                "output_schema_bytes": encoded_size(tool.outputSchema or {}),
+            }
+            for tool in sorted(tools, key=lambda item: item.name)
+        },
+    }
+
+
 def test_fastmcp_json_points_to_stdio_server_without_write_env() -> None:
     raw_config = json.loads((PROJECT_ROOT / "fastmcp.json").read_text())
     parsed = MCPServerConfig.model_validate(raw_config)
@@ -292,12 +276,15 @@ def test_fastmcp_initialization_reports_project_version_and_universal_guidance()
     instructions = initialize_result.instructions
     assert instructions
     for phrase in (
+        "QLAB_ENABLE_WRITE",
+        "workspace",
         "exact UUIDs",
         "qlab_check_write_readiness",
         "dry-run",
         "fresh readback",
         "Do not retry",
         "GO-ready",
+        "Runtime evidence",
         "QLab 5.5.10",
     ):
         assert phrase in instructions
@@ -306,6 +293,77 @@ def test_fastmcp_initialization_reports_project_version_and_universal_guidance()
 
 def test_fastmcp_tool_contract_snapshot_matches_current_public_surface() -> None:
     assert asyncio.run(_tool_contract_snapshot()) == EXPECTED_FASTMCP_TOOL_CONTRACTS
+
+
+def test_fastmcp_metadata_has_nonempty_titles_and_semantic_tags() -> None:
+    async def list_tools():
+        async with Client(mcp) as client:
+            return await client.list_tools()
+
+    for tool in asyncio.run(list_tools()):
+        assert tool.title
+        tags = set((tool.meta or {}).get("fastmcp", {}).get("tags", []))
+        assert "qlab" in tags
+        assert tags - {"qlab"}
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "expected_annotations"),
+    [
+        (tool_name, contract["annotations"])
+        for tool_name, contract in sorted(EXPECTED_FASTMCP_TOOL_CONTRACTS.items())
+    ],
+)
+def test_fastmcp_annotation_matrix_is_explicit(tool_name: str, expected_annotations: dict[str, bool]) -> None:
+    snapshot = asyncio.run(_tool_contract_snapshot())
+    assert snapshot[tool_name]["annotations"] == expected_annotations
+
+
+def test_fastmcp_cross_referenced_tool_names_exist() -> None:
+    async def list_tools_and_instructions():
+        async with Client(mcp) as client:
+            return await client.list_tools(), client.initialize_result.instructions or ""
+
+    tools, instructions = asyncio.run(list_tools_and_instructions())
+    tool_names = {tool.name for tool in tools}
+    referenced_names = set(re.findall(r"\bqlab_[a-z0-9_]+\b", instructions))
+    for tool in tools:
+        referenced_names.update(re.findall(r"\bqlab_[a-z0-9_]+\b", tool.description or ""))
+    assert referenced_names <= tool_names
+
+
+def test_fastmcp_tool_context_size_report_is_deterministic() -> None:
+    async def list_tools_and_instructions():
+        async with Client(mcp) as client:
+            return await client.list_tools(), client.initialize_result.instructions or ""
+
+    tools, instructions = asyncio.run(list_tools_and_instructions())
+    report = _tool_context_size_report(tools, instructions)
+    assert list(report["tools"]) == sorted(EXPECTED_FASTMCP_TOOL_CONTRACTS)
+    assert report["server_instructions_bytes"] > 0
+    for sizes in report["tools"].values():
+        assert sizes["description_bytes"] > 0
+        assert sizes["input_schema_bytes"] > 0
+        assert sizes["output_schema_bytes"] > 0
+    print(json.dumps(report, indent=2, sort_keys=True))
+
+
+def test_read_tool_call_shapes_remain_explicit() -> None:
+    expected = {
+        "qlab_check_connection": {"workspace_id", "require_read_access"},
+        "qlab_get_workspace_overview": {
+            "workspace_id", "max_depth", "max_cues", "include_live_state",
+            "include_cue_index", "max_index_cues", "cue_index_profile", "include_global_count",
+        },
+        "qlab_get_workspace_status": {"workspace_id", "profile", "include_timecode", "max_cues_scanned", "sample_limit"},
+        "qlab_get_workspace_settings": {"workspace_id", "mode", "sections", "requests", "profile"},
+        "qlab_get_workspace_setting_details": {"workspace_id", "section", "kind", "ref", "profile"},
+        "qlab_query_cues": {"workspace_id", "primary_filter", "primary_value", "optional_filters", "profile", "max_results", "max_cues_scanned"},
+        "qlab_get_cue_details": {"workspace_id", "cue_ref", "profile"},
+        "qlab_check_write_readiness": {"workspace_id"},
+    }
+    for tool_name, parameter_names in expected.items():
+        assert set(inspect.signature(getattr(server_module, tool_name)).parameters) == parameter_names
 
 
 def test_readme_tool_inventory_matches_current_public_surface() -> None:
@@ -665,29 +723,17 @@ def test_delete_cues_fastmcp_forwards_recursive_container(monkeypatch) -> None:
     assert result.structured_content["preserved_container_id"] == "22222222-2222-4222-8222-222222222222"
 
 
-def test_fastmcp_tool_descriptions_keep_agent_safety_phrases() -> None:
+def test_fastmcp_tool_descriptions_keep_agent_behavior_concepts() -> None:
     async def list_tools():
         async with Client(mcp) as client:
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    assert set(tools) == set(EXPECTED_DESCRIPTION_PHRASES)
-    for tool_name, phrases in EXPECTED_DESCRIPTION_PHRASES.items():
-        description = tools[tool_name].description or ""
-        for phrase in phrases:
-            assert phrase in description, f"{tool_name} description lost phrase: {phrase!r}"
-
-
-def test_fastmcp_write_descriptions_encode_operation_workflows() -> None:
-    async def list_tools():
-        async with Client(mcp) as client:
-            return await client.list_tools()
-
-    tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    for tool_name, phrases in EXPECTED_WRITE_WORKFLOW_PHRASES.items():
-        description = tools[tool_name].description or ""
-        for phrase in phrases:
-            assert phrase in description, f"{tool_name} workflow lost phrase: {phrase!r}"
+    assert set(tools) == set(EXPECTED_TOOL_CONCEPTS)
+    for tool_name, concepts in EXPECTED_TOOL_CONCEPTS.items():
+        description = (tools[tool_name].description or "").casefold()
+        for concept in concepts:
+            assert concept.casefold() in description, f"{tool_name} description lost concept: {concept!r}"
 
 
 def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> None:
@@ -1300,6 +1346,30 @@ def test_public_tool_validation_returns_structured_json_error() -> None:
     assert payload["received"]["max_results"] == 0
     assert payload["allowed"]["max_results"] == "1..5000"
     assert "Traceback" not in json.dumps(payload)
+
+
+def test_structured_domain_failure_stays_in_payload_not_mcp_error() -> None:
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_query_cues",
+                {"workspace_id": "ws-1", "primary_filter": "type", "primary_value": "Audio", "max_results": 0},
+            )
+
+    result = asyncio.run(call_tool())
+    assert result.is_error is False
+    assert result.structured_content["ok"] is False
+    assert result.structured_content["status"] == "error"
+    assert result.structured_content["error_code"] == "validation_failed"
+
+
+def test_python_surface_has_no_plural_update_alias() -> None:
+    alias = "update_" + "cues"
+    public_alias = "qlab_" + alias
+    pattern = re.compile(rf"\b(?:{re.escape(alias)}|{re.escape(public_alias)})\b")
+    paths = [*sorted((PROJECT_ROOT / "src").rglob("*.py")), *sorted((PROJECT_ROOT / "tests").rglob("*.py"))]
+    matches = [str(path.relative_to(PROJECT_ROOT)) for path in paths if pattern.search(path.read_text())]
+    assert matches == []
 
 
 def test_workspace_settings_batch_limit_is_structured_and_pre_transport(monkeypatch) -> None:

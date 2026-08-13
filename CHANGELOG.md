@@ -15,6 +15,8 @@
   Create, Edit, Move, and Delete workflows.
 - Removes the breaking `qlab_update_cues` compatibility alias; use
   `qlab_edit_cues` for cue edits.
+- Removes the duplicate `batch_update_cues` readiness capability key; use
+  `edit_existing_cue` as the canonical Edit capability.
 - Carries forward sequential Create, recursive Delete, hardened write/readback
   behavior, and release CI/packaging checks without adding new QLab runtime
   claims.

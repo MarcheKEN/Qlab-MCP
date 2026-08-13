@@ -1965,7 +1965,7 @@ def read_keys_for_operations(operations: list[dict[str, Any]]) -> list[str]:
 
 def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
     catalog = profile_catalog()
-    update_cues_capability = {
+    edit_cues_capability = {
         "planned": True,
         "tool": "qlab_edit_cues",
         "batch": {
@@ -2032,9 +2032,8 @@ def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
             "initialization": "qlab_cue_template_defaults",
             "properties": [],
         },
-        "batch_update_cues": update_cues_capability,
         "edit_existing_cue": {
-            **update_cues_capability,
+            **edit_cues_capability,
         },
         "playback_control": {"enabled": False},
         "raw_osc": {"enabled": False},

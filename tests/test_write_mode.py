@@ -2915,8 +2915,9 @@ def test_check_write_readiness_reports_disabled_without_osc() -> None:
     assert result["suggested_action"] == "Set QLAB_ENABLE_WRITE=true only for a deliberate write session."
     assert result["passcode_configured"] is True
     assert result["capabilities"]["create_cue"]["dry_run_default"] is True
-    assert result["capabilities"]["batch_update_cues"]["tool"] == "qlab_edit_cues"
-    assert result["capabilities"]["batch_update_cues"]["batch"] == {
+    assert "batch_update_cues" not in result["capabilities"]
+    assert result["capabilities"]["edit_existing_cue"]["tool"] == "qlab_edit_cues"
+    assert result["capabilities"]["edit_existing_cue"]["batch"] == {
         "min_items": 1,
         "max_items": 50,
         "requires_concrete_cue_refs": True,

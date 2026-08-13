@@ -8,11 +8,12 @@ The canonical dated inventory is [`current-state.md`](current-state.md). The
 current snapshot is provisional on the preparation branch; a docs-only PR will
 replace it after the 0.3.0 merge into `main` and before the release tag.
 
-Current focused verification: `2245 passed, 1 skipped` for the MCP/write
-contract suite. The full local suite passed with `2584 passed, 41 subtests
+Final local preflight: the full suite passed with `2595 passed, 41 subtests
 passed` outside the managed socket sandbox. FastMCP inspection reports 13 tools
-and wheel/sdist builds report `0.3.0`; Linux CI remains the external release
-gate. Artifact-membership checks passed locally.
+and wheel/sdist builds report `0.3.0`; an isolated Python 3.11 installation of
+the wheel initialized the STDIO entrypoint with version `0.3.0`, exactly 13
+tools, and no legacy Edit alias. Linux CI remains the external release gate.
+Artifact-membership and high-confidence secret checks passed locally.
 
 A clean `git archive` checkout also passed `uv sync --locked`, lock validation,
 the suite (`2580 passed, 4 skipped, 41 subtests passed`), and the package build;

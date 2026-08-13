@@ -31,13 +31,15 @@ La referencia remota se verificó con `git fetch origin` y
 
 Los entornos temporales `pip install -e ".[dev]"` y
 `uv sync --locked --no-editable --python 3.11 --extra dev` instalaron
-correctamente en la comparación inicial. La suite enfocada de contrato MCP y
-write pasó con `2242 passed`; la suite completa local pasó con
-`2593 passed, 41 subtests passed` fuera del sandbox gestionado. La verificación
-Linux de CI sigue pendiente.
+correctamente en la comparación inicial. El preflight local final pasó la suite
+completa con `2595 passed, 41 subtests passed` fuera del sandbox gestionado.
+La verificación Linux de CI sigue pendiente.
 
 La inspección FastMCP reportó 13 tools y `uv build` generó wheel y sdist
-`0.3.0`. El snapshot final posterior al merge sigue pendiente.
+`0.3.0`. El wheel se instaló en un entorno Python 3.11 temporal independiente
+del checkout; el entrypoint STDIO inicializó con versión `0.3.0`, exactamente
+13 tools y sin `qlab_update_cues`. El snapshot final posterior al merge sigue
+pendiente.
 
 Un checkout limpio generado con `git archive` pasó el flujo reproducible con
 `2580 passed, 4 skipped, 41 subtests passed`; los skips corresponden a fixtures

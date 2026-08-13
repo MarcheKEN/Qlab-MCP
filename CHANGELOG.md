@@ -25,6 +25,9 @@
 - Carries forward sequential Create, recursive Delete, hardened write/readback,
   and release CI/packaging checks. The new Group route has fixture-specific
   QLab 5.5.10 evidence; it is not a general show-readiness claim.
+- Clarifies partial overview follow-up, missing settings/cue recovery guidance,
+  and sequential Create count semantics without changing the 13-tool surface,
+  status vocabulary, write gates, tokens, or runtime behavior.
 
 ## 0.2.0
 

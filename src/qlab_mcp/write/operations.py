@@ -1015,7 +1015,11 @@ class QLabWriteMixin:
                 "executed_operations": [],
                 "confirm_token": token,
                 "warnings": ["Dry run only: no mutating OSC commands were sent to QLab."],
-                "message": "Create sequence dry-run succeeded; review the chained plan before execution.",
+                "message": (
+                    "Create sequence dry-run succeeded; planned_count counts generated plan operations "
+                    "(including verification steps), while requested_count counts logical cues. "
+                    "Review planned_operations before execution."
+                ),
             }
 
         payload, token_error = _decode_create_cues_token(confirm_token)
@@ -1092,7 +1096,10 @@ class QLabWriteMixin:
             "executed_operations": executed_operations,
             "confirm_token": None,
             "warnings": ["Sequence creation is sequential and has no automatic rollback."],
-            "message": "Cue sequence created and each item was verified before the next /new.",
+            "message": (
+                "Cue sequence created; planned_count counts generated plan operations, "
+                "created_count counts logical cues, and each item was verified before the next /new."
+            ),
         }
 
     def update_cue(

@@ -99,6 +99,12 @@ single-create token. The sequence stops on the first timeout, identity
 ambiguity, placement mismatch, or other failure; earlier items remain and there
 is no automatic rollback.
 
+In the result, requested_count and created_count count logical cues.
+planned_count counts generated plan operations, including each cue's creation
+and identity/structure verification steps. Use planned_operations for the exact
+operation list; do not compare planned_count directly with the number of cue
+requests.
+
 Good shape:
 
 ```json

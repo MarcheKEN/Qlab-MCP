@@ -230,6 +230,8 @@ def test_create_cues_chains_verified_ids(monkeypatch: pytest.MonkeyPatch) -> Non
         stub, "ws-1", ["memo", "audio"], dry_run=True, after_cue_id=anchor
     )
     assert planned["status"] == "dry_run"
+    assert "plan operations" in planned["message"]
+    assert "requested_count" in planned["message"]
     assert any(
         item.get("operation") == "new" and item.get("anchor_from_previous") is True
         for item in planned["planned_operations"]

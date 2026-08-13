@@ -2766,6 +2766,28 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIn("Multiple settings items", result["message"])
         self.assertEqual(server.received, ["/workspace/ws-1/settings/network/patchList"])
 
+    def test_workspace_setting_details_missing_ref_returns_actionable_error(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/network/patchList": [
+                {"name": "OSC", "uniqueID": "network-1"},
+            ],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_setting_details(
+                "ws-1",
+                section="network",
+                kind="network_patch",
+                ref="missing",
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error_code"], "setting_ref_not_found")
+        self.assertIn("qlab_get_workspace_settings", result["suggested_action"])
+        self.assertIn("missing", result["suggested_action"])
+
     def test_workspace_settings_summary_lists_all_detail_request_kinds(self) -> None:
         responses = {
             "/workspace/ws-1/settings/audio/patchList": [{"name": "Main", "uniqueID": "audio-out-1"}],
@@ -4237,6 +4259,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertFalse(result["partial"])
         self.assertEqual(result["error_code"], "cue_ref_unresolved")
         self.assertEqual(result["errors"]["error_code"], "cue_ref_unresolved")
+        self.assertIn("qlab_query_cues", result["suggested_action"])
 
     def test_batch_cue_details_rejects_more_than_50_cues(self) -> None:
         reader = QLabReader(SimpleNamespace(config=QLabConfig()))  # type: ignore[arg-type]

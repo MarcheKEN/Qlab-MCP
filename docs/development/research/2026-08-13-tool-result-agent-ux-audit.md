@@ -384,3 +384,24 @@ rg update_cues in src/tests: no matches
 
 No push, PR, merge, tag, branch-protection change, or other remote action was
 performed.
+
+## 0.3.0 polish resolution
+
+The implementation pass reviewed every non-KEEP finding against current source
+and tests:
+
+| Finding | Disposition | Resolution |
+| --- | --- | --- |
+| Partial overview follow-up | IMPLEMENTED_0_3_0 / FIX_NOW_TEXT | Partial overview results now expose targeted guidance to inspect warnings, use qlab_query_cues, and raise bounded overview limits. |
+| Missing setting ref | IMPLEMENTED_0_3_0 / FIX_NOW_TEXT | Detail results now return setting_ref_not_found plus the safe discovery/retry path. |
+| Missing cue detail ref | IMPLEMENTED_0_3_0 / FIX_NOW_TEXT | Existing cue_ref_unresolved results now include qlab_query_cues to qlab_get_cue_details guidance. |
+| Nested cue-details result wrapper | DEFERRED_0_3_1 / DEFER_0_3_1 | Wrapper was not flattened; current fields preserve cue_ref/error correlation and the audit found no P0/P1 decision risk. |
+| Sequential Create planned_count | IMPLEMENTED_0_3_0 / FIX_NOW_DOCS | Existing field preserved. Pydantic description, result messages, user workflow, and contract test state that it counts generated plan operations, while requested_count/created_count count cues. |
+| Generic result-item models | DEFERRED_0_3_1 / DEFER_0_3_1 | No broad typed-model migration. |
+| Universal next_action/envelope/schema redesign | DEFERRED_0_3_1 / DEFER_0_3_1 | No new field, base model, status rename, or XOR redesign. |
+
+Contract impact: public tool names remain exactly 13; version remains 0.3.0;
+status values, confirmation tokens, dry-run behavior, executed_operations,
+fresh readback, and QLab runtime behavior are unchanged. The only output
+schema change is descriptive metadata for the existing Create batch
+planned_count field; no result field was added or renamed.

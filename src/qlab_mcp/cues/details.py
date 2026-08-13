@@ -25,6 +25,9 @@ from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES, sensitive_payload_size
 MAX_VALUES_FOR_KEYS = 100
 MAX_BATCH_CUE_DETAILS = 50
 UNRESOLVED_CUE_ERROR_CODE = "cue_ref_unresolved"
+UNRESOLVED_CUE_SUGGESTED_ACTION = (
+    "Call qlab_query_cues to resolve an exact cue UUID, then retry qlab_get_cue_details."
+)
 SLICE_DETAIL_KEYS = ("sliceMarkers", "lastSlicePlayCount", "lastSliceInfiniteLoop")
 EXHAUSTIVE_WARNING = (
     "profile='exhaustive' may return large, sensitive, or heavy read-only payloads "
@@ -155,6 +158,11 @@ def _failed_cue_detail_result(
         "status": "error",
         "partial": False,
         "error_code": error_code,
+        "suggested_action": (
+            UNRESOLVED_CUE_SUGGESTED_ACTION
+            if error_code == UNRESOLVED_CUE_ERROR_CODE
+            else None
+        ),
         "message": message,
         "workspace_id": _clean_workspace_id(workspace_id),
         "cue_ref": str(cue_ref).strip().strip("/"),
@@ -181,6 +189,8 @@ def _normalize_cue_detail_result(result: dict[str, Any]) -> dict[str, Any]:
         normalized["error_code"] = normalized.get("error_code") or error_code
         if normalized.get("message") is None and isinstance(errors, dict):
             normalized["message"] = errors.get("message")
+        if normalized.get("error_code") == UNRESOLVED_CUE_ERROR_CODE:
+            normalized.setdefault("suggested_action", UNRESOLVED_CUE_SUGGESTED_ACTION)
         return normalized
     if errors:
         normalized["ok"] = True

@@ -37,6 +37,7 @@ from qlab_mcp.server import (
     qlab_query_cues,
 )
 from qlab_mcp.write.registry import UPDATE_PROFILES
+from qlab_mcp.server_responses import overview_success_payload
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -82,7 +83,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         },
         "tags": ["batch-create", "cue-create", "gated-write", "qlab", "write-mode"],
         "input_schema_hash": "5797a769a3cd5c64c8e6635013ec0156e19914d864827922c181e935523b9b33",
-        "output_schema_hash": "e6e0ef7fdaf321850769bc0afe6a8cf1342c4cc22c38519e3483345eb8efb4f5",
+        "output_schema_hash": "f7ec4ee60c9daf4c40fae9107e3034aedc21c6342bffd2ac4f44e80111b0ab98",
     },
     "qlab_get_cue_details": {
         "title": "Get QLab Cue Details",
@@ -995,6 +996,12 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert overview.annotations.idempotentHint is True
     assert overview.annotations.openWorldHint is True
 
+    create_cues = tools["qlab_create_cues"]
+    planned_count_description = create_cues.outputSchema["properties"]["planned_count"]["description"]
+    assert "plan operations" in planned_count_description
+    assert "requested_count" in planned_count_description
+    assert "created_count" in planned_count_description
+
     status = tools["qlab_get_workspace_status"]
     assert status.title == "Get QLab Workspace Status"
     assert "Workspace Status" in status.description
@@ -1179,6 +1186,20 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "empty Group" in delete.inputSchema["properties"]["container_id"]["description"]
     assert "confirm:deleteCues:v1:" in delete.inputSchema["properties"]["confirm_token"]["description"]
     assert "verification_failed" in delete.outputSchema["properties"]["status"]["enum"]
+
+
+def test_overview_partial_result_suggests_bounded_follow_up() -> None:
+    result = overview_success_payload(
+        {
+            "limits": {"truncated": True, "truncation_reasons": ["max_depth"]},
+            "summary": {"health_counts_status": "partial_non_authoritative"},
+            "warnings": ["Tree preview is partial (max_depth)."],
+        }
+    )
+
+    assert result["partial"] is True
+    assert "qlab_query_cues" in result["suggested_action"]
+    assert "max_depth" in result["suggested_action"]
 
 
 def test_create_tool_uses_qlab_template_defaults_without_property_input() -> None:

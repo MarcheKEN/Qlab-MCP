@@ -398,7 +398,13 @@ class CreateCuesResult(BaseModel):
     workspace_id: str
     dry_run: bool
     requested_count: int
-    planned_count: int = 0
+    planned_count: int = Field(
+        default=0,
+        description=(
+            "Number of generated plan operations, including per-item creation and "
+            "identity/structure verification steps; requested_count and created_count count logical cues."
+        ),
+    )
     created_count: int = 0
     results: list[dict[str, Any]] = Field(default_factory=list)
     planned_operations: list[dict[str, Any]] = Field(default_factory=list)

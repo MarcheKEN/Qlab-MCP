@@ -1068,8 +1068,9 @@ def qlab_create_cue(
     Supply exactly one of after_cue_id or parent_container_id. The latter
     creates the first cue in an empty Cue List, Group, or Cue Cart using the
     container-specific OSC route. Dry-run planning never sends mutating OSC.
-    Real creation requires the exact dedicated token from the dry-run and an
-    unchanged structural snapshot.
+    Call qlab_check_write_readiness first, then review the dry-run and supply the
+    exact confirm:createCue:v2 token. After execution, require fresh identity/placement readback.
+    An unchanged structural snapshot is required; this is not a GO-ready claim.
     Structural creation is separate from operational readiness: a created cue may be broken or warning because it still needs a target, file, patch, or edit. Script and container cue types are excluded.
     """
     return _run_tool(
@@ -1125,9 +1126,14 @@ def qlab_create_cues(
 ) -> CreateCuesResult:
     """Create an ordered cue sequence with one verified /new per item.
 
-    Creation stops at the first timeout, ambiguous identity, placement mismatch, or
-    other failure. There is no automatic rollback; earlier successful items remain.
-    Create uses QLab template defaults and does not apply initial setters.
+    Call qlab_check_write_readiness first, then review the dry-run and supply the
+    exact confirm:createCues:v1 token. The batch token is not interchangeable with
+    the single-create token. Each successful item requires fresh identity/placement
+    readback. Creation stops at the first timeout, ambiguous identity, placement
+    mismatch, or other failure. Do not retry after an ambiguous mutation. There is
+    no automatic rollback; earlier successful items remain. Create uses QLab
+    template defaults and does not apply initial setters, and the result is not a
+    GO-ready claim.
     """
     return _run_tool(
         lambda reader: CreateCuesResult.model_validate(
@@ -1180,7 +1186,11 @@ def qlab_edit_cues(
     Real updates require QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
     Dry-run planning never sends mutating OSC.
     High-risk profiles and unvalidated properties are cataloged for planning and require exact dry-run confirm_tokens for real writes.
-    Batch real writes run all preflight checks before sending any setter and use cue unique IDs for setters.
+    Resolve every target to an exact cue UUID through the read tools; this is not a
+    Create, Move, Delete, or playback tool. Dry-run returns per-operation confirm gates,
+    not one global Edit token. Batch real writes run all preflight checks before
+    sending any setter, are non-atomic, use cue unique IDs for setters, and require
+    fresh readback after each item. Do not retry after a timeout or identity ambiguity.
     """
     return _run_tool(
         lambda reader: UpdateCuesResult.model_validate(
@@ -1228,8 +1238,11 @@ def qlab_move_cues(
 ) -> MoveCuesResult:
     """Plan or execute one to ten sequential QLab cue moves.
 
-    Real moves require write readiness, Edit Mode, inactive healthy cues, a fresh dedicated confirmation
-    token, stable structural dependencies, and independent readback. This tool never claims atomicity.
+    Targets are UUID-only. Real moves require write readiness, Edit Mode, inactive
+    healthy cues, the exact confirm:moveCues:v1 token, stable structural dependencies,
+    and fresh parent/order readback. Execution is sequential and non-atomic; this
+    tool never claims atomicity. Cart execution remains runtime-blocked pending the
+    documented QLab 5.5.10 evidence boundary. Do not retry an ambiguous mutation.
     """
     return _run_tool(
         lambda reader: MoveCuesResult.model_validate(
@@ -1286,9 +1299,12 @@ def qlab_delete_cues(
 ) -> DeleteCuesResult:
     """Plan or execute sequential deletions of explicit leaf cues or safely empty one container.
 
-    Real deletion requires write readiness, Edit Mode, zero activity, a fresh dedicated confirmation
-    token, and independent existence readback after every delete. Recursive mode deletes descendants
-    deepest-first and preserves the requested root container. Deletion is sequential and not atomic.
+    Real deletion requires write readiness, Edit Mode, zero activity, the exact
+    confirm:deleteCues:v1 token, and independent existence readback after every delete.
+    Recursive mode deletes descendants deepest-first and preserves the requested root
+    container. Deletion is sequential and not atomic, with no automatic rollback.
+    Do not retry after a timeout or identity ambiguity; verify disappearance of every
+    requested leaf and preservation of the root.
     """
     return _run_tool(
         lambda reader: DeleteCuesResult.model_validate(

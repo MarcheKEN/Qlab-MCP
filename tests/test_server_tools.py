@@ -152,7 +152,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["cue-move", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "947607daa76e34b06f01d84f95d19107735b865150c48203ab6fb0978a864c8a",
+        "input_schema_hash": "7d9c474bd71d9d98541ba143dc189a3c3ff6a8e3c6cb9d4a4346a250da33f80d",
         "output_schema_hash": "1338128f239451d8d5d14fe5847888f657b4f5864972c221b5466606fa90f33a",
     },
     "qlab_delete_cues": {
@@ -183,6 +183,42 @@ EXPECTED_DESCRIPTION_PHRASES = {
     "qlab_edit_cues": ("Dry-run planning never sends mutating OSC", "High-risk profiles"),
     "qlab_move_cues": ("sequential QLab cue moves", "never claims atomicity"),
     "qlab_delete_cues": ("sequential deletions", "not atomic"),
+}
+EXPECTED_WRITE_WORKFLOW_PHRASES = {
+    "qlab_create_cue": (
+        "qlab_check_write_readiness",
+        "confirm:createCue:v2",
+        "fresh identity/placement",
+    ),
+    "qlab_create_cues": (
+        "qlab_check_write_readiness",
+        "confirm:createCues:v1",
+        "not interchangeable",
+        "fresh identity/placement",
+        "Do not retry",
+    ),
+    "qlab_edit_cues": (
+        "exact cue UUID",
+        "per-operation confirm gates",
+        "non-atomic",
+        "fresh readback",
+        "Do not retry",
+    ),
+    "qlab_move_cues": (
+        "UUID-only",
+        "confirm:moveCues:v1",
+        "non-atomic",
+        "fresh parent/order readback",
+        "Cart execution remains runtime-blocked",
+    ),
+    "qlab_delete_cues": (
+        "confirm:deleteCues:v1",
+        "deepest-first",
+        "no automatic rollback",
+        "Do not retry",
+        "verify disappearance",
+        "preservation of the root",
+    ),
 }
 
 
@@ -642,6 +678,18 @@ def test_fastmcp_tool_descriptions_keep_agent_safety_phrases() -> None:
             assert phrase in description, f"{tool_name} description lost phrase: {phrase!r}"
 
 
+def test_fastmcp_write_descriptions_encode_operation_workflows() -> None:
+    async def list_tools():
+        async with Client(mcp) as client:
+            return await client.list_tools()
+
+    tools = {tool.name: tool for tool in asyncio.run(list_tools())}
+    for tool_name, phrases in EXPECTED_WRITE_WORKFLOW_PHRASES.items():
+        description = tools[tool_name].description or ""
+        for phrase in phrases:
+            assert phrase in description, f"{tool_name} workflow lost phrase: {phrase!r}"
+
+
 def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> None:
     async def list_tools():
         async with Client(mcp) as client:
@@ -1061,6 +1109,12 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     result_item = edit.outputSchema["properties"]["results"]["items"]["properties"]
     assert "dry_run_preflight_failed" in result_item["status"]["enum"]
     assert "QLAB_UPDATE_DEBUG" in result_item["debug"]["description"]
+
+    move = tools["qlab_move_cues"]
+    move_item = move.inputSchema["properties"]["moves"]["items"]["properties"]
+    assert "Exact source cue UUID" in move_item["cue_id"]["description"]
+    assert "exactly one linear placement field" in move_item["destination_index"]["description"]
+    assert "both cart_row and cart_column" in move_item["cart_row"]["description"]
 
     delete = tools["qlab_delete_cues"]
     assert delete.title == "Delete QLab Cues"

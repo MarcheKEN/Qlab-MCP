@@ -408,6 +408,7 @@ def qlab_check_connection(
     """Check whether QLab, workspace resolution, passcode, and safe read access are ready.
 
     Use this before the overview; it reports /connect permission scopes, /showMode state, and safe read access.
+    Do not use it as write authorization; call qlab_check_write_readiness before any real write.
     """
     return _run_tool(
         lambda reader: QlabConnectionCheckResult.model_validate(
@@ -501,6 +502,7 @@ def qlab_get_workspace_overview(
     """Map what the QLab show contains and how cue lists, groups, and cues are organized.
 
     Use this as the first structural read after selecting a workspace; it includes Edit/Show mode and is bounded and shallow by default.
+    Follow with qlab_query_cues for filtered discovery or qlab_get_cue_details for one cue's properties.
     """
     try:
         return _run_tool(
@@ -571,8 +573,9 @@ def qlab_get_workspace_status(
 ) -> WorkspaceStatusResult:
     """Return compact read-only Workspace Status context for a QLab workspace.
 
-    Uses documented OSC reads and derived summaries. Sections that QLab does not expose as safe read-only OSC
-    endpoints are returned with source='not_exposed' instead of invented values.
+    Uses documented OSC reads and derived operational status. Sections that QLab does not expose as safe read-only OSC
+    endpoints are returned with source='not_exposed' instead of invented values. Use overview or query for structure,
+    not this tool as a full Workspace Status window clone.
     """
     try:
         return _run_tool(
@@ -652,8 +655,8 @@ def qlab_get_workspace_settings(
     """Return read-only QLab Workspace Settings summary or batched details.
 
     Summary mode is the first settings read after the overview: it returns compact sections, counts, redactions,
-    errors, and available_detail_requests. Details mode accepts one or more requests and returns independent
-    per-request results; one failed request does not block other valid requests.
+    errors, and available_detail_requests. Use mode="details" for focused requests. Details mode accepts one or
+    more requests and returns independent per-request results; one failed request does not block other valid requests.
     """
     if isinstance(requests, (list, tuple)) and len(requests) > MAX_WORKSPACE_DETAIL_REQUESTS:
         return _settings_error(
@@ -751,9 +754,10 @@ def qlab_get_workspace_setting_details(
 ) -> WorkspaceSettingDetailsResult:
     """Return read-only details for one workspace setting item.
 
-    Backwards-compatible wrapper around qlab_get_workspace_settings(mode="details"). The default safe profile
-    summarizes large structures: light patches become instrument indexes, video stages become stage/region/route
-    summaries, and audio maps omit long level arrays. Use technical or exhaustive only for explicit low-level audits.
+    Backwards-compatible wrapper for a single request around qlab_get_workspace_settings(mode="details"). The default
+    safe profile summarizes large structures: light patches become instrument indexes, video stages become
+    stage/region/route summaries, and audio maps omit long level arrays. Use technical or exhaustive only for
+    explicit low-level audits; use the settings tool for a batch.
     """
     try:
         return _run_tool(
@@ -847,9 +851,10 @@ def qlab_query_cues(
     """Search many QLab cues with one required filter plus optional AND filters.
 
     Use this after the overview to find cue sets such as Audio cues, Light cues, flagged cues, broken cues,
-    warnings, media-target cues, cue-target transport cues, or named/numbered ranges. Results are capped at
-    500 returned matches and 500 scanned cue IDs by default so agents stay compact. Callers can explicitly
-    raise either limit up to 5000 for large shows; truncation metadata reports incomplete scans or result caps.
+    warnings, media-target cues, cue-target transport cues, or named/numbered ranges. Follow with qlab_get_cue_details
+    for exact properties. Results are capped at 500 returned matches and 500 scanned cue IDs by default so agents
+    stay compact. Callers can explicitly raise either limit up to 5000 for large shows; truncation metadata reports
+    incomplete scans or result caps.
     """
     if str(profile).strip().lower() == "exhaustive":
         return _query_error(
@@ -920,7 +925,16 @@ def qlab_query_cues(
 )
 def qlab_get_cue_details(
     workspace_id: WorkspaceId,
-    cue_ref: CueRef | CueRefs,
+    cue_ref: Annotated[
+        CueRef | CueRefs,
+        Field(
+            description=(
+                "Accept an exact cue number or unique ID for one cue, or a list of exact cue numbers/unique IDs for a batch. "
+                "Resolve refs through qlab_query_cues or the workspace overview; ambiguous selected, playhead, "
+                "playbackPosition, and active refs may be returned for read-only inspection but should not be used for writes."
+            ),
+        ),
+    ],
     profile: Annotated[
         str,
         Field(
@@ -937,10 +951,10 @@ def qlab_get_cue_details(
 ) -> CueDetailsResult | CueDetailsBatchResult:
     """Return read-only details for one cue, or a batch of up to 50 cues, using QLab valuesForKeys when possible.
 
-    Use auto for safe type-aware inspection, inspector_safe for broader non-sensitive Inspector context,
-    editable for update capability discovery,
-    health for warnings, technical/full_sensitive only when justified, and exhaustive only for deep audits
-    or load testing because it can expose large/sensitive payloads.
+    Use after qlab_query_cues or the overview to inspect exact targets. Use auto for safe type-aware inspection,
+    inspector_safe for broader non-sensitive Inspector context, editable for update capability discovery, health for
+    warnings, technical/full_sensitive only when justified, and exhaustive only for deep audits or load testing
+    because it can expose large/sensitive payloads.
     """
     if isinstance(cue_ref, list) and len(cue_ref) > MAX_BATCH_CUE_DETAILS:
         return _cue_details_error(
@@ -985,8 +999,9 @@ def qlab_check_write_readiness(
 ) -> WriteReadinessResult:
     """Check local write-mode readiness without sending any mutating OSC commands.
 
-    This verifies QLAB_ENABLE_WRITE, required workspace_id, server-side QLAB_PASSCODE presence,
+    This read-only preflight verifies QLAB_ENABLE_WRITE, required workspace_id, server-side QLAB_PASSCODE presence,
     planned write capabilities, edit permission confirmed by QLab /connect scopes, and Edit Mode from /showMode.
+    Use it before Create, Edit, Move, or Delete; it is a readiness report, not a confirmation token.
     """
     return _run_tool(
         lambda reader: WriteReadinessResult.model_validate(

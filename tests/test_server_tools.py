@@ -86,7 +86,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "timeout": CUE_DETAILS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["details", "diagnostics", "qlab", "safe-read"],
-        "input_schema_hash": "5a71f63ffc5db72a1b7f270fc16a03fe6942155a4eb8b22ef9bab4e0f8862925",
+        "input_schema_hash": "698f6c66f96d127a8f480e868663ad49382c31ae1373420077e2be13aa9499ed",
         "output_schema_hash": "f5d340a970b906607ed9c3a2015c17a8da6f3eee5d70b36971c26920aa14da72",
     },
     "qlab_get_workspace_overview": {
@@ -170,14 +170,14 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
     },
 }
 EXPECTED_DESCRIPTION_PHRASES = {
-    "qlab_check_connection": ("passcode", "/connect permission scopes"),
-    "qlab_get_workspace_overview": ("first structural read", "bounded and shallow"),
-    "qlab_get_workspace_status": ("Workspace Status", "not expose"),
-    "qlab_get_workspace_settings": ("Summary mode", "one failed request does not block"),
-    "qlab_get_workspace_setting_details": ("Backwards-compatible wrapper", "safe profile"),
-    "qlab_query_cues": ("optional AND filters", "truncation metadata"),
-    "qlab_get_cue_details": ("editable for update capability discovery", "exhaustive only for deep audits"),
-    "qlab_check_write_readiness": ("without sending any mutating OSC commands", "Edit Mode"),
+    "qlab_check_connection": ("passcode", "/connect permission scopes", "qlab_check_write_readiness"),
+    "qlab_get_workspace_overview": ("first structural read", "bounded and shallow", "qlab_query_cues"),
+    "qlab_get_workspace_status": ("Workspace Status", "not expose", "derived operational status"),
+    "qlab_get_workspace_settings": ("Summary mode", "one failed request does not block", 'mode="details"'),
+    "qlab_get_workspace_setting_details": ("Backwards-compatible wrapper", "safe profile", "single request"),
+    "qlab_query_cues": ("optional AND filters", "truncation metadata", "qlab_get_cue_details"),
+    "qlab_get_cue_details": ("editable for update capability discovery", "exhaustive only for deep audits", "qlab_query_cues"),
+    "qlab_check_write_readiness": ("without sending any mutating OSC commands", "Edit Mode", "read-only preflight"),
     "qlab_create_cue": ("dry-run plan", "Dry-run planning never sends mutating OSC"),
     "qlab_create_cues": ("one verified /new per item", "no automatic rollback"),
     "qlab_edit_cues": ("Dry-run planning never sends mutating OSC", "High-risk profiles"),
@@ -968,6 +968,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert cue_ref_schema["anyOf"][0]["type"] == "string"
     assert cue_ref_schema["anyOf"][1]["type"] == "array"
     assert cue_ref_schema["anyOf"][1]["maxItems"] == 50
+    assert "exact cue number or unique ID" in cue_ref_schema["description"]
     assert details.annotations.readOnlyHint is True
 
     readiness = tools["qlab_check_write_readiness"]

@@ -645,7 +645,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
         assert tools[tool_name].outputSchema, f"{tool_name} lost outputSchema"
 
 
-def test_update_cues_fastmcp_schema_keeps_batch_contract() -> None:
+def test_edit_cues_fastmcp_schema_keeps_batch_contract() -> None:
     async def list_tools():
         async with Client(mcp) as client:
             return await client.list_tools()
@@ -683,9 +683,11 @@ def test_update_cues_fastmcp_schema_keeps_batch_contract() -> None:
 
 def test_qlab_edit_cues_fastmcp_response_keeps_fade_basic_token(monkeypatch) -> None:
     token = "confirm:fadeBasic:v1:test-payload:test-signature"
+    calls = []
 
     class FakeReader:
         def edit_cues(self, workspace_id, updates, dry_run):
+            calls.append((workspace_id, updates, dry_run))
             assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
             assert dry_run is True
             assert updates == [
@@ -749,6 +751,11 @@ def test_qlab_edit_cues_fastmcp_response_keeps_fade_basic_token(monkeypatch) -> 
     result = asyncio.run(call_tool())
     planned = result.structured_content["results"][0]["planned_operations"]
 
+    assert len(calls) == 1
+    assert result.is_error is False
+    assert result.structured_content["dry_run"] is True
+    assert result.structured_content["planned_count"] == 1
+    assert result.structured_content["updated_count"] == 0
     assert planned[0]["confirm_token"].startswith("confirm:fadeBasic:v1:")
     assert result.structured_content["results"][0]["executed_operations"] == []
 

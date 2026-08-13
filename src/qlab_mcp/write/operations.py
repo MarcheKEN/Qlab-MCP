@@ -1114,7 +1114,7 @@ class QLabWriteMixin:
             "confirm_gates": confirm_gates,
         }
         _normalize_batch_update_item(raw_update)
-        batch = self.update_cues(
+        batch = self.edit_cues(
             workspace_id,
             [raw_update],
             dry_run=dry_run,
@@ -1764,7 +1764,7 @@ class QLabWriteMixin:
             "calls": batch_calls,
         }
 
-    def update_cues(
+    def edit_cues(
         self,
         workspace_id: str,
         updates: list[dict[str, Any]],
@@ -1825,16 +1825,6 @@ class QLabWriteMixin:
             preflight["read_cache"],
             requested_count=requested_count,
         )
-
-    def edit_cues(
-        self,
-        workspace_id: str,
-        updates: list[dict[str, Any]],
-        dry_run: bool | None = None,
-    ) -> dict[str, Any]:
-        """Canonical batch-edit wrapper used by the qlab_edit_cues MCP tool."""
-        return self.update_cues(workspace_id, updates, dry_run=dry_run)
-
 
 def _plan_update_batch_dry_run(
     self: Any,

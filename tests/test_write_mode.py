@@ -75,6 +75,12 @@ def test_write_modules_reuse_canonical_container_types_without_widening_placemen
     assert move_helpers._CART_PARENT_TYPES == {"Cue Cart", "Cart"}
 
 
+def test_qlab_reader_exposes_only_edit_cues_as_batch_entrypoint() -> None:
+    assert hasattr(QLabReader, "edit_cues")
+    legacy_batch_name = "update_" "cues"
+    assert not hasattr(QLabReader, legacy_batch_name)
+
+
 @pytest.mark.parametrize("value", [2_147_483_648, -2_147_483_649, 10**20, 10**309, 1e39, float("inf"), float("nan")])
 def test_numeric_write_values_outside_osc_wire_ranges_are_rejected(value: Any) -> None:
     with pytest.raises(UnsafeWriteOperationError):
@@ -1692,7 +1698,7 @@ def normalized_light_patch_fixture() -> dict[str, Any]:
 
 
 def confirm_token_for(reader: QLabReader, cue_ref: str, update: dict[str, Any], profile: str = "common") -> str:
-    dry_result = reader.update_cues(
+    dry_result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_ref, "profile": profile, **update}],
         dry_run=True,
@@ -2498,7 +2504,7 @@ def test_update_registry_covers_all_profiles_and_planned_only_risk() -> None:
 
 
 @pytest.mark.parametrize("profile", UPDATE_PROFILE_NAMES)
-def test_update_cues_dry_run_contract_covers_every_profile(profile: str) -> None:
+def test_edit_cues_dry_run_contract_covers_every_profile(profile: str) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     cue_type = PROFILE_TEST_CUE_TYPES[profile]
     properties = profile_catalog()[profile]["properties"]
@@ -2512,7 +2518,7 @@ def test_update_cues_dry_run_contract_covers_every_profile(profile: str) -> None
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = _request_for_catalog_property(prop_name, prop)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -2799,7 +2805,7 @@ def test_update_cue_dry_run_only_contract_plans_then_blocks_real_write_before_os
     ("validator", "profile", "cue_type", "prop_name", "prop", "arg_name"),
     _validator_negative_cases(),
 )
-def test_update_cues_validator_contract_rejects_one_bad_value_without_plan_or_osc(
+def test_edit_cues_validator_contract_rejects_one_bad_value_without_plan_or_osc(
     validator: str,
     profile: str,
     cue_type: str,
@@ -2821,7 +2827,7 @@ def test_update_cues_validator_contract_rejects_one_bad_value_without_plan_or_os
         invalid_value=_invalid_value_for_validator(validator),
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -2843,7 +2849,7 @@ def test_update_cues_validator_contract_rejects_one_bad_value_without_plan_or_os
 
 
 @pytest.mark.parametrize("profile", [name for name in UPDATE_PROFILE_NAMES if name != "common"])
-def test_update_cues_profile_mismatch_contract_has_no_plan_or_setters(profile: str) -> None:
+def test_edit_cues_profile_mismatch_contract_has_no_plan_or_setters(profile: str) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     expected_type = PROFILE_TEST_CUE_TYPES[profile]
     mismatched_type = "Wait" if expected_type == "Memo" else "Memo"
@@ -2856,7 +2862,7 @@ def test_update_cues_profile_mismatch_contract_has_no_plan_or_setters(profile: s
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -3381,7 +3387,7 @@ def test_update_cue_dry_run_sends_no_mutating_osc() -> None:
     assert [request[0] for request in client.requests] == [f"/workspace/ws-1/cue_id/{cue_id}/valuesForKeys"]
 
 
-def test_update_cues_batch_dry_run_allows_mixed_profiles() -> None:
+def test_edit_cues_batch_dry_run_allows_mixed_profiles() -> None:
     memo_id = "11111111-1111-4111-8111-111111111111"
     audio_id = "22222222-2222-4222-8222-222222222222"
     text_id = "33333333-3333-4333-8333-333333333333"
@@ -3395,7 +3401,7 @@ def test_update_cues_batch_dry_run_allows_mixed_profiles() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": memo_id, "profile": "common", "properties": {"name": "Memo new"}},
@@ -3416,7 +3422,7 @@ def test_update_cues_batch_dry_run_allows_mixed_profiles() -> None:
     assert all(request[0].endswith("/valuesForKeys") for request in client.requests)
 
 
-def test_update_cues_single_item_real_uses_unique_id_and_one_readiness_check() -> None:
+def test_edit_cues_single_item_real_uses_unique_id_and_one_readiness_check() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -3425,7 +3431,7 @@ def test_update_cues_single_item_real_uses_unique_id_and_one_readiness_check() -
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues("ws-1", [{"cue_ref": "1", "properties": {"name": "New"}}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{"cue_ref": "1", "properties": {"name": "New"}}], dry_run=False)
 
     addresses = [request[0] for request in client.requests]
     assert result["ok"] is True
@@ -3439,7 +3445,7 @@ def test_update_cues_single_item_real_uses_unique_id_and_one_readiness_check() -
     assert "/workspace/ws-1/cue/1/name" not in addresses
 
 
-def test_update_cues_returns_normalization_failure_before_later_stages(
+def test_edit_cues_returns_normalization_failure_before_later_stages(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client = BatchFakeWriteClient(QLabConfig(enable_write=False), cues={})
@@ -3469,7 +3475,7 @@ def test_update_cues_returns_normalization_failure_before_later_stages(
         lambda *_args, **_kwargs: pytest.fail("dry-run planning must not run after normalization failure"),
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": "cue-1", "properties": {"name": "New"}}],
         dry_run=True,
@@ -3479,7 +3485,7 @@ def test_update_cues_returns_normalization_failure_before_later_stages(
     assert client.requests == []
 
 
-def test_update_cues_normalization_boundary_returns_complete_bundle_and_blocks_missing_gate() -> None:
+def test_edit_cues_normalization_boundary_returns_complete_bundle_and_blocks_missing_gate() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(QLabConfig(enable_write=True), cues={})
     reader = QLabReader(client)  # type: ignore[arg-type]
@@ -3529,7 +3535,7 @@ def test_update_cues_normalization_boundary_returns_complete_bundle_and_blocks_m
     assert client.requests == []
 
 
-def test_update_cues_real_delegates_one_setter_and_fresh_readback_to_execution_helper(
+def test_edit_cues_real_delegates_one_setter_and_fresh_readback_to_execution_helper(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
@@ -3548,7 +3554,7 @@ def test_update_cues_real_delegates_one_setter_and_fresh_readback_to_execution_h
 
     monkeypatch.setattr(write_operations, "_execute_and_verify_update_batch", tracked_helper)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "properties": {"name": "New"}}],
         dry_run=False,
@@ -3565,7 +3571,7 @@ def test_update_cues_real_delegates_one_setter_and_fresh_readback_to_execution_h
     ]
 
 
-def test_update_cues_real_preflight_helper_sends_no_setter() -> None:
+def test_edit_cues_real_preflight_helper_sends_no_setter() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -3608,7 +3614,7 @@ def test_update_cues_real_preflight_helper_sends_no_setter() -> None:
     assert cue_requests == [f"{cue_prefix}valuesForKeys"]
 
 
-def test_update_cues_dry_run_delegates_planning_without_setter(
+def test_edit_cues_dry_run_delegates_planning_without_setter(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
@@ -3627,7 +3633,7 @@ def test_update_cues_dry_run_delegates_planning_without_setter(
 
     monkeypatch.setattr(write_operations, "_plan_update_batch_dry_run", tracked_helper)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "properties": {"name": "New"}}],
         dry_run=True,
@@ -3640,18 +3646,18 @@ def test_update_cues_dry_run_delegates_planning_without_setter(
     assert cue_requests == [f"{cue_prefix}valuesForKeys"]
 
 
-def test_update_cues_rejects_empty_and_over_limit() -> None:
+def test_edit_cues_rejects_empty_and_over_limit() -> None:
     client = BatchFakeWriteClient(QLabConfig(enable_write=False), cues={})
     reader = QLabReader(client)  # type: ignore[arg-type]
 
     with pytest.raises(UnsafeWriteOperationError, match="updates must be a list"):
-        reader.update_cues("ws-1", "not-a-list", dry_run=True)  # type: ignore[arg-type]
+        reader.edit_cues("ws-1", "not-a-list", dry_run=True)  # type: ignore[arg-type]
 
     with pytest.raises(UnsafeWriteOperationError, match="at least one"):
-        reader.update_cues("ws-1", [], dry_run=True)
+        reader.edit_cues("ws-1", [], dry_run=True)
 
     with pytest.raises(UnsafeWriteOperationError, match="at most 50"):
-        reader.update_cues(
+        reader.edit_cues(
             "ws-1",
             [{"cue_ref": str(index), "properties": {"name": "x"}} for index in range(51)],
             dry_run=True,
@@ -3660,7 +3666,7 @@ def test_update_cues_rejects_empty_and_over_limit() -> None:
     assert client.requests == []
 
 
-def test_update_cues_dry_run_reports_invalid_property_value_per_item() -> None:
+def test_edit_cues_dry_run_reports_invalid_property_value_per_item() -> None:
     memo_id = "11111111-1111-4111-8111-111111111111"
     group_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -3672,7 +3678,7 @@ def test_update_cues_dry_run_reports_invalid_property_value_per_item() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": memo_id, "properties": {"name": "Memo old"}},
@@ -3697,7 +3703,7 @@ def test_update_cues_dry_run_reports_invalid_property_value_per_item() -> None:
     assert f"/workspace/ws-1/cue_id/{group_id}/preWait" not in addresses
 
 
-def test_update_cues_dry_run_rejects_osc_unrepresentable_number_before_plan_or_setter() -> None:
+def test_edit_cues_dry_run_rejects_osc_unrepresentable_number_before_plan_or_setter() -> None:
     cue_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -3705,7 +3711,7 @@ def test_update_cues_dry_run_rejects_osc_unrepresentable_number_before_plan_or_s
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "properties": {"preWait": 10**309}}],
         dry_run=True,
@@ -3718,7 +3724,7 @@ def test_update_cues_dry_run_rejects_osc_unrepresentable_number_before_plan_or_s
     assert not any(address.endswith("/preWait") for address, _, _ in client.requests)
 
 
-def test_update_cues_dry_run_rejects_unknown_color_name_without_plan() -> None:
+def test_edit_cues_dry_run_rejects_unknown_color_name_without_plan() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -3726,7 +3732,7 @@ def test_update_cues_dry_run_rejects_unknown_color_name_without_plan() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "properties": {"colorName": "banana"}}],
         dry_run=True,
@@ -3740,7 +3746,7 @@ def test_update_cues_dry_run_rejects_unknown_color_name_without_plan() -> None:
     assert result["results"][0]["planned_operations"] == []
 
 
-def test_update_cues_dry_run_accepts_known_color_name() -> None:
+def test_edit_cues_dry_run_accepts_known_color_name() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -3748,7 +3754,7 @@ def test_update_cues_dry_run_accepts_known_color_name() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "properties": {"colorName": "blue"}}],
         dry_run=True,
@@ -3760,7 +3766,7 @@ def test_update_cues_dry_run_accepts_known_color_name() -> None:
     assert result["results"][0]["planned_operations"]
 
 
-def test_update_cues_dry_run_invalid_workspace_has_no_plans() -> None:
+def test_edit_cues_dry_run_invalid_workspace_has_no_plans() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -3768,7 +3774,7 @@ def test_update_cues_dry_run_invalid_workspace_has_no_plans() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "missing-ws",
         [{"cue_ref": cue_id, "properties": {"notes": "Nope"}}],
         dry_run=True,
@@ -3810,7 +3816,7 @@ def test_workspace_resolution_statuses_validate_for_update_cues_model() -> None:
         assert result.results == []
 
 
-def test_update_cues_dry_run_reports_video_opacity_validation_per_item() -> None:
+def test_edit_cues_dry_run_reports_video_opacity_validation_per_item() -> None:
     video_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -3818,12 +3824,12 @@ def test_update_cues_dry_run_reports_video_opacity_validation_per_item() -> None
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    valid = reader.update_cues(
+    valid = reader.edit_cues(
         "ws-1",
         [{"cue_ref": video_id, "profile": "video_basic", "properties": {"opacity": 0.8}}],
         dry_run=True,
     )
-    invalid = reader.update_cues(
+    invalid = reader.edit_cues(
         "ws-1",
         [{"cue_ref": video_id, "profile": "video_basic", "properties": {"opacity": 80}}],
         dry_run=True,
@@ -3837,7 +3843,7 @@ def test_update_cues_dry_run_reports_video_opacity_validation_per_item() -> None
     assert invalid["results"][0]["errors"]["validation"] == "opacity must be a number from 0 to 1"
 
 
-def test_update_cues_dry_run_reports_video_text_extended_validation_per_item() -> None:
+def test_edit_cues_dry_run_reports_video_text_extended_validation_per_item() -> None:
     video_id = "11111111-1111-4111-8111-111111111111"
     text_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -3849,7 +3855,7 @@ def test_update_cues_dry_run_reports_video_text_extended_validation_per_item() -
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": video_id, "profile": "video_basic", "properties": {"blendMode": "not a blend mode"}},
@@ -3881,7 +3887,7 @@ def test_update_cues_dry_run_reports_video_text_extended_validation_per_item() -
     assert "videoEffect/parameter args missing required key: setting" in result["results"][5]["errors"]["validation"]
 
 
-def test_update_cues_dry_run_reports_text_rgba_validation_per_item() -> None:
+def test_edit_cues_dry_run_reports_text_rgba_validation_per_item() -> None:
     valid_text_id = "11111111-1111-4111-8111-111111111111"
     invalid_text_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -3893,7 +3899,7 @@ def test_update_cues_dry_run_reports_text_rgba_validation_per_item() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -3928,7 +3934,7 @@ def test_update_cues_dry_run_reports_text_rgba_validation_per_item() -> None:
     assert f"/workspace/ws-1/cue_id/{invalid_text_id}/valuesForKeys" not in addresses
 
 
-def test_update_cues_dry_run_unresolved_ref_has_no_planned_operations() -> None:
+def test_edit_cues_dry_run_unresolved_ref_has_no_planned_operations() -> None:
     missing_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -3937,7 +3943,7 @@ def test_update_cues_dry_run_unresolved_ref_has_no_planned_operations() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": missing_id, "properties": {"notes": "Nope"}}],
         dry_run=True,
@@ -3953,7 +3959,7 @@ def test_update_cues_dry_run_unresolved_ref_has_no_planned_operations() -> None:
     assert result["results"][0]["executed_operations"] == []
 
 
-def test_update_cues_dry_run_mixed_unresolved_ref_keeps_valid_plan_only() -> None:
+def test_edit_cues_dry_run_mixed_unresolved_ref_keeps_valid_plan_only() -> None:
     valid_id = "11111111-1111-4111-8111-111111111111"
     missing_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -3963,7 +3969,7 @@ def test_update_cues_dry_run_mixed_unresolved_ref_keeps_valid_plan_only() -> Non
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": valid_id, "properties": {"notes": "Ok"}},
@@ -3984,7 +3990,7 @@ def test_update_cues_dry_run_mixed_unresolved_ref_keeps_valid_plan_only() -> Non
     assert result["results"][1]["executed_operations"] == []
 
 
-def test_update_cues_dry_run_reports_invalid_continue_mode_per_item() -> None:
+def test_edit_cues_dry_run_reports_invalid_continue_mode_per_item() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -3992,7 +3998,7 @@ def test_update_cues_dry_run_reports_invalid_continue_mode_per_item() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "properties": {"continueMode": "bad_mode"}}],
         dry_run=True,
@@ -4005,7 +4011,7 @@ def test_update_cues_dry_run_reports_invalid_continue_mode_per_item() -> None:
     )
 
 
-def test_update_cues_transport_target_profiles_dry_run_plan_documented_targets() -> None:
+def test_edit_cues_transport_target_profiles_dry_run_plan_documented_targets() -> None:
     start_id = "11111111-1111-4111-8111-111111111111"
     reset_id = "22222222-2222-4222-8222-222222222222"
     devamp_id = "33333333-3333-4333-8333-333333333333"
@@ -4027,7 +4033,7 @@ def test_update_cues_transport_target_profiles_dry_run_plan_documented_targets()
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -4107,7 +4113,7 @@ def test_update_cues_transport_target_profiles_dry_run_plan_documented_targets()
     assert planned_by_item[2]["tempCueTargetID"]["args"] == [""]
 
 
-def test_update_cues_transport_target_validators_fail_without_plan() -> None:
+def test_edit_cues_transport_target_validators_fail_without_plan() -> None:
     start_id = "11111111-1111-4111-8111-111111111111"
     devamp_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -4119,7 +4125,7 @@ def test_update_cues_transport_target_validators_fail_without_plan() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": start_id, "profile": "target_basic", "properties": {"targetMode": 2}},
@@ -4142,7 +4148,7 @@ def test_update_cues_transport_target_validators_fail_without_plan() -> None:
     assert client.requests == []
 
 
-def test_update_cues_target_profile_type_mismatch_fails_cleanly_without_plan() -> None:
+def test_edit_cues_target_profile_type_mismatch_fails_cleanly_without_plan() -> None:
     memo_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -4150,7 +4156,7 @@ def test_update_cues_target_profile_type_mismatch_fails_cleanly_without_plan() -
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": memo_id, "profile": "target_basic", "properties": {"cueTargetID": "target-id"}}],
         dry_run=True,
@@ -4164,7 +4170,7 @@ def test_update_cues_target_profile_type_mismatch_fails_cleanly_without_plan() -
     assert result["results"][0]["planned_operations"] == []
 
 
-def test_update_cues_group_basic_dry_run_plans_documented_group_list_cart_paths() -> None:
+def test_edit_cues_group_basic_dry_run_plans_documented_group_list_cart_paths() -> None:
     group_id = "11111111-1111-4111-8111-111111111111"
     list_id = "22222222-2222-4222-8222-222222222222"
     cart_id = "33333333-3333-4333-8333-333333333333"
@@ -4178,7 +4184,7 @@ def test_update_cues_group_basic_dry_run_plans_documented_group_list_cart_paths(
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -4238,7 +4244,7 @@ def test_update_cues_group_basic_dry_run_plans_documented_group_list_cart_paths(
         assert item["executed_operations"] == []
 
 
-def test_update_cues_group_basic_invalid_values_have_no_plan() -> None:
+def test_edit_cues_group_basic_invalid_values_have_no_plan() -> None:
     group_id = "11111111-1111-4111-8111-111111111111"
     list_id = "22222222-2222-4222-8222-222222222222"
     cart_id = "33333333-3333-4333-8333-333333333333"
@@ -4252,7 +4258,7 @@ def test_update_cues_group_basic_invalid_values_have_no_plan() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 0}},
@@ -4278,7 +4284,7 @@ def test_update_cues_group_basic_invalid_values_have_no_plan() -> None:
     assert all(item["planned_operations"] == [] for item in result["results"])
 
 
-def test_update_cues_group_basic_real_blocks_planned_only_before_setters() -> None:
+def test_edit_cues_group_basic_real_blocks_planned_only_before_setters() -> None:
     group_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -4286,7 +4292,7 @@ def test_update_cues_group_basic_real_blocks_planned_only_before_setters() -> No
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playbackPosition": "next"}}],
         dry_run=False,
@@ -4298,7 +4304,7 @@ def test_update_cues_group_basic_real_blocks_planned_only_before_setters() -> No
     assert client.requests == []
 
 
-def test_update_cues_group_basic_real_blocks_playlist_setters_without_playlist_mode() -> None:
+def test_edit_cues_group_basic_real_blocks_playlist_setters_without_playlist_mode() -> None:
     workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     group_id = "11111111-1111-4111-8111-111111111111"
     child_id = "22222222-2222-4222-8222-222222222222"
@@ -4311,7 +4317,7 @@ def test_update_cues_group_basic_real_blocks_playlist_setters_without_playlist_m
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/crossfade/duration": 2.5}}],
         dry_run=True,
@@ -4325,7 +4331,7 @@ def test_update_cues_group_basic_real_blocks_playlist_setters_without_playlist_m
     assert all(not request[0].endswith("/playlist/crossfade/duration") for request in client.requests)
 
 
-def test_update_cues_group_basic_real_allows_playlist_setters_for_playlist_mode() -> None:
+def test_edit_cues_group_basic_real_allows_playlist_setters_for_playlist_mode() -> None:
     workspace_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     group_id = "11111111-1111-4111-8111-111111111111"
     child_id = "22222222-2222-4222-8222-222222222222"
@@ -4339,9 +4345,9 @@ def test_update_cues_group_basic_real_allows_playlist_setters_for_playlist_mode(
     reader = QLabReader(client)  # type: ignore[arg-type]
 
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/crossfade/duration": 2.5}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["playlist/crossfade/duration"]["confirm_token"]
-    result = reader.update_cues(workspace_id, [{**update, "confirm_gates": [token]}], dry_run=False)
+    result = reader.edit_cues(workspace_id, [{**update, "confirm_gates": [token]}], dry_run=False)
 
     assert result["ok"] is True
     assert result["status"] == "updated"
@@ -4412,9 +4418,9 @@ def test_group_playlist_large_child_snapshot_preserves_all_ordered_children() ->
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}
 
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     setter = planned_setters(plan["results"][0])["playlist/doLoop"]
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [setter["confirm_token"]]}],
         dry_run=False,
@@ -4441,7 +4447,7 @@ def test_group_warning_but_not_broken_fails_closed_before_setter() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}],
         dry_run=True,
@@ -4467,9 +4473,9 @@ def test_group_playlist_crossfade_accepts_exact_shortest_child_duration() -> Non
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doCrossfade": True}}
 
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["playlist/doCrossfade"]["confirm_token"]
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -4498,9 +4504,9 @@ def test_group_playlist_crossfade_accepts_zero_duration_candidate() -> None:
         "properties": {"playlist/crossfade/duration": 0.0},
     }
 
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["playlist/crossfade/duration"]["confirm_token"]
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -4524,11 +4530,11 @@ def test_group_token_from_previous_process_fails_signature_validation(monkeypatc
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
 
     monkeypatch.setattr(group_helpers, "_GROUP_TOKEN_SECRET", b"simulated-new-process-secret")
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -4553,7 +4559,7 @@ def test_group_mode_dry_run_emits_dedicated_expiring_confirm_token() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}],
         dry_run=True,
@@ -4582,7 +4588,7 @@ def test_group_mode_documented_writable_values_are_token_candidates(requested_mo
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": requested_mode}}],
         dry_run=True,
@@ -4605,7 +4611,7 @@ def test_group_mode_real_write_requires_reviewed_token() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}],
         dry_run=False,
@@ -4640,7 +4646,7 @@ def test_group_mode_requires_exact_workspace_and_cue_uuids(
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{"cue_ref": cue_ref, "profile": "group_basic", "properties": {"mode": 1}}],
         dry_run=True,
@@ -4663,11 +4669,11 @@ def test_group_mode_token_binds_fresh_ordered_child_fingerprint() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
     client.cues[child_id]["continueMode"] = 2
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -4692,7 +4698,7 @@ def test_group_mode_fails_closed_for_active_or_unhealthy_group() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}],
         dry_run=True,
@@ -4716,7 +4722,7 @@ def test_group_playlist_dry_run_fails_closed_when_mode_is_not_fresh_playlist() -
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}],
         dry_run=True,
@@ -4740,10 +4746,10 @@ def test_group_mode_reviewed_token_writes_and_reads_back() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -4773,15 +4779,15 @@ def test_group_mode_immediate_replay_is_rejected_as_consumed_before_noop_baselin
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
 
-    first = reader.update_cues(
+    first = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
     )
-    replay = reader.update_cues(
+    replay = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -4810,10 +4816,10 @@ def test_group_mode_timeout_with_matching_fresh_readback_is_confirmed() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -4846,10 +4852,10 @@ def test_group_mode_ignored_setter_reports_structured_verification_failure_witho
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 6}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -4865,7 +4871,7 @@ def test_group_mode_ignored_setter_reports_structured_verification_failure_witho
     modeled = UpdateCuesResult.model_validate(result)
     assert modeled.results[0].status == "verification_failed"
 
-    replay = reader.update_cues(
+    replay = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -4888,24 +4894,24 @@ def test_group_mode_token_is_rejected_after_rollback_restores_baseline() -> None
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     forward_update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
-    forward_plan = reader.update_cues(workspace_id, [forward_update], dry_run=True)
+    forward_plan = reader.edit_cues(workspace_id, [forward_update], dry_run=True)
     forward_token = planned_setters(forward_plan["results"][0])["mode"]["confirm_token"]
-    forward = reader.update_cues(
+    forward = reader.edit_cues(
         workspace_id,
         [{**forward_update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
     rollback_update = {**forward_update, "properties": {"mode": 3}}
-    rollback_plan = reader.update_cues(workspace_id, [rollback_update], dry_run=True)
+    rollback_plan = reader.edit_cues(workspace_id, [rollback_update], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])["mode"]["confirm_token"]
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         workspace_id,
         [{**rollback_update, "confirm_gates": [rollback_token]}],
         dry_run=False,
     )
     setter_count_before_replay = sum(address.endswith("/mode") for address, _, _ in client.requests)
 
-    replay = reader.update_cues(
+    replay = reader.edit_cues(
         workspace_id,
         [{**forward_update, "confirm_gates": [forward_token]}],
         dry_run=False,
@@ -4932,7 +4938,7 @@ def test_group_mode_same_token_concurrent_calls_send_one_setter(monkeypatch: pyt
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
     barrier = threading.Barrier(2)
     consume = write_operations._consume_group_token
@@ -4944,7 +4950,7 @@ def test_group_mode_same_token_concurrent_calls_send_one_setter(monkeypatch: pyt
     monkeypatch.setattr(write_operations, "_consume_group_token", synchronized_consume)
 
     def execute() -> dict[str, Any]:
-        return reader.update_cues(
+        return reader.edit_cues(
             workspace_id,
             [{**update, "confirm_gates": [token]}],
             dry_run=False,
@@ -4980,16 +4986,16 @@ def test_consumed_group_token_cannot_retry_after_timeout(
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
 
-    first = reader.update_cues(
+    first = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
     )
     client.cues[group_id]["mode"] = 3
-    replay = reader.update_cues(
+    replay = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -5017,16 +5023,16 @@ def test_consumed_group_token_cannot_retry_after_qlab_error() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
 
-    first = reader.update_cues(
+    first = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
     )
     client.cues[group_id]["mode"] = 3
-    replay = reader.update_cues(
+    replay = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -5055,10 +5061,10 @@ def test_group_mode_qlab_error_before_apply_reports_structured_partial_failure()
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 6}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -5089,11 +5095,11 @@ def test_group_continue_mode_real_change_and_rollback_use_integer_setter_once() 
     reader = QLabReader(client)  # type: ignore[arg-type]
 
     forward_update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"continueMode": 1}}
-    forward_plan = reader.update_cues(workspace_id, [forward_update], dry_run=True)
-    forward = reader.update_cues(workspace_id, [forward_update], dry_run=False)
+    forward_plan = reader.edit_cues(workspace_id, [forward_update], dry_run=True)
+    forward = reader.edit_cues(workspace_id, [forward_update], dry_run=False)
     rollback_update = {**forward_update, "properties": {"continueMode": 0}}
-    reader.update_cues(workspace_id, [rollback_update], dry_run=True)
-    rollback = reader.update_cues(workspace_id, [rollback_update], dry_run=False)
+    reader.edit_cues(workspace_id, [rollback_update], dry_run=True)
+    rollback = reader.edit_cues(workspace_id, [rollback_update], dry_run=False)
 
     setters = [(address, args) for address, args, _ in client.requests if address.endswith("/continueMode")]
     assert "confirm_token" not in planned_setters(forward_plan["results"][0])["continueMode"]
@@ -5123,7 +5129,7 @@ def test_group_continue_mode_timeout_is_confirmed_without_retry() -> None:
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"continueMode": 1}}
 
-    result = reader.update_cues(workspace_id, [update], dry_run=False)
+    result = reader.edit_cues(workspace_id, [update], dry_run=False)
 
     assert result["status"] == "updated_with_confirmed_timeouts"
     assert result["results"][0]["after"]["continueMode"] == 1
@@ -5145,7 +5151,7 @@ def test_group_continue_mode_mismatch_is_verification_failed() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{"cue_ref": group_id, "profile": "group_basic", "properties": {"continueMode": 1}}],
         dry_run=False,
@@ -5169,22 +5175,22 @@ def test_group_mode_rollback_requires_new_dry_run_token() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     forward_update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
-    forward_plan = reader.update_cues(workspace_id, [forward_update], dry_run=True)
+    forward_plan = reader.edit_cues(workspace_id, [forward_update], dry_run=True)
     forward_token = planned_setters(forward_plan["results"][0])["mode"]["confirm_token"]
-    forward = reader.update_cues(
+    forward = reader.edit_cues(
         workspace_id,
         [{**forward_update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
     rollback_update = {**forward_update, "properties": {"mode": 3}}
-    stale = reader.update_cues(
+    stale = reader.edit_cues(
         workspace_id,
         [{**rollback_update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
-    rollback_plan = reader.update_cues(workspace_id, [rollback_update], dry_run=True)
+    rollback_plan = reader.edit_cues(workspace_id, [rollback_update], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])["mode"]["confirm_token"]
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         workspace_id,
         [{**rollback_update, "confirm_gates": [rollback_token]}],
         dry_run=False,
@@ -5210,10 +5216,10 @@ def test_group_mode_reports_child_side_effects_without_hidden_restoration() -> N
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 6}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -5245,10 +5251,10 @@ def test_group_mode_reports_unrequested_playlist_scalar_side_effect() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -5278,11 +5284,11 @@ def test_group_playlist_reviewed_token_writes_in_verified_playlist_mode() -> Non
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     setter = planned_setters(plan["results"][0])["playlist/doLoop"]
     assert setter["confirm_token"].startswith("confirm:groupPlaylist:v1:")
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [setter["confirm_token"]]}],
         dry_run=False,
@@ -5306,10 +5312,10 @@ def test_group_playlist_timeout_is_confirmed_and_sends_one_setter() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["playlist/doLoop"]["confirm_token"]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -5334,10 +5340,10 @@ def test_group_playlist_ignored_setter_reports_structured_verification_failure_w
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["playlist/doLoop"]["confirm_token"]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -5353,7 +5359,7 @@ def test_group_playlist_ignored_setter_reports_structured_verification_failure_w
     modeled = UpdateCuesResult.model_validate(result)
     assert modeled.results[0].status == "verification_failed"
 
-    replay = reader.update_cues(
+    replay = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -5380,11 +5386,11 @@ def test_group_playlist_token_binds_dependent_playlist_state() -> None:
         "profile": "group_basic",
         "properties": {"playlist/doCrossfade": True},
     }
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["playlist/doCrossfade"]["confirm_token"]
     client.cues[group_id]["playlist/crossfade/duration"] = 2.0
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -5408,11 +5414,11 @@ def test_group_mode_confirm_token_expires(monkeypatch: pytest.MonkeyPatch) -> No
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
     monkeypatch.setattr(group_helpers.time, "time", lambda: 1000)
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
     monkeypatch.setattr(group_helpers.time, "time", lambda: 1301)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -5436,16 +5442,16 @@ def test_group_confirm_tokens_reject_changed_value_and_wrong_family() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     mode_update = {"cue_ref": group_id, "profile": "group_basic", "properties": {"mode": 1}}
-    plan = reader.update_cues(workspace_id, [mode_update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [mode_update], dry_run=True)
     token = planned_setters(plan["results"][0])["mode"]["confirm_token"]
 
-    changed = reader.update_cues(
+    changed = reader.edit_cues(
         workspace_id,
         [{**mode_update, "properties": {"mode": 2}, "confirm_gates": [token]}],
         dry_run=False,
     )
     client.cues[group_id]["mode"] = 6
-    wrong_family = reader.update_cues(
+    wrong_family = reader.edit_cues(
         workspace_id,
         [
             {
@@ -5484,26 +5490,26 @@ def test_group_playlist_token_rejects_malformed_tampered_and_wrong_bindings() ->
         "profile": "group_basic",
         "properties": {"playlist/doLoop": True},
     }
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["playlist/doLoop"]["confirm_token"]
     tampered = f"{token[:-1]}{'0' if token[-1] != '0' else '1'}"
 
-    malformed = reader.update_cues(
+    malformed = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": ["malformed"]}],
         dry_run=False,
     )
-    invalid_signature = reader.update_cues(
+    invalid_signature = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [tampered]}],
         dry_run=False,
     )
-    wrong_group = reader.update_cues(
+    wrong_group = reader.edit_cues(
         workspace_id,
         [{**update, "cue_ref": other_group_id, "confirm_gates": [token]}],
         dry_run=False,
     )
-    wrong_property = reader.update_cues(
+    wrong_property = reader.edit_cues(
         workspace_id,
         [
             {
@@ -5538,7 +5544,7 @@ def test_group_playlist_loop_requires_readable_nonzero_child_duration() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doLoop": True}}],
         dry_run=True,
@@ -5561,7 +5567,7 @@ def test_group_playlist_crossfade_rejects_duration_longer_than_child() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{"cue_ref": group_id, "profile": "group_basic", "properties": {"playlist/doCrossfade": True}}],
         dry_run=True,
@@ -5592,10 +5598,10 @@ def test_group_playlist_shuffle_reports_order_side_effect() -> None:
         "profile": "group_basic",
         "properties": {"playlist/doShuffle": True},
     }
-    plan = reader.update_cues(workspace_id, [update], dry_run=True)
+    plan = reader.edit_cues(workspace_id, [update], dry_run=True)
     token = planned_setters(plan["results"][0])["playlist/doShuffle"]["confirm_token"]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         workspace_id,
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -5612,7 +5618,7 @@ def test_group_playlist_shuffle_reports_order_side_effect() -> None:
     ]
 
 
-def test_update_cues_real_blocks_duration_when_cue_duration_is_not_editable() -> None:
+def test_edit_cues_real_blocks_duration_when_cue_duration_is_not_editable() -> None:
     wait_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -5620,7 +5626,7 @@ def test_update_cues_real_blocks_duration_when_cue_duration_is_not_editable() ->
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": wait_id, "profile": "wait_basic", "properties": {"duration": 3}}],
         dry_run=False,
@@ -5632,7 +5638,7 @@ def test_update_cues_real_blocks_duration_when_cue_duration_is_not_editable() ->
     assert all(not request[0].endswith("/duration") for request in client.requests)
 
 
-def test_update_cues_real_blocks_duration_when_editability_readback_is_missing() -> None:
+def test_edit_cues_real_blocks_duration_when_editability_readback_is_missing() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -5640,7 +5646,7 @@ def test_update_cues_real_blocks_duration_when_editability_readback_is_missing()
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "wait_basic", "properties": {"duration": 1.0}}],
         dry_run=False,
@@ -5651,7 +5657,7 @@ def test_update_cues_real_blocks_duration_when_editability_readback_is_missing()
     assert all(not request[0].endswith("/duration") for request in client.requests)
 
 
-def test_update_cues_real_allows_duration_when_cue_duration_is_editable() -> None:
+def test_edit_cues_real_allows_duration_when_cue_duration_is_editable() -> None:
     audio_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -5659,7 +5665,7 @@ def test_update_cues_real_allows_duration_when_cue_duration_is_editable() -> Non
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": audio_id, "profile": "audio_basic", "properties": {"duration": 3}}],
         dry_run=False,
@@ -5670,7 +5676,7 @@ def test_update_cues_real_allows_duration_when_cue_duration_is_editable() -> Non
     assert result["results"][0]["after"]["duration"] == 3
 
 
-def test_update_cues_group_basic_profile_mismatch_fails_cleanly() -> None:
+def test_edit_cues_group_basic_profile_mismatch_fails_cleanly() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -5678,7 +5684,7 @@ def test_update_cues_group_basic_profile_mismatch_fails_cleanly() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "group_basic", "properties": {"mode": 3}}],
         dry_run=True,
@@ -5689,7 +5695,7 @@ def test_update_cues_group_basic_profile_mismatch_fails_cleanly() -> None:
     assert result["results"][0]["errors"]["profile"] == "group_basic update profile requires cue type: Group, Cue List, Cue Cart"
 
 
-def test_update_cues_fade_basic_dry_run_plans_documented_fade_fields() -> None:
+def test_edit_cues_fade_basic_dry_run_plans_documented_fade_fields() -> None:
     fade_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -5709,7 +5715,7 @@ def test_update_cues_fade_basic_dry_run_plans_documented_fade_fields() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -5760,7 +5766,7 @@ def test_update_cues_fade_basic_dry_run_plans_documented_fade_fields() -> None:
         assert f'"{key}"' in args[0]
 
 
-def test_update_cues_fade_basic_validators_fail_without_plan() -> None:
+def test_edit_cues_fade_basic_validators_fail_without_plan() -> None:
     fade_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -5768,7 +5774,7 @@ def test_update_cues_fade_basic_validators_fail_without_plan() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": fade_id, "profile": "fade_basic", "properties": {"targetMode": 99}},
@@ -5833,7 +5839,7 @@ def _fade_plan(
     operation: dict[str, Any] = {"property": property_name, "args": {"value": value}}
     if mode != "saved":
         operation["mode"] = mode
-    result = reader.update_cues(
+    result = reader.edit_cues(
         FADE_WORKSPACE_ID,
         [{"cue_ref": source_id, "profile": "fade_basic", "operations": [operation]}],
         dry_run=True,
@@ -5850,7 +5856,7 @@ def _fade_write(
     value: Any,
     token: str,
 ) -> dict[str, Any]:
-    return reader.update_cues(
+    return reader.edit_cues(
         FADE_WORKSPACE_ID,
         [
             {
@@ -5916,7 +5922,7 @@ def _fade_operation_plan(
     operation: dict[str, Any] = {"property": property_name, "args": args}
     if mode != "saved":
         operation["mode"] = mode
-    result = reader.update_cues(
+    result = reader.edit_cues(
         FADE_WORKSPACE_ID,
         [{"cue_ref": source_id, "profile": "fade_basic", "operations": [operation]}],
         dry_run=True,
@@ -5932,7 +5938,7 @@ def _fade_operation_write(
     args: dict[str, Any],
     token: str,
 ) -> dict[str, Any]:
-    return reader.update_cues(
+    return reader.edit_cues(
         FADE_WORKSPACE_ID,
         [
             {
@@ -5990,6 +5996,8 @@ def test_qlab_edit_cues_fade_basic_properties_shape_emits_fade_basic_token() -> 
     assert result["status"] == "dry_run"
     assert result["results"][0]["executed_operations"] == []
     assert planned["name"]["confirm_token"].startswith("confirm:fadeBasic:v1:")
+    addresses = [address for address, *_ in client.requests]
+    assert f"/workspace/{FADE_WORKSPACE_ID}/cue_id/{source_id}/name" not in addresses
     assert client.target_reads == 1
 
 
@@ -6399,7 +6407,7 @@ def test_fade_behavior_properties_shape_matches_live_mcp_request() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    plan = reader.update_cues(
+    plan = reader.edit_cues(
         FADE_WORKSPACE_ID,
         [
             {
@@ -6411,7 +6419,7 @@ def test_fade_behavior_properties_shape_matches_live_mcp_request() -> None:
         dry_run=True,
     )
     token = planned_setters(plan["results"][0])["stopTargetWhenDone"]["confirm_token"]
-    result = reader.update_cues(
+    result = reader.edit_cues(
         FADE_WORKSPACE_ID,
         [
             {
@@ -7106,7 +7114,7 @@ def test_fade_unpromoted_properties_never_accept_generic_tokens_or_emit_setters(
         "confirm_gates": [f"confirm:{property_name}:test"],
     }
 
-    result = reader.update_cues(FADE_WORKSPACE_ID, [request], dry_run=False)
+    result = reader.edit_cues(FADE_WORKSPACE_ID, [request], dry_run=False)
 
     assert result["status"] == "preflight_failed"
     assert result["results"][0]["executed_operations"] == []
@@ -7125,13 +7133,13 @@ def test_fade_curve_and_path_unsupported_controls_never_emit_setters() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    path = reader.update_cues(
+    path = reader.edit_cues(
         FADE_WORKSPACE_ID,
         [{"cue_ref": source_id, "profile": "fade_basic", "properties": {"pathWidth": 200}}],
         dry_run=True,
     )
     cues[source_id]["fadeType"] = 2
-    curve = reader.update_cues(
+    curve = reader.edit_cues(
         FADE_WORKSPACE_ID,
         [{"cue_ref": source_id, "profile": "fade_basic", "properties": {"curveType": "S-Curve"}}],
         dry_run=True,
@@ -7168,7 +7176,7 @@ def test_fade_objects_copy_actions_and_fx_remain_planned_only_without_setter(
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         FADE_WORKSPACE_ID,
         [
             {
@@ -7480,7 +7488,7 @@ def test_fade_phase1_rejects_batch_multi_property_live_and_active_source() -> No
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    batch = reader.update_cues(
+    batch = reader.edit_cues(
         FADE_WORKSPACE_ID,
         [
             {"cue_ref": source_id, "profile": "fade_basic", "properties": {"name": "A"}},
@@ -7488,7 +7496,7 @@ def test_fade_phase1_rejects_batch_multi_property_live_and_active_source() -> No
         ],
         dry_run=True,
     )
-    multi = reader.update_cues(
+    multi = reader.edit_cues(
         FADE_WORKSPACE_ID,
         [{"cue_ref": source_id, "profile": "fade_basic", "properties": {"name": "A", "geoMode": 1}}],
         dry_run=True,
@@ -7539,7 +7547,7 @@ def test_fade_phase1_rejects_wrong_modes_and_unsafe_targets_without_token(
     assert result["results"][0]["executed_operations"] == []
 
 
-def test_update_cues_fade_profile_type_mismatch_fails_cleanly_without_plan() -> None:
+def test_edit_cues_fade_profile_type_mismatch_fails_cleanly_without_plan() -> None:
     memo_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -7547,7 +7555,7 @@ def test_update_cues_fade_profile_type_mismatch_fails_cleanly_without_plan() -> 
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": memo_id, "profile": "fade_basic", "properties": {"targetMode": 0}}],
         dry_run=True,
@@ -7561,11 +7569,11 @@ def test_update_cues_fade_profile_type_mismatch_fails_cleanly_without_plan() -> 
     assert result["results"][0]["errors"]["profile"] == "fade_basic update profile requires a Fade cue"
 
 
-def test_update_cues_dry_run_reports_invalid_cue_ref_per_item_without_reading() -> None:
+def test_edit_cues_dry_run_reports_invalid_cue_ref_per_item_without_reading() -> None:
     client = BatchFakeWriteClient(QLabConfig(enable_write=False), cues={})
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": "selected", "properties": {"name": "Nope"}}],
         dry_run=True,
@@ -7578,7 +7586,7 @@ def test_update_cues_dry_run_reports_invalid_cue_ref_per_item_without_reading() 
     assert client.requests == []
 
 
-def test_update_cues_dry_run_reports_invalid_profile_per_item() -> None:
+def test_edit_cues_dry_run_reports_invalid_profile_per_item() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -7586,7 +7594,7 @@ def test_update_cues_dry_run_reports_invalid_profile_per_item() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "bad_profile", "properties": {"name": "Nope"}}],
         dry_run=True,
@@ -7599,7 +7607,7 @@ def test_update_cues_dry_run_reports_invalid_profile_per_item() -> None:
     assert client.requests == []
 
 
-def test_update_cues_real_preflight_failure_blocks_all_setters() -> None:
+def test_edit_cues_real_preflight_failure_blocks_all_setters() -> None:
     memo_id = "11111111-1111-4111-8111-111111111111"
     audio_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -7611,7 +7619,7 @@ def test_update_cues_real_preflight_failure_blocks_all_setters() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": memo_id, "properties": {"name": "Memo new"}},
@@ -7629,7 +7637,7 @@ def test_update_cues_real_preflight_failure_blocks_all_setters() -> None:
     assert f"/workspace/ws-1/cue_id/{audio_id}/rate" not in addresses
 
 
-def test_update_cues_real_preflight_invalid_value_blocks_all_setters_without_secret_leak() -> None:
+def test_edit_cues_real_preflight_invalid_value_blocks_all_setters_without_secret_leak() -> None:
     memo_id = "11111111-1111-4111-8111-111111111111"
     group_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -7641,7 +7649,7 @@ def test_update_cues_real_preflight_invalid_value_blocks_all_setters_without_sec
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": memo_id, "properties": {"name": "Memo new"}},
@@ -7668,7 +7676,7 @@ def test_update_cues_real_preflight_invalid_value_blocks_all_setters_without_sec
     assert "server-pass" not in repr(result)
 
 
-def test_update_cues_real_updates_mixed_safe_profiles() -> None:
+def test_edit_cues_real_updates_mixed_safe_profiles() -> None:
     memo_id = "11111111-1111-4111-8111-111111111111"
     audio_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -7680,7 +7688,7 @@ def test_update_cues_real_updates_mixed_safe_profiles() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": memo_id, "properties": {"name": "Memo new"}},
@@ -7703,7 +7711,7 @@ def test_update_cues_real_updates_mixed_safe_profiles() -> None:
     assert result["results"][1]["after"]["rate"] == 1.1
 
 
-def test_update_cues_uses_configured_update_debug() -> None:
+def test_edit_cues_uses_configured_update_debug() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass", update_debug=True),
@@ -7711,14 +7719,14 @@ def test_update_cues_uses_configured_update_debug() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues("ws-1", [{"cue_ref": cue_id, "properties": {"name": "New"}}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{"cue_ref": cue_id, "properties": {"name": "New"}}], dry_run=False)
 
     assert result["ok"] is True
     assert result["results"][0]["debug"]["properties_match"] is True
     assert result["results"][0]["debug"]["requested_properties"] == {"name": "New"}
 
 
-def test_update_cues_real_blocks_dry_run_only_property_before_osc() -> None:
+def test_edit_cues_real_blocks_dry_run_only_property_before_osc() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -7726,7 +7734,7 @@ def test_update_cues_real_blocks_dry_run_only_property_before_osc() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -7744,7 +7752,7 @@ def test_update_cues_real_blocks_dry_run_only_property_before_osc() -> None:
     assert client.requests == []
 
 
-def test_update_cues_real_blocks_target_refs_before_osc() -> None:
+def test_edit_cues_real_blocks_target_refs_before_osc() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -7752,7 +7760,7 @@ def test_update_cues_real_blocks_target_refs_before_osc() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "target_basic", "properties": {"cueTargetID": "target-id"}}],
         dry_run=False,
@@ -7764,7 +7772,7 @@ def test_update_cues_real_blocks_target_refs_before_osc() -> None:
     assert client.requests == []
 
 
-def test_update_cues_utility_target_initial_assignment_allows_broken_empty_source() -> None:
+def test_edit_cues_utility_target_initial_assignment_allows_broken_empty_source() -> None:
     source_id = "11111111-1111-4111-8111-111111111111"
     target_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -7785,9 +7793,9 @@ def test_update_cues_utility_target_initial_assignment_allows_broken_empty_sourc
     reader = QLabReader(client)  # type: ignore[arg-type]
     request = {"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": target_id}}
 
-    dry = reader.update_cues("ws-1", [request], dry_run=True)
+    dry = reader.edit_cues("ws-1", [request], dry_run=True)
     operation = planned_setters(dry["results"][0])["cueTargetID"]
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1", [{**request, "confirm_gates": [operation["confirm_token"]]}], dry_run=False
     )
 
@@ -7804,7 +7812,7 @@ def test_update_cues_utility_target_initial_assignment_allows_broken_empty_sourc
         {"cueTargetID": "", "isBroken": True, "isWarning": True},
     ],
 )
-def test_update_cues_utility_target_initial_assignment_preserves_broken_source_guards(
+def test_edit_cues_utility_target_initial_assignment_preserves_broken_source_guards(
     source_values: dict[str, Any],
 ) -> None:
     source_id = "11111111-1111-4111-8111-111111111111"
@@ -7820,7 +7828,7 @@ def test_update_cues_utility_target_initial_assignment_preserves_broken_source_g
         cues={source_id: source, target_id: {"type": "Memo", "isBroken": False, "isWarning": False}},
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": target_id}}],
         dry_run=True,
@@ -7831,14 +7839,14 @@ def test_update_cues_utility_target_initial_assignment_preserves_broken_source_g
     assert not any(address.endswith("/cueTargetID") for address, _, _ in client.requests)
 
 
-def test_update_cues_utility_target_initial_assignment_requires_exact_target_uuid() -> None:
+def test_edit_cues_utility_target_initial_assignment_requires_exact_target_uuid() -> None:
     source_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
         cues={source_id: {"type": "Start", "cueTargetID": "", "hasCueTargets": True, "isBroken": True, "isWarning": False}},
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": "target-id"}}],
         dry_run=True,
@@ -7857,7 +7865,7 @@ def test_update_cues_utility_target_initial_assignment_requires_exact_target_uui
     ]
     + [("reset_basic", "Reset")],
 )
-def test_update_cues_utility_target_uuid_gate_writes_and_rolls_back(
+def test_edit_cues_utility_target_uuid_gate_writes_and_rolls_back(
     profile: str, cue_type: str
 ) -> None:
     source_id = "11111111-1111-4111-8111-111111111111"
@@ -7888,7 +7896,7 @@ def test_update_cues_utility_target_uuid_gate_writes_and_rolls_back(
     reader = QLabReader(client)  # type: ignore[arg-type]
     request = {"cue_ref": source_id, "profile": profile, "properties": {"cueTargetID": target_id}}
 
-    dry = reader.update_cues("ws-1", [request], dry_run=True)
+    dry = reader.edit_cues("ws-1", [request], dry_run=True)
     operation = planned_setters(dry["results"][0])["cueTargetID"]
     token = operation["confirm_token"]
     payload, error = write_operations._decode_utility_target_confirm_token(token)
@@ -7904,19 +7912,19 @@ def test_update_cues_utility_target_uuid_gate_writes_and_rolls_back(
         "requested": target_id,
     }
 
-    written = reader.update_cues(
+    written = reader.edit_cues(
         "ws-1", [{**request, "confirm_gates": [token]}], dry_run=False
     )
     assert written["status"] == "updated"
     assert written["results"][0]["after"]["cueTargetID"] == target_id
 
-    rollback_dry = reader.update_cues(
+    rollback_dry = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": profile, "properties": {"cueTargetID": ""}}],
         dry_run=True,
     )
     rollback_token = planned_setters(rollback_dry["results"][0])["cueTargetID"]["confirm_token"]
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": profile, "properties": {"cueTargetID": ""}, "confirm_gates": [rollback_token]}],
         dry_run=False,
@@ -7925,7 +7933,7 @@ def test_update_cues_utility_target_uuid_gate_writes_and_rolls_back(
     assert rollback["results"][0]["after"]["cueTargetID"] == ""
 
 
-def test_update_cues_utility_target_gate_rejects_batch_multi_property_and_wrong_type() -> None:
+def test_edit_cues_utility_target_gate_rejects_batch_multi_property_and_wrong_type() -> None:
     source_id = "11111111-1111-4111-8111-111111111111"
     target_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -7938,26 +7946,26 @@ def test_update_cues_utility_target_gate_rejects_batch_multi_property_and_wrong_
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     base = {"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": target_id}}
-    dry = reader.update_cues("ws-1", [base], dry_run=True)
+    dry = reader.edit_cues("ws-1", [base], dry_run=True)
     token = planned_setters(dry["results"][0])["cueTargetID"]["confirm_token"]
 
-    batch = reader.update_cues("ws-1", [{**base, "confirm_gates": [token]}, {**base, "confirm_gates": [token]}], dry_run=False)
-    multi = reader.update_cues(
+    batch = reader.edit_cues("ws-1", [{**base, "confirm_gates": [token]}, {**base, "confirm_gates": [token]}], dry_run=False)
+    multi = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": target_id, "name": "No"}, "confirm_gates": [token]}],
         dry_run=False,
     )
-    wrong = reader.update_cues(
+    wrong = reader.edit_cues(
         "ws-1",
         [{"cue_ref": target_id, "profile": "target_basic", "properties": {"cueTargetID": source_id}, "confirm_gates": [token]}],
         dry_run=False,
     )
-    cue_number = reader.update_cues(
+    cue_number = reader.edit_cues(
         "ws-1",
         [{"cue_ref": "1", "profile": "target_basic", "properties": {"cueTargetID": target_id}, "confirm_gates": [token]}],
         dry_run=False,
     )
-    target_number = reader.update_cues(
+    target_number = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetNumber": "1"}, "confirm_gates": [token]}],
         dry_run=False,
@@ -7966,7 +7974,7 @@ def test_update_cues_utility_target_gate_rejects_batch_multi_property_and_wrong_
     assert all(not address.endswith("/cueTargetID") for address, _, _ in client.requests)
 
 
-def test_update_cues_utility_target_gate_rejects_fake_wrong_and_stale_tokens() -> None:
+def test_edit_cues_utility_target_gate_rejects_fake_wrong_and_stale_tokens() -> None:
     source_id = "11111111-1111-4111-8111-111111111111"
     target_id = "22222222-2222-4222-8222-222222222222"
     other_target_id = "33333333-3333-4333-8333-333333333333"
@@ -7980,13 +7988,13 @@ def test_update_cues_utility_target_gate_rejects_fake_wrong_and_stale_tokens() -
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     request = {"cue_ref": source_id, "profile": "target_basic", "properties": {"cueTargetID": target_id}}
-    dry = reader.update_cues("ws-1", [request], dry_run=True)
+    dry = reader.edit_cues("ws-1", [request], dry_run=True)
     token = planned_setters(dry["results"][0])["cueTargetID"]["confirm_token"]
 
-    fake = reader.update_cues("ws-1", [{**request, "confirm_gates": ["confirm:utilityTarget:v1:fake:fake"]}], dry_run=False)
-    wrong = reader.update_cues("ws-1", [{**request, "confirm_gates": ["confirm:videoIO:v1:fake:fake"]}], dry_run=False)
+    fake = reader.edit_cues("ws-1", [{**request, "confirm_gates": ["confirm:utilityTarget:v1:fake:fake"]}], dry_run=False)
+    wrong = reader.edit_cues("ws-1", [{**request, "confirm_gates": ["confirm:videoIO:v1:fake:fake"]}], dry_run=False)
     client.cues[source_id]["cueTargetID"] = other_target_id
-    stale = reader.update_cues("ws-1", [{**request, "confirm_gates": [token]}], dry_run=False)
+    stale = reader.edit_cues("ws-1", [{**request, "confirm_gates": [token]}], dry_run=False)
 
     assert fake["status"] == wrong["status"] == stale["status"] == "preflight_failed"
     assert "confirm_token" in fake["results"][0]["errors"]["cueTargetID"]
@@ -7995,7 +8003,7 @@ def test_update_cues_utility_target_gate_rejects_fake_wrong_and_stale_tokens() -
     assert all(not address.endswith("/cueTargetID") for address, _, _ in client.requests)
 
 
-def test_update_cues_utility_target_gate_rejects_live_mode_without_osc() -> None:
+def test_edit_cues_utility_target_gate_rejects_live_mode_without_osc() -> None:
     source_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -8003,7 +8011,7 @@ def test_update_cues_utility_target_gate_rejects_live_mode_without_osc() -> None
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{
             "cue_ref": source_id,
@@ -8018,7 +8026,7 @@ def test_update_cues_utility_target_gate_rejects_live_mode_without_osc() -> None
     assert all(not address.endswith("/cueTargetID") for address, _, _ in client.requests)
 
 
-def test_update_cues_real_blocks_unresolved_target_ref_with_gate_before_setter() -> None:
+def test_edit_cues_real_blocks_unresolved_target_ref_with_gate_before_setter() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     target_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -8028,7 +8036,7 @@ def test_update_cues_real_blocks_unresolved_target_ref_with_gate_before_setter()
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -8047,7 +8055,7 @@ def test_update_cues_real_blocks_unresolved_target_ref_with_gate_before_setter()
     assert all(not request[0].endswith("/cueTargetID") for request in client.requests)
 
 
-def test_update_cues_real_blocks_self_target_ref_with_gate_before_setter() -> None:
+def test_edit_cues_real_blocks_self_target_ref_with_gate_before_setter() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -8055,7 +8063,7 @@ def test_update_cues_real_blocks_self_target_ref_with_gate_before_setter() -> No
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -8074,7 +8082,7 @@ def test_update_cues_real_blocks_self_target_ref_with_gate_before_setter() -> No
     assert all(not request[0].endswith("/cueTargetID") for request in client.requests)
 
 
-def test_update_cues_real_allows_resolved_target_ref_with_gate() -> None:
+def test_edit_cues_real_allows_resolved_target_ref_with_gate() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     target_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -8084,7 +8092,7 @@ def test_update_cues_real_allows_resolved_target_ref_with_gate() -> None:
     reader = QLabReader(client)  # type: ignore[arg-type]
     token = confirm_token_for(reader, cue_id, {"profile": "target_basic", "properties": {"cueTargetID": target_id}})
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -8102,7 +8110,7 @@ def test_update_cues_real_allows_resolved_target_ref_with_gate() -> None:
     assert result["results"][0]["after"]["cueTargetID"] == target_id
 
 
-def test_update_cues_real_blocks_target_name_resolution_with_gate_before_setter() -> None:
+def test_edit_cues_real_blocks_target_name_resolution_with_gate_before_setter() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -8113,7 +8121,7 @@ def test_update_cues_real_blocks_target_name_resolution_with_gate_before_setter(
         reader, cue_id, {"profile": "target_basic", "properties": {"cueTargetName": "Target by name"}}
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -8134,7 +8142,7 @@ def test_update_cues_real_blocks_target_name_resolution_with_gate_before_setter(
     assert all(not request[0].endswith("/cueTargetName") for request in client.requests)
 
 
-def test_update_cues_real_blocks_missing_cue_before_any_setter() -> None:
+def test_edit_cues_real_blocks_missing_cue_before_any_setter() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     missing_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -8144,7 +8152,7 @@ def test_update_cues_real_blocks_missing_cue_before_any_setter() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": cue_id, "properties": {"name": "New"}},
@@ -8169,7 +8177,7 @@ def test_update_cues_real_blocks_missing_cue_before_any_setter() -> None:
         ("stopTargetWhenSliceEnds", True, True, False, "22222222-2222-4222-8222-222222222222", "Audio"),
     ],
 )
-def test_update_cues_devamp_gate_writes_reads_back_and_rolls_back(
+def test_edit_cues_devamp_gate_writes_reads_back_and_rolls_back(
     property_name: str,
     requested: Any,
     start_next: bool,
@@ -8187,7 +8195,7 @@ def test_update_cues_devamp_gate_writes_reads_back_and_rolls_back(
     baseline = client.cues[source_id][property_name]
     request = {"cue_ref": source_id, "profile": "devamp_basic", "properties": {property_name: requested}}
 
-    dry = reader.update_cues("ws-1", [request], dry_run=True)
+    dry = reader.edit_cues("ws-1", [request], dry_run=True)
     setter = planned_setters(dry["results"][0])[property_name]
     token = setter["confirm_token"]
     payload, error = write_operations._decode_devamp_confirm_token(token)
@@ -8205,21 +8213,21 @@ def test_update_cues_devamp_gate_writes_reads_back_and_rolls_back(
     assert payload["target_uuid"] == expected_target_id
     assert payload["target_type"] == expected_target_type
 
-    updated = reader.update_cues("ws-1", [{**request, "confirm_gates": [token]}], dry_run=False)
+    updated = reader.edit_cues("ws-1", [{**request, "confirm_gates": [token]}], dry_run=False)
     assert updated["status"] == "updated"
     assert updated["results"][0]["after"][property_name] == requested
 
     rollback_request = {"cue_ref": source_id, "profile": "devamp_basic", "properties": {property_name: baseline}}
-    rollback_dry = reader.update_cues("ws-1", [rollback_request], dry_run=True)
+    rollback_dry = reader.edit_cues("ws-1", [rollback_request], dry_run=True)
     rollback_token = planned_setters(rollback_dry["results"][0])[property_name]["confirm_token"]
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         "ws-1", [{**rollback_request, "confirm_gates": [rollback_token]}], dry_run=False
     )
     assert rollback["status"] == "updated"
     assert rollback["results"][0]["after"][property_name] == baseline
 
 
-def test_update_cues_devamp_type_mcp_input_dry_run_returns_devamp_token() -> None:
+def test_edit_cues_devamp_type_mcp_input_dry_run_returns_devamp_token() -> None:
     source_id = "11111111-1111-4111-8111-111111111111"
     audio_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -8233,7 +8241,7 @@ def test_update_cues_devamp_type_mcp_input_dry_run_returns_devamp_token() -> Non
         properties={"devampType": 2},
     ).model_dump()
 
-    result = reader.update_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [update], dry_run=True)
     setter = planned_setters(result["results"][0])["devampType"]
 
     assert setter["confirm_token"].startswith("confirm:devamp:v1:")
@@ -8242,7 +8250,7 @@ def test_update_cues_devamp_type_mcp_input_dry_run_returns_devamp_token() -> Non
 
 
 @pytest.mark.parametrize("target_type", ["Memo", "Light"])
-def test_update_cues_devamp_target_requires_existing_audio_or_video(target_type: str) -> None:
+def test_edit_cues_devamp_target_requires_existing_audio_or_video(target_type: str) -> None:
     source_id = "11111111-1111-4111-8111-111111111111"
     audio_id = "22222222-2222-4222-8222-222222222222"
     target_id = "33333333-3333-4333-8333-333333333333"
@@ -8251,7 +8259,7 @@ def test_update_cues_devamp_target_requires_existing_audio_or_video(target_type:
     client = BatchFakeWriteClient(QLabConfig(enable_write=True, passcode="server-pass"), cues=cues)
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": "devamp_basic", "properties": {"cueTargetID": target_id}}],
         dry_run=True,
@@ -8262,7 +8270,7 @@ def test_update_cues_devamp_target_requires_existing_audio_or_video(target_type:
     assert all(not address.endswith("/cueTargetID") for address, _, _ in client.requests)
 
 
-def test_update_cues_devamp_gate_rejects_missing_self_fake_wrong_and_stale_tokens() -> None:
+def test_edit_cues_devamp_gate_rejects_missing_self_fake_wrong_and_stale_tokens() -> None:
     source_id = "11111111-1111-4111-8111-111111111111"
     audio_id = "22222222-2222-4222-8222-222222222222"
     missing_id = "33333333-3333-4333-8333-333333333333"
@@ -8273,23 +8281,23 @@ def test_update_cues_devamp_gate_rejects_missing_self_fake_wrong_and_stale_token
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     target_request = {"cue_ref": source_id, "profile": "devamp_basic", "properties": {"cueTargetID": missing_id}}
-    missing = reader.update_cues("ws-1", [target_request], dry_run=True)
-    self_target = reader.update_cues(
+    missing = reader.edit_cues("ws-1", [target_request], dry_run=True)
+    self_target = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": "devamp_basic", "properties": {"cueTargetID": source_id}}],
         dry_run=True,
     )
     settings_request = {"cue_ref": source_id, "profile": "devamp_basic", "properties": {"devampType": 2}}
-    dry = reader.update_cues("ws-1", [settings_request], dry_run=True)
+    dry = reader.edit_cues("ws-1", [settings_request], dry_run=True)
     token = planned_setters(dry["results"][0])["devampType"]["confirm_token"]
-    fake = reader.update_cues(
+    fake = reader.edit_cues(
         "ws-1", [{**settings_request, "confirm_gates": ["confirm:devamp:v1:fake:fake"]}], dry_run=False
     )
-    wrong = reader.update_cues(
+    wrong = reader.edit_cues(
         "ws-1", [{**settings_request, "confirm_gates": ["confirm:utilityTarget:v1:fake:fake"]}], dry_run=False
     )
     client.cues[source_id]["startNextCueWhenSliceEnds"] = True
-    stale = reader.update_cues("ws-1", [{**settings_request, "confirm_gates": [token]}], dry_run=False)
+    stale = reader.edit_cues("ws-1", [{**settings_request, "confirm_gates": [token]}], dry_run=False)
 
     assert missing["status"] == self_target["status"] == "preflight_failed"
     assert "could not be resolved" in missing["results"][0]["errors"]["cueTargetID"]
@@ -8301,7 +8309,7 @@ def test_update_cues_devamp_gate_rejects_missing_self_fake_wrong_and_stale_token
     assert all(not address.endswith("/cueTargetID") and not address.endswith("/devampType") for address, _, _ in client.requests)
 
 
-def test_update_cues_devamp_gate_rejects_batch_multi_live_wrong_type_and_flag_dependencies() -> None:
+def test_edit_cues_devamp_gate_rejects_batch_multi_live_wrong_type_and_flag_dependencies() -> None:
     source_id = "11111111-1111-4111-8111-111111111111"
     audio_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -8311,17 +8319,17 @@ def test_update_cues_devamp_gate_rejects_batch_multi_live_wrong_type_and_flag_de
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     base = {"cue_ref": source_id, "profile": "devamp_basic", "properties": {"devampType": 2}}
-    token = planned_setters(reader.update_cues("ws-1", [base], dry_run=True)["results"][0])["devampType"]["confirm_token"]
-    batch = reader.update_cues("ws-1", [{**base, "confirm_gates": [token]}, {**base, "confirm_gates": [token]}], dry_run=False)
-    multi = reader.update_cues(
+    token = planned_setters(reader.edit_cues("ws-1", [base], dry_run=True)["results"][0])["devampType"]["confirm_token"]
+    batch = reader.edit_cues("ws-1", [{**base, "confirm_gates": [token]}, {**base, "confirm_gates": [token]}], dry_run=False)
+    multi = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": "devamp_basic", "properties": {"devampType": 2, "startNextCueWhenSliceEnds": True}, "confirm_gates": [token]}],
         dry_run=False,
     )
-    cue_number = reader.update_cues(
+    cue_number = reader.edit_cues(
         "ws-1", [{**base, "cue_ref": "1", "confirm_gates": [token]}], dry_run=False
     )
-    live = reader.update_cues(
+    live = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": "devamp_basic", "operations": [{"property": "devampType", "args": {"value": 2}, "mode": "live"}]}],
         dry_run=True,
@@ -8330,17 +8338,17 @@ def test_update_cues_devamp_gate_rejects_batch_multi_live_wrong_type_and_flag_de
         QLabConfig(enable_write=True, passcode="server-pass"),
         cues={source_id: {"type": "Memo", "devampType": 1}},
     )
-    wrong_type = QLabReader(wrong_type_client).update_cues(  # type: ignore[arg-type]
+    wrong_type = QLabReader(wrong_type_client).edit_cues(  # type: ignore[arg-type]
         "ws-1", [base], dry_run=True
     )
-    stop_without_start = reader.update_cues(
+    stop_without_start = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": "devamp_basic", "properties": {"stopTargetWhenSliceEnds": True}}],
         dry_run=True,
     )
     client.cues[source_id]["startNextCueWhenSliceEnds"] = True
     client.cues[source_id]["stopTargetWhenSliceEnds"] = True
-    disable_start = reader.update_cues(
+    disable_start = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": "devamp_basic", "properties": {"startNextCueWhenSliceEnds": False}}],
         dry_run=True,
@@ -8355,7 +8363,7 @@ def test_update_cues_devamp_gate_rejects_batch_multi_live_wrong_type_and_flag_de
     assert all(not address.endswith("/devampType") for address, _, _ in client.requests)
 
 
-def test_update_cues_real_timeout_confirmed_by_after_read() -> None:
+def test_edit_cues_real_timeout_confirmed_by_after_read() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -8364,7 +8372,7 @@ def test_update_cues_real_timeout_confirmed_by_after_read() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues("ws-1", [{"cue_ref": cue_id, "properties": {"flagged": True}}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{"cue_ref": cue_id, "properties": {"flagged": True}}], dry_run=False)
 
     assert result["ok"] is True
     assert result["status"] == "updated_with_confirmed_timeouts"
@@ -8376,7 +8384,7 @@ def test_update_cues_real_timeout_confirmed_by_after_read() -> None:
     assert result["results"][0]["after"]["flagged"] is True
 
 
-def test_update_cues_many_setter_timeouts_are_bounded_and_confirmed(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_edit_cues_many_setter_timeouts_are_bounded_and_confirmed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(write_operations, "UPDATE_SETTER_REPLY_TIMEOUT_CAP_SECONDS", 0.001)
     monkeypatch.setattr(write_operations, "UPDATE_SETTER_REPLY_TOTAL_BUDGET_SECONDS", 0.012)
     monkeypatch.setattr(write_operations, "UPDATE_AFTER_READ_TIMEOUT_CAP_SECONDS", 0.01)
@@ -8402,7 +8410,7 @@ def test_update_cues_many_setter_timeouts_are_bounded_and_confirmed(monkeypatch:
     reader = QLabReader(client)  # type: ignore[arg-type]
 
     started = time.monotonic()
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": cue_id, "properties": {"flagged": True, "colorName": "blue"}}
@@ -8434,7 +8442,7 @@ def test_update_cues_many_setter_timeouts_are_bounded_and_confirmed(monkeypatch:
     assert max(timeout for timeout in setter_timeouts if timeout is not None) <= 0.001
 
 
-def test_update_cues_confirmed_timeouts_do_not_count_as_failures_across_batch() -> None:
+def test_edit_cues_confirmed_timeouts_do_not_count_as_failures_across_batch() -> None:
     clean_id = "11111111-1111-4111-8111-111111111111"
     timeout_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -8447,7 +8455,7 @@ def test_update_cues_confirmed_timeouts_do_not_count_as_failures_across_batch() 
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": clean_id, "properties": {"name": "New clean"}},
@@ -8465,7 +8473,7 @@ def test_update_cues_confirmed_timeouts_do_not_count_as_failures_across_batch() 
     assert result["warnings"]
 
 
-def test_update_cues_unconfirmed_timeout_counts_as_failure(
+def test_edit_cues_unconfirmed_timeout_counts_as_failure(
     no_after_read_retry_delay: None,
 ) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
@@ -8477,7 +8485,7 @@ def test_update_cues_unconfirmed_timeout_counts_as_failure(
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues("ws-1", [{"cue_ref": cue_id, "properties": {"flagged": True}}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{"cue_ref": cue_id, "properties": {"flagged": True}}], dry_run=False)
 
     assert result["ok"] is False
     assert result["status"] == "partial_failed"
@@ -8488,7 +8496,7 @@ def test_update_cues_unconfirmed_timeout_counts_as_failure(
     assert "flagged" in result["results"][0]["errors"]
 
 
-def test_update_cues_timed_out_setter_without_after_confirmation_reports_property(
+def test_edit_cues_timed_out_setter_without_after_confirmation_reports_property(
     no_after_read_retry_delay: None,
 ) -> None:
     confirmed_id = "11111111-1111-4111-8111-111111111111"
@@ -8504,7 +8512,7 @@ def test_update_cues_timed_out_setter_without_after_confirmation_reports_propert
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": confirmed_id, "properties": {"colorName": "blue"}},
@@ -8523,7 +8531,7 @@ def test_update_cues_timed_out_setter_without_after_confirmation_reports_propert
     assert "colorName" in result["results"][1]["errors"]
 
 
-def test_update_cues_retries_after_read_for_late_timeout_application(
+def test_edit_cues_retries_after_read_for_late_timeout_application(
     no_after_read_retry_delay: None,
 ) -> None:
     cues = {
@@ -8539,7 +8547,7 @@ def test_update_cues_retries_after_read_for_late_timeout_application(
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": cue_id, "properties": {"name": f"[CODEX30] {index}"}}
@@ -8556,7 +8564,7 @@ def test_update_cues_retries_after_read_for_late_timeout_application(
     assert result["results"][17]["status"] == "updated_with_confirmed_timeouts"
 
 
-def test_update_cues_after_read_mismatch_reports_requested_and_after_values(
+def test_edit_cues_after_read_mismatch_reports_requested_and_after_values(
     no_after_read_retry_delay: None,
 ) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
@@ -8567,7 +8575,7 @@ def test_update_cues_after_read_mismatch_reports_requested_and_after_values(
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues("ws-1", [{"cue_ref": cue_id, "properties": {"name": "New"}}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{"cue_ref": cue_id, "properties": {"name": "New"}}], dry_run=False)
 
     assert result["ok"] is False
     assert result["status"] == "verification_failed"
@@ -8580,7 +8588,7 @@ def test_update_cues_after_read_mismatch_reports_requested_and_after_values(
     assert "after" in result["results"][0]["errors"]["verification"]
 
 
-def test_update_cues_verification_accepts_numeric_normalization() -> None:
+def test_edit_cues_verification_accepts_numeric_normalization() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -8589,14 +8597,14 @@ def test_update_cues_verification_accepts_numeric_normalization() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues("ws-1", [{"cue_ref": cue_id, "properties": {"duration": 1}}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{"cue_ref": cue_id, "properties": {"duration": 1}}], dry_run=False)
 
     assert result["ok"] is True
     assert result["status"] == "updated"
     assert result["results"][0]["errors"] is None
 
 
-def test_update_cues_verification_accepts_qlab_float_precision() -> None:
+def test_edit_cues_verification_accepts_qlab_float_precision() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -8605,7 +8613,7 @@ def test_update_cues_verification_accepts_qlab_float_precision() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -8622,7 +8630,7 @@ def test_update_cues_verification_accepts_qlab_float_precision() -> None:
     assert result["results"][0]["errors"] is None
 
 
-def test_update_cues_verification_accepts_continue_mode_labels() -> None:
+def test_edit_cues_verification_accepts_continue_mode_labels() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -8631,7 +8639,7 @@ def test_update_cues_verification_accepts_continue_mode_labels() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "properties": {"continueMode": "auto_continue"}}],
         dry_run=False,
@@ -8642,7 +8650,7 @@ def test_update_cues_verification_accepts_continue_mode_labels() -> None:
     assert result["results"][0]["errors"] is None
 
 
-def test_update_cues_verification_accepts_safe_enum_string_normalization() -> None:
+def test_edit_cues_verification_accepts_safe_enum_string_normalization() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -8651,7 +8659,7 @@ def test_update_cues_verification_accepts_safe_enum_string_normalization() -> No
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -8668,7 +8676,7 @@ def test_update_cues_verification_accepts_safe_enum_string_normalization() -> No
     assert result["results"][0]["errors"] is None
 
 
-def test_update_cues_mixed_clean_confirmed_timeout_and_real_error_counts_only_error() -> None:
+def test_edit_cues_mixed_clean_confirmed_timeout_and_real_error_counts_only_error() -> None:
     clean_id = "11111111-1111-4111-8111-111111111111"
     timeout_id = "22222222-2222-4222-8222-222222222222"
     error_id = "33333333-3333-4333-8333-333333333333"
@@ -8684,7 +8692,7 @@ def test_update_cues_mixed_clean_confirmed_timeout_and_real_error_counts_only_er
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": clean_id, "properties": {"name": "New clean"}},
@@ -8708,7 +8716,7 @@ def test_update_cues_mixed_clean_confirmed_timeout_and_real_error_counts_only_er
     assert "armed" in result["results"][2]["errors"]
 
 
-def test_update_cues_real_reports_partial_failure_during_execution() -> None:
+def test_edit_cues_real_reports_partial_failure_during_execution() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -8717,7 +8725,7 @@ def test_update_cues_real_reports_partial_failure_during_execution() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "properties": {"name": "New", "armed": False}}],
         dry_run=False,
@@ -8835,7 +8843,7 @@ def test_update_cue_audio_last_slice_properties_dry_run_reads_before_and_plans()
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -8858,7 +8866,7 @@ def test_update_cue_audio_last_slice_properties_dry_run_reads_before_and_plans()
     assert item["executed_operations"] == []
 
 
-def test_update_cues_audio_last_slice_invalid_values_have_no_plan() -> None:
+def test_edit_cues_audio_last_slice_invalid_values_have_no_plan() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -8866,7 +8874,7 @@ def test_update_cues_audio_last_slice_invalid_values_have_no_plan() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": cue_id, "profile": "audio_basic", "properties": {"lastSlicePlayCount": 0}},
@@ -9096,7 +9104,7 @@ def test_camera_phase2_non_gated_property_emits_no_token_and_fabricated_token_ca
     assert setter["requires_confirm_token"] is False
     client.requests.clear()
 
-    real_attempt = reader.update_cues(
+    real_attempt = reader.edit_cues(
         "ws-1",
         [
             {
@@ -9374,7 +9382,7 @@ def _phase3_opacity_fixture(
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": cue_id, "profile": profile, "properties": {"opacity": requested}}
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     token = planned_setters(plan["results"][0])["opacity"]["confirm_token"]
     client.requests.clear()
     return client, reader, cue_id, update, token
@@ -9422,7 +9430,7 @@ def test_real_update_preflight_budget_exhaustion_sends_no_setter(
     monkeypatch.setattr(write_operations, "UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS", 1.0)
     monkeypatch.setattr(write_operations, "_try_read_update_values", consume_preflight_budget)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -9466,7 +9474,7 @@ def test_real_update_preflight_shares_one_deadline_across_fifty_cues(
     monkeypatch.setattr(write_operations, "UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS", 0.1)
     monkeypatch.setattr(write_operations, "_try_read_update_values", consume_shared_budget)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": cue_id, "properties": {"name": f"Updated {index}"}}
@@ -9512,7 +9520,7 @@ def test_real_update_uses_fresh_verification_budget_after_setter_dispatch(
     monkeypatch.setattr(write_operations, "UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS", 1.0)
     monkeypatch.setattr(client, "request", consume_remaining_budget_after_setter)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -9569,7 +9577,7 @@ def test_execution_guard_blocks_every_non_allowlisted_live_route() -> None:
 )
 def test_phase3a_opacity_dry_run_candidate_emits_confirm_token(profile: str, cue_type: str) -> None:
     client, reader, cue_id, update, _ = _phase3_opacity_fixture(profile=profile, cue_type=cue_type)
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     setter = planned_setters(plan["results"][0])["opacity"]
     payload, error = video_opacity._decode_confirm_token(setter["confirm_token"])
 
@@ -9615,7 +9623,7 @@ def test_phase3a_opacity_real_write_with_token_sets_once_and_verifies(
         cue_type=cue_type,
     )
 
-    result = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
 
     address = f"/workspace/ws-1/cue_id/{cue_id}/opacity"
     item = result["results"][0]
@@ -9652,7 +9660,7 @@ def test_phase3a_opacity_real_write_with_token_sets_once_and_verifies(
 
 def test_phase3a_opacity_token_cannot_authorize_other_value_workspace_or_stale_baseline() -> None:
     client, reader, cue_id, update, token = _phase3_opacity_fixture()
-    wrong_value = reader.update_cues(
+    wrong_value = reader.edit_cues(
         "ws-1",
         [{**update, "properties": {"opacity": 0.7}, "confirm_gates": [token]}],
         dry_run=False,
@@ -9663,11 +9671,11 @@ def test_phase3a_opacity_token_cannot_authorize_other_value_workspace_or_stale_b
         cues={cue_id: {"type": "Video", "opacity": 1.0}},
         workspace_id="ws-2",
     )
-    wrong_workspace = QLabReader(wrong_workspace_client).update_cues(  # type: ignore[arg-type]
+    wrong_workspace = QLabReader(wrong_workspace_client).edit_cues(  # type: ignore[arg-type]
         "ws-2", [{**update, "confirm_gates": [token]}], dry_run=False
     )
     client.cues[cue_id]["opacity"] = 0.9
-    stale = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    stale = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
 
     assert wrong_value["status"] == "preflight_failed"
     assert wrong_workspace["status"] == "preflight_failed"
@@ -9685,7 +9693,7 @@ def test_phase3a_opacity_token_cannot_authorize_other_value_workspace_or_stale_b
 def test_phase3a_opacity_invalid_token_blocks_before_setter(token_mutator: Any) -> None:
     client, reader, _, update, token = _phase3_opacity_fixture()
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token_mutator(token)]}],
         dry_run=False,
@@ -9707,7 +9715,7 @@ def test_phase3a_opacity_real_attempt_requires_uuid_single_property_and_token() 
     ]
 
     for case in cases:
-        result = reader.update_cues("ws-1", case, dry_run=False)
+        result = reader.edit_cues("ws-1", case, dry_run=False)
         assert result["status"] == "preflight_failed"
         assert all(item["executed_operations"] == [] for item in result["results"])
     assert not any(address.endswith("/opacity") for address, _, _ in client.requests)
@@ -9722,10 +9730,10 @@ def test_phase3a_opacity_setter_timeout_with_matching_readback_is_updated_warnin
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": cue_id, "profile": "video_basic", "properties": {"opacity": 0.8}}
-    token = planned_setters(reader.update_cues("ws-1", [update], dry_run=True)["results"][0])["opacity"]["confirm_token"]
+    token = planned_setters(reader.edit_cues("ws-1", [update], dry_run=True)["results"][0])["opacity"]["confirm_token"]
     client.requests.clear()
 
-    result = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
 
     assert result["status"] == "updated"
     assert result["timeout_confirmed_count"] == 1
@@ -9756,10 +9764,10 @@ def test_phase3a_opacity_setter_timeout_mismatch_is_uncertain_failure_no_retry(
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": cue_id, "profile": "video_basic", "properties": {"opacity": 0.8}}
-    token = planned_setters(reader.update_cues("ws-1", [update], dry_run=True)["results"][0])["opacity"]["confirm_token"]
+    token = planned_setters(reader.edit_cues("ws-1", [update], dry_run=True)["results"][0])["opacity"]["confirm_token"]
     client.requests.clear()
 
-    result = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
 
     assert result["status"] == "partial_failed"
     assert result["timeout_confirmed_count"] == 0
@@ -9807,7 +9815,7 @@ def _phase3b_translation_fixture(
         "profile": profile,
         "properties": {property_name: requested},
     }
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     token = planned_setters(plan["results"][0])[property_name]["confirm_token"]
     client.requests.clear()
     return client, reader, cue_id, update, token
@@ -9836,7 +9844,7 @@ def test_phase3b_translation_dry_run_emits_bound_token(
         property_name=property_name,
     )
 
-    result = reader.update_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [update], dry_run=True)
     item = result["results"][0]
     setter = planned_setters(item)[property_name]
     payload, error = video_translation._decode_confirm_token(
@@ -9898,7 +9906,7 @@ def test_phase3b_translation_real_write_sets_once_and_verifies(
         property_name=property_name,
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -9927,12 +9935,12 @@ def test_phase3b_translation_real_write_sets_once_and_verifies(
 
 def test_phase3b_translation_token_rejects_context_mismatch_and_stale_baseline() -> None:
     client, reader, cue_id, update, token = _phase3b_translation_fixture()
-    wrong_value = reader.update_cues(
+    wrong_value = reader.edit_cues(
         "ws-1",
         [{**update, "properties": {"translation/x": 21.0}, "confirm_gates": [token]}],
         dry_run=False,
     )
-    wrong_axis = reader.update_cues(
+    wrong_axis = reader.edit_cues(
         "ws-1",
         [
             {
@@ -9944,7 +9952,7 @@ def test_phase3b_translation_token_rejects_context_mismatch_and_stale_baseline()
         dry_run=False,
     )
     client.cues[cue_id]["translation/x"] = 11.0
-    stale = reader.update_cues(
+    stale = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -9954,7 +9962,7 @@ def test_phase3b_translation_token_rejects_context_mismatch_and_stale_baseline()
         cues={cue_id: {"type": "Video", "translation/x": 10.0}},
         workspace_id="ws-2",
     )
-    wrong_workspace = QLabReader(wrong_workspace_client).update_cues(  # type: ignore[arg-type]
+    wrong_workspace = QLabReader(wrong_workspace_client).edit_cues(  # type: ignore[arg-type]
         "ws-2",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -9983,18 +9991,18 @@ def test_phase3b_translation_token_rejects_wrong_cue_profile_and_type() -> None:
         "type": "Video",
         "translation/x": 10.0,
     }
-    wrong_cue = reader.update_cues(
+    wrong_cue = reader.edit_cues(
         "ws-1",
         [{**update, "cue_ref": other_cue_id, "confirm_gates": [token]}],
         dry_run=False,
     )
-    wrong_profile = reader.update_cues(
+    wrong_profile = reader.edit_cues(
         "ws-1",
         [{**update, "profile": "camera_basic", "confirm_gates": [token]}],
         dry_run=False,
     )
     client.cues[cue_id]["type"] = "Camera"
-    wrong_type = reader.update_cues(
+    wrong_type = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10021,7 +10029,7 @@ def test_phase3b_translation_token_is_bound_to_camera_type_and_profile() -> None
     )
     client.cues[cue_id]["type"] = "Text"
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -10050,7 +10058,7 @@ def test_phase3b_translation_token_is_bound_to_camera_type_and_profile() -> None
 def test_phase3b_translation_invalid_token_blocks_before_setter(token_mutator: Any) -> None:
     client, reader, _, update, token = _phase3b_translation_fixture()
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token_mutator(token)]}],
         dry_run=False,
@@ -10092,7 +10100,7 @@ def test_phase3b_translation_real_attempt_requires_video_uuid_single_saved_prope
     ]
 
     for case in cases:
-        result = reader.update_cues("ws-1", case, dry_run=False)
+        result = reader.edit_cues("ws-1", case, dry_run=False)
         assert result["status"] == "preflight_failed"
         assert all(item["executed_operations"] == [] for item in result["results"])
     assert not any(address.endswith("/translation/x") for address, _, _ in client.requests)
@@ -10112,7 +10120,7 @@ def test_phase3b_translation_rejects_unhealthy_or_active_cue(cue_state: dict[str
     client, reader, cue_id, update, token = _phase3b_translation_fixture()
     client.cues[cue_id].update(cue_state)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10131,7 +10139,7 @@ def test_phase3b_translation_rejects_non_finite_values(value: float) -> None:
         cues={cue_id: {"type": "Video", "translation/x": 10.0}},
     )
 
-    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+    result = QLabReader(client).edit_cues(  # type: ignore[arg-type]
         "ws-1",
         [
             {
@@ -10167,7 +10175,7 @@ def test_phase3b_translation_setter_timeout_matching_readback_is_updated_warning
         timeout=True,
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10189,7 +10197,7 @@ def test_phase3b_translation_setter_timeout_mismatch_is_uncertain_no_retry(
         timeout_without_apply=True,
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10205,7 +10213,7 @@ def test_phase3b_translation_setter_timeout_mismatch_is_uncertain_no_retry(
 def test_phase3b_translation_normal_setter_readback_mismatch_fails_without_retry() -> None:
     client, reader, _, update, token = _phase3b_translation_fixture(ignore_readback=True)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10233,20 +10241,20 @@ def test_phase3b_translation_rollback_requires_new_token(
         profile=profile,
         cue_type=cue_type,
     )
-    forward = reader.update_cues(
+    forward = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
     rollback_update = {**update, "properties": {"translation/x": 10.0}}
-    old_token = reader.update_cues(
+    old_token = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
-    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])["translation/x"]["confirm_token"]
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [rollback_token]}],
         dry_run=False,
@@ -10301,7 +10309,7 @@ def _phase3c_scalar_fixture(
         "profile": profile,
         "properties": {property_name: requested},
     }
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     token = planned_setters(plan["results"][0])[property_name]["confirm_token"]
     client.requests.clear()
     return client, reader, cue_id, update, token
@@ -10319,7 +10327,7 @@ def test_phase3c_scalar_dry_run_emits_bound_token(
         property_name=property_name,
     )
 
-    result = reader.update_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [update], dry_run=True)
     item = result["results"][0]
     setter = planned_setters(item)[property_name]
     payload, error = video_scalars._decode_confirm_token(
@@ -10357,7 +10365,7 @@ def test_phase3c_scalar_real_write_sets_once_and_verifies(
         property_name=property_name,
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10380,20 +10388,20 @@ def test_phase3c_scalar_real_write_sets_once_and_verifies(
 
 def test_phase3c_scalar_token_rejects_wrong_property_type_and_stale_baseline() -> None:
     client, reader, cue_id, update, token = _phase3c_scalar_fixture()
-    wrong_property = reader.update_cues(
+    wrong_property = reader.edit_cues(
         "ws-1",
         [{**update, "properties": {"scale/y": 1.25}, "confirm_gates": [token]}],
         dry_run=False,
     )
     client.cues[cue_id]["type"] = "Camera"
-    wrong_type = reader.update_cues(
+    wrong_type = reader.edit_cues(
         "ws-1",
         [{**update, "profile": "camera_basic", "confirm_gates": [token]}],
         dry_run=False,
     )
     client.cues[cue_id]["type"] = "Video"
     client.cues[cue_id]["scale/x"] = 1.1
-    stale = reader.update_cues(
+    stale = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10416,7 +10424,7 @@ def test_phase3c_scalar_token_cannot_cross_camera_and_text() -> None:
     )
     client.cues[cue_id]["type"] = "Text"
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "profile": "text_basic", "confirm_gates": [token]}],
         dry_run=False,
@@ -10438,7 +10446,7 @@ def test_phase3c_scalar_token_cannot_cross_camera_and_text() -> None:
 def test_phase3c_scalar_invalid_token_blocks_before_setter(token_mutator: Any) -> None:
     client, reader, _, update, token = _phase3c_scalar_fixture()
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token_mutator(token)]}],
         dry_run=False,
@@ -10476,7 +10484,7 @@ def test_phase3c_scalar_real_attempt_requires_uuid_single_saved_property() -> No
     ]
 
     for case in cases:
-        result = reader.update_cues("ws-1", case, dry_run=False)
+        result = reader.edit_cues("ws-1", case, dry_run=False)
         assert result["status"] == "preflight_failed"
         assert all(item["executed_operations"] == [] for item in result["results"])
     assert not any(address.endswith("/scale/x") for address, _, _ in client.requests)
@@ -10496,7 +10504,7 @@ def test_phase3c_scalar_rejects_unhealthy_or_active_cue(cue_state: dict[str, Any
     client, reader, cue_id, update, token = _phase3c_scalar_fixture()
     client.cues[cue_id].update(cue_state)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10515,7 +10523,7 @@ def test_phase3c_scalar_rejects_non_finite_values(value: float) -> None:
         cues={cue_id: {"type": "Video", "scale/x": 1.0}},
     )
 
-    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+    result = QLabReader(client).edit_cues(  # type: ignore[arg-type]
         "ws-1",
         [
             {
@@ -10551,7 +10559,7 @@ def test_phase3c_scalar_timeout_matching_readback_is_updated_warning(
         timeout=True,
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10572,7 +10580,7 @@ def test_phase3c_scalar_timeout_mismatch_is_uncertain_no_retry(
         timeout_without_apply=True,
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10595,20 +10603,20 @@ def test_phase3c_scalar_rollback_requires_new_token(profile: str, cue_type: str)
         profile=profile,
         cue_type=cue_type,
     )
-    forward = reader.update_cues(
+    forward = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
     rollback_update = {**update, "properties": {"scale/x": 1.0}}
-    old_token = reader.update_cues(
+    old_token = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
-    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])["scale/x"]["confirm_token"]
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [rollback_token]}],
         dry_run=False,
@@ -10691,7 +10699,7 @@ def test_phase3d_blend_mode_allows_official_full_name_strings_only() -> None:
     reader = QLabReader(client)  # type: ignore[arg-type]
 
     for mode in OFFICIAL_BLEND_MODE_NAMES:
-        valid = reader.update_cues(
+        valid = reader.edit_cues(
             "ws-1",
             [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"blendMode": mode}}],
             dry_run=True,
@@ -10709,7 +10717,7 @@ def test_phase3d_blend_mode_rejects_non_official_values(bad_value: Any) -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"blendMode": bad_value}}],
         dry_run=True,
@@ -10728,7 +10736,7 @@ def test_phase3d_blend_mode_rejects_old_case_insensitive_canonicalization() -> N
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"blendMode": " screen "}}],
         dry_run=True,
@@ -10762,7 +10770,7 @@ def _phase3d_appearance_fixture(
         "profile": profile,
         "properties": {property_name: requested},
     }
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     token = planned_setters(plan["results"][0])[property_name]["confirm_token"]
     client.requests.clear()
     return client, reader, cue_id, update, token
@@ -10787,7 +10795,7 @@ def test_phase3d_appearance_dry_run_emits_bound_token(
         requested=requested,
     )
 
-    result = reader.update_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [update], dry_run=True)
     item = result["results"][0]
     setter = planned_setters(item)[property_name]
     payload, error = video_appearance._decode_confirm_token(setter["confirm_token"])
@@ -10828,7 +10836,7 @@ def test_phase3d_appearance_real_write_sets_once_and_verifies(
         requested=requested,
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10870,7 +10878,7 @@ def test_phase3d_appearance_token_binding_and_structure_rejections() -> None:
         ],
     ]
     for case in cases:
-        result = reader.update_cues("ws-1", case, dry_run=False)
+        result = reader.edit_cues("ws-1", case, dry_run=False)
         assert result["status"] == "preflight_failed"
         assert all(item["executed_operations"] == [] for item in result["results"])
     assert not any(address.endswith(("/blendMode", "/preserveAspectRatio")) for address, _, _ in client.requests)
@@ -10886,7 +10894,7 @@ def test_phase3d_appearance_token_binding_and_structure_rejections() -> None:
 def test_phase3d_appearance_tampered_token_rejects_before_setter(token_mutator: Any) -> None:
     client, reader, _, update, token = _phase3d_appearance_fixture()
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token_mutator(token)]}],
         dry_run=False,
@@ -10901,19 +10909,19 @@ def test_phase3d_appearance_rejects_wrong_type_profile_cue_and_stale_baseline() 
     client, reader, cue_id, update, token = _phase3d_appearance_fixture()
     other_id = "22222222-2222-4222-8222-222222222222"
     client.cues[other_id] = {"type": "Video", "blendMode": "Normal"}
-    wrong_cue = reader.update_cues(
+    wrong_cue = reader.edit_cues(
         "ws-1",
         [{**update, "cue_ref": other_id, "confirm_gates": [token]}],
         dry_run=False,
     )
     client.cues[cue_id]["type"] = "Camera"
-    wrong_type = reader.update_cues(
+    wrong_type = reader.edit_cues(
         "ws-1",
         [{**update, "profile": "camera_basic", "confirm_gates": [token]}],
         dry_run=False,
     )
     client.cues[cue_id].update({"type": "Video", "blendMode": "Screen"})
-    stale = reader.update_cues(
+    stale = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10944,7 +10952,7 @@ def test_phase3d_appearance_rejects_unhealthy_or_active_cue(cue_state: dict[str,
     client, reader, cue_id, update, token = _phase3d_appearance_fixture()
     client.cues[cue_id].update(cue_state)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -10957,20 +10965,20 @@ def test_phase3d_appearance_rejects_unhealthy_or_active_cue(cue_state: dict[str,
 
 def test_phase3d_appearance_timeout_and_rollback_contract() -> None:
     client, reader, _, update, forward_token = _phase3d_appearance_fixture(timeout=True)
-    forward = reader.update_cues(
+    forward = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
     rollback_update = {**update, "properties": {"blendMode": "Normal"}}
-    old_token = reader.update_cues(
+    old_token = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
-    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])["blendMode"]["confirm_token"]
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [rollback_token]}],
         dry_run=False,
@@ -10991,7 +10999,7 @@ def test_phase3d_appearance_timeout_mismatch_is_uncertain_no_retry(
         timeout_without_apply=True,
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -11041,7 +11049,7 @@ def _phase7_geometry_fixture(
         "profile": profile,
         "properties": {property_name: requested},
     }
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     token = planned_setters(plan["results"][0])[property_name]["confirm_token"]
     client.requests.clear()
     return client, reader, cue_id, update, token
@@ -11067,7 +11075,7 @@ def _phase7_reset_rotation_fixture(
         "profile": profile,
         "properties": {"resetRotation": True},
     }
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     token = planned_setters(plan["results"][0])["resetRotation"]["confirm_token"]
     client.requests.clear()
     return client, reader, cue_id, update, token
@@ -11098,11 +11106,11 @@ def test_phase3d_blend_mode_token_boundaries_reject_fx_and_geometry_tokens() -> 
             }
         ],
     }
-    fx_plan = fx_reader.update_cues("ws-1", [fx_update], dry_run=True)
+    fx_plan = fx_reader.edit_cues("ws-1", [fx_update], dry_run=True)
     fx_token = planned_setters(fx_plan["results"][0])["videoEffectIndex/parameter"]["confirm_token"]
 
     for wrong_token in (geometry_token, fx_token):
-        result = appearance_reader.update_cues(
+        result = appearance_reader.edit_cues(
             "ws-1",
             [{**appearance_update, "confirm_gates": [wrong_token]}],
             dry_run=False,
@@ -11111,7 +11119,7 @@ def test_phase3d_blend_mode_token_boundaries_reject_fx_and_geometry_tokens() -> 
         assert result["results"][0]["executed_operations"] == []
 
     geometry_client, geometry_reader, _, geometry_update, _ = _phase7_geometry_fixture(property_name="fillStage")
-    wrong_family = geometry_reader.update_cues(
+    wrong_family = geometry_reader.edit_cues(
         "ws-1",
         [{**geometry_update, "confirm_gates": [appearance_token]}],
         dry_run=False,
@@ -11142,7 +11150,7 @@ def test_phase7_geometry_dry_run_emits_bound_token(
         requested=requested,
     )
 
-    result = reader.update_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [update], dry_run=True)
     item = result["results"][0]
     setter = planned_setters(item)[property_name]
     payload, error = write_operations._decode_phase7_video_geometry_confirm_token(
@@ -11190,7 +11198,7 @@ def test_phase7_geometry_real_write_sets_once_and_verifies(
         requested=requested,
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -11232,7 +11240,7 @@ def test_phase7_geometry_token_binding_and_structure_rejections() -> None:
         ],
     ]
     for case in cases:
-        result = reader.update_cues("ws-1", case, dry_run=False)
+        result = reader.edit_cues("ws-1", case, dry_run=False)
         assert result["status"] == "preflight_failed"
         assert all(item["executed_operations"] == [] for item in result["results"])
     assert not any(address.endswith(("/fillStage", "/fillStyle")) for address, _, _ in client.requests)
@@ -11251,7 +11259,7 @@ def test_phase7b_layer_rejects_v1_token_before_setter() -> None:
         "properties": {"layer": 11},
     }
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**layer_update, "confirm_gates": [v1_token]}],
         dry_run=False,
@@ -11269,7 +11277,7 @@ def test_phase7d_quaternion_rejects_v1_v2_and_v3_cross_tokens_before_setter() ->
         requested=True,
     )
     client.cues[cue_id]["layer"] = 10
-    v2_plan = reader.update_cues(
+    v2_plan = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"layer": 11}}],
         dry_run=True,
@@ -11281,7 +11289,7 @@ def test_phase7d_quaternion_rejects_v1_v2_and_v3_cross_tokens_before_setter() ->
         "profile": "video_basic",
         "properties": {"quaternion": [0, 0, 0.1, 0.995]},
     }
-    v3_plan = reader.update_cues("ws-1", [quaternion_update], dry_run=True)
+    v3_plan = reader.edit_cues("ws-1", [quaternion_update], dry_run=True)
     v3_token = planned_setters(v3_plan["results"][0])["quaternion"]["confirm_token"]
 
     cases = [
@@ -11293,7 +11301,7 @@ def test_phase7d_quaternion_rejects_v1_v2_and_v3_cross_tokens_before_setter() ->
     client.requests.clear()
 
     for update in cases:
-        result = reader.update_cues("ws-1", [update], dry_run=False)
+        result = reader.edit_cues("ws-1", [update], dry_run=False)
         assert result["status"] == "preflight_failed"
         assert result["results"][0]["executed_operations"] == []
 
@@ -11307,14 +11315,14 @@ def test_phase7f_smooth_rejects_old_geometry_tokens_before_setter() -> None:
         requested=True,
     )
     client.cues[cue_id]["layer"] = 10
-    v2_plan = reader.update_cues(
+    v2_plan = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"layer": 11}}],
         dry_run=True,
     )
     v2_token = planned_setters(v2_plan["results"][0])["layer"]["confirm_token"]
     client.cues[cue_id]["quaternion"] = [0, 0, 0, 1]
-    v3_plan = reader.update_cues(
+    v3_plan = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"quaternion": [0, 0, 0.1, 0.995]}}],
         dry_run=True,
@@ -11322,7 +11330,7 @@ def test_phase7f_smooth_rejects_old_geometry_tokens_before_setter() -> None:
     v3_token = planned_setters(v3_plan["results"][0])["quaternion"]["confirm_token"]
     client.cues[cue_id]["smooth"] = False
     smooth_update = {"cue_ref": cue_id, "profile": "video_basic", "properties": {"smooth": True}}
-    v4_plan = reader.update_cues("ws-1", [smooth_update], dry_run=True)
+    v4_plan = reader.edit_cues("ws-1", [smooth_update], dry_run=True)
     v4_token = planned_setters(v4_plan["results"][0])["smooth"]["confirm_token"]
     client.requests.clear()
 
@@ -11335,7 +11343,7 @@ def test_phase7f_smooth_rejects_old_geometry_tokens_before_setter() -> None:
         {"cue_ref": cue_id, "profile": "video_basic", "properties": {"quaternion": [0, 0, 0.1, 0.995]}, "confirm_gates": [v4_token]},
     ]
     for update in cases:
-        result = reader.update_cues("ws-1", [update], dry_run=False)
+        result = reader.edit_cues("ws-1", [update], dry_run=False)
         assert result["status"] == "preflight_failed"
         assert result["results"][0]["executed_operations"] == []
 
@@ -11351,7 +11359,7 @@ def test_phase7f_smooth_invalid_values_reject_before_setter(bad_value: Any) -> N
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"smooth": bad_value}}],
         dry_run=True,
@@ -13828,7 +13836,7 @@ def test_phase7e_reset_rotation_dry_run_emits_bound_reset_token(profile: str, cu
         baseline=baseline,
     )
 
-    result = reader.update_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [update], dry_run=True)
     item = result["results"][0]
     action = planned_setters(item)["resetRotation"]
     payload, error = write_operations._decode_phase7_video_geometry_confirm_token(
@@ -13866,20 +13874,20 @@ def test_phase7e_reset_rotation_real_write_action_and_quaternion_rollback(profil
         baseline=baseline,
     )
 
-    reset = reader.update_cues("ws-1", [{**update, "confirm_gates": [reset_token]}], dry_run=False)
+    reset = reader.edit_cues("ws-1", [{**update, "confirm_gates": [reset_token]}], dry_run=False)
     rollback_update = {
         "cue_ref": cue_id,
         "profile": profile,
         "properties": {"quaternion": baseline},
     }
-    old_token = reader.update_cues(
+    old_token = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [reset_token]}],
         dry_run=False,
     )
-    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])["quaternion"]["confirm_token"]
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [rollback_token]}],
         dry_run=False,
@@ -13906,21 +13914,21 @@ def test_phase7e_reset_rotation_token_boundaries_reject_before_action() -> None:
         requested=True,
     )
     client.cues[cue_id]["layer"] = 10
-    v2_plan = reader.update_cues(
+    v2_plan = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"layer": 11}}],
         dry_run=True,
     )
     v2_token = planned_setters(v2_plan["results"][0])["layer"]["confirm_token"]
     client.cues[cue_id]["quaternion"] = [0, 0, 0.1, 0.995]
-    v3_plan = reader.update_cues(
+    v3_plan = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"quaternion": [1, 0, 0, 0]}}],
         dry_run=True,
     )
     v3_token = planned_setters(v3_plan["results"][0])["quaternion"]["confirm_token"]
     reset_update = {"cue_ref": cue_id, "profile": "video_basic", "properties": {"resetRotation": True}}
-    reset_plan = reader.update_cues("ws-1", [reset_update], dry_run=True)
+    reset_plan = reader.edit_cues("ws-1", [reset_update], dry_run=True)
     reset_token = planned_setters(reset_plan["results"][0])["resetRotation"]["confirm_token"]
     cases = [
         {**reset_update, "confirm_gates": [v1_token]},
@@ -13933,7 +13941,7 @@ def test_phase7e_reset_rotation_token_boundaries_reject_before_action() -> None:
     client.requests.clear()
 
     for update in cases:
-        result = reader.update_cues("ws-1", [update], dry_run=False)
+        result = reader.edit_cues("ws-1", [update], dry_run=False)
         assert result["status"] == "preflight_failed"
         assert result["results"][0]["executed_operations"] == []
 
@@ -13949,7 +13957,7 @@ def test_phase7e_reset_rotation_invalid_property_values_reject_before_action(bad
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"resetRotation": bad_value}}],
         dry_run=True,
@@ -13975,7 +13983,7 @@ def test_phase7e_reset_rotation_structure_rejections_before_action() -> None:
     client.requests.clear()
 
     for case in cases:
-        result = reader.update_cues("ws-1", case, dry_run=False)
+        result = reader.edit_cues("ws-1", case, dry_run=False)
         assert result["status"] == "preflight_failed"
         assert all(item["executed_operations"] == [] for item in result["results"])
 
@@ -13985,7 +13993,7 @@ def test_phase7e_reset_rotation_structure_rejections_before_action() -> None:
 def test_phase7e_reset_rotation_timeout_accepts_only_fresh_quaternion_readback() -> None:
     client, reader, cue_id, update, token = _phase7_reset_rotation_fixture(timeout=True)
 
-    result = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
 
     assert result["status"] == "updated"
     assert result["results"][0]["after"]["quaternion"] == [1, 0, 0, 0]
@@ -14010,7 +14018,7 @@ def test_phase7_geometry_invalid_baseline_or_value_rejects_before_setter(propert
     )
     client.cues[cue_id][property_name] = "bad" if property_name != "fillStyle" else 3
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -14043,7 +14051,7 @@ def test_phase7d_quaternion_invalid_requested_values_reject_before_setter(bad_va
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"quaternion": bad_value}}],
         dry_run=True,
@@ -14058,20 +14066,20 @@ def test_phase7d_quaternion_invalid_requested_values_reject_before_setter(bad_va
 
 def test_phase7_geometry_timeout_and_rollback_contract() -> None:
     client, reader, _, update, forward_token = _phase7_geometry_fixture(timeout=True)
-    forward = reader.update_cues(
+    forward = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
     rollback_update = {**update, "properties": {"fillStage": False}}
-    old_token = reader.update_cues(
+    old_token = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
-    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])["fillStage"]["confirm_token"]
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [rollback_token]}],
         dry_run=False,
@@ -14091,20 +14099,20 @@ def test_phase7b_layer_timeout_and_rollback_contract() -> None:
         requested=11,
         timeout=True,
     )
-    forward = reader.update_cues(
+    forward = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
     rollback_update = {**update, "properties": {"layer": 10}}
-    old_token = reader.update_cues(
+    old_token = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
-    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])["layer"]["confirm_token"]
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [rollback_token]}],
         dry_run=False,
@@ -14126,21 +14134,21 @@ def test_phase7d_quaternion_timeout_and_rollback_contract() -> None:
         requested=requested,
         timeout=True,
     )
-    forward = reader.update_cues(
+    forward = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
     rollback_update = {**update, "properties": {"quaternion": baseline}}
-    old_token = reader.update_cues(
+    old_token = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
-    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])["quaternion"]["confirm_token"]
     client.timeout_set_property = None
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [rollback_token]}],
         dry_run=False,
@@ -14164,20 +14172,20 @@ def test_phase7f_smooth_timeout_and_rollback_contract() -> None:
         requested=True,
         timeout=True,
     )
-    forward = reader.update_cues(
+    forward = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
     rollback_update = {**update, "properties": {"smooth": False}}
-    old_token = reader.update_cues(
+    old_token = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
-    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])["smooth"]["confirm_token"]
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [rollback_token]}],
         dry_run=False,
@@ -14208,7 +14216,7 @@ def test_phase7c_keeps_rotation_reset_and_shutters_blocked_before_setter(profile
         client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None), existing_cue_id=cue_id)
         reader = QLabReader(client)  # type: ignore[arg-type]
         try:
-            result = reader.update_cues(
+            result = reader.edit_cues(
                 "ws-1",
                 [{"cue_ref": cue_id, "profile": profile, **case}],
                 dry_run=True,
@@ -14252,7 +14260,7 @@ def test_phase7b_stage_region_geometry_remains_blocked_before_setter() -> None:
     ]
 
     for case in cases:
-        result = reader.update_cues(
+        result = reader.edit_cues(
             "ws-1",
             [{"cue_ref": cue_id, "profile": "video_basic", **case}],
             dry_run=False,
@@ -14309,7 +14317,7 @@ def _phase3e_text_basic_fixture(
         "profile": "text_basic",
         "properties": {property_name: requested},
     }
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     token = planned_setters(plan["results"][0])[property_name]["confirm_token"]
     client.requests.clear()
     return client, reader, cue_id, update, token
@@ -14334,7 +14342,7 @@ def _phase3e_text_color_fixture(
         "profile": "text_basic",
         "operations": [{"property": property_name, "args": requested}],
     }
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     token = planned_setters(plan["results"][0])[property_name]["confirm_token"]
     client.requests.clear()
     return client, reader, cue_id, update, token
@@ -14355,7 +14363,7 @@ def test_phase3e_text_basic_dry_run_emits_bound_token(
         requested=requested,
     )
 
-    result = reader.update_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [update], dry_run=True)
     item = result["results"][0]
     setter = planned_setters(item)[property_name]
     payload, error = text_basics._decode_phase3e_text_basic_confirm_token(
@@ -14393,7 +14401,7 @@ def test_phase3e_text_basic_real_write_sets_once_and_verifies(
         requested=requested,
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -14423,17 +14431,17 @@ def test_phase3e_text_basic_real_write_sets_once_and_verifies(
 def test_phase3e_text_color_dry_run_real_write_and_rollback(property_name: str) -> None:
     client, reader, cue_id, update, token = _phase3e_text_color_fixture(property_name=property_name)
 
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
-    result = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
     rollback_update = {
         **update,
         "operations": [
             {"property": property_name, "args": {"red": 1.0, "green": 1.0, "blue": 1.0, "alpha": 1.0}}
         ],
     }
-    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])[property_name]["confirm_token"]
-    rollback = reader.update_cues("ws-1", [{**rollback_update, "confirm_gates": [rollback_token]}], dry_run=False)
+    rollback = reader.edit_cues("ws-1", [{**rollback_update, "confirm_gates": [rollback_token]}], dry_run=False)
 
     setter = planned_setters(plan["results"][0])[property_name]
     assert setter["confirm_token"].startswith("confirm:textBasic:v1:")
@@ -14471,8 +14479,8 @@ def test_phase3e_text_runtime_blocked_color_routes_stay_planned_only(property_na
         ],
     }
 
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
-    result = reader.update_cues(
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": ["confirm:textBasic:v1:fake"]}],
         dry_run=False,
@@ -14511,7 +14519,7 @@ def test_phase3e_text_basic_token_binding_and_structure_rejections() -> None:
         ],
     ]
     for case in cases:
-        result = reader.update_cues("ws-1", case, dry_run=False)
+        result = reader.edit_cues("ws-1", case, dry_run=False)
         assert result["status"] == "preflight_failed"
         assert all(item["executed_operations"] == [] for item in result["results"])
     assert not any(address.endswith("/text") for address, _, _ in client.requests)
@@ -14519,19 +14527,19 @@ def test_phase3e_text_basic_token_binding_and_structure_rejections() -> None:
 
 def test_phase3e_text_basic_rejects_wrong_profile_type_and_stale_baseline() -> None:
     client, reader, cue_id, update, token = _phase3e_text_basic_fixture()
-    wrong_profile = reader.update_cues(
+    wrong_profile = reader.edit_cues(
         "ws-1",
         [{**update, "profile": "video_basic", "confirm_gates": [token]}],
         dry_run=False,
     )
     client.cues[cue_id]["type"] = "Video"
-    wrong_type = reader.update_cues(
+    wrong_type = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
     )
     client.cues[cue_id].update({"type": "Text", "text": "Changed baseline"})
-    stale = reader.update_cues(
+    stale = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -14564,7 +14572,7 @@ def test_phase3e_text_basic_rejects_unhealthy_or_active_cue(
     client, reader, cue_id, update, token = _phase3e_text_basic_fixture()
     client.cues[cue_id].update(cue_state)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -14602,7 +14610,7 @@ def test_phase3e_text_basic_rejects_invalid_values(
     cue_id = "11111111-1111-4111-8111-111111111111"
     reader = QLabReader(FakeWriteClient(QLabConfig(enable_write=False, passcode=None)))  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "text_basic", "properties": {property_name: value}}],
         dry_run=True,
@@ -14631,7 +14639,7 @@ def test_phase3e_text_color_rejects_invalid_values(args: dict[str, Any]) -> None
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "text_basic", "operations": [{"property": "text/format/color", "args": args}]}],
         dry_run=True,
@@ -14660,7 +14668,7 @@ def test_phase3e_rich_text_properties_remain_blocked(
         cues={cue_id: {"type": "Text", "text": "Old text"}},
     )
 
-    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+    result = QLabReader(client).edit_cues(  # type: ignore[arg-type]
         "ws-1",
         [{"cue_ref": cue_id, "profile": "text_basic", "properties": {property_name: value}}],
         dry_run=False,
@@ -14673,20 +14681,20 @@ def test_phase3e_rich_text_properties_remain_blocked(
 
 def test_phase3e_text_basic_timeout_and_rollback_contract() -> None:
     client, reader, _, update, forward_token = _phase3e_text_basic_fixture(timeout=True)
-    forward = reader.update_cues(
+    forward = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
     rollback_update = {**update, "properties": {"text": "Old text"}}
-    old_token = reader.update_cues(
+    old_token = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [forward_token]}],
         dry_run=False,
     )
-    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])["text"]["confirm_token"]
-    rollback = reader.update_cues(
+    rollback = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": [rollback_token]}],
         dry_run=False,
@@ -14707,7 +14715,7 @@ def test_phase3e_text_basic_timeout_mismatch_is_uncertain_no_retry(
         timeout_without_apply=True,
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -14745,9 +14753,9 @@ def test_phase3f_text_style_dry_run_token_real_write_and_readback(
         "properties": {property_name: requested},
     }
 
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     client.requests.clear()
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
         dry_run=False,
@@ -14781,7 +14789,7 @@ def test_phase3f_text_style_rejects_fake_stale_batch_and_non_text() -> None:
         "profile": "text_basic",
         "properties": {property_name: "single"},
     }
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     assert plan["status"] == "preflight_failed"
     assert_no_confirm_token(plan)
     client.cues[cue_id][property_name] = "double"
@@ -14799,7 +14807,7 @@ def test_phase3f_text_style_rejects_fake_stale_batch_and_non_text() -> None:
         ],
     ]
     for case in cases:
-        result = reader.update_cues("ws-1", case, dry_run=False)
+        result = reader.edit_cues("ws-1", case, dry_run=False)
         assert result["status"] == "preflight_failed"
         assert all(item["executed_operations"] == [] for item in result["results"])
         assert_no_confirm_token(result)
@@ -14878,7 +14886,7 @@ def test_phase3f_text_style_token_binding_and_structure_rejections() -> None:
         [{**update, "profile": "video_basic", "confirm_gates": ["confirm:textStyle:v1:fake"]}],
     ]
     for case in cases:
-        result = reader.update_cues("ws-1", case, dry_run=False)
+        result = reader.edit_cues("ws-1", case, dry_run=False)
         assert result["status"] == "preflight_failed"
         assert all(item["executed_operations"] == [] for item in result["results"])
         assert_no_confirm_token(result)
@@ -14890,7 +14898,7 @@ def test_phase3f_text_style_rejects_video_and_camera_cues(cue_type: str) -> None
     client, reader, cue_id, update = _phase3f_text_style_fixture()
     client.cues[cue_id]["type"] = cue_type
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
         dry_run=False,
@@ -14910,7 +14918,7 @@ def test_phase3f_text_style_token_is_bound_to_workspace() -> None:
         workspace_id="ws-2",
     )
 
-    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+    result = QLabReader(client).edit_cues(  # type: ignore[arg-type]
         "ws-2",
         [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
         dry_run=False,
@@ -14938,7 +14946,7 @@ def test_phase3f_text_style_rejects_unhealthy_or_active_cue(
     client, reader, cue_id, update = _phase3f_text_style_fixture()
     client.cues[cue_id].update(cue_state)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
         dry_run=False,
@@ -14952,7 +14960,7 @@ def test_phase3f_text_style_rejects_unhealthy_or_active_cue(
 
 def test_phase3f_text_style_rollback_requires_fresh_token() -> None:
     client, reader, _, update = _phase3f_text_style_fixture()
-    forward = reader.update_cues(
+    forward = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
         dry_run=False,
@@ -14961,13 +14969,13 @@ def test_phase3f_text_style_rollback_requires_fresh_token() -> None:
         **update,
         "properties": {"text/format/underlineStyle": "none"},
     }
-    old_token = reader.update_cues(
+    old_token = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
         dry_run=False,
     )
-    rollback_plan = reader.update_cues("ws-1", [rollback_update], dry_run=True)
-    rollback = reader.update_cues(
+    rollback_plan = reader.edit_cues("ws-1", [rollback_update], dry_run=True)
+    rollback = reader.edit_cues(
         "ws-1",
         [{**rollback_update, "confirm_gates": ["confirm:textStyle:v1:fake"]}],
         dry_run=False,
@@ -14999,7 +15007,7 @@ def test_phase3f_text_style_rejects_invalid_values(
     cue_id = "11111111-1111-4111-8111-111111111111"
     result = QLabReader(  # type: ignore[arg-type]
         FakeWriteClient(QLabConfig(enable_write=False, passcode=None))
-    ).update_cues(
+    ).edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "text_basic", "properties": {property_name: value}}],
         dry_run=True,
@@ -15203,11 +15211,11 @@ def test_video_fx_phase4c_real_write_updates_single_flat_input_radius() -> None:
             }
         ],
     }
-    token = planned_setters(reader.update_cues("ws-1", [update], dry_run=True)["results"][0])[
+    token = planned_setters(reader.edit_cues("ws-1", [update], dry_run=True)["results"][0])[
         "videoEffectIndex/parameter"
     ]["confirm_token"]
 
-    result = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
     item = result["results"][0]
 
     assert result["status"] == "updated"
@@ -15254,11 +15262,11 @@ def test_video_fx_phase4c_accepts_setter_timeout_when_readback_matches() -> None
             }
         ],
     }
-    token = planned_setters(reader.update_cues("ws-1", [update], dry_run=True)["results"][0])[
+    token = planned_setters(reader.edit_cues("ws-1", [update], dry_run=True)["results"][0])[
         "videoEffectIndex/parameter"
     ]["confirm_token"]
 
-    result = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
     item = result["results"][0]
 
     assert result["status"] == "updated"
@@ -15291,12 +15299,12 @@ def test_video_fx_phase4c_rejects_stale_token_and_wrong_requested_value() -> Non
         },
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
-    token = planned_setters(reader.update_cues("ws-1", [update], dry_run=True)["results"][0])[
+    token = planned_setters(reader.edit_cues("ws-1", [update], dry_run=True)["results"][0])[
         "videoEffectIndex/parameter"
     ]["confirm_token"]
 
     client.cues[cue_id]["videoEffects"][0]["inputRadius"] = 11
-    stale = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    stale = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
 
     client.cues[cue_id]["videoEffects"][0]["inputRadius"] = 10
     wrong_value = {
@@ -15309,7 +15317,7 @@ def test_video_fx_phase4c_rejects_stale_token_and_wrong_requested_value() -> Non
         ],
         "confirm_gates": [token],
     }
-    wrong = reader.update_cues("ws-1", [wrong_value], dry_run=False)
+    wrong = reader.edit_cues("ws-1", [wrong_value], dry_run=False)
 
     assert stale["status"] == "preflight_failed"
     assert "stale_video_fx_scalar_baseline" in stale["results"][0]["errors"]["videoEffectIndex/parameter"]
@@ -15385,11 +15393,11 @@ def test_video_fx_phase6_real_write_updates_single_flat_input_intensity() -> Non
             }
         ],
     }
-    token = planned_setters(reader.update_cues("ws-1", [update], dry_run=True)["results"][0])[
+    token = planned_setters(reader.edit_cues("ws-1", [update], dry_run=True)["results"][0])[
         "videoEffectIndex/parameter"
     ]["confirm_token"]
 
-    result = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
     item = result["results"][0]
 
     assert result["status"] == "updated"
@@ -15434,11 +15442,11 @@ def test_video_fx_phase6_accepts_setter_timeout_when_readback_matches() -> None:
             }
         ],
     }
-    token = planned_setters(reader.update_cues("ws-1", [update], dry_run=True)["results"][0])[
+    token = planned_setters(reader.edit_cues("ws-1", [update], dry_run=True)["results"][0])[
         "videoEffectIndex/parameter"
     ]["confirm_token"]
 
-    result = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    result = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
     item = result["results"][0]
 
     assert result["status"] == "updated"
@@ -15481,15 +15489,15 @@ def test_video_fx_scalar_v1_and_v2_tokens_are_not_cross_authorized() -> None:
             }
         ],
     }
-    v1_token = planned_setters(reader.update_cues("ws-1", [radius_update], dry_run=True)["results"][0])[
+    v1_token = planned_setters(reader.edit_cues("ws-1", [radius_update], dry_run=True)["results"][0])[
         "videoEffectIndex/parameter"
     ]["confirm_token"]
-    v2_token = planned_setters(reader.update_cues("ws-1", [intensity_update], dry_run=True)["results"][0])[
+    v2_token = planned_setters(reader.edit_cues("ws-1", [intensity_update], dry_run=True)["results"][0])[
         "videoEffectIndex/parameter"
     ]["confirm_token"]
 
-    v1_for_v2 = reader.update_cues("ws-1", [{**intensity_update, "confirm_gates": [v1_token]}], dry_run=False)
-    v2_for_v1 = reader.update_cues("ws-1", [{**radius_update, "confirm_gates": [v2_token]}], dry_run=False)
+    v1_for_v2 = reader.edit_cues("ws-1", [{**intensity_update, "confirm_gates": [v1_token]}], dry_run=False)
+    v2_for_v1 = reader.edit_cues("ws-1", [{**radius_update, "confirm_gates": [v2_token]}], dry_run=False)
 
     assert v1_for_v2["status"] == "preflight_failed"
     assert v2_for_v1["status"] == "preflight_failed"
@@ -15524,16 +15532,16 @@ def test_video_fx_phase6_rejects_stale_token_wrong_value_and_payload_drift() -> 
         },
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
-    token = planned_setters(reader.update_cues("ws-1", [update], dry_run=True)["results"][0])[
+    token = planned_setters(reader.edit_cues("ws-1", [update], dry_run=True)["results"][0])[
         "videoEffectIndex/parameter"
     ]["confirm_token"]
 
     client.cues[cue_id]["videoEffects"][0]["inputIntensity"] = 2.75
-    stale = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    stale = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
 
     client.cues[cue_id]["videoEffects"][0]["inputIntensity"] = 2.5
     client.cues[cue_id]["videoEffects"][0]["inputRadius"] = 11
-    drift = reader.update_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
+    drift = reader.edit_cues("ws-1", [{**update, "confirm_gates": [token]}], dry_run=False)
 
     client.cues[cue_id]["videoEffects"][0]["inputRadius"] = 10
     wrong_value = {
@@ -15546,7 +15554,7 @@ def test_video_fx_phase6_rejects_stale_token_wrong_value_and_payload_drift() -> 
         ],
         "confirm_gates": [token],
     }
-    wrong = reader.update_cues("ws-1", [wrong_value], dry_run=False)
+    wrong = reader.edit_cues("ws-1", [wrong_value], dry_run=False)
 
     assert stale["status"] == "preflight_failed"
     assert drift["status"] == "preflight_failed"
@@ -15636,7 +15644,7 @@ def test_video_fx_phase6_rejects_blocked_real_write_shapes(
         cue_numbers={"v11": cue_id},
     )
 
-    result = QLabReader(client).update_cues("ws-1", [update], dry_run=False)  # type: ignore[arg-type]
+    result = QLabReader(client).edit_cues("ws-1", [update], dry_run=False)  # type: ignore[arg-type]
 
     assert result["status"] == "preflight_failed"
     assert result["results"][0]["executed_operations"] == []
@@ -15755,7 +15763,7 @@ def test_video_fx_phase4b_real_live_batch_and_multi_property_stay_blocked() -> N
     ]
 
     for dry_run, updates in cases:
-        result = reader.update_cues("ws-1", updates, dry_run=dry_run)
+        result = reader.edit_cues("ws-1", updates, dry_run=dry_run)
         assert result["status"] == "preflight_failed"
         assert all(item["executed_operations"] == [] for item in result["results"])
         assert_no_confirm_token(result)
@@ -15776,7 +15784,7 @@ def test_phase3e_text_properties_not_enabled_for_video_or_camera(
         cues={cue_id: {"type": cue_type}},
     )
 
-    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+    result = QLabReader(client).edit_cues(  # type: ignore[arg-type]
         "ws-1",
         [{"cue_ref": cue_id, "profile": profile, "properties": {"text": "Blocked"}}],
         dry_run=False,
@@ -15793,7 +15801,7 @@ def test_video_phase2_wrong_cue_type_failure_has_no_token() -> None:
         existing_cue_id=cue_id,
         cue_values={"uniqueID": cue_id, "type": "Audio", "opacity": 1},
     )
-    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+    result = QLabReader(client).edit_cues(  # type: ignore[arg-type]
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"opacity": 0.8}}],
         dry_run=True,
@@ -15816,7 +15824,7 @@ def test_video_phase2_rejects_aggregate_geometry(property_name: str) -> None:
         "right": 4,
     }
     client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None), existing_cue_id=cue_id)
-    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+    result = QLabReader(client).edit_cues(  # type: ignore[arg-type]
         "ws-1",
         [
             {
@@ -15839,7 +15847,7 @@ def test_video_phase2_rejects_aggregate_geometry(property_name: str) -> None:
 @pytest.mark.parametrize("cue_ref", ["1", "not-a-uuid"])
 def test_video_phase2_requires_exact_cue_uuid(cue_ref: str) -> None:
     client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None))
-    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+    result = QLabReader(client).edit_cues(  # type: ignore[arg-type]
         "ws-1",
         [{"cue_ref": cue_ref, "profile": "video_basic", "properties": {"opacity": 0.8}}],
         dry_run=True,
@@ -15878,7 +15886,7 @@ def test_video_phase2_rejects_batch_second_property_and_confirm_gates() -> None:
     ]
 
     for updates in cases:
-        result = reader.update_cues("ws-1", updates, dry_run=True)
+        result = reader.edit_cues("ws-1", updates, dry_run=True)
         assert result["ok"] is False
         assert all(item["executed_operations"] == [] for item in result["results"])
         assert all(item["planned_operations"] == [] for item in result["results"])
@@ -15893,7 +15901,7 @@ def test_video_phase2_rejects_fresh_unique_id_mismatch() -> None:
         existing_cue_id=cue_ref,
         cue_values={"uniqueID": returned_id, "type": "Video", "opacity": 1},
     )
-    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+    result = QLabReader(client).edit_cues(  # type: ignore[arg-type]
         "ws-1",
         [{"cue_ref": cue_ref, "profile": "video_basic", "properties": {"opacity": 0.8}}],
         dry_run=True,
@@ -15912,7 +15920,7 @@ def test_video_phase2_rejects_unregistered_rotation_family_with_empty_execution(
 ) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None))
-    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+    result = QLabReader(client).edit_cues(  # type: ignore[arg-type]
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {property_name: 10}}],
         dry_run=True,
@@ -15971,7 +15979,7 @@ def test_video_phase2_rejections_include_updateq_plan(
 ) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = FakeWriteClient(QLabConfig(enable_write=False, passcode=None), existing_cue_id=cue_id)
-    result = QLabReader(client).update_cues(  # type: ignore[arg-type]
+    result = QLabReader(client).edit_cues(  # type: ignore[arg-type]
         "ws-1", [{"cue_ref": cue_id, **update}], dry_run=True
     )
 
@@ -16008,7 +16016,7 @@ def test_video_phase2_fresh_read_is_uncached(monkeypatch: pytest.MonkeyPatch) ->
         return original(*args, **kwargs)
 
     monkeypatch.setattr(reader, "read_cue_values", spy)
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "video_basic", "properties": {"opacity": 0.8}}],
         dry_run=True,
@@ -16176,7 +16184,7 @@ def test_update_cue_audio_dry_run_builds_slice_level_object_and_patch_paths() ->
     assert result["executed_operations"] == []
 
 
-def test_update_cues_audio_invalid_structured_operation_has_no_plan() -> None:
+def test_edit_cues_audio_invalid_structured_operation_has_no_plan() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -16184,7 +16192,7 @@ def test_update_cues_audio_invalid_structured_operation_has_no_plan() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -16412,7 +16420,7 @@ def test_update_cue_real_allows_gated_common_property_with_explicit_gate() -> No
     assert result["executed_operations"][0]["capability_gate"] == "cue_behavior"
 
 
-def test_update_cues_real_operation_with_readback_verifies_as_updated() -> None:
+def test_edit_cues_real_operation_with_readback_verifies_as_updated() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -16420,7 +16428,7 @@ def test_update_cues_real_operation_with_readback_verifies_as_updated() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -16439,7 +16447,7 @@ def test_update_cues_real_operation_with_readback_verifies_as_updated() -> None:
     assert result["results"][0]["errors"] is None
 
 
-def test_update_cues_confirm_token_is_bound_to_cue_ref() -> None:
+def test_edit_cues_confirm_token_is_bound_to_cue_ref() -> None:
     cue_a = "11111111-1111-4111-8111-111111111111"
     cue_b = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -16508,7 +16516,7 @@ def test_update_cue_timecode_rejects_invalid_output_type_and_frame_rate() -> Non
     assert client.requests == []
 
 
-def test_update_cues_mic_basic_dry_run_plans_documented_mic_and_audio_fields() -> None:
+def test_edit_cues_mic_basic_dry_run_plans_documented_mic_and_audio_fields() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -16516,7 +16524,7 @@ def test_update_cues_mic_basic_dry_run_plans_documented_mic_and_audio_fields() -
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -16551,7 +16559,7 @@ def test_update_cues_mic_basic_dry_run_plans_documented_mic_and_audio_fields() -
     assert result["results"][0]["executed_operations"] == []
 
 
-def test_update_cues_mic_basic_invalid_values_and_profile_mismatch_have_no_plan() -> None:
+def test_edit_cues_mic_basic_invalid_values_and_profile_mismatch_have_no_plan() -> None:
     mic_id = "11111111-1111-4111-8111-111111111111"
     memo_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -16560,7 +16568,7 @@ def test_update_cues_mic_basic_invalid_values_and_profile_mismatch_have_no_plan(
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": mic_id, "profile": "mic_basic", "properties": {"channels": 0}},
@@ -16585,7 +16593,7 @@ def test_update_cues_mic_basic_invalid_values_and_profile_mismatch_have_no_plan(
     assert all(item["planned_operations"] == [] for item in result["results"])
 
 
-def test_update_cues_mic_channel_offset_blocks_real_write_without_patch_gate() -> None:
+def test_edit_cues_mic_channel_offset_blocks_real_write_without_patch_gate() -> None:
     mic_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -16593,7 +16601,7 @@ def test_update_cues_mic_channel_offset_blocks_real_write_without_patch_gate() -
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": mic_id, "profile": "mic_basic", "properties": {"channelOffset": 1}}],
         dry_run=False,
@@ -16604,7 +16612,7 @@ def test_update_cues_mic_channel_offset_blocks_real_write_without_patch_gate() -
     assert all(not request[0].endswith("/channelOffset") for request in client.requests)
 
 
-def test_update_cues_timecode_basic_dry_run_plans_ltc_mtc_fields() -> None:
+def test_edit_cues_timecode_basic_dry_run_plans_ltc_mtc_fields() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -16612,7 +16620,7 @@ def test_update_cues_timecode_basic_dry_run_plans_ltc_mtc_fields() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -16642,7 +16650,7 @@ def test_update_cues_timecode_basic_dry_run_plans_ltc_mtc_fields() -> None:
         assert setters[prop]["planned_only_reason"]
 
 
-def test_update_cues_timecode_basic_invalid_ltc_and_profile_mismatch_have_no_plan() -> None:
+def test_edit_cues_timecode_basic_invalid_ltc_and_profile_mismatch_have_no_plan() -> None:
     timecode_id = "11111111-1111-4111-8111-111111111111"
     memo_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -16651,7 +16659,7 @@ def test_update_cues_timecode_basic_invalid_ltc_and_profile_mismatch_have_no_pla
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": timecode_id, "profile": "timecode_basic", "properties": {"ltcChannel": 0}},
@@ -16667,7 +16675,7 @@ def test_update_cues_timecode_basic_invalid_ltc_and_profile_mismatch_have_no_pla
     assert all(item["planned_operations"] == [] for item in result["results"])
 
 
-def test_update_cues_midi_file_basic_dry_run_plans_playback_and_patch_fields() -> None:
+def test_edit_cues_midi_file_basic_dry_run_plans_playback_and_patch_fields() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -16675,7 +16683,7 @@ def test_update_cues_midi_file_basic_dry_run_plans_playback_and_patch_fields() -
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -16704,7 +16712,7 @@ def test_update_cues_midi_file_basic_dry_run_plans_playback_and_patch_fields() -
         assert setters[prop]["planned_only_reason"]
 
 
-def test_update_cues_midi_file_invalid_values_and_profile_mismatch_have_no_plan() -> None:
+def test_edit_cues_midi_file_invalid_values_and_profile_mismatch_have_no_plan() -> None:
     midi_file_id = "11111111-1111-4111-8111-111111111111"
     memo_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -16713,7 +16721,7 @@ def test_update_cues_midi_file_invalid_values_and_profile_mismatch_have_no_plan(
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": midi_file_id, "profile": "midi_file_basic", "properties": {"rate": 0.01}},
@@ -16733,7 +16741,7 @@ def test_update_cues_midi_file_invalid_values_and_profile_mismatch_have_no_plan(
     assert all(item["planned_operations"] == [] for item in result["results"])
 
 
-def test_update_cues_midi_basic_dry_run_plans_documented_message_fields() -> None:
+def test_edit_cues_midi_basic_dry_run_plans_documented_message_fields() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -16741,7 +16749,7 @@ def test_update_cues_midi_basic_dry_run_plans_documented_message_fields() -> Non
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -16789,7 +16797,7 @@ def test_update_cues_midi_basic_dry_run_plans_documented_message_fields() -> Non
         assert setter["planned_only_reason"]
 
 
-def test_update_cues_midi_basic_invalid_values_and_profile_mismatch_have_no_plan() -> None:
+def test_edit_cues_midi_basic_invalid_values_and_profile_mismatch_have_no_plan() -> None:
     midi_id = "11111111-1111-4111-8111-111111111111"
     memo_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -16798,7 +16806,7 @@ def test_update_cues_midi_basic_invalid_values_and_profile_mismatch_have_no_plan
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": midi_id, "profile": "midi_basic", "properties": {"messageType": 4}},
@@ -16826,7 +16834,7 @@ def test_update_cues_midi_basic_invalid_values_and_profile_mismatch_have_no_plan
     assert all(item["planned_operations"] == [] for item in result["results"])
 
 
-def test_update_cues_network_basic_dry_run_plans_documented_non_ambiguous_fields() -> None:
+def test_edit_cues_network_basic_dry_run_plans_documented_non_ambiguous_fields() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -16840,7 +16848,7 @@ def test_update_cues_network_basic_dry_run_plans_documented_non_ambiguous_fields
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -16870,7 +16878,7 @@ def test_update_cues_network_basic_dry_run_plans_documented_non_ambiguous_fields
         assert setter["planned_only_reason"]
     assert_no_confirm_token(result)
 
-    real = reader.update_cues(
+    real = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "network_basic", "properties": {"customString": "/eos/cue/2/fire"}}],
         dry_run=False,
@@ -16892,7 +16900,7 @@ def test_network_patch_type_classifier_is_exact_and_fail_closed() -> None:
     assert classify_network_patch_type("OSC Message - Plain Text - Imitation") is None
 
 
-def test_update_cues_network_osc_message_gate_tokens_and_patch_classification() -> None:
+def test_edit_cues_network_osc_message_gate_tokens_and_patch_classification() -> None:
     source_id = "11111111-1111-4111-8111-111111111111"
     osc_one = "22222222-2222-4222-8222-222222222222"
     osc_two = "33333333-3333-4333-8333-333333333333"
@@ -16921,27 +16929,27 @@ def test_update_cues_network_osc_message_gate_tokens_and_patch_classification() 
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     request = {"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "/cue/1/stop"}}
-    dry = reader.update_cues("ws-1", [request], dry_run=True)
+    dry = reader.edit_cues("ws-1", [request], dry_run=True)
     token = planned_setters(dry["results"][0])["customString"]["confirm_token"]
     assert token.startswith("confirm:networkOscMessage:v1:")
     assert dry["results"][0]["executed_operations"] == []
-    real = reader.update_cues("ws-1", [{**request, "confirm_gates": [token]}], dry_run=False)
+    real = reader.edit_cues("ws-1", [{**request, "confirm_gates": [token]}], dry_run=False)
     assert real["status"] == "updated"
     assert client.cues[source_id]["customString"] == "/cue/1/stop"
 
     rollback_request = {"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "/cue/1/start"}}
-    rollback_dry = reader.update_cues("ws-1", [rollback_request], dry_run=True)
+    rollback_dry = reader.edit_cues("ws-1", [rollback_request], dry_run=True)
     rollback_token = planned_setters(rollback_dry["results"][0])["customString"]["confirm_token"]
-    rollback = reader.update_cues("ws-1", [{**rollback_request, "confirm_gates": [rollback_token]}], dry_run=False)
+    rollback = reader.edit_cues("ws-1", [{**rollback_request, "confirm_gates": [rollback_token]}], dry_run=False)
     assert rollback["status"] == "updated"
     assert client.cues[source_id]["customString"] == "/cue/1/start"
 
     patch_request = {"cue_ref": source_id, "profile": "network_basic", "properties": {"networkPatchID": osc_two}}
-    patch_dry = reader.update_cues("ws-1", [patch_request], dry_run=True)
+    patch_dry = reader.edit_cues("ws-1", [patch_request], dry_run=True)
     patch_setter = planned_setters(patch_dry["results"][0])["networkPatchID"]
     assert patch_setter["real_write_enabled"] is False
     assert "confirm_token" not in patch_setter
-    patch_real = reader.update_cues(
+    patch_real = reader.edit_cues(
         "ws-1", [{**patch_request, "confirm_gates": ["confirm:networkOscMessage:v1:fake:fake"]}], dry_run=False
     )
     assert patch_real["status"] == "preflight_failed"
@@ -16974,24 +16982,24 @@ def test_network_osc_message_gate_rejects_negative_shapes_and_tokens() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     base = {"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "/cue/1/stop"}}
-    token = planned_setters(reader.update_cues("ws-1", [base], dry_run=True)["results"][0])["customString"]["confirm_token"]
-    fake = reader.update_cues("ws-1", [{**base, "confirm_gates": ["confirm:networkOscMessage:v1:fake:fake"]}], dry_run=False)
-    wrong = reader.update_cues("ws-1", [{**base, "confirm_gates": ["confirm:devamp:v1:fake:fake"]}], dry_run=False)
+    token = planned_setters(reader.edit_cues("ws-1", [base], dry_run=True)["results"][0])["customString"]["confirm_token"]
+    fake = reader.edit_cues("ws-1", [{**base, "confirm_gates": ["confirm:networkOscMessage:v1:fake:fake"]}], dry_run=False)
+    wrong = reader.edit_cues("ws-1", [{**base, "confirm_gates": ["confirm:devamp:v1:fake:fake"]}], dry_run=False)
     client.network_patches[0]["name"] = "Plain Text - Changed"
-    stale = reader.update_cues("ws-1", [{**base, "confirm_gates": [token]}], dry_run=False)
+    stale = reader.edit_cues("ws-1", [{**base, "confirm_gates": [token]}], dry_run=False)
     assert fake["status"] == wrong["status"] == stale["status"] == "preflight_failed"
     assert fake["results"][0]["errors"]
     assert wrong["results"][0]["errors"]
     assert stale["results"][0]["errors"]
     assert all(not address.endswith("/customString") for address, _, _ in client.requests)
 
-    batch = reader.update_cues("ws-1", [{**base, "confirm_gates": [token]}, {**base, "confirm_gates": [token]}], dry_run=False)
-    multi = reader.update_cues(
+    batch = reader.edit_cues("ws-1", [{**base, "confirm_gates": [token]}, {**base, "confirm_gates": [token]}], dry_run=False)
+    multi = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "/cue/1/a", "networkPatchID": osc_id}, "confirm_gates": [token]}],
         dry_run=False,
     )
-    live = reader.update_cues(
+    live = reader.edit_cues(
         "ws-1",
         [{"cue_ref": source_id, "profile": "network_basic", "operations": [{"property": "customString", "args": {"value": "/cue/1/a"}, "mode": "live"}]}],
         dry_run=True,
@@ -17039,11 +17047,11 @@ def test_network_repair_custom_string_and_validation() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     request = {"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": requested}}
-    dry = reader.update_cues(workspace_id, [request], dry_run=True)
+    dry = reader.edit_cues(workspace_id, [request], dry_run=True)
     token = planned_setters(dry["results"][0])["customString"]["confirm_token"]
     assert token.startswith("confirm:networkRepair:v1:")
     assert dry["results"][0]["executed_operations"] == []
-    real = reader.update_cues(workspace_id, [{**request, "confirm_gates": [token]}], dry_run=False)
+    real = reader.edit_cues(workspace_id, [{**request, "confirm_gates": [token]}], dry_run=False)
     assert real["status"] == "updated"
     assert real["results"][0]["after"]["customString"] == requested
     assert real["results"][0]["after"]["isBroken"] is False
@@ -17052,7 +17060,7 @@ def test_network_repair_custom_string_and_validation() -> None:
 
     client.cues[source_id].update(cue)
     setter_count = len([address for address, _, _ in client.requests if address.endswith("/customString")])
-    invalid = reader.update_cues(
+    invalid = reader.edit_cues(
         workspace_id,
         [{"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "{custom}"}}],
         dry_run=True,
@@ -17062,7 +17070,7 @@ def test_network_repair_custom_string_and_validation() -> None:
     assert "valid OSC address/message" in invalid["results"][0]["errors"]["customString"]
     assert len([address for address, _, _ in client.requests if address.endswith("/customString")]) == setter_count
 
-    non_osc = reader.update_cues(
+    non_osc = reader.edit_cues(
         workspace_id,
         [{"cue_ref": source_id, "profile": "network_basic", "properties": {"networkPatchID": plain_id}}],
         dry_run=True,
@@ -17103,10 +17111,10 @@ def test_network_patch_repair_success_and_automatic_recovery() -> None:
     )
     success_reader = QLabReader(success_client)  # type: ignore[arg-type]
     request = {"cue_ref": source_id, "profile": "network_basic", "properties": {"networkPatchID": target_id}}
-    dry = success_reader.update_cues(workspace_id, [request], dry_run=True)
+    dry = success_reader.edit_cues(workspace_id, [request], dry_run=True)
     token = planned_setters(dry["results"][0])["networkPatchID"]["confirm_token"]
     assert token.startswith("confirm:networkRepair:v1:")
-    success = success_reader.update_cues(workspace_id, [{**request, "confirm_gates": [token]}], dry_run=False)
+    success = success_reader.edit_cues(workspace_id, [{**request, "confirm_gates": [token]}], dry_run=False)
     assert success["status"] == "updated"
     assert success["results"][0]["after"]["networkPatchID"] == target_id
     assert success["results"][0]["after"]["isBroken"] is False
@@ -17118,9 +17126,9 @@ def test_network_patch_repair_success_and_automatic_recovery() -> None:
         network_patches=patches,
     )
     recovery_reader = QLabReader(recovery_client)  # type: ignore[arg-type]
-    recovery_dry = recovery_reader.update_cues(workspace_id, [request], dry_run=True)
+    recovery_dry = recovery_reader.edit_cues(workspace_id, [request], dry_run=True)
     recovery_token = planned_setters(recovery_dry["results"][0])["networkPatchID"]["confirm_token"]
-    failed = recovery_reader.update_cues(
+    failed = recovery_reader.edit_cues(
         workspace_id, [{**request, "confirm_gates": [recovery_token]}], dry_run=False
     )
     assert failed["status"] == "verification_failed"
@@ -17154,23 +17162,23 @@ def test_network_repair_rejects_tokens_shapes_live_and_active_without_setters() 
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     request = {"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "/repair/test"}}
-    token = planned_setters(reader.update_cues(workspace_id, [request], dry_run=True)["results"][0])["customString"]["confirm_token"]
+    token = planned_setters(reader.edit_cues(workspace_id, [request], dry_run=True)["results"][0])["customString"]["confirm_token"]
     rejected = [
-        reader.update_cues(workspace_id, [{**request, "confirm_gates": ["confirm:networkRepair:v1:fake:fake"]}], dry_run=False),
-        reader.update_cues(workspace_id, [{**request, "confirm_gates": ["confirm:networkOscMessage:v1:fake:fake"]}], dry_run=False),
+        reader.edit_cues(workspace_id, [{**request, "confirm_gates": ["confirm:networkRepair:v1:fake:fake"]}], dry_run=False),
+        reader.edit_cues(workspace_id, [{**request, "confirm_gates": ["confirm:networkOscMessage:v1:fake:fake"]}], dry_run=False),
     ]
     client.cues[source_id]["customString"] = "/stale/baseline"
-    rejected.append(reader.update_cues(workspace_id, [{**request, "confirm_gates": [token]}], dry_run=False))
+    rejected.append(reader.edit_cues(workspace_id, [{**request, "confirm_gates": [token]}], dry_run=False))
     client.cues[source_id]["customString"] = ""
     rejected.extend(
         [
-            reader.update_cues(workspace_id, [{**request, "confirm_gates": [token]}, {**request, "confirm_gates": [token]}], dry_run=False),
-            reader.update_cues(
+            reader.edit_cues(workspace_id, [{**request, "confirm_gates": [token]}, {**request, "confirm_gates": [token]}], dry_run=False),
+            reader.edit_cues(
                 workspace_id,
                 [{"cue_ref": source_id, "profile": "network_basic", "properties": {"customString": "/repair/test", "networkPatchID": osc_id}, "confirm_gates": [token]}],
                 dry_run=False,
             ),
-            reader.update_cues(
+            reader.edit_cues(
                 workspace_id,
                 [{"cue_ref": source_id, "profile": "network_basic", "operations": [{"property": "customString", "args": {"value": "/repair/test"}, "mode": "live"}]}],
                 dry_run=True,
@@ -17178,12 +17186,12 @@ def test_network_repair_rejects_tokens_shapes_live_and_active_without_setters() 
         ]
     )
     client.cues[source_id]["isRunning"] = True
-    rejected.append(reader.update_cues(workspace_id, [request], dry_run=True))
+    rejected.append(reader.edit_cues(workspace_id, [request], dry_run=True))
     assert all(result["status"] == "preflight_failed" for result in rejected)
     assert all(not address.endswith(("/customString", "/networkPatchID")) for address, _, _ in client.requests)
 
 
-def test_update_cues_rejects_slash_in_path_template_arg() -> None:
+def test_edit_cues_rejects_slash_in_path_template_arg() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -17191,7 +17199,7 @@ def test_update_cues_rejects_slash_in_path_template_arg() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -17207,7 +17215,7 @@ def test_update_cues_rejects_slash_in_path_template_arg() -> None:
     assert "must not contain '/'" in result["results"][0]["errors"]["validation"]
 
 
-def test_update_cues_network_basic_invalid_values_and_unsupported_fields_have_no_plan() -> None:
+def test_edit_cues_network_basic_invalid_values_and_unsupported_fields_have_no_plan() -> None:
     network_id = "11111111-1111-4111-8111-111111111111"
     memo_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -17216,7 +17224,7 @@ def test_update_cues_network_basic_invalid_values_and_unsupported_fields_have_no
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": network_id, "profile": "network_basic", "properties": {"parameterValues": "not-list"}},
@@ -17238,7 +17246,7 @@ def test_update_cues_network_basic_invalid_values_and_unsupported_fields_have_no
     assert all(item["planned_operations"] == [] for item in result["results"])
 
 
-def test_update_cues_light_basic_dry_run_plans_documented_light_cue_messages() -> None:
+def test_edit_cues_light_basic_dry_run_plans_documented_light_cue_messages() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -17247,7 +17255,7 @@ def test_update_cues_light_basic_dry_run_plans_documented_light_cue_messages() -
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -17318,7 +17326,7 @@ def test_update_cues_light_basic_dry_run_plans_documented_light_cue_messages() -
     assert result["results"][0]["executed_operations"] == []
 
 
-def test_update_cues_light_analysis_policies_share_one_patch_read() -> None:
+def test_edit_cues_light_analysis_policies_share_one_patch_read() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -17327,7 +17335,7 @@ def test_update_cues_light_analysis_policies_share_one_patch_read() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Back.red = 50"}},
@@ -17362,7 +17370,7 @@ def test_update_cues_light_analysis_policies_share_one_patch_read() -> None:
     assert all(item["executed_operations"] == [] for item in result["results"])
 
 
-def test_update_cues_light_analysis_unavailable_keeps_dry_run_planned() -> None:
+def test_edit_cues_light_analysis_unavailable_keeps_dry_run_planned() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -17371,7 +17379,7 @@ def test_update_cues_light_analysis_unavailable_keeps_dry_run_planned() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Front = 50"}}],
         dry_run=True,
@@ -17389,7 +17397,7 @@ def test_update_cues_light_analysis_unavailable_keeps_dry_run_planned() -> None:
     assert result["results"][0]["errors"] is None
 
 
-def test_update_cues_light_analyzer_failure_is_nonfatal(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_edit_cues_light_analyzer_failure_is_nonfatal(monkeypatch: pytest.MonkeyPatch) -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -17399,7 +17407,7 @@ def test_update_cues_light_analyzer_failure_is_nonfatal(monkeypatch: pytest.Monk
     reader = QLabReader(client)  # type: ignore[arg-type]
     monkeypatch.setattr(write_operations, "analyze_light_command_text", lambda *_: (_ for _ in ()).throw(RuntimeError()))
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Front = 50"}}],
         dry_run=True,
@@ -17411,7 +17419,7 @@ def test_update_cues_light_analyzer_failure_is_nonfatal(monkeypatch: pytest.Monk
     assert analysis["error"]["code"] == "light_command_analyzer_failed"
 
 
-def test_update_cues_light_command_size_limit_rejects_before_reads_or_token() -> None:
+def test_edit_cues_light_command_size_limit_rejects_before_reads_or_token() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -17420,7 +17428,7 @@ def test_update_cues_light_command_size_limit_rejects_before_reads_or_token() ->
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -17439,7 +17447,7 @@ def test_update_cues_light_command_size_limit_rejects_before_reads_or_token() ->
     assert client.requests == []
 
 
-def test_update_cues_light_non_command_updates_do_not_read_patch() -> None:
+def test_edit_cues_light_non_command_updates_do_not_read_patch() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -17447,7 +17455,7 @@ def test_update_cues_light_non_command_updates_do_not_read_patch() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "light_basic", "properties": {"alwaysCollate": True}}],
         dry_run=True,
@@ -17457,7 +17465,7 @@ def test_update_cues_light_non_command_updates_do_not_read_patch() -> None:
     assert "/workspace/ws-1/settings/light/patch" not in [request[0] for request in client.requests]
 
 
-def test_update_cues_light_command_real_write_with_token_sets_once_and_verifies() -> None:
+def test_edit_cues_light_command_real_write_with_token_sets_once_and_verifies() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -17466,11 +17474,11 @@ def test_update_cues_light_command_real_write_with_token_sets_once_and_verifies(
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
     update = {"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Front = 50"}}
-    dry_run = reader.update_cues("ws-1", [update], dry_run=True)
+    dry_run = reader.edit_cues("ws-1", [update], dry_run=True)
     token = planned_setters(dry_run["results"][0])["lightCommandText"]["confirm_token"]
     client.requests.clear()
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -17495,7 +17503,7 @@ def test_update_cues_light_command_real_write_with_token_sets_once_and_verifies(
     ) == 1
 
 
-def test_update_cues_light_command_rollback_uses_new_dry_run_token() -> None:
+def test_edit_cues_light_command_rollback_uses_new_dry_run_token() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=True, passcode="server-pass"),
@@ -17505,17 +17513,17 @@ def test_update_cues_light_command_rollback_uses_new_dry_run_token() -> None:
     reader = QLabReader(client)  # type: ignore[arg-type]
 
     forward = {"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Front = 50"}}
-    forward_plan = reader.update_cues("ws-1", [forward], dry_run=True)
+    forward_plan = reader.edit_cues("ws-1", [forward], dry_run=True)
     forward_token = planned_setters(forward_plan["results"][0])["lightCommandText"]["confirm_token"]
-    assert reader.update_cues(
+    assert reader.edit_cues(
         "ws-1", [{**forward, "confirm_gates": [forward_token]}], dry_run=False
     )["status"] == "updated"
 
     rollback = {"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": "Front = 20"}}
-    rollback_plan = reader.update_cues("ws-1", [rollback], dry_run=True)
+    rollback_plan = reader.edit_cues("ws-1", [rollback], dry_run=True)
     rollback_token = planned_setters(rollback_plan["results"][0])["lightCommandText"]["confirm_token"]
     assert rollback_token != forward_token
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1", [{**rollback, "confirm_gates": [rollback_token]}], dry_run=False
     )
 
@@ -17524,7 +17532,7 @@ def test_update_cues_light_command_rollback_uses_new_dry_run_token() -> None:
     assert client.cues[cue_id]["lightCommandText"] == "Front = 20"
 
 
-def test_update_cues_empty_light_command_is_valid_but_not_confirmable() -> None:
+def test_edit_cues_empty_light_command_is_valid_but_not_confirmable() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -17533,7 +17541,7 @@ def test_update_cues_empty_light_command_is_valid_but_not_confirmable() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{"cue_ref": cue_id, "profile": "light_basic", "properties": {"lightCommandText": ""}}],
         dry_run=True,
@@ -17570,7 +17578,7 @@ def _phase4_fixture(
         "profile": "light_basic",
         "properties": {"lightCommandText": "Front = 50"},
     }
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     token = planned_setters(plan["results"][0])["lightCommandText"]["confirm_token"]
     client.requests.clear()
     return client, reader, cue_id, update, token
@@ -17615,7 +17623,7 @@ def test_phase4_token_payload_binds_version_kind_and_write_context() -> None:
 def test_phase4_malformed_tampered_or_wrong_version_token_blocks_before_setter(token_mutator: Any) -> None:
     client, reader, _, update, token = _phase4_fixture()
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token_mutator(token)]}],
         dry_run=False,
@@ -17629,14 +17637,14 @@ def test_phase4_malformed_tampered_or_wrong_version_token_blocks_before_setter(t
 def test_phase4_token_cannot_authorize_another_requested_value_or_cue_ref() -> None:
     client, reader, cue_id, update, token = _phase4_fixture()
 
-    wrong_value = reader.update_cues(
+    wrong_value = reader.edit_cues(
         "ws-1",
         [{**update, "properties": {"lightCommandText": "Front = 60"}, "confirm_gates": [token]}],
         dry_run=False,
     )
     client.requests.clear()
     client.cue_numbers["1"] = cue_id
-    wrong_ref = reader.update_cues(
+    wrong_ref = reader.edit_cues(
         "ws-1",
         [{**update, "cue_ref": "1", "confirm_gates": [token]}],
         dry_run=False,
@@ -17657,7 +17665,7 @@ def test_phase4_token_cannot_authorize_another_workspace() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-2",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -17671,7 +17679,7 @@ def test_phase4_token_cannot_authorize_another_workspace() -> None:
 def test_phase4_missing_workspace_blocks_before_setter() -> None:
     client, reader, _, update, token = _phase4_fixture()
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "missing-ws",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -17697,11 +17705,11 @@ def test_phase4_nonconfirmable_analysis_has_no_real_write_path(command_text: str
         "profile": "light_basic",
         "properties": {"lightCommandText": command_text},
     }
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     setter = planned_setters(plan["results"][0])["lightCommandText"]
     client.requests.clear()
 
-    result = reader.update_cues("ws-1", [update], dry_run=False)
+    result = reader.edit_cues("ws-1", [update], dry_run=False)
 
     assert setter["real_write_possible"] is False
     assert "confirm_token" not in setter
@@ -17724,12 +17732,12 @@ def test_phase4_unavailable_analysis_and_multiple_tokens_block_before_setter() -
         "profile": "light_basic",
         "properties": {"lightCommandText": "Front = 50"},
     }
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     setter = planned_setters(plan["results"][0])["lightCommandText"]
     client.requests.clear()
 
-    unavailable = reader.update_cues("ws-1", [update], dry_run=False)
-    multiple = reader.update_cues(
+    unavailable = reader.edit_cues("ws-1", [update], dry_run=False)
+    multiple = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": ["one", "two"]}],
         dry_run=False,
@@ -17746,7 +17754,7 @@ def test_phase4_stale_baseline_blocks_before_setter() -> None:
     client, reader, cue_id, update, token = _phase4_fixture()
     client.cues[cue_id]["lightCommandText"] = "Front = 30"
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -17761,7 +17769,7 @@ def test_phase4_stale_baseline_blocks_before_setter() -> None:
 def test_phase4_readback_mismatch_returns_verification_failure() -> None:
     client, reader, _, update, token = _phase4_fixture(ignore_readback=True)
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -17783,7 +17791,7 @@ def test_phase4_batch_or_extra_property_blocks_whole_call_before_osc() -> None:
         "lightCommandText": "Front = 20",
     }
 
-    batch = reader.update_cues(
+    batch = reader.edit_cues(
         "ws-1",
         [
             {**update, "confirm_gates": [token]},
@@ -17791,7 +17799,7 @@ def test_phase4_batch_or_extra_property_blocks_whole_call_before_osc() -> None:
         ],
         dry_run=False,
     )
-    mixed = reader.update_cues(
+    mixed = reader.edit_cues(
         "ws-1",
         [
             {
@@ -17823,7 +17831,7 @@ def test_phase4_edit_scope_and_show_mode_block_before_setter(
         show_mode_data=show_mode_data,
     )
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -17837,17 +17845,17 @@ def test_phase4_edit_scope_and_show_mode_block_before_setter(
 def test_phase4_non_light_missing_cue_and_patch_failure_block_before_setter() -> None:
     client, reader, cue_id, update, token = _phase4_fixture()
     client.cues[cue_id]["type"] = "Memo"
-    non_light = reader.update_cues(
+    non_light = reader.edit_cues(
         "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
     )
     client.cues[cue_id]["type"] = "Light"
     client.missing_refs.add(cue_id)
-    missing = reader.update_cues(
+    missing = reader.edit_cues(
         "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
     )
     client.missing_refs.clear()
     client.light_patch_error = True
-    patch_failure = reader.update_cues(
+    patch_failure = reader.edit_cues(
         "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
     )
 
@@ -17862,7 +17870,7 @@ def test_phase4_non_light_missing_cue_and_patch_failure_block_before_setter() ->
 def test_phase4_success_requests_no_dashboard_playback_or_unqualified_osc() -> None:
     client, reader, _, update, token = _phase4_fixture()
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
     )
 
@@ -17900,7 +17908,7 @@ def _phase5_fixture(
         "profile": "light_basic",
         "properties": {property_name: requested},
     }
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     token = planned_setters(plan["results"][0])[property_name]["confirm_token"]
     client.cues[cue_id]["type"] = cue_type
     client.requests.clear()
@@ -17926,7 +17934,7 @@ def test_phase5_dry_run_candidate_and_real_write_verify_boolean(
         baseline=baseline,
         requested=requested,
     )
-    plan = reader.update_cues("ws-1", [update], dry_run=True)
+    plan = reader.edit_cues("ws-1", [update], dry_run=True)
     setter = planned_setters(plan["results"][0])[property_name]
     token = setter["confirm_token"]
     client.requests.clear()
@@ -17938,7 +17946,7 @@ def test_phase5_dry_run_candidate_and_real_write_verify_boolean(
     assert setter["planned_only_reason"] == "light_behavior_requires_confirm_token"
     assert token.startswith("confirm:lightBehavior:v1:")
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token]}],
         dry_run=False,
@@ -17975,7 +17983,7 @@ def test_phase5_token_payload_binds_kind_property_and_context() -> None:
 
 def test_phase5_rollback_requires_new_dry_run_token() -> None:
     client, reader, cue_id, forward, token = _phase5_fixture()
-    assert reader.update_cues(
+    assert reader.edit_cues(
         "ws-1", [{**forward, "confirm_gates": [token]}], dry_run=False
     )["status"] == "updated"
 
@@ -17984,9 +17992,9 @@ def test_phase5_rollback_requires_new_dry_run_token() -> None:
         "profile": "light_basic",
         "properties": {"alwaysCollate": False},
     }
-    plan = reader.update_cues("ws-1", [rollback], dry_run=True)
+    plan = reader.edit_cues("ws-1", [rollback], dry_run=True)
     rollback_token = planned_setters(plan["results"][0])["alwaysCollate"]["confirm_token"]
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1", [{**rollback, "confirm_gates": [rollback_token]}], dry_run=False
     )
 
@@ -18006,7 +18014,7 @@ def test_phase5_rollback_requires_new_dry_run_token() -> None:
 def test_phase5_invalid_token_blocks_before_setter(token_mutator: Any) -> None:
     client, reader, _, update, token = _phase5_fixture()
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [{**update, "confirm_gates": [token_mutator(token)]}],
         dry_run=False,
@@ -18019,13 +18027,13 @@ def test_phase5_invalid_token_blocks_before_setter(token_mutator: Any) -> None:
 
 def test_phase5_token_cannot_authorize_other_property_value_workspace_or_cue_ref() -> None:
     client, reader, cue_id, update, token = _phase5_fixture()
-    wrong_value = reader.update_cues(
+    wrong_value = reader.edit_cues(
         "ws-1",
         [{**update, "properties": {"alwaysCollate": False}, "confirm_gates": [token]}],
         dry_run=False,
     )
     client.requests.clear()
-    wrong_property = reader.update_cues(
+    wrong_property = reader.edit_cues(
         "ws-1",
         [
             {
@@ -18039,7 +18047,7 @@ def test_phase5_token_cannot_authorize_other_property_value_workspace_or_cue_ref
     )
     client.requests.clear()
     client.cue_numbers["1"] = cue_id
-    wrong_ref = reader.update_cues(
+    wrong_ref = reader.edit_cues(
         "ws-1", [{**update, "cue_ref": "1", "confirm_gates": [token]}], dry_run=False
     )
     client.requests.clear()
@@ -18049,7 +18057,7 @@ def test_phase5_token_cannot_authorize_other_property_value_workspace_or_cue_ref
         workspace_id="ws-2",
     )
     other_reader = QLabReader(other_client)  # type: ignore[arg-type]
-    wrong_workspace = other_reader.update_cues(
+    wrong_workspace = other_reader.edit_cues(
         "ws-2", [{**update, "confirm_gates": [token]}], dry_run=False
     )
 
@@ -18065,7 +18073,7 @@ def test_phase5_token_cannot_authorize_other_property_value_workspace_or_cue_ref
 def test_phase5_stale_baseline_and_readback_mismatch_are_detected() -> None:
     client, reader, cue_id, update, token = _phase5_fixture()
     client.cues[cue_id]["alwaysCollate"] = True
-    stale = reader.update_cues(
+    stale = reader.edit_cues(
         "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
     )
     assert stale["status"] == "preflight_failed"
@@ -18075,7 +18083,7 @@ def test_phase5_stale_baseline_and_readback_mismatch_are_detected() -> None:
     mismatch_client, mismatch_reader, _, mismatch_update, mismatch_token = _phase5_fixture(
         ignore_readback=True
     )
-    mismatch = mismatch_reader.update_cues(
+    mismatch = mismatch_reader.edit_cues(
         "ws-1",
         [{**mismatch_update, "confirm_gates": [mismatch_token]}],
         dry_run=False,
@@ -18120,7 +18128,7 @@ def test_phase5_batch_mixed_properties_and_live_mode_block_whole_call() -> None:
     ]
 
     for updates in cases:
-        result = reader.update_cues("ws-1", updates, dry_run=False)
+        result = reader.edit_cues("ws-1", updates, dry_run=False)
         assert result["status"] == "preflight_failed"
         assert all(item["executed_operations"] == [] for item in result["results"])
     assert client.requests == []
@@ -18129,7 +18137,7 @@ def test_phase5_batch_mixed_properties_and_live_mode_block_whole_call() -> None:
 def test_phase5_non_strict_dry_run_has_no_confirmable_token() -> None:
     client, reader, cue_id, _, _ = _phase5_fixture()
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -18169,7 +18177,7 @@ def test_phase5_non_light_edit_scope_and_show_mode_block_before_setter(
         connect_data=connect_data,
         show_mode_data=show_mode_data,
     )
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
     )
 
@@ -18181,14 +18189,14 @@ def test_phase5_non_light_edit_scope_and_show_mode_block_before_setter(
 def test_phase5_missing_cue_and_safe_addresses_only() -> None:
     client, reader, cue_id, update, token = _phase5_fixture()
     client.missing_refs.add(cue_id)
-    missing = reader.update_cues(
+    missing = reader.edit_cues(
         "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
     )
     assert missing["status"] == "preflight_failed"
     assert not any(address.endswith("/alwaysCollate") for address, _, _ in client.requests)
 
     client.missing_refs.clear()
-    success = reader.update_cues(
+    success = reader.edit_cues(
         "ws-1", [{**update, "confirm_gates": [token]}], dry_run=False
     )
     addresses = [address for address, _, _ in client.requests]
@@ -18201,7 +18209,7 @@ def test_phase5_missing_cue_and_safe_addresses_only() -> None:
     )
 
 
-def test_update_cues_light_basic_invalid_values_and_profile_mismatch_have_no_plan() -> None:
+def test_edit_cues_light_basic_invalid_values_and_profile_mismatch_have_no_plan() -> None:
     light_id = "11111111-1111-4111-8111-111111111111"
     memo_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -18210,7 +18218,7 @@ def test_update_cues_light_basic_invalid_values_and_profile_mismatch_have_no_pla
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": light_id, "profile": "light_basic", "properties": {"alwaysCollate": "yes"}},
@@ -18254,7 +18262,7 @@ def test_update_cues_light_basic_invalid_values_and_profile_mismatch_have_no_pla
     assert all(item["executed_operations"] == [] for item in result["results"])
 
 
-def test_update_cues_script_basic_dry_run_plans_source_alias_without_execution() -> None:
+def test_edit_cues_script_basic_dry_run_plans_source_alias_without_execution() -> None:
     cue_id = "11111111-1111-4111-8111-111111111111"
     client = BatchFakeWriteClient(
         QLabConfig(enable_write=False),
@@ -18262,7 +18270,7 @@ def test_update_cues_script_basic_dry_run_plans_source_alias_without_execution()
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {
@@ -18284,7 +18292,7 @@ def test_update_cues_script_basic_dry_run_plans_source_alias_without_execution()
     assert result["results"][0]["executed_operations"] == []
 
 
-def test_update_cues_script_basic_invalid_value_and_profile_mismatch_have_no_plan() -> None:
+def test_edit_cues_script_basic_invalid_value_and_profile_mismatch_have_no_plan() -> None:
     script_id = "11111111-1111-4111-8111-111111111111"
     memo_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -18293,7 +18301,7 @@ def test_update_cues_script_basic_invalid_value_and_profile_mismatch_have_no_pla
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": script_id, "profile": "script_basic", "properties": {"scriptSource": 123}},
@@ -18309,7 +18317,7 @@ def test_update_cues_script_basic_invalid_value_and_profile_mismatch_have_no_pla
     assert all(item["planned_operations"] == [] for item in result["results"])
 
 
-def test_update_cues_wait_and_memo_basic_stay_common_only() -> None:
+def test_edit_cues_wait_and_memo_basic_stay_common_only() -> None:
     catalog = profile_catalog()
     safe_common = set(catalog["memo_basic"]["properties"])
     assert set(catalog["wait_basic"]["properties"]) == safe_common
@@ -18325,7 +18333,7 @@ def test_update_cues_wait_and_memo_basic_stay_common_only() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": wait_id, "profile": "wait_basic", "properties": {"duration": 3, "continueMode": "auto_follow"}},
@@ -18342,7 +18350,7 @@ def test_update_cues_wait_and_memo_basic_stay_common_only() -> None:
     assert result["results"][1]["executed_operations"] == []
 
 
-def test_update_cues_wait_and_memo_invalid_common_values_have_no_plan() -> None:
+def test_edit_cues_wait_and_memo_invalid_common_values_have_no_plan() -> None:
     wait_id = "11111111-1111-4111-8111-111111111111"
     memo_id = "22222222-2222-4222-8222-222222222222"
     client = BatchFakeWriteClient(
@@ -18351,7 +18359,7 @@ def test_update_cues_wait_and_memo_invalid_common_values_have_no_plan() -> None:
     )
     reader = QLabReader(client)  # type: ignore[arg-type]
 
-    result = reader.update_cues(
+    result = reader.edit_cues(
         "ws-1",
         [
             {"cue_ref": wait_id, "profile": "wait_basic", "properties": {"duration": -1}},

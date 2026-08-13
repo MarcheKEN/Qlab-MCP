@@ -570,7 +570,7 @@ DeleteCuesStatus = Literal[
 
 
 class DeleteCuesResult(BaseModel):
-    """Result for explicit leaf deletion or recursive emptying of one container."""
+    """Result for explicit leaves, one empty Group, or recursive container emptying."""
 
     ok: bool
     status: DeleteCuesStatus

@@ -19,9 +19,12 @@
   `edit_existing_cue` as the canonical Edit capability.
 - Marks Edit and Move as conservatively destructive MCP metadata hints; runtime
   safety gates, confirmation tokens, execution, and QLab behavior are unchanged.
-- Carries forward sequential Create, recursive Delete, hardened write/readback
-  behavior, and release CI/packaging checks without adding new QLab runtime
-  claims.
+- Adds a direct Delete route for one exact inactive empty Group while preserving
+  the existing leaf and root-preserving recursive routes. Lists and Carts remain
+  recursive-only.
+- Carries forward sequential Create, recursive Delete, hardened write/readback,
+  and release CI/packaging checks. The new Group route has fixture-specific
+  QLab 5.5.10 evidence; it is not a general show-readiness claim.
 
 ## 0.2.0
 

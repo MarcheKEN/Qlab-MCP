@@ -219,10 +219,12 @@ The invalid example supplies two linear placement forms and no reviewed token.
 
 ## Delete cues
 
-`qlab_delete_cues` accepts either 1–10 explicit leaf UUIDs or one
-`container_id` with `recursive=true`. Recursive mode deletes descendants
-deepest-first and preserves the requested root. Use the exact
-`confirm:deleteCues:v1` token from the dry-run.
+`qlab_delete_cues` accepts either 1–10 explicit leaf UUIDs, one exact empty
+`Group` through `container_id` with `recursive=false`, or one container with
+`recursive=true`. Direct Group deletion removes the Group itself only when it
+is empty and inactive. Recursive mode deletes descendants deepest-first and
+preserves the requested root. Use the exact `confirm:deleteCues:v1` token from
+the dry-run.
 
 Deletion is sequential and non-atomic, with no automatic rollback. Fresh
 existence readback must verify disappearance of every requested leaf and

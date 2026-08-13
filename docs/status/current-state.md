@@ -32,8 +32,8 @@ La referencia remota se verificó con `git fetch origin` y
 Los entornos temporales `pip install -e ".[dev]"` y
 `uv sync --locked --no-editable --python 3.11 --extra dev` instalaron
 correctamente en la comparación inicial. La suite enfocada de contrato MCP y
-write pasó con `2245 passed, 1 skipped`; la suite completa local pasó con
-`2584 passed, 41 subtests passed` fuera del sandbox gestionado. La verificación
+write pasó con `2242 passed`; la suite completa local pasó con
+`2589 passed, 41 subtests passed` fuera del sandbox gestionado. La verificación
 Linux de CI sigue pendiente.
 
 La inspección FastMCP reportó 13 tools y `uv build` generó wheel y sdist
@@ -47,8 +47,9 @@ locales `.codex/agents/` ausentes. Este resultado local no sustituye GitHub CI.
 
 Los workorders 017, 019, 021 y 022 quedan clasificados como implementación local
 con validación runtime pendiente. El workorder 029 sigue siendo trabajo real de
-validación runtime pendiente. Esta preparación no ejecuta nuevas pruebas en
-QLab ni convierte implementación local en evidencia runtime.
+validación runtime pendiente. La única nueva mutación runtime de esta iteración
+fue la validación acotada de Delete sobre dos Groups vacíos desechables; está
+documentada en [`empty-group-delete-2026-08-13.md`](../development/runtime-validation/empty-group-delete-2026-08-13.md).
 
 La auditoría arquitectónica acotada está documentada en
 [`architecture-audit-0.3.0.md`](architecture-audit-0.3.0.md) y concluye
@@ -67,7 +68,10 @@ runtime validado
 show listo para GO
 ```
 
-No se ejecutan setters, Create, Delete, playback, GO, `/live` ni raw OSC.
+No se ejecutaron setters, Create, Edit, Move, playback, GO, `/live` ni raw OSC.
+El Delete acotado de dos Groups vacíos usó únicamente el flujo MCP
+dry-run/token/una ejecución/readback y dejó el prefijo temporal sin resultados;
+no convierte otros workorders en evidencia runtime.
 Las referencias históricas y la evidencia runtime previa permanecen bajo
 `docs/archive/` y no se reutilizan como prueba nueva de esta release.
 

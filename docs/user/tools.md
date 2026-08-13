@@ -19,7 +19,7 @@ annotations, and result models.
 | `qlab_create_cues` | Ordered sequential creation, 1–50 items | Atomic transaction or rollback | [Create batch](agent-workflows.md#create-a-sequence) |
 | `qlab_edit_cues` | Allowlisted property/operation edits, 1–50 items | Create, Move, Delete, playback, or raw OSC | [Edit](agent-workflows.md#edit-existing-cues) |
 | `qlab_move_cues` | Sequential structural moves, 1–10 UUID targets | Playback or unproven Cart writes | [Move](agent-workflows.md#move-existing-cues) |
-| `qlab_delete_cues` | Explicit leaf deletion or root-preserving recursive emptying | Root deletion or automatic rollback | [Delete](agent-workflows.md#delete-cues) |
+| `qlab_delete_cues` | Explicit leaves, one empty Group, or root-preserving recursive emptying | Root deletion or automatic rollback | [Delete](agent-workflows.md#delete-cues) |
 
 ## Shared contract
 

@@ -94,10 +94,12 @@ inspection and a new dry-run/token.
 
 ### Delete
 
-`qlab_delete_cues` uses exact leaf UUIDs or one root-preserving recursive
-container request with `confirm:deleteCues:v1`. Deletes run deepest-first,
-sequentially, and have no automatic rollback. Fresh existence readback must
-confirm disappearance and root preservation.
+`qlab_delete_cues` uses exact leaf UUIDs, one exact empty `Group`, or one
+root-preserving recursive container request with `confirm:deleteCues:v1`.
+Direct container deletion is limited to an inactive empty `Group`; Cue Lists
+and Cue Carts remain recursive-only. Deletes run sequentially and have no
+automatic rollback. Fresh existence readback must confirm disappearance and,
+for recursive requests, root preservation.
 
 ## UDP and Reply Integrity
 

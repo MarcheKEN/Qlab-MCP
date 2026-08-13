@@ -104,8 +104,9 @@ QLab runtime probe is part of these gates.
 
 - Sequential Create and recursive Delete — `qlab_create_cues` chains each
   verified UUID into the next `/new` and stops without rollback on the first
-  ambiguity. `qlab_delete_cues` can empty a container deepest-first with a
-  fresh token and readback while preserving the requested root. Broken or
+  ambiguity. `qlab_delete_cues` can delete one exact inactive empty Group or
+  empty a container deepest-first with a fresh token and readback while
+  preserving the requested root. Broken or
   warning anchors remain valid structural references when inactive.
 
 - Authenticated request/reply handling uses invocation-owned TCP sessions,

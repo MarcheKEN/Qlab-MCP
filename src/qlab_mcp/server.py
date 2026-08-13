@@ -1270,18 +1270,30 @@ def qlab_delete_cues(
             min_length=0,
             max_length=10,
             description=(
-                "Optional explicit leaf cue UUIDs. For recursive emptying, omit cue_ids and provide "
-                "container_id with recursive=true."
+                "Optional explicit leaf cue UUIDs. For direct deletion of one exact empty Group, "
+                "omit cue_ids and provide container_id with recursive=false. For recursive emptying, "
+                "omit cue_ids and provide container_id with recursive=true."
             ),
         ),
     ] = None,
     container_id: Annotated[
         UUID | None,
-        Field(description="Container UUID to empty recursively; the container itself is preserved."),
+        Field(
+            description=(
+                "Exact empty Group UUID to delete only when recursive=false; or exact "
+                "Cue List, Cue Cart, Cart, or Group UUID to empty recursively with recursive=true. "
+                "Recursive mode preserves the container itself."
+            ),
+        ),
     ] = None,
     recursive: Annotated[
         bool,
-        Field(description="When true with container_id, delete descendants deepest-first and preserve the root."),
+        Field(
+            description=(
+                "When true with container_id, delete descendants deepest-first and preserve the root. "
+                "When false, container_id must identify one empty Group that will itself be deleted."
+            ),
+        ),
     ] = False,
     dry_run: Annotated[
         bool | None,
@@ -1297,12 +1309,13 @@ def qlab_delete_cues(
         Field(description="Exact confirm:deleteCues:v1: token returned by a reviewed dry-run plan."),
     ] = None,
 ) -> DeleteCuesResult:
-    """Plan or execute sequential deletions of explicit leaf cues or safely empty one container.
+    """Plan or execute sequential deletions of explicit leaves or one exact empty Group.
 
     Real deletion requires write readiness, Edit Mode, zero activity, the exact
     confirm:deleteCues:v1 token, and independent existence readback after every delete.
-    Recursive mode deletes descendants deepest-first and preserves the requested root
-    container. Deletion is sequential and not atomic, with no automatic rollback.
+    A non-recursive container request deletes only an empty Group. Recursive mode
+    deletes descendants deepest-first and preserves the requested root container.
+    Deletion is sequential and not atomic, with no automatic rollback.
     Do not retry after a timeout or identity ambiguity; verify disappearance of every
     requested leaf and preservation of the root.
     """

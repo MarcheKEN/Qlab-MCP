@@ -168,8 +168,8 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["cue-delete", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "d761f60fcb5e204262098c4d16fdf9b8cf2bc2875dd4c9114959975bbf10a270",
-        "output_schema_hash": "d1a1e6c0d3df47ee9f83366133c85d20f71e7356396acb61b3c6b29e57f24bd6",
+        "input_schema_hash": "f3b0e3825a3db87c44c44243b5bd635e4588155e0e8ba8a703cc7ffb53cc990b",
+        "output_schema_hash": "8b8a38d3937174d9e74a828201c56c5ebcc9c77482eb7f11be303423d8eb7132",
     },
 }
 EXPECTED_TOOL_CONCEPTS = {
@@ -185,7 +185,7 @@ EXPECTED_TOOL_CONCEPTS = {
     "qlab_create_cues": ("one verified /new per item", "no automatic rollback", "confirm:createcues:v1", "do not retry"),
     "qlab_edit_cues": ("dry-run planning never sends mutating osc", "high-risk profiles", "exact cue uuid", "per-operation confirm gates", "non-atomic", "fresh readback", "do not retry"),
     "qlab_move_cues": ("sequential qlab cue moves", "never claims atomicity", "uuid-only", "confirm:movecues:v1", "fresh parent/order readback"),
-    "qlab_delete_cues": ("sequential deletions", "not atomic", "confirm:deletecues:v1", "deepest-first", "no automatic rollback", "verify disappearance", "preservation of the root"),
+    "qlab_delete_cues": ("sequential deletions", "not atomic", "confirm:deletecues:v1", "deepest-first", "no automatic rollback", "verify disappearance", "preservation of the root", "empty group"),
 }
 
 
@@ -1165,7 +1165,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
 
     delete = tools["qlab_delete_cues"]
     assert delete.title == "Delete QLab Cues"
-    assert "explicit leaf" in delete.description
+    assert "explicit leaves" in delete.description
     assert delete.annotations.readOnlyHint is False
     assert delete.annotations.destructiveHint is True
     assert delete.annotations.idempotentHint is False
@@ -1175,6 +1175,8 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert delete_cue_ids_schema["items"]["format"] == "uuid"
     assert "container_id" in delete.inputSchema["properties"]
     assert "recursive" in delete.inputSchema["properties"]
+    assert "recursive=false" in delete.inputSchema["properties"]["container_id"]["description"]
+    assert "empty Group" in delete.inputSchema["properties"]["container_id"]["description"]
     assert "confirm:deleteCues:v1:" in delete.inputSchema["properties"]["confirm_token"]["description"]
     assert "verification_failed" in delete.outputSchema["properties"]["status"]["enum"]
 

@@ -16,6 +16,7 @@ FIRST_ID = "44444444-4444-4444-8444-444444444444"
 SECOND_ID = "55555555-5555-4555-8555-555555555555"
 THIRD_ID = "66666666-6666-4666-8666-666666666666"
 NESTED_ID = "77777777-7777-4777-8777-777777777777"
+CART_ID = "88888888-8888-4888-8888-888888888888"
 
 
 def test_delete_mode_reuses_canonical_container_types() -> None:
@@ -34,6 +35,7 @@ class DeleteReader:
         self.nodes = {
             LIST_ID: {"uniqueID": LIST_ID, "type": "Cue List"},
             GROUP_ID: {"uniqueID": GROUP_ID, "type": "Group"},
+            CART_ID: {"uniqueID": CART_ID, "type": "Cue Cart"},
             FIRST_ID: {"uniqueID": FIRST_ID, "type": "Memo", "isRunning": False, "isPaused": False},
             SECOND_ID: {"uniqueID": SECOND_ID, "type": "Memo", "isRunning": False, "isPaused": False},
             THIRD_ID: {"uniqueID": THIRD_ID, "type": "Memo", "isRunning": False, "isPaused": False},
@@ -202,12 +204,141 @@ def test_delete_cues_rejects_duplicates_and_containers_before_mutation() -> None
 
     reader = DeleteReader()
     duplicate = delete_cues(reader, WORKSPACE_ID, [FIRST_ID, FIRST_ID], dry_run=True)
-    container = delete_cues(reader, WORKSPACE_ID, [GROUP_ID], dry_run=True)
+    container = delete_cues(reader, WORKSPACE_ID, [LIST_ID], dry_run=True)
 
     assert duplicate["status"] == "preflight_failed"
     assert "duplicate" in str(duplicate["errors"]).lower()
     assert container["status"] == "preflight_failed"
     assert "container" in str(container["errors"]).lower()
+    assert reader.requests == []
+
+
+def test_delete_cues_plans_exact_empty_group_container_delete() -> None:
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    planned = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        recursive=False,
+        dry_run=True,
+    )
+    payload, error = deletes._decode_token(planned["confirm_token"])
+
+    assert error is None
+    assert planned["status"] == "planned"
+    assert planned["requested_count"] == 1
+    assert planned["planned_count"] == 1
+    assert planned["container_id"] == GROUP_ID
+    assert planned["recursive"] is False
+    assert planned["results"][0]["cue_id"] == GROUP_ID
+    assert planned["results"][0]["cue_type"] == "Group"
+    assert payload["binding"]["container_id"] == GROUP_ID
+    assert payload["binding"]["recursive"] is False
+    assert payload["binding"]["requested_cue_ids"] == [GROUP_ID]
+    assert payload["binding"]["plan"][0]["parent_children"] == [FIRST_ID, GROUP_ID, SECOND_ID, THIRD_ID]
+    assert reader.requests == []
+
+
+def test_delete_cues_executes_exact_empty_group_and_verifies_absence(monkeypatch: pytest.MonkeyPatch) -> None:
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    monkeypatch.setattr(deletes, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    planned = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        recursive=False,
+        dry_run=True,
+    )
+    result = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        recursive=False,
+        dry_run=False,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["status"] == "deleted_immediately"
+    assert result["deleted_count"] == 1
+    assert result["container_id"] == GROUP_ID
+    assert result["preserved_container_id"] is None
+    assert reader.nodes[LIST_ID]["uniqueID"] == LIST_ID
+    assert GROUP_ID not in reader.nodes
+    assert reader.children[LIST_ID] == [FIRST_ID, SECOND_ID, THIRD_ID]
+    assert [address for address, _ in reader.requests if "/delete_id/" in address] == [
+        f"/workspace/{WORKSPACE_ID}/delete_id/{GROUP_ID}"
+    ]
+
+
+def test_delete_cues_rejects_nonempty_or_unsupported_direct_containers() -> None:
+    from qlab_mcp.write.deletes import delete_cues
+
+    reader = DeleteReader()
+    reader.children[LIST_ID].append(CART_ID)
+    reader.children[GROUP_ID] = [NESTED_ID]
+    reader.nodes[NESTED_ID] = {"uniqueID": NESTED_ID, "type": "Memo", "isRunning": False, "isPaused": False}
+    nonempty = delete_cues(reader, WORKSPACE_ID, container_id=GROUP_ID, dry_run=True)
+    cue_list = delete_cues(reader, WORKSPACE_ID, container_id=LIST_ID, dry_run=True)
+    cue_cart = delete_cues(reader, WORKSPACE_ID, container_id=CART_ID, dry_run=True)
+
+    assert nonempty["status"] == "preflight_failed"
+    assert "empty Group" in str(nonempty["errors"])
+    assert cue_list["status"] == "preflight_failed"
+    assert "empty Group" in str(cue_list["errors"])
+    assert cue_cart["status"] == "preflight_failed"
+    assert "empty Group" in str(cue_cart["errors"])
+    assert reader.requests == []
+
+
+def test_delete_cues_rejects_stale_empty_group_token_after_child_appears() -> None:
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    planned = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        recursive=False,
+        dry_run=True,
+    )
+    reader.children[GROUP_ID] = [NESTED_ID]
+    reader.nodes[NESTED_ID] = {"uniqueID": NESTED_ID, "type": "Memo", "isRunning": False, "isPaused": False}
+
+    result = deletes.delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        recursive=False,
+        dry_run=False,
+        confirm_token=planned["confirm_token"],
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "empty Group" in str(result["errors"])
+    assert GROUP_ID in reader.nodes
+    assert [address for address, _ in reader.requests if "/delete_id/" in address] == []
+
+
+def test_delete_cues_rejects_active_empty_group_before_mutation() -> None:
+    from qlab_mcp.write.deletes import delete_cues
+
+    reader = DeleteReader()
+    reader.nodes[GROUP_ID]["isRunning"] = True
+
+    result = delete_cues(
+        reader,
+        WORKSPACE_ID,
+        container_id=GROUP_ID,
+        recursive=False,
+        dry_run=True,
+    )
+
+    assert result["status"] == "preflight_failed"
+    assert "active" in str(result["errors"]).lower()
     assert reader.requests == []
 
 

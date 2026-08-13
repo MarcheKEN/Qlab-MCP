@@ -57,8 +57,9 @@ one placement form, sequential execution, and fresh parent/order readback.
 
 ### Delete
 
-[`qlab_delete_cues`](agent-workflows.md#delete-cues) deletes explicit leaves or
-empties one container deepest-first while preserving its root.
+[`qlab_delete_cues`](agent-workflows.md#delete-cues) deletes explicit leaves,
+one exact empty Group, or empties one container deepest-first while preserving
+its root.
 
 ## Evidence boundary
 

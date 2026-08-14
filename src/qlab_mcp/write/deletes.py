@@ -1,4 +1,4 @@
-"""Gated deletion of explicit leaves or one recursively emptied container."""
+"""Gated deletion of explicit leaves, one empty Group, or one emptied container."""
 
 from __future__ import annotations
 
@@ -223,11 +223,12 @@ def delete_cues(
         )
 
     try:
-        preserved_container_id = (
+        resolved_container_id = (
             _uuid_key(container_id, "container_id") if container_id is not None else None
         )
     except (TypeError, ValueError):
-        preserved_container_id = container_id
+        resolved_container_id = container_id
+    preserved_container_id = resolved_container_id if recursive else None
 
     if not fresh_plan and container_id is not None:
         # Empty-container deletion is a verified no-op; the root is preserved.
@@ -283,7 +284,7 @@ def delete_cues(
         fresh_plan,
         requested_count=requested_count,
         preserved_container_id=preserved_container_id,
-        container_id=preserved_container_id,
+        container_id=resolved_container_id,
         recursive=recursive,
     )
 
@@ -514,8 +515,6 @@ def _validate_delete_request(
     if container_id is not None:
         if cue_ids not in (None, []):
             raise UnsafeWriteOperationError("container_id cannot be combined with cue_ids.")
-        if not recursive:
-            raise UnsafeWriteOperationError("recursive must be true when container_id is supplied.")
         return 1
     if recursive:
         raise UnsafeWriteOperationError("recursive requires container_id.")
@@ -543,12 +542,29 @@ def _normalize_delete_request(
     root = nodes.get(root_id)
     if root is None:
         return [], {"container_id": "container_id does not resolve in this workspace."}
-    if str(root.get("type") or "") not in CONTAINER_CUE_TYPES:
+    root_type = str(root.get("type") or "")
+    if root_type not in CONTAINER_CUE_TYPES:
         return [], {"container_id": "container_id must identify a Cue List, Group, or Cue Cart."}
     if any(_qlab_bool(root.get(field)) for field in ("isRunning", "isPaused", "isAuditioning")):
         return [], {"container_id": "Active, paused, or auditioning containers cannot be emptied."}
     if not recursive:
-        return [], {"recursive": "recursive must be true when container_id is supplied."}
+        if root_type != "Group":
+            return [], {
+                "container_id": (
+                    "Direct container deletion supports only an empty Group; "
+                    "Cue Lists and Cue Carts require recursive=true."
+                )
+            }
+        if snapshot["children_by_parent"].get(root_id):
+            return [], {
+                "container_id": (
+                    "Direct container deletion requires an empty Group; "
+                    "use recursive=true to empty a non-empty container."
+                )
+            }
+        if snapshot["parent_by_child"].get(root_id) is None:
+            return [], {"container_id": "Top-level Group deletion is blocked."}
+        return [root_id], {}
     try:
         expanded = _postorder_descendants(snapshot, root_id)
     except ValueError as exc:

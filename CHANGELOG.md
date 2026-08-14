@@ -9,6 +9,26 @@
 - Records delayed UDP reply correlation as a separate follow-up from source-port
   authenticity.
 
+## 0.3.0
+
+- Establishes the 13-tool public FastMCP contract for QLab inspection and gated
+  Create, Edit, Move, and Delete workflows.
+- Removes the breaking `qlab_update_cues` compatibility alias; use
+  `qlab_edit_cues` for cue edits.
+- Removes the duplicate `batch_update_cues` readiness capability key; use
+  `edit_existing_cue` as the canonical Edit capability.
+- Marks Edit and Move as conservatively destructive MCP metadata hints; runtime
+  safety gates, confirmation tokens, execution, and QLab behavior are unchanged.
+- Adds a direct Delete route for one exact inactive empty Group while preserving
+  the existing leaf and root-preserving recursive routes. Lists and Carts remain
+  recursive-only.
+- Carries forward sequential Create, recursive Delete, hardened write/readback,
+  and release CI/packaging checks. The new Group route has fixture-specific
+  QLab 5.5.10 evidence; it is not a general show-readiness claim.
+- Clarifies partial overview follow-up, missing settings/cue recovery guidance,
+  and sequential Create count semantics without changing the 13-tool surface,
+  status vocabulary, write gates, tokens, or runtime behavior.
+
 ## 0.2.0
 
 - Exposes 13 public MCP tools for QLab inspection and gated cue creation,

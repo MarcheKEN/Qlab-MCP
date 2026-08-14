@@ -1,8 +1,12 @@
 # Current Architecture
 
-This describes QLab MCP 0.2.0 at the security-hardened baseline
-`8a5a92c195e2cdab30cb381c124f2d726c0b4def`. Historical graphs and refactor
+This describes QLab MCP 0.3.0 at the security-hardened baseline. Historical graphs and refactor
 analysis live under [`docs/archive/`](../archive/README.md).
+
+The 0.3.0 architecture audit concluded
+[`no extraction for 0.3.0`](../status/architecture-audit-0.3.0.md): the current
+write boundaries are retained until a future family-level extraction can prove
+contract and safety preservation.
 
 The supported threat model and accepted risks are defined in the repository
 root [`SECURITY.md`](../../SECURITY.md). The current hardening rejects
@@ -65,3 +69,5 @@ is confirmed or uncertain.
 - Imported QLab protocol: `docs/references/` plus checksum tests.
 - Current project state: `docs/status/`.
 - Historical decisions and runtime evidence: `docs/archive/`.
+- Agent-facing contract research:
+  [`2026-08-13-mcp-agent-ux-and-edit-cleanup.md`](research/2026-08-13-mcp-agent-ux-and-edit-cleanup.md).

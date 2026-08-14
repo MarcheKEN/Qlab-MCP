@@ -75,8 +75,11 @@ exceptions are listed in Current Invariants.
   active/auditioning Groups remain outside this bounded closure.
 - Playlist navigation, `/shuffle`, deprecated aliases, crossfade curve shapes,
   and Timeline UI pseudo-properties remain non-real-write surfaces.
-- `cueTargetID`, `cueTargetNumber`, and temporary target refs require target resolution before real writes.
-- `cueTargetName` remains blocked for real writes; callers must use `cueTargetID` or `cueTargetNumber`.
+- `cueTargetID` is the only supported utility target assignment route; it still
+  requires fresh exact-UUID target resolution before a real write.
+- `cueTargetNumber`, `cueTargetName`, and temporary target refs remain blocked
+  for real writes; numeric/name convenience does not become supported by
+  resolving it first.
 - Devamp local saved configuration emits `confirm:devamp:v1:` only for exact
   UUID, one-cue, one-property saved `cueTargetID`, `devampType`,
   `startNextCueWhenSliceEnds`, or `stopTargetWhenSliceEnds` writes. Source and

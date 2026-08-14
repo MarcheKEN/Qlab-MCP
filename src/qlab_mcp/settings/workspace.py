@@ -628,7 +628,7 @@ class WorkspaceSettingsMixin:
         errors: dict[str, str] | None = None,
         message: str | None = None,
     ) -> dict[str, Any]:
-        return {
+        result = {
             "workspace_id": _clean_workspace_id(workspace_id),
             "section": section,
             "kind": kind,
@@ -640,6 +640,19 @@ class WorkspaceSettingsMixin:
             "errors": errors or None,
             "message": message,
         }
+        if details is None and ref is not None and message and message.startswith("No settings item matched ref"):
+            result.update(
+                {
+                    "ok": False,
+                    "status": "error",
+                    "error_code": "setting_ref_not_found",
+                    "suggested_action": (
+                        f"Ref {ref!r} was not found; call qlab_get_workspace_settings in summary or details mode "
+                        "to inspect available refs, then retry with an exact setting name or uniqueID."
+                    ),
+                }
+            )
+        return result
 
     def _setting_details_from_collection(
         self,

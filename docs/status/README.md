@@ -2,7 +2,9 @@
 
 This folder contains only current project status:
 
+- [Current state snapshot](current-state.md) — provisional 0.3.0 preparation state.
 - [Roadmap](roadmap.md) — supported, pending, and blocked work.
+- [Architecture audit](architecture-audit-0.3.0.md) — 0.3.0 extraction decision.
 - [Coverage](coverage/README.md) — technical OSC and feature coverage.
 - [Workorders](workorders/README.md) — active and blocked tasks.
 

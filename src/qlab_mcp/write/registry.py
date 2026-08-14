@@ -1916,7 +1916,7 @@ def real_write_permission_errors(
         if profile == "light_basic" and prop == "lightCommandText":
             errors[prop] = (
                 "lightCommandText is gated or dry-run only outside the specialized "
-                "single-cue Phase 4 qlab_update_cues flow."
+                "single-cue Phase 4 qlab_edit_cues flow."
             )
             continue
         if profile == "light_basic" and prop in {
@@ -1934,7 +1934,7 @@ def real_write_permission_errors(
         if profile == "light_basic" and prop in {"alwaysCollate", "subcontroller"}:
             errors[prop] = (
                 f"{prop} is gated or dry-run only outside the specialized single-cue Phase 5 "
-                "qlab_update_cues flow."
+                "qlab_edit_cues flow."
             )
             continue
         if operation["real_write_enabled"]:
@@ -1965,10 +1965,9 @@ def read_keys_for_operations(operations: list[dict[str, Any]]) -> list[str]:
 
 def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
     catalog = profile_catalog()
-    update_cues_capability = {
+    edit_cues_capability = {
         "planned": True,
         "tool": "qlab_edit_cues",
-        "legacy_tool_aliases": ["qlab_update_cues"],
         "batch": {
             "min_items": 1,
             "max_items": 50,
@@ -2033,10 +2032,8 @@ def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
             "initialization": "qlab_cue_template_defaults",
             "properties": [],
         },
-        "batch_update_cues": update_cues_capability,
         "edit_existing_cue": {
-            **update_cues_capability,
-            "legacy_alias_for": "batch_update_cues",
+            **edit_cues_capability,
         },
         "playback_control": {"enabled": False},
         "raw_osc": {"enabled": False},

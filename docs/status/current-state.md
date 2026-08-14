@@ -1,101 +1,95 @@
 # Estado actual del proyecto
 
-Snapshot canónico: **2026-08-10 Europe/Madrid**
-Ámbito: repositorio local y una captura read-only de QLab 5.5.10.
+Snapshot provisional de preparación: **2026-08-13 Europe/Madrid**.
 
-## Estado Git de cierre
+Este documento describe la rama de preparación de QLab MCP 0.3.0. El snapshot
+canónico definitivo se actualizará mediante una PR docs-only después del merge
+en `main`, antes del tag `v0.3.0`.
+
+## Estado Git de preparación
 
 ```text
-branch: validation/group-edge-runtime
-HEAD: commit final de cierre, resuelto por Git en la verificación final
-worktree: limpio tras la verificación final
+branch: codex/docs
+HEAD: preparación local; consultar `git rev-parse HEAD`
+base: origin/main verificado antes de iniciar; la rama contiene commits locales de preparación
+worktree: commit local de preparación 0.3.0; snapshot aún provisional
 ```
 
-El SHA no se duplica aquí: el commit final y su estado exacto son la fuente de
-verdad de Git y de la PR.
+La referencia remota se verificó con `git fetch origin` y
+`git ls-remote origin refs/heads/main` antes de comenzar.
 
-## Verificación local
+## Objetivo de la preparación
 
-La suite completa queda en:
+- versión contractual `0.3.0`;
+- exactamente 13 tools FastMCP públicas;
+- `qlab_edit_cues` como única tool pública de edición;
+- CI reproducible en checkout limpio;
+- documentación vigente y workorders auditados;
+- auditoría arquitectónica sin refactor especulativo.
 
-```text
-2559 passed, 41 subtests passed
-```
+## Estado de verificación
 
-El Reader queda en:
+Los entornos temporales `pip install -e ".[dev]"` y
+`uv sync --locked --no-editable --python 3.11 --extra dev` instalaron
+correctamente en la comparación inicial. El preflight local final pasó la suite
+completa con `2595 passed, 41 subtests passed` fuera del sandbox gestionado.
+La verificación Linux de CI sigue pendiente.
 
-```text
-196 passed, 37 subtests passed
-```
+La inspección FastMCP reportó 13 tools y `uv build` generó wheel y sdist
+`0.3.0`. El wheel se instaló en un entorno Python 3.11 temporal independiente
+del checkout; el entrypoint STDIO inicializó con versión `0.3.0`, exactamente
+13 tools y sin `qlab_update_cues`. El snapshot final posterior al merge sigue
+pendiente.
 
-La corrección de `fileTarget` mantiene la separación entre capacidad y
-presencia:
+Un checkout limpio generado con `git archive` pasó el flujo reproducible con
+`2580 passed, 4 skipped, 41 subtests passed`; los skips corresponden a fixtures
+locales `.codex/agents/` ausentes. Este resultado local no sustituye GitHub CI.
 
-- `fileTarget` se lee internamente en los perfiles seguros que necesitan
-  derivar presencia.
-- `fileTargetPresent` es `true` para un target no vacío, `false` para un target
-  vacío y `unknown` cuando la lectura no permite determinarlo.
-- `hasFileTargets` no se usa como prueba de que exista un archivo.
-- `auto`, `editable`, `health`, `targets`, `inspector_safe` y `full` no exponen
-  rutas.
-- `technical` y `full_sensitive` conservan la ruta solo por ser perfiles
-  explícitamente sensibles; las lecturas internas no se almacenan en caché.
-- Los tests comprueban también las claves enviadas realmente a
-  `valuesForKeys`, la redacción, los estados `true/false/unknown` y la ausencia
-  de caché para lecturas internas.
+## Workorders activos
 
-## Evidencia runtime de `fileTarget`
+Los workorders 017, 019, 021 y 022 quedan clasificados como implementación local
+con validación runtime pendiente. El workorder 029 sigue siendo trabajo real de
+validación runtime pendiente. La única nueva mutación runtime de esta iteración
+fue la validación acotada de Delete sobre dos Groups vacíos desechables; está
+documentada en [`empty-group-delete-2026-08-13.md`](../development/runtime-validation/empty-group-delete-2026-08-13.md).
 
-Captura read-only realizada tras reiniciar MCP, sin setters, Create, Delete,
-playback, `/live` ni raw OSC.
+La auditoría arquitectónica acotada está documentada en
+[`architecture-audit-0.3.0.md`](architecture-audit-0.3.0.md) y concluye
+`no extraction for 0.3.0`.
 
-```text
-QLab: 5.5.10
-workspace: mcp_prueba.qlab5
-workspace UUID: 95F0A03D-140E-4673-974A-E76748EBB023
-connection: ready
-read access: confirmed
-show mode: Edit
-connect scopes: view, edit, control
-```
+La investigación agent-facing y de limpieza de Edit está documentada en
+[`2026-08-13-mcp-agent-ux-and-edit-cleanup.md`](../development/research/2026-08-13-mcp-agent-ux-and-edit-cleanup.md).
 
-Para el cue Audio `AUDIO_VALID` (#2), los perfiles `auto`, `editable`,
-`health`, `targets`, `inspector_safe` y `full` devolvieron
-`fileTargetPresent=true` sin incluir `fileTarget`. Los perfiles `technical` y
-`full_sensitive` devolvieron la ruta, como permite su contrato sensible.
-
-Para el cue Audio `AUDIO_MISSING_FILE` (#1), los perfiles seguros devolvieron
-`fileTargetPresent=false`, sin ruta, aunque `hasFileTargets=true`.
-
-Una consulta `hasFileTargets=true` con perfil `auto` devolvió una mezcla real de
-`fileTargetPresent=true` y `false`, sin rutas en los resultados.
-
-Esta evidencia valida el contrato Reader en el workspace y versión indicados;
-no convierte el show completo en GO-ready ni valida escrituras de rutas.
-
-## Alcance de la PR
-
-La PR conserva sus cambios de Create secuencial y Delete recursivo, pero este
-cierre no los amplía ni añade nuevas afirmaciones runtime sobre ellos. La
-distinción operativa sigue siendo:
+## Límite de evidencia
 
 ```text
-estructura programada
+implementación local
 ≠
-show runtime-validado
+runtime validado
 ≠
 show listo para GO
 ```
 
-## Reproducción final
+No se ejecutaron setters, Create, Edit, Move, playback, GO, `/live` ni raw OSC.
+El Delete acotado de dos Groups vacíos usó únicamente el flujo MCP
+dry-run/token/una ejecución/readback y dejó el prefijo temporal sin resultados;
+no convierte otros workorders en evidencia runtime.
+Las referencias históricas y la evidencia runtime previa permanecen bajo
+`docs/archive/` y no se reutilizan como prueba nueva de esta release.
+
+## Verificación reproducible
 
 ```bash
 cd <repo-root>
+uv sync --locked --no-editable --python 3.11 --extra dev
 PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider
+uv lock --check
+uv run fastmcp inspect fastmcp.json
+uv build --out-dir /tmp/qlab-mcp-build
 git diff --check
 git status --short --branch
 ```
 
-La revisión final debe confirmar que solo cambian Reader, sus tests y este
-snapshot; después se actualiza la descripción de la PR y se mergea únicamente
-si no aparecen nuevos hallazgos.
+El snapshot final sustituirá este estado provisional después de la PR principal,
+el merge en `main`, la PR docs-only final y la verificación del commit que
+recibirá `v0.3.0`.

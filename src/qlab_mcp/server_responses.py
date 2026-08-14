@@ -84,7 +84,13 @@ def overview_success_payload(payload: dict[str, Any]) -> dict[str, Any]:
         or summary.get("total_cue_ids_status") not in {None, "known"}
         or summary.get("health_counts_status") not in {None, "known", "not_calculated"}
     )
-    return read_status_from_payload(payload, partial=partial)
+    normalized = read_status_from_payload(payload, partial=partial)
+    if normalized.get("partial") and not normalized.get("suggested_action"):
+        normalized["suggested_action"] = (
+            "Inspect warnings and errors; use qlab_query_cues for authoritative health or exact IDs, "
+            "and increase max_depth/max_cues for deeper overview coverage."
+        )
+    return normalized
 
 
 def settings_success_payload(payload: dict[str, Any]) -> dict[str, Any]:

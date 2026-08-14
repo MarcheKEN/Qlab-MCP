@@ -48,14 +48,58 @@ file roots are operator configuration, not tool arguments.
 - `scriptSource` is the canonical script field. `scriptText` is not a public
   OSC/read-profile field. Script contents are exposed only through explicit
   sensitive profiles.
-- Writes are disabled by default and remain protected by dry-run, a fresh
-  confirmation token, passcode/readiness checks, connection scope, Edit Mode,
-  one intended setter, fresh readback, and rollback with a new token.
+- Writes are disabled by default. Their universal safety sequence is defined
+  below; token cardinality, atomicity, and rollback vary by operation.
 - A timed-out setter is never retried automatically. Matching fresh readback
   may confirm it; otherwise the result remains failed or inconclusive.
 - Tokens are single-use and process-bound where the operation requires it.
 - The server does not execute cues or expose GO, playback, Dashboard, panic,
   raw OSC, or an AppleScript write fallback.
+
+## Write Workflow
+
+All real Create, Edit, Move, and Delete requests use this universal sequence:
+
+1. Resolve one explicit workspace and exact cue/container identifiers.
+2. Run `qlab_check_write_readiness` and stop on any blocker.
+3. Run `dry_run=true`; review the plan, diff, warnings, errors, and confirm that
+   `executed_operations=[]`.
+4. Use only the fresh token or per-operation gates returned by that plan.
+5. Execute once. Never automatically retry a timeout or identity ambiguity.
+6. Require fresh structural or property readback before declaring the result
+   verified or choosing recovery.
+
+### Create
+
+`qlab_create_cue` uses one dedicated `confirm:createCue:v2` token and exactly
+one placement selector. `qlab_create_cues` uses the separate
+`confirm:createCues:v1` family, chains verified UUIDs, and stops without
+automatic rollback when a sequence item fails. Neither Create tool applies
+initial setters or claims GO readiness.
+
+### Edit
+
+`qlab_edit_cues` has no global token. Each planned operation may require its own
+exact `confirm_token` copied into that update item's `confirm_gates`. Edit
+batches are non-atomic; a timeout confirmed by readback is not retried, while an
+inconclusive timeout requires inspection before any recovery. Rollback, when
+supported, uses a new dry-run and fresh gate.
+
+### Move
+
+`qlab_move_cues` uses exact UUID targets and one dedicated
+`confirm:moveCues:v1` token. Moves are sequential and non-atomic; fresh
+parent/order readback determines whether a timeout converged. Recovery requires
+inspection and a new dry-run/token.
+
+### Delete
+
+`qlab_delete_cues` uses exact leaf UUIDs, one exact empty `Group`, or one
+root-preserving recursive container request with `confirm:deleteCues:v1`.
+Direct container deletion is limited to an inactive empty `Group`; Cue Lists
+and Cue Carts remain recursive-only. Deletes run sequentially and have no
+automatic rollback. Fresh existence readback must confirm disappearance and,
+for recursive requests, root preservation.
 
 ## UDP and Reply Integrity
 

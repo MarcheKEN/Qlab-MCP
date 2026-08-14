@@ -398,7 +398,13 @@ class CreateCuesResult(BaseModel):
     workspace_id: str
     dry_run: bool
     requested_count: int
-    planned_count: int = 0
+    planned_count: int = Field(
+        default=0,
+        description=(
+            "Number of generated plan operations, including per-item creation and "
+            "identity/structure verification steps; requested_count and created_count count logical cues."
+        ),
+    )
     created_count: int = 0
     results: list[dict[str, Any]] = Field(default_factory=list)
     planned_operations: list[dict[str, Any]] = Field(default_factory=list)
@@ -570,7 +576,7 @@ DeleteCuesStatus = Literal[
 
 
 class DeleteCuesResult(BaseModel):
-    """Result for explicit leaf deletion or recursive emptying of one container."""
+    """Result for explicit leaves, one empty Group, or recursive container emptying."""
 
     ok: bool
     status: DeleteCuesStatus
@@ -610,14 +616,37 @@ MoveCueStatus = Literal[
 class MoveCueInput(BaseModel):
     """One explicit structural cue move."""
 
-    cue_id: UUID
-    destination_parent_id: UUID | None = None
-    destination_index: int | None = None
-    before_cue_id: UUID | None = None
-    after_cue_id: UUID | None = None
-    position: Literal["first", "last"] | None = None
-    cart_row: int | None = None
-    cart_column: int | None = None
+    cue_id: UUID = Field(description="Exact source cue UUID; cue numbers and implicit selections are not accepted.")
+    destination_parent_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Exact destination parent UUID. Omit for a same-parent linear move; required for Cue Cart coordinates."
+        ),
+    )
+    destination_index: int | None = Field(
+        default=None,
+        description="Non-negative insertion index; use exactly one linear placement field.",
+    )
+    before_cue_id: UUID | None = Field(
+        default=None,
+        description="Exact sibling UUID to place before; use exactly one linear placement field.",
+    )
+    after_cue_id: UUID | None = Field(
+        default=None,
+        description="Exact sibling UUID to place after; use exactly one linear placement field.",
+    )
+    position: Literal["first", "last"] | None = Field(
+        default=None,
+        description="Place first or last; use exactly one linear placement field.",
+    )
+    cart_row: int | None = Field(
+        default=None,
+        description="Non-negative Cue Cart row; requires both cart_row and cart_column and no linear placement field.",
+    )
+    cart_column: int | None = Field(
+        default=None,
+        description="Non-negative Cue Cart column; requires both cart_row and cart_column and no linear placement field.",
+    )
 
 
 class MoveCuesResult(BaseModel):

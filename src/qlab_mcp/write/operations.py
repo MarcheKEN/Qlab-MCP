@@ -1015,7 +1015,11 @@ class QLabWriteMixin:
                 "executed_operations": [],
                 "confirm_token": token,
                 "warnings": ["Dry run only: no mutating OSC commands were sent to QLab."],
-                "message": "Create sequence dry-run succeeded; review the chained plan before execution.",
+                "message": (
+                    "Create sequence dry-run succeeded; planned_count counts generated plan operations "
+                    "(including verification steps), while requested_count counts logical cues. "
+                    "Review planned_operations before execution."
+                ),
             }
 
         payload, token_error = _decode_create_cues_token(confirm_token)
@@ -1092,7 +1096,10 @@ class QLabWriteMixin:
             "executed_operations": executed_operations,
             "confirm_token": None,
             "warnings": ["Sequence creation is sequential and has no automatic rollback."],
-            "message": "Cue sequence created and each item was verified before the next /new.",
+            "message": (
+                "Cue sequence created; planned_count counts generated plan operations, "
+                "created_count counts logical cues, and each item was verified before the next /new."
+            ),
         }
 
     def update_cue(
@@ -1105,7 +1112,7 @@ class QLabWriteMixin:
         operations: list[dict[str, Any]] | None = None,
         confirm_gates: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Compatibility wrapper for local Python callers; MCP exposes qlab_update_cues."""
+        """Compatibility wrapper for local Python callers; MCP exposes qlab_edit_cues."""
         raw_update = {
             "cue_ref": cue_ref,
             "profile": profile or COMMON_UPDATE_PROFILE,
@@ -1114,7 +1121,7 @@ class QLabWriteMixin:
             "confirm_gates": confirm_gates,
         }
         _normalize_batch_update_item(raw_update)
-        batch = self.update_cues(
+        batch = self.edit_cues(
             workspace_id,
             [raw_update],
             dry_run=dry_run,
@@ -1764,7 +1771,7 @@ class QLabWriteMixin:
             "calls": batch_calls,
         }
 
-    def update_cues(
+    def edit_cues(
         self,
         workspace_id: str,
         updates: list[dict[str, Any]],
@@ -1825,16 +1832,6 @@ class QLabWriteMixin:
             preflight["read_cache"],
             requested_count=requested_count,
         )
-
-    def edit_cues(
-        self,
-        workspace_id: str,
-        updates: list[dict[str, Any]],
-        dry_run: bool | None = None,
-    ) -> dict[str, Any]:
-        """Compatibility-forward alias; MCP exposes qlab_edit_cues and keeps qlab_update_cues."""
-        return self.update_cues(workspace_id, updates, dry_run=dry_run)
-
 
 def _plan_update_batch_dry_run(
     self: Any,

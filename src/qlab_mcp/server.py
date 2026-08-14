@@ -11,6 +11,7 @@ from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from . import __version__
 from .errors import QLabMcpError
 from .models import (
     CreateCuesResult,
@@ -192,7 +193,7 @@ GATED_CREATE_QLAB_TOOL = ToolAnnotations(
     idempotentHint=False,
     openWorldHint=True,
 )
-GATED_DELETE_QLAB_TOOL = ToolAnnotations(
+GATED_DESTRUCTIVE_QLAB_TOOL = ToolAnnotations(
     readOnlyHint=False,
     destructiveHint=True,
     idempotentHint=False,
@@ -216,28 +217,18 @@ T = TypeVar("T")
 
 mcp = FastMCP(
     "QLab Workspace Inspector",
+    version=__version__,
     mask_error_details=True,
     instructions="""
-Use these tools to read QLab 5 workspace and cue information over OSC.
+QLab MCP 0.3.0 exposes eight read-only tools plus five gated structural write tools over OSC.
+Write mode requires QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; it remains dry-run first.
+This server does not expose GO, stop, panic, playback, audition, /live writes, AppleScript writes, or raw OSC passthrough.
 
-The seven inspector tools are read-only and intentionally avoid playback, editing, deletion, and raw OSC.
-Write mode is a separate gated preface: it is disabled unless QLAB_ENABLE_WRITE=true and defaults to dry-run.
-When write mode is ready, all update profiles may exist; safe properties can execute as real writes, while dangerous or high-risk properties require explicit per-item confirm_gates.
-Write mode also requires QLAB_PASSCODE on the server plus edit confirmed by /connect. It supports gated single/sequence cue creation, cue editing, structural cue moves, and explicit or recursive cue deletion.
+Orient first with qlab_check_connection, then use a bounded workspace overview/status or settings read, qlab_query_cues, and qlab_get_cue_details as needed. Resolve one exact workspace before any write. Use exact UUIDs for workspace and cue writes; never infer a workspace or target from selection, playhead, or active state.
 
-Start with qlab_check_connection to verify QLab, workspace candidates, passcode, and read access.
+For every real write, call qlab_check_write_readiness, inspect an explicit dry-run, review warnings/errors/planned operations, supply only the exact fresh confirmation token required by that operation, execute once, and require fresh readback. Do not retry a mutation after a timeout or identity ambiguity. Batches are not automatically transactional.
 
-Then use qlab_get_workspace_overview for a bounded show map.
-
-Use qlab_get_workspace_status for compact operational status derived from documented read-only OSC reads: cue warnings, trigger/timecode summaries, settings summary, and explicit not_exposed sections for Workspace Status data QLab does not expose over OSC.
-
-Use qlab_get_workspace_settings(mode="summary") when you need compact infrastructure/settings inventory such as patches, stages, routes, MIDI, network, or light availability. It returns available_detail_requests and avoids heavy light-patch dumps.
-
-Use qlab_get_workspace_settings(mode="details", requests=[...]) after settings when you need one or more specific patches, stages, routes, maps, MIDI/network items, or the light patch. Use profile="safe" first for compact normalized details; use profile="technical" or profile="exhaustive" only when raw routing/device diagnostics are justified. qlab_get_workspace_setting_details remains as a single-request compatibility wrapper.
-
-Use qlab_query_cues for filtered cue searches across up to 500 cues by default, or up to 5000 cues when a caller explicitly raises the scan limit, then qlab_get_cue_details for one cue that needs deeper inspection.
-
-For write preflight, call qlab_check_write_readiness with an explicit workspace_id and always review a dry-run first. qlab_create_cue accepts exactly one of an exact after_cue_id anchor or a parent_container_id for an empty Cue List, Group, or Cue Cart, and returns a dedicated confirm:createCue:v2 token bound to the reviewed workspace structure; real creation still requires write readiness, an explicit workspace_id, a configured passcode, edit permission, and Edit Mode. qlab_edit_cues may return confirmation tokens for individual planned high-risk operations; copy the exact relevant planned_operations[].confirm_token values into that update item's confirm_gates, not one tool-level token. qlab_move_cues returns a dedicated tool-level confirm_token bound to the reviewed workspace structure and planned move batch, and real execution must receive that exact token. qlab_delete_cues returns a dedicated tool-level confirm_token bound to the reviewed deletion plan and fresh workspace structure, and real execution must receive that exact token. Create, Move, and Delete tokens are process-bound, so restarting the MCP invalidates tokens issued by the previous process. This server does not expose GO, stop, panic, raw OSC, or playback control.
+Create, Edit, Move, and Delete have different token, atomicity, rollback, and postcondition rules; follow each tool's description and output fields. A structural result is not runtime validation: created or edited structure is not necessarily GO-ready. Runtime evidence in this project is bounded to QLab 5.5.10.
 """,
 )
 
@@ -417,6 +408,7 @@ def qlab_check_connection(
     """Check whether QLab, workspace resolution, passcode, and safe read access are ready.
 
     Use this before the overview; it reports /connect permission scopes, /showMode state, and safe read access.
+    Do not use it as write authorization; call qlab_check_write_readiness before any real write.
     """
     return _run_tool(
         lambda reader: QlabConnectionCheckResult.model_validate(
@@ -510,6 +502,7 @@ def qlab_get_workspace_overview(
     """Map what the QLab show contains and how cue lists, groups, and cues are organized.
 
     Use this as the first structural read after selecting a workspace; it includes Edit/Show mode and is bounded and shallow by default.
+    Follow with qlab_query_cues for filtered discovery or qlab_get_cue_details for one cue's properties.
     """
     try:
         return _run_tool(
@@ -580,8 +573,9 @@ def qlab_get_workspace_status(
 ) -> WorkspaceStatusResult:
     """Return compact read-only Workspace Status context for a QLab workspace.
 
-    Uses documented OSC reads and derived summaries. Sections that QLab does not expose as safe read-only OSC
-    endpoints are returned with source='not_exposed' instead of invented values.
+    Uses documented OSC reads and derived operational status. Sections that QLab does not expose as safe read-only OSC
+    endpoints are returned with source='not_exposed' instead of invented values. Use overview or query for structure,
+    not this tool as a full Workspace Status window clone.
     """
     try:
         return _run_tool(
@@ -661,8 +655,8 @@ def qlab_get_workspace_settings(
     """Return read-only QLab Workspace Settings summary or batched details.
 
     Summary mode is the first settings read after the overview: it returns compact sections, counts, redactions,
-    errors, and available_detail_requests. Details mode accepts one or more requests and returns independent
-    per-request results; one failed request does not block other valid requests.
+    errors, and available_detail_requests. Use mode="details" for focused requests. Details mode accepts one or
+    more requests and returns independent per-request results; one failed request does not block other valid requests.
     """
     if isinstance(requests, (list, tuple)) and len(requests) > MAX_WORKSPACE_DETAIL_REQUESTS:
         return _settings_error(
@@ -760,9 +754,10 @@ def qlab_get_workspace_setting_details(
 ) -> WorkspaceSettingDetailsResult:
     """Return read-only details for one workspace setting item.
 
-    Backwards-compatible wrapper around qlab_get_workspace_settings(mode="details"). The default safe profile
-    summarizes large structures: light patches become instrument indexes, video stages become stage/region/route
-    summaries, and audio maps omit long level arrays. Use technical or exhaustive only for explicit low-level audits.
+    Backwards-compatible wrapper for a single request around qlab_get_workspace_settings(mode="details"). The default
+    safe profile summarizes large structures: light patches become instrument indexes, video stages become
+    stage/region/route summaries, and audio maps omit long level arrays. Use technical or exhaustive only for
+    explicit low-level audits; use the settings tool for a batch.
     """
     try:
         return _run_tool(
@@ -856,9 +851,10 @@ def qlab_query_cues(
     """Search many QLab cues with one required filter plus optional AND filters.
 
     Use this after the overview to find cue sets such as Audio cues, Light cues, flagged cues, broken cues,
-    warnings, media-target cues, cue-target transport cues, or named/numbered ranges. Results are capped at
-    500 returned matches and 500 scanned cue IDs by default so agents stay compact. Callers can explicitly
-    raise either limit up to 5000 for large shows; truncation metadata reports incomplete scans or result caps.
+    warnings, media-target cues, cue-target transport cues, or named/numbered ranges. Follow with qlab_get_cue_details
+    for exact properties. Results are capped at 500 returned matches and 500 scanned cue IDs by default so agents
+    stay compact. Callers can explicitly raise either limit up to 5000 for large shows; truncation metadata reports
+    incomplete scans or result caps.
     """
     if str(profile).strip().lower() == "exhaustive":
         return _query_error(
@@ -929,7 +925,16 @@ def qlab_query_cues(
 )
 def qlab_get_cue_details(
     workspace_id: WorkspaceId,
-    cue_ref: CueRef | CueRefs,
+    cue_ref: Annotated[
+        CueRef | CueRefs,
+        Field(
+            description=(
+                "Accept an exact cue number or unique ID for one cue, or a list of exact cue numbers/unique IDs for a batch. "
+                "Resolve refs through qlab_query_cues or the workspace overview; ambiguous selected, playhead, "
+                "playbackPosition, and active refs may be returned for read-only inspection but should not be used for writes."
+            ),
+        ),
+    ],
     profile: Annotated[
         str,
         Field(
@@ -937,7 +942,7 @@ def qlab_get_cue_details(
                 "Read-only detail profile. Use auto for safe type-aware sections, health for warnings/broken cues, "
                 "inspector_safe for broader QLab Inspector-style details without file paths or scripts, "
                 "targets for target IDs without file paths, technical for notes/targets/routing/paths, "
-                "editable for safe details plus qlab_update_cues profile/property capabilities, "
+                "editable for safe details plus qlab_edit_cues profile/property capabilities, "
                 "full_sensitive for deep audits, and exhaustive for the deepest allowlisted read-only read "
                 "including heavy/sensitive payloads; exhaustive may be large."
             )
@@ -946,10 +951,10 @@ def qlab_get_cue_details(
 ) -> CueDetailsResult | CueDetailsBatchResult:
     """Return read-only details for one cue, or a batch of up to 50 cues, using QLab valuesForKeys when possible.
 
-    Use auto for safe type-aware inspection, inspector_safe for broader non-sensitive Inspector context,
-    editable for update capability discovery,
-    health for warnings, technical/full_sensitive only when justified, and exhaustive only for deep audits
-    or load testing because it can expose large/sensitive payloads.
+    Use after qlab_query_cues or the overview to inspect exact targets. Use auto for safe type-aware inspection,
+    inspector_safe for broader non-sensitive Inspector context, editable for update capability discovery, health for
+    warnings, technical/full_sensitive only when justified, and exhaustive only for deep audits or load testing
+    because it can expose large/sensitive payloads.
     """
     if isinstance(cue_ref, list) and len(cue_ref) > MAX_BATCH_CUE_DETAILS:
         return _cue_details_error(
@@ -994,8 +999,9 @@ def qlab_check_write_readiness(
 ) -> WriteReadinessResult:
     """Check local write-mode readiness without sending any mutating OSC commands.
 
-    This verifies QLAB_ENABLE_WRITE, required workspace_id, server-side QLAB_PASSCODE presence,
+    This read-only preflight verifies QLAB_ENABLE_WRITE, required workspace_id, server-side QLAB_PASSCODE presence,
     planned write capabilities, edit permission confirmed by QLab /connect scopes, and Edit Mode from /showMode.
+    Use it before Create, Edit, Move, or Delete; it is a readiness report, not a confirmation token.
     """
     return _run_tool(
         lambda reader: WriteReadinessResult.model_validate(
@@ -1062,8 +1068,9 @@ def qlab_create_cue(
     Supply exactly one of after_cue_id or parent_container_id. The latter
     creates the first cue in an empty Cue List, Group, or Cue Cart using the
     container-specific OSC route. Dry-run planning never sends mutating OSC.
-    Real creation requires the exact dedicated token from the dry-run and an
-    unchanged structural snapshot.
+    Call qlab_check_write_readiness first, then review the dry-run and supply the
+    exact confirm:createCue:v2 token. After execution, require fresh identity/placement readback.
+    An unchanged structural snapshot is required; this is not a GO-ready claim.
     Structural creation is separate from operational readiness: a created cue may be broken or warning because it still needs a target, file, patch, or edit. Script and container cue types are excluded.
     """
     return _run_tool(
@@ -1119,9 +1126,14 @@ def qlab_create_cues(
 ) -> CreateCuesResult:
     """Create an ordered cue sequence with one verified /new per item.
 
-    Creation stops at the first timeout, ambiguous identity, placement mismatch, or
-    other failure. There is no automatic rollback; earlier successful items remain.
-    Create uses QLab template defaults and does not apply initial setters.
+    Call qlab_check_write_readiness first, then review the dry-run and supply the
+    exact confirm:createCues:v1 token. The batch token is not interchangeable with
+    the single-create token. Each successful item requires fresh identity/placement
+    readback. Creation stops at the first timeout, ambiguous identity, placement
+    mismatch, or other failure. Do not retry after an ambiguous mutation. There is
+    no automatic rollback; earlier successful items remain. Create uses QLab
+    template defaults and does not apply initial setters, and the result is not a
+    GO-ready claim.
     """
     return _run_tool(
         lambda reader: CreateCuesResult.model_validate(
@@ -1141,7 +1153,7 @@ def qlab_create_cues(
 @mcp.tool(
     title="Edit QLab Cues",
     tags={"qlab", "write-mode", "cue-edit", "batch-edit", "gated-write"},
-    annotations=GATED_CREATE_QLAB_TOOL,
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
     timeout=UPDATE_CUES_TIMEOUT,
 )
 def qlab_edit_cues(
@@ -1174,7 +1186,11 @@ def qlab_edit_cues(
     Real updates require QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
     Dry-run planning never sends mutating OSC.
     High-risk profiles and unvalidated properties are cataloged for planning and require exact dry-run confirm_tokens for real writes.
-    Batch real writes run all preflight checks before sending any setter and use cue unique IDs for setters.
+    Resolve every target to an exact cue UUID through the read tools; this is not a
+    Create, Move, Delete, or playback tool. Dry-run returns per-operation confirm gates,
+    not one global Edit token. Batch real writes run all preflight checks before
+    sending any setter, are non-atomic, use cue unique IDs for setters, and require
+    fresh readback after each item. Do not retry after a timeout or identity ambiguity.
     """
     return _run_tool(
         lambda reader: UpdateCuesResult.model_validate(
@@ -1188,46 +1204,9 @@ def qlab_edit_cues(
 
 
 @mcp.tool(
-    title="Update QLab Cues (compatibility alias)",
-    tags={"qlab", "write-mode", "cue-update", "batch-update", "gated-write", "deprecated-alias"},
-    annotations=GATED_CREATE_QLAB_TOOL,
-    timeout=UPDATE_CUES_TIMEOUT,
-)
-def qlab_update_cues(
-    workspace_id: WorkspaceId,
-    updates: Annotated[
-        list[CueUpdateInput],
-        Field(
-            min_length=1,
-            max_length=50,
-            description=(
-                "Compatibility alias for qlab_edit_cues. Prefer qlab_edit_cues for new work. "
-                "Each item has cue_ref, profile, properties, operations, and optional confirm_gates "
-                "containing exact confirm_token values from reviewed dry-run planned_operations."
-            ),
-        ),
-    ],
-    dry_run: Annotated[
-        bool | None,
-        Field(
-            description=(
-                "When true, plan and diff the update but send no mutating commands. "
-                "When omitted, QLAB_WRITE_DRY_RUN_DEFAULT is used and defaults to true."
-            ),
-        ),
-    ] = None,
-) -> UpdateCuesResult:
-    """Compatibility alias for qlab_edit_cues.
-
-    Dry-run planning never sends mutating OSC. Prefer qlab_edit_cues for new work.
-    """
-    return qlab_edit_cues(workspace_id=workspace_id, updates=updates, dry_run=dry_run)
-
-
-@mcp.tool(
     title="Move QLab Cues",
     tags={"qlab", "write-mode", "cue-move", "gated-write"},
-    annotations=GATED_CREATE_QLAB_TOOL,
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
     timeout=UPDATE_CUES_TIMEOUT,
 )
 def qlab_move_cues(
@@ -1259,8 +1238,11 @@ def qlab_move_cues(
 ) -> MoveCuesResult:
     """Plan or execute one to ten sequential QLab cue moves.
 
-    Real moves require write readiness, Edit Mode, inactive healthy cues, a fresh dedicated confirmation
-    token, stable structural dependencies, and independent readback. This tool never claims atomicity.
+    Targets are UUID-only. Real moves require write readiness, Edit Mode, inactive
+    healthy cues, the exact confirm:moveCues:v1 token, stable structural dependencies,
+    and fresh parent/order readback. Execution is sequential and non-atomic; this
+    tool never claims atomicity. Cart execution remains runtime-blocked pending the
+    documented QLab 5.5.10 evidence boundary. Do not retry an ambiguous mutation.
     """
     return _run_tool(
         lambda reader: MoveCuesResult.model_validate(
@@ -1277,7 +1259,7 @@ def qlab_move_cues(
 @mcp.tool(
     title="Delete QLab Cues",
     tags={"qlab", "write-mode", "cue-delete", "gated-write"},
-    annotations=GATED_DELETE_QLAB_TOOL,
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
     timeout=DELETE_CUES_TIMEOUT,
 )
 def qlab_delete_cues(
@@ -1288,18 +1270,30 @@ def qlab_delete_cues(
             min_length=0,
             max_length=10,
             description=(
-                "Optional explicit leaf cue UUIDs. For recursive emptying, omit cue_ids and provide "
-                "container_id with recursive=true."
+                "Optional explicit leaf cue UUIDs. For direct deletion of one exact empty Group, "
+                "omit cue_ids and provide container_id with recursive=false. For recursive emptying, "
+                "omit cue_ids and provide container_id with recursive=true."
             ),
         ),
     ] = None,
     container_id: Annotated[
         UUID | None,
-        Field(description="Container UUID to empty recursively; the container itself is preserved."),
+        Field(
+            description=(
+                "Exact empty Group UUID to delete only when recursive=false; or exact "
+                "Cue List, Cue Cart, Cart, or Group UUID to empty recursively with recursive=true. "
+                "Recursive mode preserves the container itself."
+            ),
+        ),
     ] = None,
     recursive: Annotated[
         bool,
-        Field(description="When true with container_id, delete descendants deepest-first and preserve the root."),
+        Field(
+            description=(
+                "When true with container_id, delete descendants deepest-first and preserve the root. "
+                "When false, container_id must identify one empty Group that will itself be deleted."
+            ),
+        ),
     ] = False,
     dry_run: Annotated[
         bool | None,
@@ -1315,11 +1309,15 @@ def qlab_delete_cues(
         Field(description="Exact confirm:deleteCues:v1: token returned by a reviewed dry-run plan."),
     ] = None,
 ) -> DeleteCuesResult:
-    """Plan or execute sequential deletions of explicit leaf cues or safely empty one container.
+    """Plan or execute sequential deletions of explicit leaves or one exact empty Group.
 
-    Real deletion requires write readiness, Edit Mode, zero activity, a fresh dedicated confirmation
-    token, and independent existence readback after every delete. Recursive mode deletes descendants
-    deepest-first and preserves the requested root container. Deletion is sequential and not atomic.
+    Real deletion requires write readiness, Edit Mode, zero activity, the exact
+    confirm:deleteCues:v1 token, and independent existence readback after every delete.
+    A non-recursive container request deletes only an empty Group. Recursive mode
+    deletes descendants deepest-first and preserves the requested root container.
+    Deletion is sequential and not atomic, with no automatic rollback.
+    Do not retry after a timeout or identity ambiguity; verify disappearance of every
+    requested leaf and preservation of the root.
     """
     return _run_tool(
         lambda reader: DeleteCuesResult.model_validate(

@@ -1,7 +1,8 @@
 # Video Phase 8C - Slice Markers for Audio and Video
 
-Status: status audit needed. This workorder records Phase 8C/8C.2 local
-hardening; confirm current validation status in `docs/status/roadmap.md`.
+Status: implemented locally; runtime validation pending. This workorder records
+Phase 8C/8C.2 local hardening; no new runtime probe is part of the 0.3.0
+preparation.
 
 ## Sources
 

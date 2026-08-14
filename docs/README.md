@@ -6,10 +6,13 @@ Start here, then follow the folder index nearest to the work you are doing.
 
 - [User guide](user/README.md)
 - [Public tools](user/tools.md)
+- [Agent workflows](user/agent-workflows.md)
 
 ## Status
 
 - [Project status](status/README.md)
+- [Current state snapshot](status/current-state.md)
+- [Architecture audit 0.3.0](status/architecture-audit-0.3.0.md)
 - [Roadmap](status/roadmap.md)
 - [Workorders](status/workorders/README.md)
 - [Coverage](status/coverage/README.md)
@@ -18,6 +21,7 @@ Start here, then follow the folder index nearest to the work you are doing.
 
 - [Development index](development/README.md)
 - [Architecture](development/architecture.md)
+- [MCP agent UX and Edit cleanup research](development/research/2026-08-13-mcp-agent-ux-and-edit-cleanup.md)
 - [Runtime checklist for `qlab_create_cue`](development/runtime-validation/create-cues.md)
 - [Runtime checklist for `qlab_edit_cues`](development/runtime-validation/edit-cues.md)
 

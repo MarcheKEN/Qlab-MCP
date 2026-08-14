@@ -1,18 +1,24 @@
 # Active Roadmap
 
-Status: 2026-08-07
+Status: 2026-08-13 — 0.3.0 preparation
 
 ## Current state snapshot
 
-The canonical dated inventory is [`current-state.md`](current-state.md).
-It records the exact Git/worktree state, full and focused test output, and the
-latest QLab runtime probe. At the snapshot time MCP reported `qlab_unreachable`,
-so the runtime section is explicitly unverified rather than reusing an older
-workspace snapshot.
+The canonical dated inventory is [`current-state.md`](current-state.md). The
+current snapshot is provisional on the preparation branch; a docs-only PR will
+replace it after the 0.3.0 merge into `main` and before the release tag.
 
-Current local verification: focused Create/server contract checks pass; the
-full-suite count is pending after the template-only Create change. The full
-suite includes wheel/sdist build and artifact-membership checks.
+Final local preflight: the full suite passed with `2595 passed, 41 subtests
+passed` outside the managed socket sandbox. FastMCP inspection reports 13 tools
+and wheel/sdist builds report `0.3.0`; an isolated Python 3.11 installation of
+the wheel initialized the STDIO entrypoint with version `0.3.0`, exactly 13
+tools, and no legacy Edit alias. Linux CI remains the external release gate.
+Artifact-membership and high-confidence secret checks passed locally.
+
+A clean `git archive` checkout also passed `uv sync --locked`, lock validation,
+the suite (`2580 passed, 4 skipped, 41 subtests passed`), and the package build;
+the four skips are intentionally local `.codex/agents/` fixtures. This is local
+clean-checkout evidence, not GitHub CI.
 
 Evidence terms follow [Current Docs](README.md): documented,
 source-confirmed, runtime-proven, inferred, and unsupported. Runtime claims
@@ -38,6 +44,21 @@ runtime support is not claimed.
 - No new schema limits, AppleScript fallback, raw OSC, playback, GO, Dashboard,
   or broad write surface is planned from this security pass without new
   evidence and an explicit compatibility decision.
+
+## Active workorders and release gates
+
+The five active workorders are implementation-local or runtime-pending work;
+none is closed by inference during the 0.3.0 preparation:
+
+- [017 — Geometry smooth/defaults](workorders/active/017_geometry_completion_smooth_and_defaults.md): implemented locally; runtime validation pending.
+- [019 — Video I/O selection](workorders/active/019_video_io_selection_edit_cues.md): implemented locally; Audio/Mic runtime validation pending.
+- [021 — Video audio time and loops](workorders/active/021_video_audio_time_loops.md): implemented locally; runtime validation pending.
+- [022 — Audio/Video slice markers](workorders/active/022_slice_markers_audio_video.md): implemented locally; runtime validation pending.
+- [029 — Video audio runtime validation](workorders/active/029_video_audio_runtime_validation.md): active runtime validation after MCP restart.
+
+Release gates for this preparation are the 13-tool contract, current docs,
+portable Linux CI, packaging checks, and the final post-merge snapshot. No new
+QLab runtime probe is part of these gates.
 
 ## Locally implemented; runtime validation pending
 
@@ -84,8 +105,9 @@ runtime support is not claimed.
 
 - Sequential Create and recursive Delete — `qlab_create_cues` chains each
   verified UUID into the next `/new` and stops without rollback on the first
-  ambiguity. `qlab_delete_cues` can empty a container deepest-first with a
-  fresh token and readback while preserving the requested root. Broken or
+  ambiguity. `qlab_delete_cues` can delete one exact inactive empty Group or
+  empty a container deepest-first with a fresh token and readback while
+  preserving the requested root. Broken or
   warning anchors remain valid structural references when inactive.
 
 - Authenticated request/reply handling uses invocation-owned TCP sessions,
@@ -280,7 +302,7 @@ Utility cue editing (runtime validated and closed):
   `0/0/0` activity passed; names/numbers/actions and unsupported targets remain
   blocked
 
-Devamp saved configuration (runtime validated and closed for listed properties):
+Devamp saved configuration (implemented locally; runtime validation pending):
 
 - local `confirm:devamp:v1:` gate for exact-UUID, saved, one-property
   `cueTargetID`, `devampType`, `startNextCueWhenSliceEnds`, and
@@ -289,14 +311,14 @@ Devamp saved configuration (runtime validated and closed for listed properties):
   existing `Audio` or `Video` cue UUIDs only
 - Stop target requires Start next already enabled; Start next cannot be disabled
   while Stop target is true, avoiding an implicit multi-property change
-- fresh baseline/readback and fresh-token rollback passed; slices and actions
-  remain blocked
+- fresh baseline/readback and fresh-token rollback are required for closure;
+  no new runtime evidence is claimed here. Slices and actions remain blocked.
 
-Network OSC Message:
+Network OSC Message (planned-only pending runtime evidence):
 
-- saved `customString` is runtime validated for an exact healthy inactive cue
-  after a fresh patch-list read classifies its current patch as `OSC Message`;
-  it uses `confirm:networkOscMessage:v1:` with fresh readback and rollback
+- saved `customString` remains planned-only: source/tests can build the
+  `confirm:networkOscMessage:v1:` candidate, but no current runtime evidence
+  proves the patch classification and readback path for release claims
 - `networkPatchID` reassignment remains blocked/planned-only because the tested
   reassignment read back but left the cue broken
 - fades and device-description parameters remain planned-only
@@ -338,8 +360,7 @@ Video Phase 7F — Smooth Geometry:
 
 Cue I/O Phase 8A — Edit Cues and cue-level I/O selection:
 
-- local implementation exposes preferred `qlab_edit_cues` while keeping
-  `qlab_update_cues` as a compatibility alias
+- local implementation exposes `qlab_edit_cues` as the only public cue-edit tool
 - adds saved ID-only I/O real-write candidates using `confirm:videoIO:v1:`
 - `Video`: `stageID`, `audioOutputPatchID`
 - `Camera`: `stageID`, `audioOutputPatchID`, `videoInputPatchID`,
@@ -587,27 +608,28 @@ Video Phase 8C — Slice Markers for Audio/Video:
 
 See:
 
-- `workorders/completed/002_close_phase3a_docs.md`
-- `workorders/completed/003_plan_phase3b_translation.md`
-- `workorders/completed/004_implement_phase3c_visual_scalars.md`
-- `workorders/completed/005_implement_phase3d_visual_appearance.md`
-- `workorders/completed/006_implement_phase3e_text_basics.md`
-- `workorders/007_text_style_and_video_fx_read_plan.md`
-- `workorders/completed/008_video_fx_real_write_candidate.md`
-- `workorders/completed/009_video_completion_matrix.md`
-- `workorders/completed/010_video_docs_consistency_cleanup.md`
-- `workorders/completed/011_video_fx_scalar_v2_candidate.md`
-- `workorders/completed/012_geometry_completion_video_camera_text.md`
-- `workorders/completed/013_full_geometry_completion_video_camera_text.md`
-- `workorders/completed/014_rotation_quaternion_shutter_geometry.md`
-- `workorders/completed/015_quaternion_geometry_write.md`
-- `workorders/completed/016_safe_reset_rotation.md`
-- `workorders/017_geometry_completion_smooth_and_defaults.md`
-- `workorders/completed/018_blend_mode_audit_and_completion.md`
-- `workorders/019_video_io_selection_edit_cues.md`
-- `workorders/020_video_embedded_audio_research.md`
-- `workorders/021_video_audio_time_loops.md`
-- `workorders/022_slice_markers_audio_video.md`
+- [`002_close_phase3a_docs.md`](../archive/workorders/completed/002_close_phase3a_docs.md)
+- [`003_plan_phase3b_translation.md`](../archive/workorders/completed/003_plan_phase3b_translation.md)
+- [`004_implement_phase3c_visual_scalars.md`](../archive/workorders/completed/004_implement_phase3c_visual_scalars.md)
+- [`005_implement_phase3d_visual_appearance.md`](../archive/workorders/completed/005_implement_phase3d_visual_appearance.md)
+- [`006_implement_phase3e_text_basics.md`](../archive/workorders/completed/006_implement_phase3e_text_basics.md)
+- [`007_text_style_and_video_fx_read_plan.md`](workorders/blocked/007_text_style_and_video_fx_read_plan.md)
+- [`008_video_fx_real_write_candidate.md`](../archive/workorders/completed/008_video_fx_real_write_candidate.md)
+- [`009_video_completion_matrix.md`](../archive/workorders/completed/009_video_completion_matrix.md)
+- [`010_video_docs_consistency_cleanup.md`](../archive/workorders/completed/010_video_docs_consistency_cleanup.md)
+- [`011_video_fx_scalar_v2_candidate.md`](../archive/workorders/completed/011_video_fx_scalar_v2_candidate.md)
+- [`012_geometry_completion_video_camera_text.md`](../archive/workorders/completed/012_geometry_completion_video_camera_text.md)
+- [`013_full_geometry_completion_video_camera_text.md`](../archive/workorders/completed/013_full_geometry_completion_video_camera_text.md)
+- [`014_rotation_quaternion_shutter_geometry.md`](../archive/workorders/completed/014_rotation_quaternion_shutter_geometry.md)
+- [`015_quaternion_geometry_write.md`](../archive/workorders/completed/015_quaternion_geometry_write.md)
+- [`016_safe_reset_rotation.md`](../archive/workorders/completed/016_safe_reset_rotation.md)
+- [`017_geometry_completion_smooth_and_defaults.md`](workorders/active/017_geometry_completion_smooth_and_defaults.md)
+- [`018_blend_mode_audit_and_completion.md`](../archive/workorders/completed/018_blend_mode_audit_and_completion.md)
+- [`019_video_io_selection_edit_cues.md`](workorders/active/019_video_io_selection_edit_cues.md)
+- [`020_video_embedded_audio_research.md`](../archive/workorders/research/020_video_embedded_audio_research.md)
+- [`021_video_audio_time_loops.md`](workorders/active/021_video_audio_time_loops.md)
+- [`022_slice_markers_audio_video.md`](workorders/active/022_slice_markers_audio_video.md)
+- [`029_video_audio_runtime_validation.md`](workorders/active/029_video_audio_runtime_validation.md)
 
 ## Safety boundary
 

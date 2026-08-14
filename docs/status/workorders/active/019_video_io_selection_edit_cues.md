@@ -1,8 +1,7 @@
 # Cue I/O Selection and Edit Cues
 
-Status: local implementation and contract tests cover all rows below. Confirm
-the per-cue-family runtime status in `docs/status/roadmap.md`; Audio and
-Mic I/O runtime validation remains pending.
+Status: implemented locally; Audio and Mic I/O runtime validation remains
+pending. No new runtime probe is part of the 0.3.0 preparation.
 
 ## Scope
 
@@ -10,8 +9,7 @@ Phase 8A adds cue-level selection of existing I/O targets only. It does not edit
 workspace-level stage, patch, route, region, surface, device, media target, or
 patch definition.
 
-Public tool naming now prefers `qlab_edit_cues`. `qlab_update_cues` remains as a
-compatibility alias to avoid breaking existing prompts, tests, and clients.
+Public tool naming uses `qlab_edit_cues` as the only public cue-edit tool.
 
 ## Sources
 

@@ -31,6 +31,8 @@ from .models import (
     WorkspaceSettingDetailsResult,
     WorkspaceOverviewResult,
     WorkspaceSettingsResult,
+    GeneralSettingsEditResult,
+    GeneralSettingsOperation,
 )
 from .qlab import QLabReader
 from .cues.details import MAX_BATCH_CUE_DETAILS
@@ -211,6 +213,7 @@ CREATE_CUE_TIMEOUT = 30.0
 CREATE_CUES_TIMEOUT = 180.0
 UPDATE_CUES_TIMEOUT = 180.0
 DELETE_CUES_TIMEOUT = 180.0
+WORKSPACE_SETTINGS_WRITE_TIMEOUT = 60.0
 
 T = TypeVar("T")
 
@@ -220,7 +223,7 @@ mcp = FastMCP(
     version=__version__,
     mask_error_details=True,
     instructions="""
-QLab MCP 0.3.0 exposes eight read-only tools plus five gated structural write tools over OSC.
+QLab MCP 0.3.0 exposes eight read-only tools plus six gated write tools over OSC.
 Write mode requires QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; it remains dry-run first.
 This server does not expose GO, stop, panic, playback, audition, /live writes, AppleScript writes, or raw OSC passthrough.
 
@@ -228,7 +231,7 @@ Orient first with qlab_check_connection, then use a bounded workspace overview/s
 
 For every real write, call qlab_check_write_readiness, inspect an explicit dry-run, review warnings/errors/planned operations, supply only the exact fresh confirmation token required by that operation, execute once, and require fresh readback. Do not retry a mutation after a timeout or identity ambiguity. Batches are not automatically transactional.
 
-Create, Edit, Move, and Delete have different token, atomicity, rollback, and postcondition rules; follow each tool's description and output fields. A structural result is not runtime validation: created or edited structure is not necessarily GO-ready. Runtime evidence in this project is bounded to QLab 5.5.10.
+Create, Edit, Move, Delete, and Workspace Settings writes have different token, atomicity, rollback, and postcondition rules; follow each tool's description and output fields. A structural or settings result is not runtime validation: a successful write is not necessarily GO-ready. Runtime evidence in this project is bounded to QLab 5.5.10.
 """,
 )
 
@@ -1200,6 +1203,59 @@ def qlab_edit_cues(
                 dry_run=dry_run,
             )
         )
+    )
+
+
+@mcp.tool(
+    title="Edit QLab General Settings",
+    tags={"qlab", "settings", "general-settings", "write-mode", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT,
+)
+def qlab_edit_general_settings(
+    workspace_id: UUID,
+    operation: GeneralSettingsOperation,
+    value: Annotated[
+        int | float,
+        Field(
+            ge=0,
+            json_schema_extra={"minimum": 0},
+            description=(
+                "Finite non-negative seconds for the allowlisted general.minGoTime setting. "
+                "The OSC encoder preserves integer versus float transport types."
+            ),
+        ),
+    ],
+    dry_run: Annotated[
+        bool | None,
+        Field(description="Plan without mutating OSC; omitted uses QLAB_WRITE_DRY_RUN_DEFAULT."),
+    ] = None,
+    confirm_token: Annotated[
+        str | None,
+        Field(description="Exact fresh confirm:workspaceSettings:v1 token returned by the reviewed dry-run."),
+    ] = None,
+) -> GeneralSettingsEditResult:
+    """Plan or execute the gated general.minGoTime Workspace Settings write.
+
+    Target an exact workspace UUID and use seconds as the value. Dry-run performs
+    readiness, inactive-cue, baseline, and activity checks before issuing a fresh
+    single-use token. Real execution rechecks readiness and activity, sends exactly one
+    setter. One setter is attempted per real call. It requires fresh no-argument readback. A timeout-confirmed result is
+    not retried; unavailable readback is inconclusive and unsafe to retry. The
+    activity reader cannot prove workspace-wide Audition state, so keep Audition
+    disabled. This tool has no GO, playback, panic, /live, or raw OSC behavior.
+    """
+    return _run_tool(
+        lambda reader: GeneralSettingsEditResult.model_validate(
+            reader.edit_general_settings(
+                workspace_id=str(workspace_id),
+                operation=operation,
+                value=value,
+                dry_run=dry_run,
+                confirm_token=confirm_token,
+            )
+        ),
+        timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT,
     )
 
 

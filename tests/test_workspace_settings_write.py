@@ -312,6 +312,58 @@ def test_workspace_settings_rejects_missing_malformed_and_changed_request_tokens
     assert changed_request.executed_operations == []
 
 
+def test_workspace_settings_token_bindings_reject_workspace_operation_and_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    spec = MIN_GO_TIME_SPEC
+
+    for workspace_id, operation, requested_value in (
+        ("22222222-2222-4222-8222-222222222222", "minGoTime", 0.4),
+        (WORKSPACE_ID, "selectionIsPlayhead", 0.4),
+        (WORKSPACE_ID, "minGoTime", 0.5),
+    ):
+        token = write_operations.encode_confirm_token(
+            write_operations.SETTINGS_TOKEN_FAMILY,
+            write_operations.SETTINGS_TOKEN_VERSION,
+            write_operations._token_payload(workspace_id, operation, 0.2, requested_value, spec),
+            write_operations._SETTINGS_TOKEN_SECRET,
+        )
+        reader = _SettingsFakeReader()
+        result = reader.edit_general_settings(
+            WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=token
+        )
+        assert result.status == "preflight_failed"
+        assert result.executed_operations == []
+
+
+class _ActivityChangesReader(_SettingsFakeReader):
+    def __init__(self) -> None:
+        super().__init__()
+        self.activity_reads = 0
+
+    def get_running_cues(self, *_args: object, **_kwargs: object) -> dict[str, object]:
+        self.activity_reads += 1
+        return {"running_cues": [] if self.activity_reads == 1 else [{"uniqueID": "cue-3"}]}
+
+
+def test_workspace_settings_rechecks_activity_before_setter(monkeypatch: pytest.MonkeyPatch) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    reader = _ActivityChangesReader()
+    dry = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    result = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
+    )
+    assert result.status == "preflight_failed"
+    assert result.executed_operations == []
+
+
 def test_workspace_settings_rejects_changed_workspace_and_stale_baseline(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

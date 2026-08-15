@@ -1,6 +1,6 @@
 # Public MCP Tools
 
-QLab MCP 0.3.0 exposes exactly 13 tools. This page is a compact human
+QLab MCP 0.3.0 exposes exactly 14 tools. This page is a compact human
 catalogue; decorated functions, generated schemas, and
 `tests/test_server_tools.py` remain the source of truth for exact parameters,
 annotations, and result models.
@@ -18,6 +18,7 @@ annotations, and result models.
 | `qlab_create_cue` | One template-backed structural creation | Initial setters, playback, or GO | [Create](agent-workflows.md#create-one-cue) |
 | `qlab_create_cues` | Ordered sequential creation, 1–50 items | Atomic transaction or rollback | [Create batch](agent-workflows.md#create-a-sequence) |
 | `qlab_edit_cues` | Allowlisted property/operation edits, 1–50 items | Create, Move, Delete, playback, or raw OSC | [Edit](agent-workflows.md#edit-existing-cues) |
+| `qlab_edit_general_settings` | One exact `general.minGoTime` write in seconds | Other settings writes, playback, GO, or raw OSC | [General settings](agent-workflows.md#edit-general-settings) |
 | `qlab_move_cues` | Sequential structural moves, 1–10 UUID targets | Playback or unproven Cart writes | [Move](agent-workflows.md#move-existing-cues) |
 | `qlab_delete_cues` | Explicit leaves, one empty Group, or root-preserving recursive emptying | Root deletion or automatic rollback | [Delete](agent-workflows.md#delete-cues) |
 
@@ -25,8 +26,8 @@ annotations, and result models.
 
 - Writes default to dry-run and require readiness, exact targets, fresh
   confirmation, and post-write readback.
-- Edit confirmation is per planned operation; Create, Move, and Delete use
-  dedicated token families.
+- Edit confirmation is per planned operation; Create, Move, Delete, and
+  `qlab_edit_general_settings` use dedicated confirmation flows.
 - Batches are sequential/non-transactional unless a tool description says
   otherwise. Timeout or identity ambiguity means inspect first; do not retry.
 - `destructiveHint` is MCP metadata, not authorization. Runtime gates remain

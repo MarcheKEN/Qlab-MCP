@@ -4,7 +4,7 @@ QLab MCP `0.3.0` is a FastMCP server for inspecting QLab 5 workspaces over OSC
 and requesting narrowly gated structural writes. It is read-only by default;
 write mode is disabled unless explicitly configured and remains dry-run-first.
 
-The public surface is intentionally small: 8 read-only tools and 5 gated write
+The public surface is intentionally small: 8 read-only tools and 6 gated write
 tools. The server exposes no playback or raw-protocol escape hatch.
 
 ## Capability boundaries
@@ -64,6 +64,7 @@ annotations.
 | `qlab_create_cue` | One template-backed structural creation | Gated, additive structural write; not initial setters or GO |
 | `qlab_create_cues` | Ordered sequential creation, 1–50 items | Gated, non-atomic batch; no automatic rollback |
 | `qlab_edit_cues` | Allowlisted property/operation edits, 1–50 items | Gated, per-operation confirmation, non-atomic |
+| `qlab_edit_general_settings` | One exact `general.minGoTime` saved-setting write | Gated, one setter, fresh token, fresh readback |
 | `qlab_move_cues` | Sequential structural moves, 1–10 UUID targets | Gated, destructive metadata hint, non-atomic |
 | `qlab_delete_cues` | Explicit leaves, one empty Group, or root-preserving recursive emptying | Gated destructive, sequential, non-atomic |
 
@@ -83,7 +84,8 @@ do not silently claim a complete show inventory.
 
 ## Safe write flow
 
-Every real Create, Edit, Move, or Delete follows this compact sequence:
+Every real Create, Edit, Move, Delete, or General Settings write follows this
+compact sequence:
 
 1. Resolve one explicit workspace and exact cue/container UUIDs.
 2. Call `qlab_check_write_readiness`.
@@ -92,6 +94,17 @@ Every real Create, Edit, Move, or Delete follows this compact sequence:
 4. Supply only the fresh token or per-operation gates returned by that plan.
 5. Execute once; never automatically retry timeout or identity ambiguity.
 6. Require fresh structural/property readback before deciding on recovery.
+
+`qlab_edit_general_settings` is intentionally narrower than cue editing: it
+accepts one exact workspace UUID, `operation="minGoTime"`, and a finite
+non-negative seconds value. The dry-run returns one fresh
+`confirm:workspaceSettings:v1:` token and one exact saved-settings setter plan.
+Real execution rechecks readiness, exact workspace identity, baseline, and
+zero running/paused cues, then sends exactly one qualified
+`/workspace/{uuid}/settings/general/minGoTime` setter and requires a fresh
+no-argument readback. The current activity reader cannot prove workspace-wide
+Audition state, so keep Audition disabled. Timeout-confirmed and inconclusive
+results are evidence states, not GO or playback authorization.
 
 Details, good/invalid examples, token families, partial failures, and recovery
 guidance live in the [agent workflow guide](docs/user/agent-workflows.md).
@@ -138,7 +151,7 @@ estructura programada
 ## Deeper documentation
 
 - [User guide](docs/user/README.md)
-- [13-tool catalogue](docs/user/tools.md)
+- [14-tool catalogue](docs/user/tools.md)
 - [Agent workflows](docs/user/agent-workflows.md)
 - [Security policy](SECURITY.md)
 - [Development architecture](docs/development/architecture.md)

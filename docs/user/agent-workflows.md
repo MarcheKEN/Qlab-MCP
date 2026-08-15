@@ -19,6 +19,7 @@ schemas or the server-side safety checks.
 | Create one cue from a template | `qlab_create_cue` | Initial setters, playback, or GO |
 | Create an ordered sequence | `qlab_create_cues` | Atomic transactions or automatic rollback |
 | Edit allowlisted properties and operations | `qlab_edit_cues` | Create, Move, Delete, playback, or raw OSC |
+| Edit one exact saved general setting | `qlab_edit_general_settings` | Other settings writes, playback, GO, or raw OSC |
 | Move existing cues structurally | `qlab_move_cues` | Playback or Cart writes not runtime-proven |
 | Delete leaves, one empty Group, or empty one preserved container | `qlab_delete_cues` | Deleting the requested root or automatic rollback |
 
@@ -175,6 +176,53 @@ Invalid or unsafe shape:
 The invalid example uses an implicit selection and skips readiness, dry-run, and
 per-operation confirmation. Edit does not expose Create, Move, Delete,
 playback, or raw OSC operations.
+
+## Edit general settings
+
+`qlab_edit_general_settings` is the first and only Workspace Settings write
+slice. It accepts one exact workspace UUID, `operation="minGoTime"`, a finite
+non-negative seconds value, optional `dry_run`, and the exact fresh
+`confirm:workspaceSettings:v1:` token returned by the reviewed dry-run.
+
+The dry-run reads fresh readiness, exact workspace identity, current
+`general.minGoTime`, and current `runningOrPausedCues`. Real execution repeats
+those checks, sends exactly one qualified saved-settings setter for
+`/workspace/{uuid}/settings/general/minGoTime`, clears read cache, and requires
+fresh no-argument readback. Do not retry a setter after timeout or uncertain
+reply. A matching fresh readback can confirm the outcome; a mismatch or
+unavailable readback requires inspection first.
+
+The activity gate requires zero running or paused cues before token issuance
+and again before the setter. The current activity reader cannot prove
+workspace-wide Audition state, so this tool requires the operator to keep
+Audition disabled. This is implementation/documentation evidence, not runtime
+validation or GO readiness.
+
+Good shape:
+
+```json
+{
+  "workspace_id": "<workspace-uuid>",
+  "operation": "minGoTime",
+  "value": 0.5,
+  "dry_run": true
+}
+```
+
+Invalid or unsafe shape:
+
+```json
+{
+  "workspace_id": "selected",
+  "operation": "selectionIsPlayhead",
+  "value": "0.5",
+  "dry_run": false
+}
+```
+
+The invalid example uses a non-UUID workspace target, an unsupported operation,
+the wrong value type, and skips the reviewed dry-run/token flow. This tool does
+not expose GO, playback, panic, `/live`, raw OSC, or AppleScript fallback.
 
 ## Move existing cues
 

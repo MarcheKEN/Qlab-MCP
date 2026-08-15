@@ -13,6 +13,7 @@ from typing import Any
 from ..errors import OscTimeoutError, QLabReplyError
 from ..models import GeneralSettingsEditInput, GeneralSettingsEditResult
 from ..osc.addressing import _workspace_address
+from ..write.comparison import numeric_values_match
 from ..write.safety import check_write_readiness, ensure_write_ready, resolve_dry_run
 from ..write.timeouts import AFTER_READ_RETRY_DELAYS, setter_reply_timeout
 from ..write.tokens import decode_confirm_token, encode_confirm_token
@@ -29,14 +30,6 @@ _CONSUMED_SETTINGS_TOKENS_LOCK = threading.RLock()
 
 def _canonical_float32(value: int | float) -> float:
     return struct.unpack(">f", struct.pack(">f", float(value)))[0]
-
-
-def _numeric_match(actual: Any, requested: int | float) -> bool:
-    if isinstance(actual, bool) or not isinstance(actual, int | float) or not math.isfinite(float(actual)):
-        return False
-    expected = float(requested)
-    actual_float = float(actual)
-    return math.isclose(actual_float, expected, rel_tol=1e-5, abs_tol=1e-5)
 
 
 def _activity_snapshot(reader: Any, workspace_id: str) -> dict[str, Any]:
@@ -133,6 +126,34 @@ def _token_error(
     return payload, None
 
 
+def _preflight_status(dry_run: bool) -> str:
+    return "dry_run_preflight_failed" if dry_run else "preflight_failed"
+
+
+def _settings_setter_operation(
+    operation: str,
+    address: str,
+    value: int | float,
+    *,
+    mode: str | None = None,
+    risk_tier: str | None = None,
+    real_write_enabled: bool | None = None,
+) -> dict[str, Any]:
+    item: dict[str, Any] = {
+        "operation": "set_workspace_setting",
+        "property": operation,
+        "address": address,
+        "args": [value],
+    }
+    if mode is not None:
+        item["mode"] = mode
+    if risk_tier is not None:
+        item["risk_tier"] = risk_tier
+    if real_write_enabled is not None:
+        item["real_write_enabled"] = real_write_enabled
+    return item
+
+
 class WorkspaceSettingsWriteMixin:
     """Single-operation Workspace Settings write surface."""
 
@@ -154,18 +175,20 @@ class WorkspaceSettingsWriteMixin:
         workspace = str(request.workspace_id)
         is_dry_run = resolve_dry_run(self, request.dry_run)
         spec = get_workspace_settings_write_spec(request.operation)
+        setter_address = _workspace_address(workspace, spec.osc_path)
         readiness: dict[str, Any] | None = None
         activity: dict[str, Any] | None = None
         baseline: int | float | None = None
-        planned = [{
-            "operation": "set_workspace_setting",
-            "property": request.operation,
-            "address": _workspace_address(workspace, spec.osc_path),
-            "args": [request.value],
-            "mode": spec.mode,
-            "risk_tier": spec.risk_tier,
-            "real_write_enabled": spec.real_write_enabled,
-        }]
+        planned = [
+            _settings_setter_operation(
+                request.operation,
+                setter_address,
+                request.value,
+                mode=spec.mode,
+                risk_tier=spec.risk_tier,
+                real_write_enabled=spec.real_write_enabled,
+            )
+        ]
 
         try:
             self._resolve_settings_workspace_uuid(workspace)
@@ -173,7 +196,7 @@ class WorkspaceSettingsWriteMixin:
             if not readiness.get("ok"):
                 return self._settings_result(
                     request, workspace, is_dry_run, baseline, None, planned, [], readiness=readiness,
-                    activity=None, status="dry_run_preflight_failed" if is_dry_run else "preflight_failed",
+                    activity=None, status=_preflight_status(is_dry_run),
                     errors={"readiness": readiness.get("message", "Workspace Settings write readiness failed.")},
                     error_code=readiness.get("error_code"),
                     suggested_action=readiness.get("suggested_action"),
@@ -184,7 +207,7 @@ class WorkspaceSettingsWriteMixin:
             if activity["active_count"]:
                 return self._settings_result(
                     request, workspace, is_dry_run, baseline, None, planned, [], readiness=readiness,
-                    activity=activity, status="dry_run_preflight_failed" if is_dry_run else "preflight_failed",
+                    activity=activity, status=_preflight_status(is_dry_run),
                     errors={"activity": "Workspace has running or paused cues; settings write is blocked."},
                     error_code="QLAB_SETTINGS_ACTIVE_CUES",
                     suggested_action="Stop or pause no cues, then obtain a fresh dry-run token.",
@@ -194,20 +217,20 @@ class WorkspaceSettingsWriteMixin:
             return self._settings_result(
                 request, workspace, is_dry_run, baseline, None, planned, [], readiness=readiness,
                 activity=activity,
-                status="dry_run_preflight_failed" if is_dry_run else "preflight_failed",
+                status=_preflight_status(is_dry_run),
                 errors={"preflight": str(exc)}, error_code="QLAB_SETTINGS_PREFLIGHT_FAILED",
                 suggested_action="Inspect the preflight error and retry with the exact workspace UUID.",
                 message="Workspace Settings write was blocked during preflight.",
             )
 
         warnings = ["The activity reader cannot prove workspace-wide Audition state; keep Audition disabled."]
-        token = encode_confirm_token(
-            SETTINGS_TOKEN_FAMILY,
-            SETTINGS_TOKEN_VERSION,
-            _token_payload(workspace, request.operation, baseline, request.value, spec),
-            _SETTINGS_TOKEN_SECRET,
-        )
         if is_dry_run:
+            token = encode_confirm_token(
+                SETTINGS_TOKEN_FAMILY,
+                SETTINGS_TOKEN_VERSION,
+                _token_payload(workspace, request.operation, baseline, request.value, spec),
+                _SETTINGS_TOKEN_SECRET,
+            )
             return self._settings_result(
                 request, workspace, True, baseline, None, planned, [], readiness=readiness,
                 activity=activity, confirm_token=token, warnings=warnings, status="dry_run",
@@ -267,14 +290,18 @@ class WorkspaceSettingsWriteMixin:
                 message="Workspace Settings write was blocked before the setter.",
             )
 
-        address = _workspace_address(workspace, spec.osc_path)
-        executed = [{"operation": "set_workspace_setting", "property": request.operation, "address": address, "args": [request.value]}]
+        executed = [_settings_setter_operation(request.operation, setter_address, request.value)]
         setter_error: str | None = None
         setter_timeout = False
         try:
-            reply = self._request(address, request.value, workspace_id=workspace, request_timeout=setter_reply_timeout(self, 1))
+            reply = self._request(
+                setter_address,
+                request.value,
+                workspace_id=workspace,
+                request_timeout=setter_reply_timeout(self, 1),
+            )
             if getattr(reply, "status", "ok") != "ok":
-                raise QLabReplyError(getattr(reply, "status", "error"), getattr(reply, "data", None), address)
+                raise QLabReplyError(getattr(reply, "status", "error"), getattr(reply, "data", None), setter_address)
             executed[0]["status"] = "ok"
         except OscTimeoutError as exc:
             setter_error = str(exc)
@@ -291,7 +318,7 @@ class WorkspaceSettingsWriteMixin:
         for attempt in range(len(AFTER_READ_RETRY_DELAYS) + 1):
             try:
                 readback = self._read_settings_number(workspace, spec)
-                if _numeric_match(readback, request.value) or attempt == len(AFTER_READ_RETRY_DELAYS):
+                if numeric_values_match(readback, request.value) or attempt == len(AFTER_READ_RETRY_DELAYS):
                     break
             except Exception as exc:
                 readback_error = str(exc)
@@ -308,7 +335,7 @@ class WorkspaceSettingsWriteMixin:
                 suggested_action="Inspect QLab state manually; do not retry the consumed write.",
                 message="Workspace Settings setter was attempted, but fresh readback was unavailable.",
             )
-        matched = readback is not None and _numeric_match(readback, request.value)
+        matched = readback is not None and numeric_values_match(readback, request.value)
         if matched:
             status = "updated_with_confirmed_timeouts" if setter_timeout else "updated"
             if setter_error and not setter_timeout:

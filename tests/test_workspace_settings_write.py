@@ -61,6 +61,11 @@ def test_general_settings_edit_input_validation_rejects_non_numeric_values(value
         GeneralSettingsEditInput(workspace_id=WORKSPACE_ID, operation="minGoTime", value=value)
 
 
+def test_general_settings_edit_input_rejects_deferred_operations() -> None:
+    with pytest.raises(ValidationError):
+        GeneralSettingsEditInput(workspace_id=WORKSPACE_ID, operation="selectionIsPlayhead", value=0.4)
+
+
 @pytest.mark.parametrize("value", [-0.1, math.inf, -math.inf, math.nan])
 def test_general_settings_edit_input_validation_rejects_invalid_numeric_values(value: float) -> None:
     with pytest.raises(ValidationError):
@@ -243,6 +248,23 @@ def test_workspace_settings_timeout_is_confirmed_by_matching_readback(monkeypatc
     assert len(setter_calls) == 1
 
 
+def test_workspace_settings_timeout_with_mismatch_is_not_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    reader = _SettingsFakeReader(timeout_setter=True, apply_setter=False)
+    dry = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    result = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
+    )
+
+    setter_calls = [args for address, args in reader.calls if args and address.endswith("settings/general/minGoTime")]
+    assert result.status == "verification_failed"
+    assert result.retry_unsafe is False
+    assert len(setter_calls) == 1
+
+
 def test_workspace_settings_token_binds_numeric_wire_type(monkeypatch: pytest.MonkeyPatch) -> None:
     import qlab_mcp.settings.write_operations as write_operations
 
@@ -266,6 +288,57 @@ def test_workspace_settings_token_binds_numeric_wire_type(monkeypatch: pytest.Mo
     assert result.executed_operations == []
 
 
+def test_workspace_settings_rejects_missing_malformed_and_changed_request_tokens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    reader = _SettingsFakeReader()
+
+    for token, requested in ((None, 0.4), ("not-a-confirm-token", 0.4)):
+        result = reader.edit_general_settings(
+            WORKSPACE_ID, "minGoTime", requested, dry_run=False, confirm_token=token
+        )
+        assert result.status == "preflight_failed"
+        assert result.executed_operations == []
+
+    dry = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    changed_request = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.5, dry_run=False, confirm_token=dry.confirm_token
+    )
+    assert changed_request.status == "preflight_failed"
+    assert changed_request.executed_operations == []
+
+
+def test_workspace_settings_rejects_changed_workspace_and_stale_baseline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    reader = _SettingsFakeReader()
+    dry = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+
+    reader.workspace_id = "22222222-2222-4222-8222-222222222222"
+    changed_workspace = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
+    )
+    assert changed_workspace.status == "preflight_failed"
+    assert changed_workspace.executed_operations == []
+
+    reader = _SettingsFakeReader()
+    dry = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    reader.value = 0.3
+    stale_baseline = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
+    )
+    assert stale_baseline.status == "preflight_failed"
+    assert stale_baseline.executed_operations == []
+
+
 def test_workspace_settings_rejects_active_cues_and_exact_uuid_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
     import qlab_mcp.settings.write_operations as write_operations
 
@@ -275,6 +348,12 @@ def test_workspace_settings_rejects_active_cues_and_exact_uuid_mismatch(monkeypa
     assert result.status == "dry_run_preflight_failed"
     assert result.confirm_token is None
     assert not [args for _, args in active.calls if args]
+
+    auditioning = _SettingsFakeReader(running=[{"uniqueID": "cue-2", "isAuditioning": True}])
+    result = auditioning.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    assert result.status == "dry_run_preflight_failed"
+    assert result.confirm_token is None
+    assert not [args for _, args in auditioning.calls if args]
 
     missing = _SettingsFakeReader(workspace_id="22222222-2222-4222-8222-222222222222")
     result = missing.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)

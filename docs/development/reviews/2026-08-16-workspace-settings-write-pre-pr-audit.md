@@ -7,13 +7,13 @@ Version: `0.3.0`
 
 ## Executive Verdict
 
-**NOT_READY_FOR_DRAFT_PR**
+**READY_FOR_DRAFT_PR**
 
-The feature is bounded and the implementation/runtime evidence is coherent,
-but the authoritative remote `main` could not be live-verified during this
-audit. `git ls-remote origin refs/heads/main` failed with DNS resolution for
-`github.com`. Local `main`, cached `origin/main`, and the merge base all match
-`f94de272a2e29a7cb52e542f62de1e0e0a9e2204`.
+The feature is bounded and the implementation/runtime evidence is coherent.
+The initial local `git ls-remote origin refs/heads/main` check was blocked by
+DNS resolution for `github.com`; subsequent authoritative GitHub verification
+confirmed `main` at `f94de272a2e29a7cb52e542f62de1e0e0a9e2204`. The cached local
+ref and merge base match that authoritative SHA.
 
 The two runtime fixes that were previously only in the worktree are now in a
 local commit, and the missing one-setter regression assertion is covered.
@@ -24,6 +24,7 @@ Nothing was pushed, merged, tagged, published, or mutated in QLab.
 - Expected base: `f94de272a2e29a7cb52e542f62de1e0e0a9e2204`.
 - Local `main`: expected SHA.
 - Cached `origin/main`: expected SHA.
+- Authoritative GitHub `refs/heads/main`: expected SHA (subsequently verified).
 - Merge base: expected SHA.
 - Package version: `0.3.0`.
 - Source and clean-cache FastMCP inspection: 14 tools.
@@ -42,6 +43,8 @@ failure.
 Before audit fixes, `HEAD` was `1633e0b0a910789a94704be65500d6f310707853`, ten
 feature commits ahead of the verified base. The audit fixes were committed
 locally as `84e59aa` (`Fix workspace settings runtime validation regressions`).
+Closure `HEAD` is `54b83d45cf09137b79314505fdba6183dc9f729d`; it descends from
+the expected base and the worktree is clean.
 The commit contains:
 
 - strict public `StrictInt | StrictFloat` validation;
@@ -187,9 +190,10 @@ metadata separately after Draft PR review and authorization.
 
 ## Git / Commit Review
 
-The feature branch is based on the expected local main SHA and has no merge or
-rebase of main. The audit created only local commits. The live remote check is
-still blocked by DNS; no remote state is inferred from the cached ref.
+The feature branch is based on the expected main SHA and has no merge or rebase
+of main. The audit created only local commits. The earlier local DNS failure is
+preserved in this report; it was superseded by the subsequent authoritative
+GitHub ref verification.
 
 ## Secrets / Repository Hygiene
 
@@ -204,12 +208,9 @@ None.
 
 ## P1 Findings
 
-1. **Authoritative remote verification blocked.** `git ls-remote origin
-   refs/heads/main` cannot resolve `github.com`. Re-run this check before any
-   push or Draft PR decision; until it succeeds with the expected SHA, the
-   branch remains `NOT_READY_FOR_DRAFT_PR`.
-
-No implementation or test P1 remains after commit `84e59aa`.
+None. The remote-baseline P1 is resolved by the subsequent authoritative
+GitHub verification. The optional local retry remained DNS-blocked, which does
+not contradict the independently verified authoritative ref.
 
 ## P2 Findings
 
@@ -254,12 +255,10 @@ No implementation or test P1 remains after commit `84e59aa`.
 
 ## Draft PR Readiness
 
-`NOT_READY_FOR_DRAFT_PR` solely because the authoritative remote `main` could
-not be live-verified in this environment. All local implementation, contract,
-test, packaging, runtime-report, and hygiene gates are otherwise documented.
+`READY_FOR_DRAFT_PR`. All local implementation, contract, test, packaging,
+runtime-report, hygiene, and authoritative-base gates are documented.
 
 ## Next Gate
 
-Re-run `git ls-remote origin refs/heads/main` and confirm the expected SHA.
-Only after that succeeds should the user decide whether to authorize pushing
-`feature/workspace-settings-write` and opening a Draft PR against `main`.
+Await user authorization to push `feature/workspace-settings-write` and create
+a Draft PR against `main`. No merge authorization exists.

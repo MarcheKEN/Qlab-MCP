@@ -143,8 +143,8 @@ unavailable/nonconvergent readback maps to `verification_inconclusive` with
 
 ## Automated Test Evidence
 
-- Focused settings/server tests after audit hardening: `115 passed`.
-- Full suite with loopback access: `2644 passed, 41 subtests passed`.
+- Focused feature/write/token/server tests after audit hardening: `2318 passed`.
+- Full suite with loopback access: `2649 passed, 41 subtests passed`.
 - Initial sandbox full-suite attempt failed only because UDP/TCP fixtures could
   not bind localhost (`PermissionError: [Errno 1] Operation not permitted`).
 - `uv lock --check`: passed.

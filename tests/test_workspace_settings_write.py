@@ -13,6 +13,8 @@ from qlab_mcp.models import (
     GeneralSettingsOperation,
     GeneralSettingsWriteStatus,
 )
+from qlab_mcp.settings.write_operations import WorkspaceSettingsWriteMixin
+from qlab_mcp.settings.write_registry import MIN_GO_TIME_SPEC
 
 
 WORKSPACE_ID = "11111111-1111-4111-8111-111111111111"
@@ -139,3 +141,195 @@ def test_general_settings_contract_type_aliases_are_narrow() -> None:
         "verification_failed",
         "verification_inconclusive",
     )
+
+
+class _SettingsFakeReader(WorkspaceSettingsWriteMixin):
+    def __init__(self, *, timeout_setter: bool = False, running: list[object] | None = None,
+                 readback_error: bool = False, apply_setter: bool = True,
+                 workspace_id: str = WORKSPACE_ID) -> None:
+        from types import SimpleNamespace
+
+        self.client = SimpleNamespace(config=SimpleNamespace(write_dry_run_default=True))
+        self._read_cache = SimpleNamespace(clear=lambda: None)
+        self.value: int | float = 0.2
+        self.timeout_setter = timeout_setter
+        self.running = running or []
+        self.readback_error = readback_error
+        self.apply_setter = apply_setter
+        self.setter_done = False
+        self.workspace_id = workspace_id
+        self.calls: list[tuple[str, tuple[object, ...]]] = []
+
+    def get_workspaces(self) -> dict[str, object]:
+        return {"workspaces": [{"uniqueID": self.workspace_id, "displayName": "Demo"}]}
+
+    def get_running_cues(self, *_args: object, **_kwargs: object) -> dict[str, object]:
+        return {"running_cues": self.running}
+
+    def _request(self, address: str, *args: object, **_kwargs: object) -> object:
+        from types import SimpleNamespace
+        from qlab_mcp.errors import OscTimeoutError
+
+        self.calls.append((address, args))
+        if not args and self.readback_error and self.setter_done:
+            raise RuntimeError("readback unavailable")
+        if args:
+            if self.apply_setter:
+                self.value = args[0]  # one and only mutating request
+            self.setter_done = True
+            if self.timeout_setter:
+                raise OscTimeoutError("setter timed out")
+        return SimpleNamespace(status="ok", data=self.value)
+
+
+def test_workspace_settings_registry_is_one_exact_saved_operation() -> None:
+    assert MIN_GO_TIME_SPEC.osc_path == "settings/general/minGoTime"
+    assert MIN_GO_TIME_SPEC.readback_path == MIN_GO_TIME_SPEC.osc_path
+    assert MIN_GO_TIME_SPEC.activity_policy == "running_or_paused_zero"
+
+
+def test_workspace_settings_dry_run_issues_token_without_setter(monkeypatch: pytest.MonkeyPatch) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    reader = _SettingsFakeReader()
+    result = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+
+    assert result.status == "dry_run"
+    assert result.confirm_token and result.confirm_token.startswith("confirm:workspaceSettings:v1:")
+    assert result.planned_operations[0]["address"] == f"/workspace/{WORKSPACE_ID}/settings/general/minGoTime"
+    assert result.executed_operations == []
+    assert [args for _, args in reader.calls if args] == []
+
+
+def test_workspace_settings_real_write_attempts_one_setter_and_reads_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    reader = _SettingsFakeReader()
+    dry = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    result = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
+    )
+
+    setter_calls = [args for address, args in reader.calls if args and address.endswith("settings/general/minGoTime")]
+    assert result.status == "updated"
+    assert len(setter_calls) == 1
+    assert result.readback == pytest.approx(0.4)
+
+
+def test_workspace_settings_timeout_is_confirmed_by_matching_readback(monkeypatch: pytest.MonkeyPatch) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    reader = _SettingsFakeReader(timeout_setter=True)
+    dry = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    result = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
+    )
+
+    setter_calls = [args for address, args in reader.calls if args and address.endswith("settings/general/minGoTime")]
+    assert result.status == "updated_with_confirmed_timeouts"
+    assert result.retry_unsafe is False
+    assert len(setter_calls) == 1
+
+
+def test_workspace_settings_token_binds_numeric_wire_type(monkeypatch: pytest.MonkeyPatch) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    reader = _SettingsFakeReader()
+    dry = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 1, dry_run=True)
+    result = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 1.0, dry_run=False, confirm_token=dry.confirm_token
+    )
+
+    assert result.status == "preflight_failed"
+    assert result.executed_operations == []
+
+    reader = _SettingsFakeReader()
+    dry = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.1, dry_run=True)
+    result = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.10000000149011612, dry_run=False, confirm_token=dry.confirm_token
+    )
+    assert result.status == "preflight_failed"
+    assert result.executed_operations == []
+
+
+def test_workspace_settings_rejects_active_cues_and_exact_uuid_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    active = _SettingsFakeReader(running=[{"uniqueID": "cue-1"}])
+    result = active.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    assert result.status == "dry_run_preflight_failed"
+    assert result.confirm_token is None
+    assert not [args for _, args in active.calls if args]
+
+    missing = _SettingsFakeReader(workspace_id="22222222-2222-4222-8222-222222222222")
+    result = missing.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    assert result.status == "dry_run_preflight_failed"
+    assert result.confirm_token is None
+
+
+def test_workspace_settings_replay_and_inconclusive_readback_are_explicit(monkeypatch: pytest.MonkeyPatch) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    reader = _SettingsFakeReader()
+    dry = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    first = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
+    )
+    replay = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
+    )
+    assert first.status == "updated"
+    assert replay.status == "preflight_failed"
+    assert replay.executed_operations == []
+
+    unavailable = _SettingsFakeReader(readback_error=True)
+    dry = unavailable.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    result = unavailable.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
+    )
+    assert result.status == "verification_inconclusive"
+    assert result.retry_unsafe is True
+
+
+def test_workspace_settings_expired_token_is_rejected_before_setter(monkeypatch: pytest.MonkeyPatch) -> None:
+    import time
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    reader = _SettingsFakeReader()
+    dry = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    now = time.time()
+    monkeypatch.setattr(write_operations.time, "time", lambda: now + 301)
+    result = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
+    )
+
+    assert result.status == "preflight_failed"
+    assert result.executed_operations == []
+
+
+def test_workspace_settings_readable_mismatch_is_verification_failed(monkeypatch: pytest.MonkeyPatch) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    reader = _SettingsFakeReader(apply_setter=False)
+    dry = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.4, dry_run=True)
+    result = reader.edit_general_settings(
+        WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
+    )
+
+    assert result.status == "verification_failed"
+    assert result.retry_unsafe is False
+    assert result.executed_operations and len(result.executed_operations) == 1

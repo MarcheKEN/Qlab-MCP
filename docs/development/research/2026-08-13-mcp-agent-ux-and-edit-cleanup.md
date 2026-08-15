@@ -246,9 +246,9 @@ shape:
 6. the evidence boundary:
 
    ```text
-   estructura programada
-   ≠ runtime validado
-   ≠ show listo para GO
+   planned structure
+   ≠ runtime validated
+   ≠ show ready for GO
    ```
 
 7. links to user, security, development, status, and reference docs.

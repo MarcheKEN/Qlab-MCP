@@ -67,9 +67,9 @@ its root.
 Keep this distinction explicit:
 
 ```text
-estructura programada
-!= runtime validado
-!= show listo para GO
+planned structure
+!= runtime validated
+!= show ready for GO
 ```
 
 See the [14-tool catalogue](tools.md),

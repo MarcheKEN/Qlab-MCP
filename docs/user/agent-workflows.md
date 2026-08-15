@@ -325,9 +325,9 @@ panic, playback, Audition, raw OSC, AppleScript write, or `/live` workflow.
 Keep this distinction in every report:
 
 ```text
-estructura programada
-!= runtime validado
-!= show listo para GO
+planned structure
+!= runtime validated
+!= show ready for GO
 ```
 
 Maintainer-only runtime evidence lives in the

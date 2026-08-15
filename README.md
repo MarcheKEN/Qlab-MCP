@@ -143,9 +143,9 @@ checklists; they are not universal QLab guarantees.
 Keep this distinction explicit:
 
 ```text
-estructura programada
-!= runtime validado
-!= show listo para GO
+planned structure
+!= runtime validated
+!= show ready for GO
 ```
 
 ## Deeper documentation

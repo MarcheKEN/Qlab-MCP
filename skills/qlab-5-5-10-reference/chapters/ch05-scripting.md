@@ -1,10 +1,10 @@
-# Scripting y automatización
+# Scripting and automation
 
-QLab documenta `OSC Dictionary`, `OSC Queries`, `AppleScript Dictionary`, `Script Cues`, `Parameter Reference` y ejemplos de scripting.
+QLab documents `OSC Dictionary`, `OSC Queries`, `AppleScript Dictionary`, `Script Cues`, `Parameter Reference`, and scripting examples.
 
-- Para conceptos de automatización: [Scripting & Automation](https://reference.qlab.app/docs/v5/scripting/).
-- Para exactitud de rutas, argumentos, permisos, replies, queries, `/live` y `+/-`: usa [qlab-5-5-10-osc](../../qlab-5-5-10-osc/SKILL.md).
-- Para AppleScript, busca el nombre exacto en el `AppleScript Dictionary`; no traduzcas identificadores.
-- Para un `Script Cue`, comprueba licencia, comandos soportados y permisos en la página oficial antes de afirmar que algo funciona.
+- For automation concepts: [Scripting & Automation](https://reference.qlab.app/docs/v5/scripting/).
+- For exact paths, arguments, permissions, replies, queries, `/live`, and `+/-`: use [qlab-5-5-10-osc](../../qlab-5-5-10-osc/SKILL.md).
+- For AppleScript, search for the exact name in the `AppleScript Dictionary`; do not translate identifiers.
+- For a `Script Cue`, check the license, supported commands, and permissions on the official page before claiming that something works.
 
-La regla es fuente primero: si una operación no aparece en el diccionario entregado, responde `Not found in the supplied QLab OSC Dictionary.`
+The rule is source first: if an operation does not appear in the supplied dictionary, respond `Not found in the supplied QLab OSC Dictionary.`

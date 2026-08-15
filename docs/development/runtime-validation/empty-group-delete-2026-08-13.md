@@ -103,9 +103,9 @@ fixtures. It does not prove Cue List or Cue Cart direct deletion, output
 isolation for a production show, or GO readiness:
 
 ```text
-implementación local
+local implementation
 ≠
-runtime validado
+runtime validated
 ≠
-show listo para GO
+show ready for GO
 ```

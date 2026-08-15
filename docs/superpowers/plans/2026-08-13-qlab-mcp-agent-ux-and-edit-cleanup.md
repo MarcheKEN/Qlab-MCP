@@ -37,9 +37,9 @@ Markdown.
 - Keep this distinction explicit:
 
   ```text
-  estructura programada
-  != runtime validado
-  != show listo para GO
+  planned structure
+  != runtime validated
+  != show ready for GO
   ```
 
 ## Approval decisions before Task 1

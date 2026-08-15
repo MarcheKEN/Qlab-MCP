@@ -1,8 +1,8 @@
 # QLab MCP — Workspace Settings Write Pre-PR Audit
 
-Audit date: 2026-08-16  
-Repository: `MarcheKEN/Qlab-MCP`  
-Branch: `feature/workspace-settings-write`  
+Audit date: 2026-08-16
+Repository: `MarcheKEN/Qlab-MCP`
+Branch: `feature/workspace-settings-write`
 Version: `0.3.0`
 
 ## Executive Verdict

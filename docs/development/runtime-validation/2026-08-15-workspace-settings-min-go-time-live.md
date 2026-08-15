@@ -1,6 +1,6 @@
 # Workspace Settings `minGoTime` Runtime Validation
 
-Date: 2026-08-15  
+Date: 2026-08-15
 Result: bounded runtime validation completed; one positive activity-gate case was safely skipped; workspace restored.
 
 ## Environment

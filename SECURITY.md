@@ -96,8 +96,10 @@ requires zero running or paused cues before token issuance and again before the
 setter, and sends exactly one qualified saved-settings setter followed by fresh
 no-argument readback. A timed-out setter is never retried. Matching readback
 may confirm the outcome; mismatch or unavailable readback remains failed or
-inconclusive. The current activity reader cannot prove workspace-wide Audition
-state, so Audition must remain disabled by operator policy.
+inconclusive. The zero-activity gate is a conservative MCP safety policy, not
+an asserted QLab requirement. The current activity reader cannot prove
+workspace-wide Audition state, so Audition must remain disabled by operator
+policy.
 
 ### Move
 

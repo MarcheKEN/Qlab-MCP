@@ -193,10 +193,11 @@ reply. A matching fresh readback can confirm the outcome; a mismatch or
 unavailable readback requires inspection first.
 
 The activity gate requires zero running or paused cues before token issuance
-and again before the setter. The current activity reader cannot prove
-workspace-wide Audition state, so this tool requires the operator to keep
-Audition disabled. This is implementation/documentation evidence, not runtime
-validation or GO readiness.
+and again before the setter. This zero-activity gate is a conservative MCP
+safety policy, not a claim that QLab requires an idle workspace for this
+setting. The current activity reader cannot prove workspace-wide Audition
+state, so this tool requires the operator to keep Audition disabled. This is
+implementation/documentation evidence, not runtime validation or GO readiness.
 
 Good shape:
 

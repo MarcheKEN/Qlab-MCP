@@ -47,3 +47,37 @@ tests/test_workspace_settings_write.py .......................
 ## Concerns
 
 - The required verification selector intentionally leaves one type-alias test deselected because its name does not include `schema`, `validation`, or `result`.
+
+## Canonical UUID fix
+
+RED command:
+
+```bash
+uv run pytest tests/test_workspace_settings_write.py::test_general_settings_edit_input_validation_rejects_non_canonical_uuid_forms -v
+```
+
+RED output:
+
+```text
+collected 3 items
+FAILED ... DID NOT RAISE <class 'pydantic_core._pydantic_core.ValidationError'>
+```
+
+Fix applied:
+
+- Added explicit RED coverage for hyphenless, braced, and `urn:uuid:` workspace UUID forms.
+- Added a `workspace_id` pre-validator in `GeneralSettingsEditInput` that parses the UUID and requires the original text to match the canonical hyphenated UUID form case-insensitively.
+
+GREEN commands:
+
+```bash
+uv run pytest tests/test_workspace_settings_write.py::test_general_settings_edit_input_validation_rejects_non_canonical_uuid_forms -v
+uv run pytest tests/test_workspace_settings_write.py
+```
+
+GREEN output:
+
+```text
+3 passed
+27 passed
+```

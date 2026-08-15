@@ -214,6 +214,19 @@ class GeneralSettingsEditInput(BaseModel):
     dry_run: bool | None = None
     confirm_token: str | None = None
 
+    @field_validator("workspace_id", mode="before")
+    @classmethod
+    def validate_workspace_id(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        try:
+            canonical = str(UUID(value))
+        except ValueError as exc:
+            raise ValueError("workspace_id must be an exact workspace UUID.") from exc
+        if canonical.casefold() != value.casefold():
+            raise ValueError("workspace_id must be an exact workspace UUID.")
+        return value
+
     @field_validator("value", mode="before")
     @classmethod
     def validate_value(cls, value: object) -> int | float:

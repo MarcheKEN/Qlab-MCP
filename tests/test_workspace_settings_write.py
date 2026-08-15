@@ -40,6 +40,19 @@ def test_general_settings_edit_input_validation_rejects_non_uuid_workspace_ids(w
         GeneralSettingsEditInput(workspace_id=workspace_id, operation="minGoTime", value=0.4)
 
 
+@pytest.mark.parametrize(
+    "workspace_id",
+    [
+        "11111111111141118111111111111111",
+        "{11111111-1111-4111-8111-111111111111}",
+        "urn:uuid:11111111-1111-4111-8111-111111111111",
+    ],
+)
+def test_general_settings_edit_input_validation_rejects_non_canonical_uuid_forms(workspace_id: str) -> None:
+    with pytest.raises(ValidationError):
+        GeneralSettingsEditInput(workspace_id=workspace_id, operation="minGoTime", value=0.4)
+
+
 @pytest.mark.parametrize("value", [True, False, "0.4", None])
 def test_general_settings_edit_input_validation_rejects_non_numeric_values(value: object) -> None:
     with pytest.raises(ValidationError):

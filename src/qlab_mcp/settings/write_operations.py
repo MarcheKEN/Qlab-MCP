@@ -13,7 +13,7 @@ from typing import Any
 from ..errors import OscTimeoutError, QLabReplyError
 from ..models import GeneralSettingsEditInput, GeneralSettingsEditResult
 from ..osc.addressing import _workspace_address
-from ..write.comparison import numeric_values_match
+from ..write.comparison import SETTINGS_NUMERIC_MATCH_REL_TOLERANCE, numeric_values_match
 from ..write.safety import check_write_readiness, ensure_write_ready, resolve_dry_run
 from ..write.timeouts import AFTER_READ_RETRY_DELAYS, setter_reply_timeout
 from ..write.tokens import decode_confirm_token, encode_confirm_token
@@ -318,7 +318,10 @@ class WorkspaceSettingsWriteMixin:
         for attempt in range(len(AFTER_READ_RETRY_DELAYS) + 1):
             try:
                 readback = self._read_settings_number(workspace, spec)
-                if numeric_values_match(readback, request.value) or attempt == len(AFTER_READ_RETRY_DELAYS):
+                if (
+                    numeric_values_match(readback, request.value, rel_tol=SETTINGS_NUMERIC_MATCH_REL_TOLERANCE)
+                    or attempt == len(AFTER_READ_RETRY_DELAYS)
+                ):
                     break
             except Exception as exc:
                 readback_error = str(exc)
@@ -335,7 +338,11 @@ class WorkspaceSettingsWriteMixin:
                 suggested_action="Inspect QLab state manually; do not retry the consumed write.",
                 message="Workspace Settings setter was attempted, but fresh readback was unavailable.",
             )
-        matched = readback is not None and numeric_values_match(readback, request.value)
+        matched = readback is not None and numeric_values_match(
+            readback,
+            request.value,
+            rel_tol=SETTINGS_NUMERIC_MATCH_REL_TOLERANCE,
+        )
         if matched:
             status = "updated_with_confirmed_timeouts" if setter_timeout else "updated"
             if setter_error and not setter_timeout:

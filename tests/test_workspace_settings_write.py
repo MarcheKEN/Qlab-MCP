@@ -188,6 +188,13 @@ def test_workspace_settings_registry_is_one_exact_saved_operation() -> None:
     assert MIN_GO_TIME_SPEC.activity_policy == "running_or_paused_zero"
 
 
+def test_workspace_settings_readback_keeps_existing_numeric_tolerance() -> None:
+    from qlab_mcp.write.comparison import SETTINGS_NUMERIC_MATCH_REL_TOLERANCE, numeric_values_match
+
+    assert SETTINGS_NUMERIC_MATCH_REL_TOLERANCE == 1e-5
+    assert numeric_values_match(1000.005, 1000.0, rel_tol=SETTINGS_NUMERIC_MATCH_REL_TOLERANCE)
+
+
 def test_workspace_settings_dry_run_issues_token_without_setter(monkeypatch: pytest.MonkeyPatch) -> None:
     import qlab_mcp.settings.write_operations as write_operations
 

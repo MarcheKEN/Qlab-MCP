@@ -35,7 +35,8 @@ examples live in the [agent workflow guide](agent-workflows.md).
 
 ### Preflight
 
-Use `qlab_check_write_readiness` before every real Create, Edit, Move, or Delete.
+Use `qlab_check_write_readiness` before every real Create, Edit, Move, Delete,
+or Workspace Settings write.
 It is a read-only preflight, not a confirmation token.
 
 ### Create

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import math
+import struct
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 UpdateCueProfile = Literal[
@@ -84,6 +86,36 @@ UpdateCuesStatus = Literal[
     "workspace_ambiguous",
     "workspace_unavailable",
 ]
+GeneralSettingsOperation = Literal["minGoTime"]
+GeneralSettingsWriteStatus = Literal[
+    "dry_run",
+    "dry_run_preflight_failed",
+    "updated",
+    "updated_with_confirmed_timeouts",
+    "preflight_failed",
+    "verification_failed",
+    "verification_inconclusive",
+]
+
+
+def _general_settings_numeric_value(value: object) -> int | float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError("value must be a non-negative OSC-representable number.")
+    if value < 0:
+        raise ValueError("value must be non-negative.")
+    if isinstance(value, int):
+        try:
+            struct.pack(">i", value)
+        except (OverflowError, struct.error) as exc:
+            raise ValueError("value must fit the OSC signed int32 range.") from exc
+        return value
+    if not math.isfinite(value):
+        raise ValueError("value must be finite.")
+    try:
+        struct.pack(">f", value)
+    except (OverflowError, struct.error) as exc:
+        raise ValueError("value must fit the OSC float32 range.") from exc
+    return value
 
 
 class QlabConnectionCheckResult(BaseModel):
@@ -171,6 +203,47 @@ class WorkspaceSettingsResult(BaseModel):
     redactions: list[dict[str, str]] = Field(default_factory=list)
     errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
+
+
+class GeneralSettingsEditInput(BaseModel):
+    """Typed input for qlab_edit_general_settings."""
+
+    workspace_id: UUID = Field(description="Exact workspace UUID.")
+    operation: GeneralSettingsOperation
+    value: int | float
+    dry_run: bool | None = None
+    confirm_token: str | None = None
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def validate_value(cls, value: object) -> int | float:
+        return _general_settings_numeric_value(value)
+
+
+class GeneralSettingsEditResult(BaseModel):
+    """Result for the gated general workspace setting write slice."""
+
+    ok: bool
+    status: GeneralSettingsWriteStatus = Field(description="Machine-readable workspace settings write result status.")
+    workspace_id: str
+    operation: GeneralSettingsOperation
+    dry_run: bool
+    requested_value: int | float
+    baseline: int | float | None = None
+    readback: int | float | None = None
+    planned_operations: list[dict[str, Any]] = Field(default_factory=list)
+    executed_operations: list[dict[str, Any]] = Field(default_factory=list)
+    confirm_token: str | None = None
+    readiness: dict[str, Any] | None = None
+    activity: dict[str, Any] | None = None
+    verification: dict[str, Any] | None = None
+    timeout_confirmation: dict[str, Any] | None = None
+    retry_unsafe: bool
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    error_code: str | None = None
+    suggested_action: str | None = None
+    message: str
 
 
 class WorkspaceStatusResult(BaseModel):

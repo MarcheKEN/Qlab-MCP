@@ -14,7 +14,7 @@ from qlab_mcp.models import (
     GeneralSettingsWriteStatus,
 )
 from qlab_mcp.settings.write_operations import WorkspaceSettingsWriteMixin
-from qlab_mcp.settings.write_registry import MIN_GO_TIME_SPEC
+from qlab_mcp.settings.write_registry import MIN_GO_TIME_SPEC, get_workspace_settings_write_spec
 
 
 WORKSPACE_ID = "11111111-1111-4111-8111-111111111111"
@@ -191,6 +191,8 @@ def test_workspace_settings_registry_is_one_exact_saved_operation() -> None:
     assert MIN_GO_TIME_SPEC.osc_path == "settings/general/minGoTime"
     assert MIN_GO_TIME_SPEC.readback_path == MIN_GO_TIME_SPEC.osc_path
     assert MIN_GO_TIME_SPEC.activity_policy == "running_or_paused_zero"
+    with pytest.raises(ValueError):
+        get_workspace_settings_write_spec("selectionIsPlayhead")
 
 
 def test_workspace_settings_readback_keeps_existing_numeric_tolerance() -> None:

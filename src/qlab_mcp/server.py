@@ -9,7 +9,7 @@ from uuid import UUID
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
-from pydantic import Field
+from pydantic import Field, StrictFloat, StrictInt
 
 from . import __version__
 from .errors import QLabMcpError
@@ -1216,7 +1216,7 @@ def qlab_edit_general_settings(
     workspace_id: UUID,
     operation: GeneralSettingsOperation,
     value: Annotated[
-        int | float,
+        StrictInt | StrictFloat,
         Field(
             ge=0,
             json_schema_extra={"minimum": 0},

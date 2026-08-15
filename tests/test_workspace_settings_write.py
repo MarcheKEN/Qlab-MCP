@@ -195,6 +195,21 @@ def test_workspace_settings_registry_is_one_exact_saved_operation() -> None:
         get_workspace_settings_write_spec("selectionIsPlayhead")
 
 
+def test_workspace_settings_uuid_resolution_preserves_qlab_canonical_case(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    reader = _SettingsFakeReader(workspace_id=WORKSPACE_ID.upper())
+
+    result = reader.edit_general_settings(WORKSPACE_ID.lower(), "minGoTime", 0.4, dry_run=True)
+
+    assert result.status == "dry_run"
+    assert result.workspace_id == WORKSPACE_ID.upper()
+    assert result.planned_operations[0]["address"] == f"/workspace/{WORKSPACE_ID.upper()}/settings/general/minGoTime"
+
+
 def test_workspace_settings_readback_keeps_existing_numeric_tolerance() -> None:
     from qlab_mcp.write.comparison import SETTINGS_NUMERIC_MATCH_REL_TOLERANCE, numeric_values_match
 
@@ -227,9 +242,12 @@ def test_workspace_settings_real_write_attempts_one_setter_and_reads_back(monkey
         WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
     )
 
-    setter_calls = [args for address, args in reader.calls if args and address.endswith("settings/general/minGoTime")]
+    expected_address = f"/workspace/{WORKSPACE_ID}/settings/general/minGoTime"
+    setter_calls = [(address, args) for address, args in reader.calls if args]
+    readback_calls = [address for address, args in reader.calls if not args]
     assert result.status == "updated"
-    assert len(setter_calls) == 1
+    assert setter_calls == [(expected_address, (0.4,))]
+    assert readback_calls and all(address == expected_address for address in readback_calls)
     assert result.readback == pytest.approx(0.4)
 
 
@@ -437,8 +455,10 @@ def test_workspace_settings_replay_and_inconclusive_readback_are_explicit(monkey
     result = unavailable.edit_general_settings(
         WORKSPACE_ID, "minGoTime", 0.4, dry_run=False, confirm_token=dry.confirm_token
     )
+    setter_calls = [args for _, args in unavailable.calls if args]
     assert result.status == "verification_inconclusive"
     assert result.retry_unsafe is True
+    assert setter_calls == [(0.4,)]
 
 
 def test_workspace_settings_expired_token_is_rejected_before_setter(monkeypatch: pytest.MonkeyPatch) -> None:

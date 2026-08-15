@@ -175,10 +175,10 @@ class WorkspaceSettingsWriteMixin:
         workspace = str(request.workspace_id)
         is_dry_run = resolve_dry_run(self, request.dry_run)
         spec = get_workspace_settings_write_spec(request.operation)
-        setter_address = _workspace_address(workspace, spec.osc_path)
         readiness: dict[str, Any] | None = None
         activity: dict[str, Any] | None = None
         baseline: int | float | None = None
+        setter_address = _workspace_address(workspace, spec.osc_path)
         planned = [
             _settings_setter_operation(
                 request.operation,
@@ -191,7 +191,9 @@ class WorkspaceSettingsWriteMixin:
         ]
 
         try:
-            self._resolve_settings_workspace_uuid(workspace)
+            workspace = self._resolve_settings_workspace_uuid(workspace)
+            setter_address = _workspace_address(workspace, spec.osc_path)
+            planned[0]["address"] = setter_address
             readiness = check_write_readiness(self, workspace)
             if not readiness.get("ok"):
                 return self._settings_result(
@@ -251,7 +253,8 @@ class WorkspaceSettingsWriteMixin:
                     message="Workspace Settings write was blocked by confirmation-token validation.",
                 )
             ensure_write_ready(self, workspace)
-            self._resolve_settings_workspace_uuid(workspace)
+            workspace = self._resolve_settings_workspace_uuid(workspace)
+            setter_address = _workspace_address(workspace, spec.osc_path)
             fresh_baseline = self._read_settings_number(workspace, spec)
             fresh_activity = _activity_snapshot(self, workspace)
             if fresh_activity["active_count"]:
@@ -370,10 +373,16 @@ class WorkspaceSettingsWriteMixin:
         workspaces = response.get("workspaces") if isinstance(response, dict) else None
         if not isinstance(workspaces, list):
             raise ValueError("QLab workspaces response must be a list.")
-        matches = [item for item in workspaces if isinstance(item, dict) and item.get("uniqueID") == workspace_id]
+        matches = [
+            item
+            for item in workspaces
+            if isinstance(item, dict)
+            and isinstance(item.get("uniqueID"), str)
+            and item["uniqueID"].casefold() == workspace_id.casefold()
+        ]
         if len(matches) != 1:
             raise ValueError("workspace_id must exactly match one QLab workspace uniqueID; display names are not accepted.")
-        return workspace_id
+        return matches[0]["uniqueID"]
 
     def _read_settings_number(self, workspace_id: str, spec: WorkspaceSettingsWriteSpec) -> int | float:
         reply = self._request(_workspace_address(workspace_id, spec.readback_path), workspace_id=workspace_id)

@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import inspect
 import json
+import math
 from pathlib import Path
 import re
 from typing import Any
@@ -1224,6 +1225,38 @@ def test_general_settings_tool_schema_and_annotations_are_conservative() -> None
     assert set(tool.meta["fastmcp"]["tags"]) == {
         "qlab", "settings", "general-settings", "write-mode", "gated-write"
     }
+
+
+@pytest.mark.parametrize("value", ["0.6", True, False, None, -0.1, math.inf, math.nan])
+def test_general_settings_tool_rejects_coercible_non_numeric_values_before_handler(
+    monkeypatch: pytest.MonkeyPatch,
+    value: object,
+) -> None:
+    called = False
+
+    class FakeReader:
+        def edit_general_settings(self, **_kwargs: object) -> None:
+            nonlocal called
+            called = True
+            raise AssertionError("invalid input reached the settings handler")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_edit_general_settings",
+                {
+                    "workspace_id": "11111111-1111-4111-8111-111111111111",
+                    "operation": "minGoTime",
+                    "value": value,
+                    "dry_run": True,
+                },
+            )
+
+    with pytest.raises(ToolError, match=r"validation error(?:s)? for call\[qlab_edit_general_settings\]"):
+        asyncio.run(call_tool())
+    assert called is False
 
 
 def test_general_settings_tool_forwards_typed_request_to_reader(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -38,6 +38,12 @@ from .allowlist import (
     validate_writable_cue_type,
     writable_cue_type_label,
 )
+from .comparison import (
+    UPDATE_NUMERIC_MATCH_ABS_TOLERANCE,
+    UPDATE_NUMERIC_MATCH_REL_TOLERANCE,
+    is_plain_finite_number as _is_plain_finite_number,
+    is_plain_number as _is_plain_number,
+)
 from .safety import check_write_readiness, ensure_write_ready, resolve_dry_run
 from .results import build_batch_update_result as _batch_update_result
 from .timeouts import (
@@ -116,8 +122,6 @@ CREATE_CUES_TOKEN_TTL_SECONDS = 300
 
 
 MAX_BATCH_UPDATES = 50
-UPDATE_NUMERIC_MATCH_ABS_TOLERANCE = 1e-5
-UPDATE_NUMERIC_MATCH_REL_TOLERANCE = 1e-6
 # QLab quantizes saved dB values slightly (for example, -12 -> -11.999952...).
 FADE_AUDIO_DB_MATCH_TOLERANCE = 1e-3
 CASEFOLD_COMPARISON_KEYS = {
@@ -4692,11 +4696,6 @@ def _phase4c_video_fx_after_value(after: Any, item: dict[str, Any]) -> Any:
     if operation is None:
         return None
     return parameters.get((operation.get("arg_values") or {}).get("parameterKey"))
-
-
-def _is_plain_finite_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value))
-
 
 
 def _phase7_video_geometry_operation(item: dict[str, Any]) -> dict[str, Any] | None:
@@ -11448,10 +11447,6 @@ def _comparison_value(key: str, value: Any) -> Any:
     if key in CASEFOLD_COMPARISON_KEYS and isinstance(value, str):
         return value.strip().casefold()
     return value
-
-
-def _is_plain_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _after_values_for_requested(values: Any, requested: dict[str, Any]) -> dict[str, Any] | None:

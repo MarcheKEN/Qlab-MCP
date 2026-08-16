@@ -1,23 +1,23 @@
-# PLAN LUCES Phase 4A — escritura limitada de `lightCommandText`
+# LIGHT PLAN Phase 4A — limited `lightCommandText` write
 
-## 1. Alcance
+## 1. Scope
 
-Phase 4A habilita una sola mutación: actualizar `lightCommandText` de un único cue de tipo exacto `Light` mediante `qlab_update_cues` y `profile="light_basic"`.
+Phase 4A enables one mutation only: update `lightCommandText` on one cue of exact type `Light` through `qlab_update_cues` with `profile="light_basic"`.
 
-El diccionario OSC incluido en el repositorio documenta `/cue/{cue_number}/lightCommandText {string}` como lectura/escritura. La implementación usa su variante estable y cualificada por workspace: `/workspace/{workspace_id}/cue_id/{cue_unique_id}/lightCommandText`.
+The repository's OSC dictionary documents `/cue/{cue_number}/lightCommandText {string}` as read/write. The implementation uses its stable workspace-qualified variant: `/workspace/{workspace_id}/cue_id/{cue_unique_id}/lightCommandText`.
 
-No añade tools MCP. No habilita Dashboard, playback, raw OSC, Light Patch ni otros setters Light.
+It adds no MCP tools. It does not enable Dashboard, playback, raw OSC, the Light Patch, or other Light setters.
 
-## 2. Dry-run confirmable
+## 2. Confirmable dry-run
 
-Un dry-run produce candidato Phase 4 solo cuando:
+A dry-run produces a Phase 4 candidate only when:
 
 - `light_command_analysis.overall_status == "valid"`;
-- texto solicitado no vacío;
-- baseline actual es string;
-- cue tiene `uniqueID` resuelto.
+- requested text is non-empty;
+- the current baseline is a string;
+- the cue has a resolved `uniqueID`.
 
-Operación resultante:
+Resulting operation:
 
 ```json
 {
@@ -32,93 +32,93 @@ Operación resultante:
 }
 ```
 
-`real_write_enabled=false` impide bypass del registry general. Solo flujo especializado Phase 4 acepta token.
+`real_write_enabled=false` prevents bypassing the general registry. Only the specialized Phase 4 flow accepts the token.
 
-Texto vacío puede analizar como `valid`, pero no es confirmable: `phase4_real_write_candidate=false`, `real_write_possible=false`, sin token y motivo `empty_light_command_text_not_writeable`.
+Empty text may analyze as `valid`, but is not confirmable: `phase4_real_write_candidate=false`, `real_write_possible=false`, no token, and reason `empty_light_command_text_not_writeable`.
 
-Estados `warning`, `invalid`, `unsupported` y `unavailable` tampoco generan token ni ruta real.
+`warning`, `invalid`, `unsupported`, and `unavailable` states also generate neither a token nor a real-write path.
 
-## 3. Preflight real exacto
+## 3. Exact real preflight
 
-Si cualquier item menciona `lightCommandText`, toda llamada queda bajo reglas Phase 4:
+If any item mentions `lightCommandText`, the entire call is subject to Phase 4 rules:
 
-1. Workspace explícito y resoluble.
-2. Un solo item.
+1. Explicit, resolvable workspace.
+2. One item only.
 3. `profile="light_basic"`.
-4. Una sola property/operation: `lightCommandText`, path idéntico y modo `saved`.
-5. Exactamente un `confirm_token` revisado.
-6. Readiness normal: writes habilitados, passcode, scope `edit` vía `/connect` y QLab Edit Mode (`showMode=false`).
-7. Cache de lectura limpia; lectura fresh de tipo, `uniqueID` y baseline.
-8. Tipo exacto `Light`.
-9. Light Patch safe leído fresh; texto solicitado reanalizado y aún `valid`.
-10. Firma y contexto del token válidos.
-11. Hash del baseline fresh igual al firmado. Si cambia: `stale_light_command_baseline`; cero setters.
-12. Un único setter por `cue_id`.
-13. Cache limpia y readback fresh. Éxito solo con igualdad exacta del string solicitado.
+4. One property/operation: `lightCommandText`, identical path, and `saved` mode.
+5. Exactly one reviewed `confirm_token`.
+6. Normal readiness: writes enabled, passcode, `edit` scope via `/connect`, and QLab Edit Mode (`showMode=false`).
+7. Cleared read cache; fresh type, `uniqueID`, and baseline read.
+8. Exact type `Light`.
+9. Fresh safe Light Patch read; requested text re-analyzed and still `valid`.
+10. Valid token signature and context.
+11. Fresh baseline hash matches the signed hash. If it changes: `stale_light_command_baseline`; zero setters.
+12. One setter for the `cue_id`.
+13. Cleared cache and fresh readback. Success requires exact equality with the requested string.
 
-Mismatch de readback devuelve `verification_failed`, incluyendo `requested` y `after`. Todo fallo anterior al setter deja `executed_operations=[]` por item.
+Readback mismatch returns `verification_failed`, including `requested` and `after`. Any failure before the setter leaves `executed_operations=[]` for the item.
 
 ## 4. Token
 
-Token autocontenido HMAC-SHA256, secreto aleatorio por proceso. Payload:
+Self-contained HMAC-SHA256 token with a per-process random secret. Payload:
 
 - `version=1`;
 - `operation_kind="phase4_light_command_text_write"`;
 - `workspace_id`, `cue_ref`, `cue_id`;
 - `profile`, `property`, `path`, `mode`;
-- SHA-256 de baseline y requested;
+- SHA-256 of the baseline and requested value;
 - `risk_tier`, `capability_gate`, `analysis_status="valid"`.
 
-No contiene texto LCL en claro. Reiniciar MCP cambia secreto e invalida tokens anteriores. Tokens no son single-use dentro del mismo proceso. Rollback exige siempre leer baseline actual, ejecutar nuevo dry-run y usar token nuevo.
+It contains no plaintext LCL text. Restarting the MCP changes the secret and invalidates previous tokens. Tokens are not single-use within the same process. Rollback always requires reading the current baseline, running a new dry-run, and using a new token.
 
-## 5. Operaciones bloqueadas
+## 5. Blocked operations
 
 - `alwaysCollate`, `subcontroller`, `collateAndStart`;
 - `setLight`, `replaceLightCommand`, `removeLightCommandsMatching`;
 - `safeSort`, `safeSortCommands`, `prune`, `pruneCommands`;
-- batch o mezcla con propiedades adicionales;
+- batch or mixing with additional properties;
 - Dashboard/live lighting;
 - GO, playback, start, stop, panic, audition, preview;
 - raw OSC;
-- cambios de Light Patch, instrumentos, grupos, definiciones o DMX.
+- changes to the Light Patch, instruments, groups, definitions, or DMX.
 
-## 6. Matriz de tests fake-client
+## 6. Fake-client test matrix
 
-| Caso | Resultado esperado |
+| Case | Expected result |
 |---|---|
-| Dry-run válido/no vacío | Candidato high-risk y token |
-| Write válido | Un setter; readback exacto |
-| Rollback | Nuevo dry-run y token; restaura baseline |
-| Vacío/warning/invalid/unsupported/unavailable | Sin token ni ruta real |
-| Cue no-Light, ausente, patch/read failure | Preflight bloqueado; cero setters |
-| Dos items o property adicional | Llamada completa bloqueada antes de OSC |
-| Setter Light distinto | Sigue dry-run only |
-| Token malformado, firma o versión inválida | Bloqueado |
-| Workspace/ref/cue/request/context distinto | Bloqueado |
-| Baseline stale | `stale_light_command_baseline`; cero setters |
-| Readback distinto | `verification_failed` con requested/after |
-| Sin edit scope o Show Mode | Bloqueado antes de setter |
-| Direcciones observadas | Sin Dashboard, playback ni OSC sin workspace |
+| Valid/non-empty dry-run | High-risk candidate and token |
+| Valid write | One setter; exact readback |
+| Rollback | New dry-run and token; baseline restored |
+| Empty/warning/invalid/unsupported/unavailable | No token or real path |
+| Non-Light, missing cue, patch/read failure | Preflight blocked; zero setters |
+| Two items or additional property | Entire call blocked before OSC |
+| Other Light setter | Remains dry-run only |
+| Malformed token, invalid signature or version | Blocked |
+| Different workspace/ref/cue/request/context | Blocked |
+| Stale baseline | `stale_light_command_baseline`; zero setters |
+| Different readback | `verification_failed` with requested/after |
+| No edit scope or Show Mode | Blocked before setter |
+| Observed addresses | No Dashboard, playback, or OSC without a workspace |
 
-## 7. Protocolo runtime Phase 4B — no ejecutado
+## 7. Phase 4B runtime protocol — not executed
 
-Usar exclusivamente `<TEST_WORKSPACE_NAME>`, tras identificar su UUID explícito. Elegir un Light Cue desarmado y aislado. No usar cues de show, Dashboard ni playback.
+Use only `<TEST_WORKSPACE_NAME>` after identifying its explicit UUID. Choose an isolated, disarmed Light Cue. Do not use show cues, Dashboard, or playback.
 
-1. Confirmar conexión, workspace UUID, Edit Mode y scope `edit`.
-2. Leer cue y guardar `uniqueID`, tipo y `lightCommandText` original.
-3. Leer Light Patch safe. Abortar si patch vacío, lectura parcial o target de prueba inexistente.
-4. Ejecutar dry-run con cambio mínimo válido y no vacío.
-5. Revisar analysis, diff, baseline, `phase4_real_write_candidate` y token.
-6. Ejecutar una sola llamada real con mismo workspace/cue/property/value y token.
-7. Verificar `updated`, un setter y readback exacto.
-8. Para rollback, ejecutar nuevo dry-run desde valor actual hacia texto original. Revisar token nuevo.
-9. Ejecutar rollback único y verificar readback original exacto.
-10. Ante cualquier mismatch, no reintentar write; registrar respuesta y parar.
+1. Confirm connection, workspace UUID, Edit Mode, and `edit` scope.
+2. Read the cue and save its `uniqueID`, type, and original `lightCommandText`.
+3. Read the safe Light Patch. Abort if the patch is empty, the read is partial, or the test target does not exist.
+4. Run a dry-run with a minimal valid, non-empty change.
+5. Review the analysis, diff, baseline, `phase4_real_write_candidate`, and token.
+6. Make exactly one real call with the same workspace/cue/property/value and token.
+7. Verify `updated`, one setter, and exact readback.
+8. For rollback, run a new dry-run from the current value to the original text. Review the new token.
+9. Execute one rollback and verify the exact original readback.
+10. On any mismatch, do not retry the write; record the response and stop.
 
-Prompt exacto para Phase 4B:
+Exact Phase 4B prompt:
 
 ```text
-Usa solo tools MCP read-only salvo las dos llamadas qlab_update_cues expresamente descritas. Trabaja únicamente en <TEST_WORKSPACE_NAME> usando su workspace_id UUID explícito. No uses GO, playback, start, stop, panic, audition, preview, Dashboard ni raw OSC. Identifica un Light Cue desarmado y aislado; lee y conserva su lightCommandText original. Lee Light Patch safe y aborta si está vacío/parcial o no ofrece un target simple válido. Ejecuta dry_run=true para cambiar solo lightCommandText a un comando mínimo válido no vacío. Revisa overall_status=valid, phase4_real_write_candidate=true, diff, baseline y confirm_token. Si todo coincide, ejecuta exactamente una llamada real qlab_update_cues con un item, profile=light_basic, solo lightCommandText y ese token. Verifica un único setter y readback exacto. Después crea un nuevo dry-run desde el valor actual hacia el texto original, obtiene token nuevo y ejecuta un único rollback. Verifica readback original exacto. Ante cualquier error, stale baseline, análisis no válido o mismatch, no hagas más writes y reporta. No cambies ningún otro cue, patch, instrumento, grupo, definición ni dirección DMX.
+Use only read-only MCP tools except for the two explicitly described `qlab_update_cues` calls. Work only in <TEST_WORKSPACE_NAME> using its explicit workspace_id UUID. Do not use GO, playback, start, stop, panic, audition, preview, Dashboard, or raw OSC. Identify an isolated, disarmed Light Cue; read and preserve its original lightCommandText. Read the safe Light Patch and abort if it is empty/partial or does not offer a valid simple target. Run `dry_run=true` to change only lightCommandText to a minimal valid, non-empty command. Review overall_status=valid, phase4_real_write_candidate=true, diff, baseline, and confirm_token. If everything matches, make exactly one real `qlab_update_cues` call with one item, profile=light_basic, only lightCommandText, and that token. Verify one setter and exact readback. Then create a new dry-run from the current value to the original text, obtain a new token, and execute one rollback. Verify the exact original readback. On any error, stale baseline, invalid analysis, or mismatch, make no further writes and report it. Do not change any other cue, patch, instrument, group, definition, or DMX address.
 ```
 
-Phase 4B no forma parte de esta entrega y no se ha ejecutado.
+Phase 4B is not part of this delivery and has not been executed.

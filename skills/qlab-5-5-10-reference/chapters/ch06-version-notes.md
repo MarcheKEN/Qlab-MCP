@@ -1,7 +1,7 @@
-# Versión, licencias y límites
+# Version, licenses, and limits
 
-Esta skill está acotada a **QLab 5.5.10**. La página canónica fue verificada el 2026-08-01 y declara esa versión; la página de cambios registra 5.5.10 del 11 de marzo de 2026.
+This skill is scoped to **QLab 5.5.10**. The canonical page was verified on 2026-08-01 and states that version; the change log records 5.5.10 on March 11, 2026.
 
-La documentación oficial puede cambiar. Si la página actual muestra otra versión, conserva la fecha y declara la diferencia en vez de mezclar afirmaciones.
+Official documentation can change. If the current page shows another version, preserve the date and report the difference instead of mixing claims.
 
-No afirmes requisitos de licencia sin la página [Features by License](https://reference.qlab.app/docs/v5/general/features/). No trates snapshots locales, notas del proyecto o resultados runtime como documentación oficial.
+Do not claim license requirements without the [Features by License](https://reference.qlab.app/docs/v5/general/features/) page. Do not treat local snapshots, project notes, or runtime results as official documentation.

@@ -16,7 +16,7 @@ traffic.
 
 ## Public boundary
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 13 decorated tools,
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 14 decorated tools,
 their schemas, annotations, timeouts, and result models. Each call creates a
 fresh `QLabReader` and closes it after the operation. `qlab-mcp` maps to
 `qlab_mcp.server:main`.
@@ -55,11 +55,15 @@ retains batch planning and orchestration while extracted family modules own
 their domain rules. `write/tokens.py`, `write/timeouts.py`, and
 `write/results.py` provide shared token, deadline, and result behavior.
 
-Move and Delete have dedicated modules and public tools. Real writes require
+Move, Delete, and Workspace Settings writes have dedicated modules and public
+tools. `settings/write_registry.py` and `settings/write_operations.py` keep the
+first Workspace Settings write separate from cue-edit orchestration. The
+`qlab_edit_workspace_settings` tool currently accepts only the typed
+`general.minGoTime` operation; future researched operations stay outside the
+executable registry until their own implementation wave. Real writes require
 exact targeting, readiness, deterministic preflight, the required fresh token,
-one setter per operation, cache invalidation, and fresh readback. A timed-out
-setter is never resent automatically; later reads determine whether the result
-is confirmed or uncertain.
+one setter per operation, cache invalidation, and fresh readback. A timed-out setter is never resent automatically; later reads
+determine whether the result is confirmed or uncertain.
 
 ## Sources of truth
 

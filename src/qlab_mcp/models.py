@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+import math
+import struct
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, field_validator
 
 
 UpdateCueProfile = Literal[
@@ -84,6 +86,68 @@ UpdateCuesStatus = Literal[
     "workspace_ambiguous",
     "workspace_unavailable",
 ]
+WorkspaceSettingsOperationId = Literal["general.minGoTime"]
+WorkspaceSettingsWriteStatus = Literal[
+    "dry_run",
+    "dry_run_preflight_failed",
+    "unsupported",
+    "unchanged",
+    "updated",
+    "updated_with_confirmed_timeouts",
+    "preflight_failed",
+    "verification_failed",
+    "verification_inconclusive",
+]
+
+
+def _general_settings_numeric_value(value: object) -> int | float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError("value must be a non-negative OSC-representable number.")
+    if value < 0:
+        raise ValueError("value must be non-negative.")
+    if isinstance(value, int):
+        try:
+            struct.pack(">i", value)
+        except (OverflowError, struct.error) as exc:
+            raise ValueError("value must fit the OSC signed int32 range.") from exc
+        return value
+    if not math.isfinite(value):
+        raise ValueError("value must be finite.")
+    try:
+        struct.pack(">f", value)
+    except (OverflowError, struct.error) as exc:
+        raise ValueError("value must fit the OSC float32 range.") from exc
+    return value
+
+
+class GeneralMinGoTimeOperation(BaseModel):
+    """The only executable Workspace Settings operation in Wave 1."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["general.minGoTime"]
+    value: Annotated[
+        StrictInt | StrictFloat,
+        Field(
+            ge=0,
+            json_schema_extra={"minimum": 0},
+            description=(
+                "Finite non-negative seconds for the allowlisted general.minGoTime setting. "
+                "The OSC encoder preserves integer versus float transport types."
+            ),
+        ),
+    ]
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def validate_value(cls, value: object) -> int | float:
+        return _general_settings_numeric_value(value)
+
+
+# Keep the public request shape extensible without advertising a one-item union
+# in FastMCP's JSON Schema. Add the next typed operation and promote this alias
+# to an Annotated discriminated union in that operation's implementation wave.
+WorkspaceSettingsOperation = GeneralMinGoTimeOperation
 
 
 class QlabConnectionCheckResult(BaseModel):
@@ -171,6 +235,56 @@ class WorkspaceSettingsResult(BaseModel):
     redactions: list[dict[str, str]] = Field(default_factory=list)
     errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
+
+
+class WorkspaceSettingsEditRequest(BaseModel):
+    """Typed input for the unified Workspace Settings write tool."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    workspace_id: UUID = Field(description="Exact workspace UUID.")
+    operation: WorkspaceSettingsOperation
+    dry_run: bool | None = None
+    confirm_token: str | None = None
+
+    @field_validator("workspace_id", mode="before")
+    @classmethod
+    def validate_workspace_id(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        try:
+            canonical = str(UUID(value))
+        except ValueError as exc:
+            raise ValueError("workspace_id must be an exact workspace UUID.") from exc
+        if canonical.casefold() != value.casefold():
+            raise ValueError("workspace_id must be an exact workspace UUID.")
+        return value
+
+
+class WorkspaceSettingsEditResult(BaseModel):
+    """Result for the gated Workspace Settings write slice."""
+
+    ok: bool
+    status: WorkspaceSettingsWriteStatus = Field(description="Machine-readable workspace settings write result status.")
+    workspace_id: str
+    operation: WorkspaceSettingsOperationId
+    dry_run: bool
+    requested_value: int | float
+    baseline: int | float | None = None
+    readback: int | float | None = None
+    planned_operations: list[dict[str, Any]] = Field(default_factory=list)
+    executed_operations: list[dict[str, Any]] = Field(default_factory=list)
+    confirm_token: str | None = None
+    readiness: dict[str, Any] | None = None
+    activity: dict[str, Any] | None = None
+    verification: dict[str, Any] | None = None
+    timeout_confirmation: dict[str, Any] | None = None
+    retry_unsafe: bool
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    error_code: str | None = None
+    suggested_action: str | None = None
+    message: str
 
 
 class WorkspaceStatusResult(BaseModel):

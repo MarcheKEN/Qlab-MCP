@@ -1,17 +1,17 @@
-# Video, Camera y Text
+# Video, Camera, and Text
 
 ## Video cues
 
-Un **Video cue** reproduce vídeo o imágenes fijas con control de timing, opacity, scale, position, 3D rotation, effects y blending. Necesita un `file target` y un `stage`. Las imágenes fijas corren indefinidamente salvo duración finita.
+A **Video cue** plays video or still images with control over timing, opacity, scale, position, 3D rotation, effects, and blending. It needs a `file target` and a `stage`. Still images run indefinitely unless given a finite duration.
 
-Fuente: [Video Cues](https://reference.qlab.app/docs/v5/video/video-cues/).
+Source: [Video Cues](https://reference.qlab.app/docs/v5/video/video-cues/).
 
-La compatibilidad depende del codec y del container. `mov` y `mp4` son containers recomendados; para transparencia se recomiendan ProRes 4444 o Hap Alpha y alpha premultiplicado.
+Compatibility depends on the codec and container. `mov` and `mp4` are recommended containers; for transparency, ProRes 4444 or Hap Alpha and premultiplied alpha are recommended.
 
-## Camera y Text
+## Camera and Text
 
-Usa las páginas oficiales [Camera Cues](https://reference.qlab.app/docs/v5/video/camera-cues/) y [Text Cues](https://reference.qlab.app/docs/v5/video/text-cues/) para sus tabs, permisos, formatos y propiedades. Mantén sus términos exactos y no deduzcas una ruta OSC desde una propiedad visual: deriva la consulta al diccionario OSC.
+Use the official [Camera Cues](https://reference.qlab.app/docs/v5/video/camera-cues/) and [Text Cues](https://reference.qlab.app/docs/v5/video/text-cues/) pages for their tabs, permissions, formats, and properties. Keep their exact terms and do not infer an OSC path from a visual property; route the query to the OSC dictionary.
 
-## Patches y geometry
+## Patches and geometry
 
-`Stage`, `Video Output`, `Geometry`, `Levels` y `Video FX` son capas distintas. Verifica cada propiedad en el inspector o en la fuente de scripting correspondiente antes de documentar una automatización.
+`Stage`, `Video Output`, `Geometry`, `Levels`, and `Video FX` are separate layers. Verify each property in the inspector or corresponding scripting source before documenting an automation.

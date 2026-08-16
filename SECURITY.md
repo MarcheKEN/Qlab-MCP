@@ -7,9 +7,10 @@ narrowly gated cue-editing workflows over OSC. The supported deployment is on
 the operator's machine, with QLab reachable through `QLAB_HOST`.
 
 This policy covers the shipped MCP server, its OSC transport, read profiles,
-workspace/cue resolution, input validation, and gated write paths. It does not
-turn QLab into a remote show-control surface: GO, playback, Dashboard, panic,
-raw OSC, broad `/live` writes, and AppleScript fallback are not supported.
+workspace/cue/settings resolution, input validation, and gated write paths. It
+does not turn QLab into a remote show-control surface: GO, playback,
+Dashboard, panic, raw OSC, broad `/live` writes, and AppleScript fallback are
+not supported.
 
 ## Threat Model and Trust Boundaries
 
@@ -58,7 +59,8 @@ file roots are operator configuration, not tool arguments.
 
 ## Write Workflow
 
-All real Create, Edit, Move, and Delete requests use this universal sequence:
+All real Create, Edit, Move, Delete, and Workspace Settings write requests use
+this universal sequence:
 
 1. Resolve one explicit workspace and exact cue/container identifiers.
 2. Run `qlab_check_write_readiness` and stop on any blocker.
@@ -84,6 +86,20 @@ exact `confirm_token` copied into that update item's `confirm_gates`. Edit
 batches are non-atomic; a timeout confirmed by readback is not retried, while an
 inconclusive timeout requires inspection before any recovery. Rollback, when
 supported, uses a new dry-run and fresh gate.
+
+### General settings
+
+`qlab_edit_general_settings` is limited to one exact workspace UUID, one
+allowlisted operation (`general.minGoTime`), and one finite non-negative
+seconds value. It uses one dedicated `confirm:workspaceSettings:v1` token,
+requires zero running or paused cues before token issuance and again before the
+setter, and sends exactly one qualified saved-settings setter followed by fresh
+no-argument readback. A timed-out setter is never retried. Matching readback
+may confirm the outcome; mismatch or unavailable readback remains failed or
+inconclusive. The zero-activity gate is a conservative MCP safety policy, not
+an asserted QLab requirement. The current activity reader cannot prove
+workspace-wide Audition state, so Audition must remain disabled by operator
+policy.
 
 ### Move
 

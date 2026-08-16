@@ -4,9 +4,11 @@ import asyncio
 import hashlib
 import inspect
 import json
+import math
 from pathlib import Path
 import re
 from typing import Any
+from uuid import UUID
 
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
@@ -146,6 +148,19 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "input_schema_hash": "ed9ba9bbfec6d77e87994f66680f65dcf2399f17e963c226f1daaf6c8b62f7df",
         "output_schema_hash": "016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d",
     },
+    "qlab_edit_workspace_settings": {
+        "title": "Edit QLab Workspace Settings",
+        "timeout": 60.0,
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+        "tags": ["gated-write", "general-settings", "qlab", "settings", "write-mode"],
+        "input_schema_hash": "982bfde04442b4bd399b7c43344a8094346ff35ea18408427adba9cdd9a578a5",
+        "output_schema_hash": "68b12c38b49fc5e0a676863f13242de8b4645022952f527a14fbfe8916f967b2",
+    },
     "qlab_move_cues": {
         "title": "Move QLab Cues",
         "timeout": UPDATE_CUES_TIMEOUT,
@@ -185,6 +200,7 @@ EXPECTED_TOOL_CONCEPTS = {
     "qlab_create_cue": ("dry-run plan", "dry-run planning never sends mutating osc", "confirm:createcue:v2"),
     "qlab_create_cues": ("one verified /new per item", "no automatic rollback", "confirm:createcues:v1", "do not retry"),
     "qlab_edit_cues": ("dry-run planning never sends mutating osc", "high-risk profiles", "exact cue uuid", "per-operation confirm gates", "non-atomic", "fresh readback", "do not retry"),
+    "qlab_edit_workspace_settings": ("general.minGoTime", "fresh", "single-use token", "one setter", "readback", "Audition"),
     "qlab_move_cues": ("sequential qlab cue moves", "never claims atomicity", "uuid-only", "confirm:movecues:v1", "fresh parent/order readback"),
     "qlab_delete_cues": ("sequential deletions", "not atomic", "confirm:deletecues:v1", "deepest-first", "no automatic rollback", "verify disappearance", "preservation of the root", "empty group"),
 }
@@ -388,7 +404,7 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
     tools = asyncio.run(list_tools())
     tool_names = {tool.name for tool in tools}
 
-    assert len(tools) == 13
+    assert len(tools) == 14
     assert tool_names == set(EXPECTED_FASTMCP_TOOL_CONTRACTS)
     forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
     assert all(
@@ -743,7 +759,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    write_tools = {"qlab_create_cue", "qlab_create_cues", "qlab_edit_cues", "qlab_move_cues", "qlab_delete_cues"}
+    write_tools = {"qlab_create_cue", "qlab_create_cues", "qlab_edit_cues", "qlab_edit_workspace_settings", "qlab_move_cues", "qlab_delete_cues"}
     read_only_tools = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) - write_tools
 
     for tool_name in read_only_tools:
@@ -754,7 +770,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
 
     for tool_name in write_tools:
         assert tools[tool_name].annotations.readOnlyHint is False, f"{tool_name} was marked read-only"
-        if tool_name in {"qlab_edit_cues", "qlab_move_cues", "qlab_delete_cues"}:
+        if tool_name in {"qlab_edit_cues", "qlab_edit_workspace_settings", "qlab_move_cues", "qlab_delete_cues"}:
             assert tools[tool_name].annotations.destructiveHint is True
         else:
             assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
@@ -966,6 +982,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_create_cue",
         "qlab_create_cues",
         "qlab_edit_cues",
+        "qlab_edit_workspace_settings",
         "qlab_move_cues",
         "qlab_delete_cues",
     }
@@ -1186,6 +1203,141 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "empty Group" in delete.inputSchema["properties"]["container_id"]["description"]
     assert "confirm:deleteCues:v1:" in delete.inputSchema["properties"]["confirm_token"]["description"]
     assert "verification_failed" in delete.outputSchema["properties"]["status"]["enum"]
+
+
+def test_workspace_settings_tool_schema_and_annotations_are_conservative() -> None:
+    async def list_tools():
+        async with Client(mcp) as client:
+            return await client.list_tools()
+
+    tool = next(tool for tool in asyncio.run(list_tools()) if tool.name == "qlab_edit_workspace_settings")
+    schema = tool.inputSchema
+    assert schema["properties"]["workspace_id"]["format"] == "uuid"
+    operation_schema = schema["properties"]["operation"]
+    assert operation_schema["properties"]["kind"]["const"] == "general.minGoTime"
+    value_schema = operation_schema["properties"]["value"]
+    assert value_schema["anyOf"][0]["type"] == "integer"
+    assert value_schema["anyOf"][1]["type"] == "number"
+    assert value_schema["minimum"] == 0
+    assert set(schema["properties"]) == {"workspace_id", "operation", "dry_run", "confirm_token"}
+    assert "oneOf" not in schema["properties"]["operation"]
+    assert "selectionIsPlayhead" not in json.dumps(schema)
+    assert tool.annotations.readOnlyHint is False
+    assert tool.annotations.destructiveHint is True
+    assert tool.annotations.idempotentHint is False
+    assert tool.annotations.openWorldHint is True
+    assert set(tool.meta["fastmcp"]["tags"]) == {
+        "qlab", "settings", "general-settings", "write-mode", "gated-write"
+    }
+
+
+@pytest.mark.parametrize("value", ["0.6", True, False, None, -0.1, math.inf, math.nan])
+def test_general_settings_tool_rejects_coercible_non_numeric_values_before_handler(
+    monkeypatch: pytest.MonkeyPatch,
+    value: object,
+) -> None:
+    called = False
+
+    class FakeReader:
+        def edit_workspace_settings(self, **_kwargs: object) -> None:
+            nonlocal called
+            called = True
+            raise AssertionError("invalid input reached the settings handler")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_edit_workspace_settings",
+                {
+                    "workspace_id": "11111111-1111-4111-8111-111111111111",
+                    "operation": {"kind": "general.minGoTime", "value": value},
+                    "dry_run": True,
+                },
+            )
+
+    with pytest.raises(ToolError, match=r"validation error(?:s)? for call\[qlab_edit_workspace_settings\]"):
+        asyncio.run(call_tool())
+    assert called is False
+
+
+def test_workspace_settings_tool_rejects_non_enabled_operation_before_handler(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called = False
+
+    class FakeReader:
+        def edit_workspace_settings(self, **_kwargs: object) -> None:
+            nonlocal called
+            called = True
+            raise AssertionError("non-enabled operation reached the settings handler")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_edit_workspace_settings",
+                {
+                    "workspace_id": "11111111-1111-4111-8111-111111111111",
+                    "operation": {"kind": "general.selectionIsPlayhead", "value": True},
+                    "dry_run": True,
+                },
+            )
+
+    with pytest.raises(ToolError, match=r"validation error(?:s)? for call\[qlab_edit_workspace_settings\]"):
+        asyncio.run(call_tool())
+    assert called is False
+
+
+def test_workspace_settings_tool_forwards_typed_request_to_reader(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeReader:
+        def edit_workspace_settings(self, request: Any) -> dict[str, object]:
+            captured.update(request.model_dump(mode="json"))
+            return {
+                "ok": True,
+                "status": "dry_run",
+                "workspace_id": str(request.workspace_id),
+                "operation": "general.minGoTime",
+                "dry_run": True,
+                "requested_value": request.operation.value,
+                "baseline": 0.2,
+                "readback": None,
+                "planned_operations": [{"operation": "set_workspace_setting"}],
+                "executed_operations": [],
+                "confirm_token": "confirm:workspaceSettings:v1:test",
+                "readiness": {"ok": True},
+                "activity": {"active_count": 0},
+                "verification": None,
+                "timeout_confirmation": None,
+                "retry_unsafe": False,
+                "errors": None,
+                "warnings": [],
+                "error_code": None,
+                "suggested_action": None,
+                "message": "dry run",
+            }
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+    result = server_module.qlab_edit_workspace_settings(
+        UUID("11111111-1111-4111-8111-111111111111"),
+        {"kind": "general.minGoTime", "value": 0.4},
+        True,
+        None,
+    )
+    assert result.status == "dry_run"
+    assert captured == {
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "operation": {"kind": "general.minGoTime", "value": 0.4},
+        "dry_run": True,
+        "confirm_token": None,
+    }
 
 
 def test_overview_partial_result_suggests_bounded_follow_up() -> None:

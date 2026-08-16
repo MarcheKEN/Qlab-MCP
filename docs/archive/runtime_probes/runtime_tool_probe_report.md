@@ -8,7 +8,7 @@ Workspace ID: `<TEST_WORKSPACE_UUID>`
 
 QLab version: `5.5.10`
 
-## 1. Resumen Ejecutivo
+## 1. Executive Summary
 
 Empirical probe ran against an open QLab fixture workspace. No GO, playback,
 stop, panic, audition, preview, raw OSC, deletion, or real write was executed.
@@ -58,7 +58,7 @@ of 8 parallel `qlab_query_cues` calls timed out at 120 seconds. Later serial or
 smaller parallel calls mostly recovered, but one robustness round returned a
 partial settings summary with `errors.audio.patchList`.
 
-## 2. Tabla Por Tool
+## 2. Tool Table
 
 | Tool | Exposed args/schema | Kind | Requires `workspace_id` | Empirical result |
 | --- | --- | --- | --- | --- |
@@ -72,7 +72,7 @@ partial settings summary with `errors.audio.patchList`.
 | `qlab_create_cue` | `workspace_id: string`, `cue_type: memo/group/wait/audio`, `properties?`, `dry_run?`, `after_cue_id?` | Dry-run/write gated | Yes | `dry_run=true` worked for `memo`, `group`, `wait`, `audio`. Returned `planned_operations`, no `executed_operations`. No real create attempted. |
 | `qlab_update_cues` | `workspace_id: string`, `updates: [{cue_ref, profile?, properties?, operations?}]`, `dry_run?` | Dry-run/write gated | Yes | `dry_run=true` worked for safe and type-specific probes. Returned `before`, `diff`, `planned_operations`, `real_write_enabled`, `planned_only_reason`. No `confirm_token` observed in exposed MCP runtime. No real update attempted. |
 
-## 3. Baseline Inicial Vs Final
+## 3. Initial vs. Final Baseline
 
 | Metric | Initial | Final | Notes |
 | --- | ---: | ---: | --- |
@@ -226,7 +226,7 @@ Rejected despite being exposed in schema:
 `exhaustive` was not exposed by the MCP schema in this session, so it was not
 callable through this MCP surface.
 
-## 5. Tabla Por Tipo De Cue
+## 5. Table by Cue Type
 
 | Type | Representative cue | Read profile tested | Update dry-run tested | Notes |
 | --- | --- | --- | --- | --- |
@@ -240,7 +240,7 @@ callable through this MCP surface.
 | Script | `15` `SCRIPT_SAFE_HIDDEN` | `full_sensitive` rejected | `script_basic`: `scriptSource` | High-risk, `real_write_enabled=false`, `planned_only_reason="script_execution_risk"`. Existing script text contains audition/preview command, not executed. |
 | MIDI | none in fixture | MIDI settings empty | `midi_basic` against Network cue | Dry-run preflight failed: profile requires MIDI cue. |
 
-## 6. Tabla De Propiedades `qlab_update_cues`
+## 6. `qlab_update_cues` Property Table
 
 | Profile/properties tested | Cue | Dry-run status | Real-write flag | Gates/tokens |
 | --- | --- | --- | --- | --- |
@@ -262,7 +262,7 @@ Create dry-run:
 | `wait` | OK | `new`, `set_property name`, `set_property duration`, `verify` |
 | `audio` | OK | `new`, `set_property name`, `set_property number`, `verify` |
 
-## 7. Gaps Respecto A Leer Todo / Editar Todo
+## 7. Gaps Relative to Read All / Edit All
 
 - Runtime MCP tool surface is older than local `src/qlab_mcp/server.py` and
   README. Missing exposed runtime tools/features: `qlab_get_workspace_status`,
@@ -285,7 +285,7 @@ Create dry-run:
 - Real-write verification/rollback was skipped because readiness was not
   consistently clean and the objective made real-write optional.
 
-## 8. Próximas PRs Recomendadas
+## 8. Recommended Next PRs
 
 1. Align installed MCP runtime with current `src/qlab_mcp/server.py`, or update
    README to state the deployed/runtime surface separately.

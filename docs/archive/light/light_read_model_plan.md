@@ -1,25 +1,25 @@
-# PLAN LUCES — modelo de lectura y analizador LCL MVP
+# LIGHT PLAN — MVP read model and LCL analyzer
 
 Snapshot: 2026-06-19
 
-QLab verificado: 5.5.10
+Verified QLab: 5.5.10
 
-Alcance: análisis y planificación read-only. Este documento no autoriza cambios en QLab ni en el MCP.
+Scope: read-only analysis and planning. This document does not authorize changes in QLab or the MCP.
 
-## 1. Resumen ejecutivo
+## 1. Executive summary
 
-El MCP actual ya puede obtener las dos fuentes principales necesarias para entender iluminación:
+The current MCP can already retrieve the two main sources needed to understand lighting:
 
-- `/settings/light/patch`, mediante `qlab_get_workspace_setting_details`, contiene instrumentos, grupos, definiciones y parámetros.
-- Los perfiles `auto` e `inspector_safe` de `qlab_get_cue_details` devuelven `lightCommandText`, `alwaysCollate`, `subcontroller`, duración y estado de cada Light Cue.
+- `/settings/light/patch`, through `qlab_get_workspace_setting_details`, contains instruments, groups, definitions, and parameters.
+- The `auto` and `inspector_safe` profiles of `qlab_get_cue_details` return `lightCommandText`, `alwaysCollate`, `subcontroller`, duration, and status for each Light Cue.
 
-La brecha principal no es acceso OSC. Es normalización: el Light Patch seguro se presenta como `instrument_index` tabular, los parámetros profundos quedan omitidos y no existe análisis semántico de Lighting Command Language (LCL). La propuesta mínima mantiene las herramientas existentes, amplía la salida segura del Light Patch y añade después una sola herramienta read-only para analizar texto LCL.
+The main gap is not OSC access; it is normalization. The safe Light Patch is exposed as the tabular `instrument_index`, deep parameters are omitted, and no semantic Lighting Command Language (LCL) analysis exists. The minimal proposal keeps the existing tools, expands the safe Light Patch output, and then adds one read-only tool for analyzing LCL text.
 
-No se propone leer ni controlar el estado Live del Light Dashboard. No se propone escribir cues, patch, niveles, grupos, instrumentos, definiciones ni direcciones DMX.
+Reading or controlling the Light Dashboard Live state is out of scope. Writing cues, the patch, levels, groups, instruments, definitions, or DMX addresses is also out of scope.
 
-## 2. Fuentes y comportamiento oficial de QLab 5
+## 2. Official QLab 5 sources and behavior
 
-Fuentes oficiales consultadas:
+Official sources consulted:
 
 - [The Light Patch Editor](https://qlab.app/docs/v5/lighting/light-patch-editor/)
 - [Light Cues](https://qlab.app/docs/v5/lighting/light-cues/)
@@ -29,46 +29,46 @@ Fuentes oficiales consultadas:
 
 ### 2.1 Light Patch
 
-El Light Patch pertenece a `Workspace Settings → Light`. El editor muestra instrumentos y grupos, parámetros por instrumento, definición asignada y estado de patch. Los nombres deben ser únicos dentro del workspace. Un instrumento puede estar sin patch o roto por conflicto de dirección; un instrumento sin patch no aparece en Light Dashboard.
+The Light Patch belongs to `Workspace Settings → Light`. The editor shows instruments and groups, per-instrument parameters, the assigned definition, and patch state. Names must be unique within the workspace. An instrument may be unpatched or broken because of an address conflict; an unpatched instrument does not appear in the Light Dashboard.
 
-El OSC Dictionary define `/workspace/{id}/settings/light/patch` como read-only para permisos view, edit y control. Devuelve un JSON con:
+The OSC Dictionary defines `/workspace/{id}/settings/light/patch` as read-only for view, edit, and control permissions. It returns JSON containing:
 
-- `settingKeywords`: al menos `home`, `pass` y `cue`.
-- `instruments[]`: `name`, `patched`, `conflicted`, `definition` y `parameters[]`.
-- `groups[]`: nombre, miembros, instrumentos expandidos y parámetros de grupo.
-- Definición: `name`, `manufacturer`, `definitionVersion`, `defaultParameter`, `isBroken` y mapa de parámetros.
-- Parámetro: `name`, `type`, `homeValue`, `homeValueInDMX`, `valueIsPercentage`, `twoBytes`, `uniqueName` y `definitionParameter` cuando corresponda.
+- `settingKeywords`: at least `home`, `pass`, and `cue`.
+- `instruments[]`: `name`, `patched`, `conflicted`, `definition`, and `parameters[]`.
+- `groups[]`: name, members, expanded instruments, and group parameters.
+- Definition: `name`, `manufacturer`, `definitionVersion`, `defaultParameter`, `isBroken`, and a parameter map.
+- Parameter: `name`, `type`, `homeValue`, `homeValueInDMX`, `valueIsPercentage`, `twoBytes`, `uniqueName`, and `definitionParameter` where applicable.
 
-`twoBytes` permite distinguir parámetros de 8 y 16 bits. `valueIsPercentage` permite distinguir valores porcentuales de valores DMX crudos. El payload documentado no publica una lista normalizada de direcciones DMX ni el destino físico de cada parámetro; publica `patched` y `conflicted`.
+`twoBytes` distinguishes 8-bit and 16-bit parameters. `valueIsPercentage` distinguishes percentage values from raw DMX values. The documented payload does not publish a normalized list of DMX addresses or each parameter's physical destination; it publishes `patched` and `conflicted`.
 
-Con varios workspaces abiertos debe usarse UUID explícito. Un mensaje sin `/workspace/{id}` puede llegar a todos los workspaces que escuchen el mismo puerto. Los nombres de los workspaces observados contienen espacios o diacríticos, por lo que el UUID también evita las restricciones de caracteres OSC aplicables al display name.
+With multiple workspaces open, an explicit UUID must be used. A message without `/workspace/{id}` may reach every workspace listening on the same port. The observed workspace names contain spaces or diacritics, so the UUID also avoids OSC character restrictions that apply to the display name.
 
 ### 2.2 Light Cues
 
-Una Light Cue contiene texto LCL, duración y curva. No tiene target de cue: puede afectar uno o varios parámetros del Light Patch. Sus comandos se interpretan secuencialmente, de arriba abajo.
+A Light Cue contains LCL text, duration, and a curve. It has no cue target: it may affect one or more Light Patch parameters. Its commands are interpreted sequentially, from top to bottom.
 
-Lecturas OSC específicas confirmadas:
+Confirmed cue-specific OSC reads:
 
-| Campo | Mensaje | Lectura oficial |
+| Field | Message | Official read |
 | --- | --- | --- |
-| `lightCommandText` | `/cue/{cue_number}/lightCommandText` | Texto completo de comandos |
-| `alwaysCollate` | `/cue/{cue_number}/alwaysCollate` | Estado de “Collate effects of previous light cues” |
-| `subcontroller` | `/cue/{cue_number}/subcontroller` | Estado de “Use as subcontroller in dashboard” |
+| `lightCommandText` | `/cue/{cue_number}/lightCommandText` | Complete command text |
+| `alwaysCollate` | `/cue/{cue_number}/alwaysCollate` | State of “Collate effects of previous light cues” |
+| `subcontroller` | `/cue/{cue_number}/subcontroller` | State of “Use as subcontroller in dashboard” |
 
-Duración, identidad, armed/broken/warning y waits pertenecen a los mensajes comunes de cue y ya forman parte de los perfiles de detalle actuales.
+Duration, identity, armed/broken/warning, and waits belong to the common cue messages and are already part of the current detail profiles.
 
-QLab documenta cuatro causas principales de Light Cue rota:
+QLab documents four main causes of a broken Light Cue:
 
-1. Comando LCL inválido.
-2. Ningún instrumento referido está correctamente patcheado.
-3. Definición de instrumento rota.
-4. Dispositivo USB DMX requerido desconectado.
+1. Invalid LCL command.
+2. None of the referenced instruments is correctly patched.
+3. Broken instrument definition.
+4. Required USB DMX device disconnected.
 
-El booleano `isBroken` no identifica por sí solo cuál de estas causas aplica.
+The `isBroken` boolean alone does not identify which cause applies.
 
 ### 2.3 Lighting Command Language
 
-Formas básicas oficiales:
+Official basic forms:
 
 ```text
 instrument = value
@@ -77,19 +77,19 @@ group = value
 group.parameter = value
 ```
 
-Los espacios alrededor de `=` son opcionales. Si se omite el parámetro, QLab usa el parámetro por defecto definido para el instrumento. En un `group.parameter`, QLab aplica el valor solo a miembros que posean ese parámetro. `home` usa el valor home definido; `pass` excluye explícitamente el target del ajuste de la cue.
+Spaces around `=` are optional. If the parameter is omitted, QLab uses the instrument's defined default parameter. For `group.parameter`, QLab applies the value only to members that have that parameter. `home` uses the defined home value; `pass` explicitly excludes the target from the cue adjustment.
 
-QLab soporta más sintaxis —rangos, grupos ad hoc, pull desde otra cue y valores compuestos—, pero queda fuera del MVP propuesto.
+QLab supports more syntax—ranges, ad hoc groups, pull from another cue, and compound values—but it is outside the proposed MVP.
 
 ### 2.4 Light Dashboard
 
-Light Dashboard representa niveles Live y Audition, permite control inmediato y puede grabar o actualizar Light Cues. Es deliberadamente ajeno a esta fase. Leer el patch o el texto de una cue no equivale a leer el look actual, determinar la cue “activa” de iluminación ni simular el resultado acumulado de cues previas.
+The Light Dashboard represents Live and Audition levels, provides immediate control, and can record or update Light Cues. It is deliberately outside this phase. Reading the patch or a cue's text is not equivalent to reading the current look, determining the “active” lighting cue, or simulating the accumulated result of previous cues.
 
-## 3. Implementación actual del repositorio
+## 3. Current repository implementation
 
-### 3.1 Estado Git previo
+### 3.1 Prior Git state
 
-Estado observado antes de crear este documento:
+State observed before creating this document:
 
 ```text
  M README.md
@@ -98,11 +98,11 @@ Estado observado antes de crear este documento:
 ?? docs/runtime_tool_probe_report.md
 ```
 
-Esos cambios son preexistentes y quedan fuera de alcance.
+Those changes predate this document and are out of scope.
 
-### 3.2 Herramientas MCP expuestas
+### 3.2 Exposed MCP tools
 
-Diez herramientas detectadas. Siete inspectoras read-only:
+Ten tools detected. Seven are read-only inspection tools:
 
 1. `qlab_check_connection`
 2. `qlab_get_workspace_overview`
@@ -112,35 +112,35 @@ Diez herramientas detectadas. Siete inspectoras read-only:
 6. `qlab_query_cues`
 7. `qlab_get_cue_details`
 
-Tres herramientas orientadas al flujo de escritura, no usadas en este trabajo:
+Three tools target the write flow and were not used for this work:
 
-1. `qlab_check_write_readiness` — preflight sin mutación, pero perteneciente al flujo write.
+1. `qlab_check_write_readiness` — non-mutating preflight, but part of the write flow.
 2. `qlab_create_cue`
 3. `qlab_update_cues`
 
-El servidor no expone GO, stop, panic ni raw OSC como herramientas MCP.
+The server does not expose GO, stop, panic, or raw OSC as MCP tools.
 
-### 3.3 Lectura actual del Light Patch
+### 3.3 Current Light Patch read
 
-`src/qlab_mcp/settings/workspace.py` usa la dirección workspace-qualified `settings/light/patch`. Primero intenta UDP y usa TCP como fallback para payloads grandes.
+`src/qlab_mcp/settings/workspace.py` uses the workspace-qualified address `settings/light/patch`. It tries UDP first and uses TCP as a fallback for large payloads.
 
 Perfil `safe`:
 
-- Devuelve `summary`, `groups`, `instrument_index` y `definition_counts`.
-- `instrument_index` usa columnas `name`, `comment`, `patched`, `conflicted`, `definition`, `manufacturer`, `parameter_count` y `parameter_names`.
-- Deduplica instrumentos presentes tanto arriba como dentro de grupos.
-- Omite explícitamente `instrument.definition.parameters` e `instrument.parameters[].definitionParameter`.
+- Returns `summary`, `groups`, `instrument_index`, and `definition_counts`.
+- `instrument_index` uses the columns `name`, `comment`, `patched`, `conflicted`, `definition`, `manufacturer`, `parameter_count`, and `parameter_names`.
+- Deduplicates instruments present both at the top level and inside groups.
+- Explicitly omits `instrument.definition.parameters` and `instrument.parameters[].definitionParameter`.
 
-Perfiles `technical` y `exhaustive`:
+`technical` and `exhaustive` profiles:
 
-- Conservan el payload Light Patch bajo `details.patch` después de aplicar redacción general.
-- Permiten inspeccionar definición y parámetros profundos, pero no ofrecen todavía un modelo normalizado estable.
+- Preserve the Light Patch payload under `details.patch` after applying general redaction.
+- Allow inspection of definitions and deep parameters, but do not yet provide a stable normalized model.
 
-La vista summary de settings no lee el Light Patch en perfil seguro; devuelve `patch_read: "skipped"` y anuncia el detail request disponible. Esto evita descargar involuntariamente un payload grande.
+The settings summary view does not read the Light Patch in the safe profile; it returns `patch_read: "skipped"` and advertises the available detail request. This avoids downloading a large payload unintentionally.
 
-### 3.4 Lectura actual de Light Cues
+### 3.4 Current Light Cue read
 
-`AUTO_LIGHT_KEYS` contiene exactamente:
+`AUTO_LIGHT_KEYS` contains exactly:
 
 ```text
 lightCommandText
@@ -148,17 +148,17 @@ alwaysCollate
 subcontroller
 ```
 
-`qlab_query_cues(primary_filter="type", primary_value="Light")` localiza cues y devuelve identidad/estado compacto. `qlab_get_cue_details(profile="auto"|"inspector_safe")` añade campos comunes, timing y los tres campos específicos de Light Cue. El MCP no analiza `lightCommandText`; solo lo devuelve.
+`qlab_query_cues(primary_filter="type", primary_value="Light")` locates cues and returns compact identity/status. `qlab_get_cue_details(profile="auto"|"inspector_safe")` adds common fields, timing, and the three Light Cue-specific fields. The MCP does not analyze `lightCommandText`; it only returns it.
 
-La salud actual deriva una advertencia genérica cuando `isBroken=true`. No discrimina entre comando inválido, patch incompleto, definición rota o dispositivo ausente.
+The current health logic derives a generic warning when `isBroken=true`. It does not distinguish an invalid command, incomplete patch, broken definition, or missing device.
 
-## 4. Hallazgos runtime reales
+## 4. Actual runtime findings
 
-Todas las llamadas usaron UUID explícito. No se llamó ninguna herramienta write-facing, playback, Dashboard ni raw OSC.
+All calls used an explicit UUID. No write-facing tool, playback, Dashboard, or raw OSC call was made.
 
-### 4.1 Conexión y workspaces
+### 4.1 Connection and workspaces
 
-`qlab_check_connection(require_read_access=true)` sin UUID devolvió:
+`qlab_check_connection(require_read_access=true)` without a UUID returned:
 
 ```json
 {
@@ -170,19 +170,19 @@ Todas las llamadas usaron UUID explícito. No se llamó ninguna herramienta writ
 }
 ```
 
-Workspaces detectados:
+Detected workspaces:
 
-| Workspace | UUID | QLab | Cue lists leíbles |
+| Workspace | UUID | QLab | Readable cue lists |
 | --- | --- | --- | ---: |
 | `<TEST_WORKSPACE_NAME>` | `<TEST_WORKSPACE_UUID>` | 5.5.10 | 5 |
 | `<TEST_WORKSPACE_NAME>` | `<TEST_WORKSPACE_UUID>` | 5.5.10 | 1 |
 | `<TEST_WORKSPACE_NAME>` | `<TEST_WORKSPACE_UUID>` | 5.5.10 | 7 |
 
-Las tres comprobaciones explícitas devolvieron `ok=true`, `status="ready"`, `workspace_readable=true` y `qlab_version="5.5.10"`.
+All three explicit checks returned `ok=true`, `status="ready"`, `workspace_readable=true`, and `qlab_version="5.5.10"`.
 
 ### 4.2 Settings summary
 
-En los tres UUID, esta llamada:
+For all three UUIDs, this call:
 
 ```json
 {
@@ -192,7 +192,7 @@ En los tres UUID, esta llamada:
 }
 ```
 
-devolvió el mismo contrato Light:
+returned the same Light contract:
 
 ```json
 {
@@ -204,32 +204,32 @@ devolvió el mismo contrato Light:
 }
 ```
 
-Además anunció `{"section":"light","kind":"light_patch","ref":null}` en `available_detail_requests`.
+It also advertised `{"section":"light","kind":"light_patch","ref":null}` in `available_detail_requests`.
 
-### 4.3 Light Patch seguro
+### 4.3 Safe Light Patch
 
-Llamada usada por workspace:
+Call used per workspace:
 
 ```json
 {
   "section": "light",
   "kind": "light_patch",
   "profile": "safe",
-  "workspace_id": "<UUID explícito>"
+  "workspace_id": "<Explicit UUID>"
 }
 ```
 
-Resultados exactos relevantes:
+Relevant exact results:
 
-| Workspace | `patch_present` | Instrumentos | Grupos | Transporte | Sin patch | Conflictos |
+| Workspace | `patch_present` | Instruments | Groups | Transport | Unpatched | Conflicts |
 | --- | ---: | ---: | ---: | --- | ---: | ---: |
 | `<TEST_WORKSPACE_NAME>` | true | 59 | 6 | `tcp_fallback` | 2 | 0 |
 | `<TEST_WORKSPACE_NAME>` | true | 0 | 0 | `udp` | 0 | 0 |
 | `<TEST_WORKSPACE_NAME>` | true | 60 | 13 | `tcp_fallback` | 12 | 0 |
 
-`patch_present=true` con cero elementos representa un patch devuelto correctamente pero vacío; no significa que haya instrumentos.
+`patch_present=true` with zero elements represents a correctly returned but empty patch; it does not mean that instruments exist.
 
-El primer workspace de prueba devolvió:
+The first test workspace returned:
 
 ```json
 {
@@ -244,15 +244,15 @@ El primer workspace de prueba devolvió:
 }
 ```
 
-Los instrumentos sin patch observados fueron `32 Cuna` y `104 FRONTAL`. Los RGBWA+UV publicaron siete nombres de parámetro: `color`, `red`, `green`, `blue`, `white`, `amber`, `uv`.
+The observed unpatched instruments were `32 Cuna` and `104 FRONTAL`. The RGBWA+UV fixtures published seven parameter names: `color`, `red`, `green`, `blue`, `white`, `amber`, `uv`.
 
-El tercer workspace de prueba devolvió `{"definition_counts":{"Generic Dimmer":60}}`. Instrumentos sin patch: `07 PC refuerzo 1`, `10 PC refuerzo 4`, `37 Contra L medio`, `38 Contra L arriba`, `40 Contra R centro`, `41 Contra R arriba`, `46 Sala 2`, `46 Sala 3`, `46 Sala 4`, `48 Cabina`, `49 Cabina` y `50 Puntual butaca`.
+The third test workspace returned `{"definition_counts":{"Generic Dimmer":60}}`. Unpatched instruments: `07 PC refuerzo 1`, `10 PC refuerzo 4`, `37 Contra L medio`, `38 Contra L arriba`, `40 Contra R centro`, `41 Contra R arriba`, `46 Sala 2`, `46 Sala 3`, `46 Sala 4`, `48 Cabina`, `49 Cabina`, and `50 Puntual butaca`.
 
-Los arrays completos de 59 y 60 instrumentos y las listas completas de miembros de grupo no se reproducen aquí. Las cifras, nombres excepcionales y claves anteriores proceden directamente de la respuesta; esta omisión evita convertir el documento en un dump runtime.
+The complete arrays of 59 and 60 instruments and the complete group-member lists are not reproduced here. The figures, exceptional names, and keys above come directly from the response; omitting them avoids turning the document into a runtime dump.
 
-### 4.4 Consulta de Light Cues
+### 4.4 Light Cue query
 
-Argumentos usados:
+Arguments used:
 
 ```json
 {
@@ -261,7 +261,7 @@ Argumentos usados:
   "profile": "basic_safe",
   "max_cues_scanned": 5000,
   "max_results": 10,
-  "workspace_id": "<UUID explícito>"
+  "workspace_id": "<Explicit UUID>"
 }
 ```
 
@@ -271,13 +271,13 @@ Argumentos usados:
 | `<TEST_WORKSPACE_NAME>` | 30 | 1 | 1 | `complete` | false | — |
 | `<TEST_WORKSPACE_NAME>` | 1424 | 933 | 10 | `complete` | true | `max_results` |
 
-`status="partial"` en los workspaces primero y tercero indica límite de resultados, no escaneo incompleto: ambos devolvieron `scanned_all_cues=true` e `id_only_unscanned_count=0`.
+`status="partial"` in the first and third workspaces indicates a result limit, not an incomplete scan: both returned `scanned_all_cues=true` and `id_only_unscanned_count=0`.
 
-### 4.5 Detalle de cues representativas
+### 4.5 Representative cue details
 
-Perfil usado: `inspector_safe`.
+Profile used: `inspector_safe`.
 
-Primer workspace, cue `<TEST_CUE_UUID>`:
+First workspace, cue `<TEST_CUE_UUID>`:
 
 ```json
 {
@@ -301,7 +301,7 @@ Primer workspace, cue `<TEST_CUE_UUID>`:
 }
 ```
 
-Segundo workspace, cue `<TEST_CUE_UUID>`:
+Second workspace, cue `<TEST_CUE_UUID>`:
 
 ```json
 {
@@ -321,7 +321,7 @@ Segundo workspace, cue `<TEST_CUE_UUID>`:
 }
 ```
 
-Tercer workspace, cue `<TEST_CUE_UUID>`:
+Third workspace, cue `<TEST_CUE_UUID>`:
 
 ```json
 {
@@ -341,35 +341,35 @@ Tercer workspace, cue `<TEST_CUE_UUID>`:
 }
 ```
 
-Los extractos reducen campos comunes no relacionados con iluminación; valores mostrados y nombres de claves no están reinterpretados.
+The excerpts reduce common fields unrelated to lighting; displayed values and key names have not been reinterpreted.
 
-## 5. Qué puede leerse por OSC
+## 5. What can be read through OSC
 
-- Identidad de workspaces abiertos y sus UUID.
-- Light Patch completo documentado mediante `/settings/light/patch`.
-- Instrumentos y grupos, incluido membership.
-- Estado `patched` y `conflicted` por instrumento.
-- Definición embebida, fabricante, versión, `isBroken` y parámetro por defecto.
-- Parámetros físicos y virtuales publicados por QLab, home, escala porcentaje/DMX y 8/16-bit.
-- Listado y estado común de Light Cues.
-- Texto íntegro `lightCommandText`.
-- `alwaysCollate` y `subcontroller`.
-- Duración, waits, continue mode, armed, broken y warning.
+- Identity of open workspaces and their UUIDs.
+- Complete Light Patch documented through `/settings/light/patch`.
+- Instruments and groups, including membership.
+- `patched` and `conflicted` state per instrument.
+- Embedded definition, manufacturer, version, `isBroken`, and default parameter.
+- Physical and virtual parameters published by QLab, home values, percentage/DMX scale, and 8/16-bit type.
+- Light Cue list and common state.
+- Complete `lightCommandText` text.
+- `alwaysCollate` and `subcontroller`.
+- Duration, waits, continue mode, armed, broken, and warning.
 
-## 6. Qué no queda disponible mediante estas lecturas
+## 6. What these reads do not provide
 
-- Direcciones DMX normalizadas por parámetro: no aparecen en el esquema oficial publicado para `/settings/light/patch`.
-- Estado Live actual del Light Dashboard, modificaciones amarillas, niveles originadores o look acumulado.
-- Confirmación de salida física real, luz visible en escenario o salud extremo a extremo de Art-Net, sACN o USB DMX.
-- Causa exacta de `isBroken=true`; debe inferirse de patch/comando y puede exigir comprobación humana.
-- Resultado final de ejecutar una secuencia de Light Cues, incluyendo collation, orden histórico, curvas y valores previos.
-- Validación completa de toda la gramática LCL mediante un endpoint OSC read-only específico; QLab expone texto y estado broken, no un AST ni diagnóstico estructurado.
+- Normalized DMX addresses per parameter: they do not appear in the official schema published for `/settings/light/patch`.
+- Current Live state of the Light Dashboard, yellow modifications, originating levels, or accumulated look.
+- Confirmation of real physical output, visible stage light, or end-to-end Art-Net, sACN, or USB DMX health.
+- Exact cause of `isBroken=true`; it must be inferred from the patch/command and may require human inspection.
+- Final result of running a Light Cue sequence, including collation, historical order, curves, and previous values.
+- Complete validation of the LCL grammar through a dedicated read-only OSC endpoint; QLab exposes text and broken state, not an AST or structured diagnostic.
 
-El OSC Dictionary sí contiene setters y comandos de Dashboard/cue. Su existencia no los convierte en lecturas ni los incluye en esta fase.
+The OSC Dictionary does contain setters and Dashboard/cue commands. Their existence does not make them reads or include them in this phase.
 
-## 7. Modelo de lectura propuesto
+## 7. Proposed read model
 
-El modelo se construirá componiendo settings, query y cue details existentes; no hace falta otro agregador MCP.
+The model will compose the existing settings, query, and cue-details data; another MCP aggregator is not needed.
 
 ```json
 {
@@ -432,52 +432,52 @@ El modelo se construirá componiendo settings, query y cue details existentes; n
 }
 ```
 
-Reglas del modelo:
+Model rules:
 
-- Conservar nombres y texto originales; añadir campos normalizados, no sustituir el payload fuente.
-- Diferenciar `null`/unavailable de `false`, `0` y colección vacía.
-- Derivar `default_parameter_name` desde `definition.defaultParameter` y el mapa de parámetros. Si falla, dejar `null` y añadir warning.
-- Un patch vacío es éxito con arrays vacíos.
-- Instrumento `patched=false`, `conflicted=true` o definición rota genera warning estructurado, no error de transporte.
-- Mantener `instrument_index` durante compatibilidad; añadir `instruments[]` y `parameters[]` sin romper consumidores existentes.
-- Declarar omisiones en `unsupported_or_unavailable_fields`; nunca inventar direcciones, niveles Live ni causa exacta de cue rota.
+- Preserve original names and text; add normalized fields without replacing the source payload.
+- Distinguish `null`/unavailable from `false`, `0`, and an empty collection.
+- Derive `default_parameter_name` from `definition.defaultParameter` and the parameter map. If it cannot be resolved, leave `null` and add a warning.
+- An empty patch is a successful result with empty arrays.
+- An instrument with `patched=false`, `conflicted=true`, or a broken definition generates a structured warning, not a transport error.
+- Keep `instrument_index` for compatibility; add `instruments[]` and `parameters[]` without breaking existing consumers.
+- Declare omissions in `unsupported_or_unavailable_fields`; never invent addresses, Live levels, or the exact cause of a broken cue.
 
-## 8. Analizador LCL read-only MVP
+## 8. Read-only LCL analyzer MVP
 
-Herramienta futura mínima:
+Minimal future tool:
 
 ```text
 qlab_analyze_light_command_text(workspace_id: string, command_text: string)
 ```
 
-La herramienta leerá el Light Patch del UUID indicado y no enviará setters. Obtener texto desde una cue seguirá siendo responsabilidad de `qlab_get_cue_details`; no se añade un segundo modo por `cue_ref`.
+The tool will read the Light Patch for the supplied UUID and will not send setters. Getting text from a cue remains the responsibility of `qlab_get_cue_details`; no second mode keyed by `cue_ref` is added.
 
-### 8.1 Gramática admitida
+### 8.1 Supported grammar
 
-Una asignación por línea:
+One assignment per line:
 
 ```text
 target [ "." parameter ] "=" value
 value := number | "home" | "pass"
 ```
 
-Se admiten espacios opcionales alrededor de `=` y extremos de línea. Líneas vacías se ignoran. El texto y número de línea originales se conservan.
+Optional spaces around `=` and at line ends are accepted. Empty lines are ignored. The original text and line number are preserved.
 
-### 8.2 Resolución
+### 8.2 Resolution
 
-1. Buscar target exacto entre instrumentos y grupos.
-2. Si no existe, probar coincidencia case-insensitive única y marcar `normalized_match=true`.
-3. Más de una coincidencia normalizada produce `ambiguous_target`; ninguna produce `unknown_target`.
-4. Target con parámetro explícito:
-   - Instrumento: validar que lo posee.
-   - Grupo: expandir solo miembros que lo poseen; miembros incompatibles quedan en `skipped_members`.
-5. Target sin parámetro:
-   - Instrumento: resolver su `defaultParameter`.
-   - Grupo: resolver el default de cada miembro; el resultado puede contener parámetros distintos.
-6. `all` no es keyword implícita del analizador. Es válido solo si existe como grupo en ese workspace.
-7. `home` y `pass` se aceptan como valores simbólicos; el analizador no calcula el estado Live resultante.
+1. Find an exact target among instruments and groups.
+2. If none exists, try a unique case-insensitive match and set `normalized_match=true`.
+3. More than one normalized match produces `ambiguous_target`; no match produces `unknown_target`.
+4. Target with an explicit parameter:
+   - Instrument: verify that it has the parameter.
+   - Group: expand only members that have it; incompatible members remain in `skipped_members`.
+5. Target without a parameter:
+   - Instrument: resolve its `defaultParameter`.
+   - Group: resolve each member's default; the result may contain different parameters.
+6. `all` is not an implicit analyzer keyword. It is valid only when a group named `all` exists in that workspace.
+7. `home` and `pass` are accepted as symbolic values; the analyzer does not calculate the resulting Live state.
 
-Salida por línea:
+Per-line output:
 
 ```json
 {
@@ -506,90 +506,90 @@ Salida por línea:
 }
 ```
 
-### 8.3 Sintaxis fuera del MVP
+### 8.3 Syntax outside the MVP
 
-Debe devolverse `status="unsupported"`, nunca una interpretación parcial, para:
+Return `status="unsupported"`, never a partial interpretation, for:
 
-- Rangos y listas: `1 - 3 = 50`, `1, 2 = 50`.
-- Grupos ad hoc: `[1 - 3] = 50`.
-- Pull desde cue: `10 = cue A`.
-- Valores compuestos o funciones: color, pan/tilt, muxers y formas equivalentes.
-- Operadores, expresiones, múltiples asignaciones en una línea o texto no reconocido.
-- Cualquier forma válida de LCL que no esté incluida explícitamente en la gramática MVP.
+- Ranges and lists: `1 - 3 = 50`, `1, 2 = 50`.
+- Ad hoc groups: `[1 - 3] = 50`.
+- Pull from cue: `10 = cue A`.
+- Compound values or functions: color, pan/tilt, muxers, and equivalent forms.
+- Operators, expressions, multiple assignments on one line, or unrecognized text.
+- Any valid LCL form not explicitly included in the MVP grammar.
 
-El analizador no reordena, poda ni reemplaza comandos. Tampoco simula comandos duplicados, secuencia histórica, fade, `alwaysCollate`, subcontroller, Dashboard o DMX.
+The analyzer does not reorder, prune, or replace commands. It also does not simulate duplicate commands, historical sequence, fade, `alwaysCollate`, subcontroller, Dashboard, or DMX.
 
-### 8.4 Ejemplos mínimos esperados
+### 8.4 Minimal expected examples
 
-| Entrada | Resultado esperado |
+| Input | Expected result |
 | --- | --- |
-| `Front = 100` | Target resuelto; default por instrumento; afectados enumerados |
-| `Back.red = 50` | Grupo válido; solo miembros con `red` |
-| `All = 0` | Válido solo si grupo `all` existe; posible normalized match |
-| `Front = home` | Defaults resueltos; valores home disponibles como metadatos |
-| `Back = pass` | Afectados identificados; sin simulación de look |
+| `Front = 100` | Target resolved; instrument default; affected members listed |
+| `Back.red = 50` | Valid group; only members with `red` |
+| `All = 0` | Valid only if group `all` exists; normalized match may be possible |
+| `Front = home` | Defaults resolved; home values available as metadata |
+| `Back = pass` | Affected members identified; no look simulation |
 
-## 9. Cambios MCP requeridos en fases posteriores
+## 9. MCP changes required in later phases
 
-1. Ampliar normalización segura de Light Patch:
-   - Añadir `instruments[]`, `groups[].parameter_names` y `parameters[]`.
-   - Resolver definición rota y parámetro por defecto.
-   - Conservar `instrument_index` y `definition_counts` durante compatibilidad.
-2. Añadir warnings estructurados:
-   - Instrumentos sin patch, conflicto, definición/parámetro roto y metadata incompleta.
-   - Diferenciar datos no expuestos, omitidos por perfil y fallos de transporte.
-3. Añadir `qlab_analyze_light_command_text` con la gramática anterior.
-4. Reutilizar `qlab_query_cues` y `qlab_get_cue_details`; no crear `qlab_get_light_model` ni otro agregador hasta demostrar necesidad.
-5. Mantener TCP fallback para payloads grandes y UUID obligatorio en toda herramienta nueva.
+1. Expand safe Light Patch normalization:
+   - Add `instruments[]`, `groups[].parameter_names`, and `parameters[]`.
+   - Resolve broken definitions and default parameters.
+   - Keep `instrument_index` and `definition_counts` for compatibility.
+2. Add structured warnings:
+   - Unpatched instruments, conflicts, broken definitions/parameters, and incomplete metadata.
+   - Distinguish unexposed data, profile omissions, and transport failures.
+3. Add `qlab_analyze_light_command_text` with the grammar above.
+4. Reuse `qlab_query_cues` and `qlab_get_cue_details`; do not create `qlab_get_light_model` or another aggregator until need is demonstrated.
+5. Keep the TCP fallback for large payloads and require UUIDs in every new tool.
 
-## 10. Reglas de seguridad
+## 10. Safety rules
 
-- Solo OSC read-only documentado y herramientas inspectoras MCP.
-- UUID explícito siempre que haya varios workspaces.
-- Prohibidos GO, playback, start, stop, panic, audition y preview.
-- Prohibidos raw OSC y control Live del Dashboard.
-- Prohibidos `dashboard/setLight`, `dashboard/clear`, `newCueWithAll`, `newCueWithChanges`, `recordAllToLatest`, `updateSelectedCues`, `collateAndStart`, setters y operaciones de orden/prune/replace.
-- Prohibido modificar Light Patch, instrumentos, grupos, definiciones, direcciones DMX y Light Cues.
-- `lightCommandText` se trata como datos no confiables: límites de tamaño/líneas, sin ejecución ni reenvío a QLab.
-- Un análisis `valid` significa “admitido y resoluble por este MVP”, no garantía de salida física ni equivalencia completa con el parser interno de QLab.
-- Nunca ocultar sintaxis desconocida: devolver `unsupported` con línea y texto originales.
+- Only documented read-only OSC and MCP inspection tools.
+- Always use an explicit UUID when multiple workspaces are open.
+- GO, playback, start, stop, panic, audition, and preview are prohibited.
+- Raw OSC and Live Dashboard control are prohibited.
+- `dashboard/setLight`, `dashboard/clear`, `newCueWithAll`, `newCueWithChanges`, `recordAllToLatest`, `updateSelectedCues`, `collateAndStart`, setters, and ordering/prune/replace operations are prohibited.
+- Modifying the Light Patch, instruments, groups, definitions, DMX addresses, and Light Cues is prohibited.
+- Treat `lightCommandText` as untrusted data: enforce size/line limits and do not execute or forward it to QLab.
+- A `valid` analysis means “accepted and resolvable by this MVP,” not a guarantee of physical output or equivalence with QLab's internal parser.
+- Never hide unknown syntax: return `unsupported` with the original line and text.
 
-## 11. Plan de pruebas para el futuro probe runtime
+## 11. Test plan for the future runtime probe
 
-### 11.1 Unitarias
+### 11.1 Unit tests
 
-- Normalizar patch vacío, instrumento simple, RGBWA+UV, grupo mixto y definición rota.
-- Resolver `defaultParameter` válido, ausente y fuera del mapa.
-- Preservar 8/16-bit, porcentaje/DMX, home y tipo de parámetro.
-- Detectar unpatched/conflicted sin convertirlos en error de transporte.
-- Probar los cinco ejemplos MVP.
-- Probar target desconocido, parámetro desconocido y target ambiguo por normalización.
-- Probar grupo donde solo algunos miembros poseen el parámetro.
-- Rechazar rangos, ad-hoc groups, `cue`, valores compuestos y expresiones como `unsupported`.
-- Verificar que el parser nunca llama setters ni genera direcciones OSC mutantes.
+- Normalize an empty patch, simple instrument, RGBWA+UV fixture, mixed group, and broken definition.
+- Resolve valid, missing, and out-of-map `defaultParameter` values.
+- Preserve 8/16-bit, percentage/DMX, home, and parameter type data.
+- Detect unpatched/conflicted states without turning them into transport errors.
+- Test the five MVP examples.
+- Test an unknown target, unknown parameter, and target made ambiguous by normalization.
+- Test a group where only some members have the parameter.
+- Reject ranges, ad hoc groups, `cue`, compound values, and expressions as `unsupported`.
+- Verify that the parser never calls setters or generates mutating OSC addresses.
 
-### 11.2 Integración MCP simulada
+### 11.2 Simulated MCP integration
 
-- `qlab_get_workspace_setting_details(profile="safe")` conserva `instrument_index` y añade arrays normalizados.
-- `technical` conserva payload profundo sin alterar redacciones.
-- TCP fallback produce el mismo modelo que UDP.
-- Analyzer exige UUID válido, limita tamaño y devuelve errores parciales por línea sin abortar líneas independientes.
-- Patch vacío permite analizar solo como `unknown_target`, sin excepción.
+- `qlab_get_workspace_setting_details(profile="safe")` preserves `instrument_index` and adds normalized arrays.
+- `technical` preserves the deep payload without changing redactions.
+- TCP fallback produces the same model as UDP.
+- The analyzer requires a valid UUID, limits size, and returns per-line partial errors without aborting independent lines.
+- An empty patch permits analysis only as `unknown_target`, without raising an exception.
 
-### 11.3 Runtime read-only
+### 11.3 Read-only runtime
 
-- Repetir contra los tres UUID del snapshot.
-- Confirmar 59/0/60 instrumentos y 6/0/13 grupos mientras los workspaces permanezcan sin cambios.
-- Repetir query completa de Light Cues y registrar `matched_count`, `scanned_all_cues` y truncación.
-- Leer varias cues por workspace, incluyendo una cue rota del workspace de prueba y cues con comandos de grupo/parámetro.
-- Comparar analyzer contra identidad, grupos y parámetros del patch, sin ejecutar cues.
-- Registrar cualquier diferencia como cambio de workspace o incompatibilidad de modelo; nunca “corregir” QLab automáticamente.
+- Repeat against the three UUIDs in the snapshot.
+- Confirm 59/0/60 instruments and 6/0/13 groups while the workspaces remain unchanged.
+- Repeat the complete Light Cue query and record `matched_count`, `scanned_all_cues`, and truncation.
+- Read several cues per workspace, including a broken cue from the test workspace and cues with group/parameter commands.
+- Compare the analyzer with patch identity, groups, and parameters without executing cues.
+- Record any difference as a workspace change or model incompatibility; never “correct” QLab automatically.
 
-### 11.4 Criterios de aceptación
+### 11.4 Acceptance criteria
 
-- Cero mensajes mutantes enviados a QLab.
-- Todos los reads workspace-qualified con UUID.
-- Modelo distingue vacío, omitido, unavailable, warning y error.
-- Cada línea LCL produce resultado determinista y trazable.
-- Sintaxis fuera del MVP queda explícitamente marcada.
-- Cambios futuros conservan contratos existentes o documentan versión/migración.
+- Zero mutating messages sent to QLab.
+- Every read is workspace-qualified with a UUID.
+- The model distinguishes empty, omitted, unavailable, warning, and error states.
+- Every LCL line produces a deterministic, traceable result.
+- Syntax outside the MVP is explicitly marked.
+- Future changes preserve existing contracts or document versioning/migration.

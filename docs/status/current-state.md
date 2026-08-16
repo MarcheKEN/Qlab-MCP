@@ -1,83 +1,83 @@
-# Estado actual del proyecto
+# Current Project State
 
-Snapshot provisional de preparación: **2026-08-13 Europe/Madrid**.
+Provisional preparation snapshot: **2026-08-13 Europe/Madrid**.
 
-Este documento describe la rama de preparación de QLab MCP 0.3.0. El snapshot
-canónico definitivo se actualizará mediante una PR docs-only después del merge
-en `main`, antes del tag `v0.3.0`.
+This document describes the QLab MCP 0.3.0 preparation branch. The definitive
+canonical snapshot will be updated through a docs-only PR after the merge into
+`main`, before the `v0.3.0` tag.
 
-## Estado Git de preparación
+## Preparation Git State
 
 ```text
 branch: codex/docs
-HEAD: preparación local; consultar `git rev-parse HEAD`
-base: origin/main verificado antes de iniciar; la rama contiene commits locales de preparación
-worktree: commit local de preparación 0.3.0; snapshot aún provisional
+HEAD: local preparation; run `git rev-parse HEAD` to query it
+base: origin/main verified before starting; the branch contains local preparation commits
+worktree: local 0.3.0 preparation commit; snapshot still provisional
 ```
 
-La referencia remota se verificó con `git fetch origin` y
-`git ls-remote origin refs/heads/main` antes de comenzar.
+The remote reference was verified with `git fetch origin` and
+`git ls-remote origin refs/heads/main` before starting.
 
-## Objetivo de la preparación
+## Preparation Objective
 
-- versión contractual `0.3.0`;
-- exactamente 13 tools FastMCP públicas;
-- `qlab_edit_cues` como única tool pública de edición;
-- CI reproducible en checkout limpio;
-- documentación vigente y workorders auditados;
-- auditoría arquitectónica sin refactor especulativo.
+- contractual version `0.3.0`;
+- exactly 13 public FastMCP tools;
+- `qlab_edit_cues` as the only public edit tool;
+- reproducible CI in a clean checkout;
+- current documentation and audited workorders;
+- architectural audit without speculative refactoring.
 
-## Estado de verificación
+## Verification State
 
-Los entornos temporales `pip install -e ".[dev]"` y
-`uv sync --locked --no-editable --python 3.11 --extra dev` instalaron
-correctamente en la comparación inicial. El preflight local final pasó la suite
-completa con `2595 passed, 41 subtests passed` fuera del sandbox gestionado.
-La verificación Linux de CI sigue pendiente.
+The temporary environments `pip install -e ".[dev]"` and
+`uv sync --locked --no-editable --python 3.11 --extra dev` installed
+successfully during the initial comparison. The final local preflight passed the
+full suite with `2595 passed, 41 subtests passed` outside the managed sandbox.
+Linux CI verification remains pending.
 
-La inspección FastMCP reportó 13 tools y `uv build` generó wheel y sdist
-`0.3.0`. El wheel se instaló en un entorno Python 3.11 temporal independiente
-del checkout; el entrypoint STDIO inicializó con versión `0.3.0`, exactamente
-13 tools y sin `qlab_update_cues`. El snapshot final posterior al merge sigue
-pendiente.
+FastMCP inspection reported 13 tools, and `uv build` generated the `0.3.0`
+wheel and sdist. The wheel was installed in a temporary Python 3.11
+environment independent of the checkout; the STDIO entry point initialized with
+version `0.3.0`, exactly 13 tools, and no `qlab_update_cues`. The final
+post-merge snapshot remains pending.
 
-Un checkout limpio generado con `git archive` pasó el flujo reproducible con
-`2580 passed, 4 skipped, 41 subtests passed`; los skips corresponden a fixtures
-locales `.codex/agents/` ausentes. Este resultado local no sustituye GitHub CI.
+A clean checkout generated with `git archive` passed the reproducible flow with
+`2580 passed, 4 skipped, 41 subtests passed`; the skips correspond to missing
+local `.codex/agents/` fixtures. This local result does not replace GitHub CI.
 
-## Workorders activos
+## Active Workorders
 
-Los workorders 017, 019, 021 y 022 quedan clasificados como implementación local
-con validación runtime pendiente. El workorder 029 sigue siendo trabajo real de
-validación runtime pendiente. La única nueva mutación runtime de esta iteración
-fue la validación acotada de Delete sobre dos Groups vacíos desechables; está
-documentada en [`empty-group-delete-2026-08-13.md`](../development/runtime-validation/empty-group-delete-2026-08-13.md).
+Workorders 017, 019, 021, and 022 are classified as local implementation with
+runtime validation pending. Workorder 029 remains active runtime-validation
+work. The only new runtime mutation in this iteration was bounded Delete
+validation on two disposable empty Groups; it is documented in
+[`empty-group-delete-2026-08-13.md`](../development/runtime-validation/empty-group-delete-2026-08-13.md).
 
-La auditoría arquitectónica acotada está documentada en
-[`architecture-audit-0.3.0.md`](architecture-audit-0.3.0.md) y concluye
+The bounded architectural audit is documented in
+[`architecture-audit-0.3.0.md`](architecture-audit-0.3.0.md) and concludes
 `no extraction for 0.3.0`.
 
-La investigación agent-facing y de limpieza de Edit está documentada en
+The agent-facing and Edit cleanup research is documented in
 [`2026-08-13-mcp-agent-ux-and-edit-cleanup.md`](../development/research/2026-08-13-mcp-agent-ux-and-edit-cleanup.md).
 
-## Límite de evidencia
+## Evidence Boundary
 
 ```text
-implementación local
+local implementation
 ≠
-runtime validado
+runtime validated
 ≠
-show listo para GO
+show ready for GO
 ```
 
-No se ejecutaron setters, Create, Edit, Move, playback, GO, `/live` ni raw OSC.
-El Delete acotado de dos Groups vacíos usó únicamente el flujo MCP
-dry-run/token/una ejecución/readback y dejó el prefijo temporal sin resultados;
-no convierte otros workorders en evidencia runtime.
-Las referencias históricas y la evidencia runtime previa permanecen bajo
-`docs/archive/` y no se reutilizan como prueba nueva de esta release.
+No setters, Create, Edit, Move, playback, GO, `/live`, or raw OSC were run.
+The bounded Delete of two empty Groups used only the MCP
+dry-run/token/one-execution/readback flow and left the temporary prefix with no
+results; it does not turn other workorders into runtime evidence.
+Historical references and prior runtime evidence remain under
+`docs/archive/` and are not reused as new evidence for this release.
 
-## Verificación reproducible
+## Reproducible Verification
 
 ```bash
 cd <repo-root>
@@ -90,6 +90,6 @@ git diff --check
 git status --short --branch
 ```
 
-El snapshot final sustituirá este estado provisional después de la PR principal,
-el merge en `main`, la PR docs-only final y la verificación del commit que
-recibirá `v0.3.0`.
+The final snapshot will replace this provisional state after the main PR, the
+merge into `main`, the final docs-only PR, and verification of the commit that
+will receive `v0.3.0`.

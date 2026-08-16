@@ -35,7 +35,8 @@ examples live in the [agent workflow guide](agent-workflows.md).
 
 ### Preflight
 
-Use `qlab_check_write_readiness` before every real Create, Edit, Move, or Delete.
+Use `qlab_check_write_readiness` before every real Create, Edit, Move, Delete,
+or Workspace Settings write.
 It is a read-only preflight, not a confirmation token.
 
 ### Create
@@ -66,12 +67,12 @@ its root.
 Keep this distinction explicit:
 
 ```text
-estructura programada
-!= runtime validado
-!= show listo para GO
+planned structure
+!= runtime validated
+!= show ready for GO
 ```
 
-See the [13-tool catalogue](tools.md),
+See the [14-tool catalogue](tools.md),
 [security policy](../../SECURITY.md), and
 [Create checklist](../development/runtime-validation/create-cues.md) and
 [Edit checklist](../development/runtime-validation/edit-cues.md).

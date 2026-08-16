@@ -33,8 +33,8 @@ The Light Patch belongs to `Workspace Settings → Light`. The editor shows inst
 
 The OSC Dictionary defines `/workspace/{id}/settings/light/patch` as read-only for view, edit, and control permissions. It returns JSON containing:
 
-- `settingKeywords`: al menos `home`, `pass` y `cue`.
-- `instruments[]`: `name`, `patched`, `conflicted`, `definition` y `parameters[]`.
+- `settingKeywords`: at least `home`, `pass`, and `cue`.
+- `instruments[]`: `name`, `patched`, `conflicted`, `definition`, and `parameters[]`.
 - `groups[]`: name, members, expanded instruments, and group parameters.
 - Definition: `name`, `manufacturer`, `definitionVersion`, `defaultParameter`, `isBroken`, and a parameter map.
 - Parameter: `name`, `type`, `homeValue`, `homeValueInDMX`, `valueIsPercentage`, `twoBytes`, `uniqueName`, and `definitionParameter` where applicable.
@@ -49,7 +49,7 @@ A Light Cue contains LCL text, duration, and a curve. It has no cue target: it m
 
 Confirmed cue-specific OSC reads:
 
-| Campo | Mensaje | Lectura oficial |
+| Field | Message | Official read |
 | --- | --- | --- |
 | `lightCommandText` | `/cue/{cue_number}/lightCommandText` | Complete command text |
 | `alwaysCollate` | `/cue/{cue_number}/alwaysCollate` | State of “Collate effects of previous light cues” |
@@ -131,7 +131,7 @@ Perfil `safe`:
 - Deduplicates instruments present both at the top level and inside groups.
 - Explicitly omits `instrument.definition.parameters` and `instrument.parameters[].definitionParameter`.
 
-Perfiles `technical` y `exhaustive`:
+`technical` and `exhaustive` profiles:
 
 - Preserve the Light Patch payload under `details.patch` after applying general redaction.
 - Allow inspection of definitions and deep parameters, but do not yet provide a stable normalized model.
@@ -182,7 +182,7 @@ All three explicit checks returned `ok=true`, `status="ready"`, `workspace_reada
 
 ### 4.2 Settings summary
 
-En los tres UUID, esta llamada:
+For all three UUIDs, this call:
 
 ```json
 {
@@ -277,7 +277,7 @@ Arguments used:
 
 Profile used: `inspector_safe`.
 
-Primer workspace, cue `<TEST_CUE_UUID>`:
+First workspace, cue `<TEST_CUE_UUID>`:
 
 ```json
 {
@@ -301,7 +301,7 @@ Primer workspace, cue `<TEST_CUE_UUID>`:
 }
 ```
 
-Segundo workspace, cue `<TEST_CUE_UUID>`:
+Second workspace, cue `<TEST_CUE_UUID>`:
 
 ```json
 {
@@ -321,7 +321,7 @@ Segundo workspace, cue `<TEST_CUE_UUID>`:
 }
 ```
 
-Tercer workspace, cue `<TEST_CUE_UUID>`:
+Third workspace, cue `<TEST_CUE_UUID>`:
 
 ```json
 {
@@ -345,7 +345,7 @@ The excerpts reduce common fields unrelated to lighting; displayed values and ke
 
 ## 5. What can be read through OSC
 
-- Identidad de workspaces abiertos y sus UUID.
+- Identity of open workspaces and their UUIDs.
 - Complete Light Patch documented through `/settings/light/patch`.
 - Instruments and groups, including membership.
 - `patched` and `conflicted` state per instrument.
@@ -353,7 +353,7 @@ The excerpts reduce common fields unrelated to lighting; displayed values and ke
 - Physical and virtual parameters published by QLab, home values, percentage/DMX scale, and 8/16-bit type.
 - Light Cue list and common state.
 - Complete `lightCommandText` text.
-- `alwaysCollate` y `subcontroller`.
+- `alwaysCollate` and `subcontroller`.
 - Duration, waits, continue mode, armed, broken, and warning.
 
 ## 6. What these reads do not provide
@@ -510,9 +510,9 @@ Per-line output:
 
 Return `status="unsupported"`, never a partial interpretation, for:
 
-- Rangos y listas: `1 - 3 = 50`, `1, 2 = 50`.
-- Grupos ad hoc: `[1 - 3] = 50`.
-- Pull desde cue: `10 = cue A`.
+- Ranges and lists: `1 - 3 = 50`, `1, 2 = 50`.
+- Ad hoc groups: `[1 - 3] = 50`.
+- Pull from cue: `10 = cue A`.
 - Compound values or functions: color, pan/tilt, muxers, and equivalent forms.
 - Operators, expressions, multiple assignments on one line, or unrecognized text.
 - Any valid LCL form not explicitly included in the MVP grammar.
@@ -521,7 +521,7 @@ The analyzer does not reorder, prune, or replace commands. It also does not simu
 
 ### 8.4 Minimal expected examples
 
-| Entrada | Resultado esperado |
+| Input | Expected result |
 | --- | --- |
 | `Front = 100` | Target resolved; instrument default; affected members listed |
 | `Back.red = 50` | Valid group; only members with `red` |

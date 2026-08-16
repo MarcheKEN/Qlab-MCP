@@ -177,7 +177,7 @@ break. It must not be hidden inside the method move.
 The heaviest README block is the write-safety/runtime material around lines
 173–440. Tool signatures around lines 591–651 duplicate `docs/user/tools.md`.
 Repeated token, dry-run, readback, playback, and runtime-evidence explanations
-create the “sopa de letras” effect even when each statement is individually
+create a “word-salad” effect even when each statement is individually
 correct.
 
 ### 4.2 Concrete truth/navigation defects

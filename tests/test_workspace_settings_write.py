@@ -8,10 +8,11 @@ import pytest
 from pydantic import ValidationError
 
 from qlab_mcp.models import (
-    GeneralSettingsEditInput,
-    GeneralSettingsEditResult,
-    GeneralSettingsOperation,
-    GeneralSettingsWriteStatus,
+    GeneralMinGoTimeOperation,
+    WorkspaceSettingsEditRequest,
+    WorkspaceSettingsEditResult,
+    WorkspaceSettingsOperation,
+    WorkspaceSettingsWriteStatus,
 )
 from qlab_mcp.settings.write_operations import WorkspaceSettingsWriteMixin
 from qlab_mcp.settings.write_registry import MIN_GO_TIME_SPEC, get_workspace_settings_write_spec
@@ -20,26 +21,35 @@ from qlab_mcp.settings.write_registry import MIN_GO_TIME_SPEC, get_workspace_set
 WORKSPACE_ID = "11111111-1111-4111-8111-111111111111"
 
 
-def test_general_settings_edit_input_schema_accepts_min_go_time_contract() -> None:
-    model = GeneralSettingsEditInput(
-        workspace_id=WORKSPACE_ID,
-        operation="minGoTime",
-        value=0.4,
-        dry_run=True,
-        confirm_token="confirm:workspaceSettings:v1:test",
+def _request(
+    value: int | float,
+    *,
+    workspace_id: str = WORKSPACE_ID,
+    dry_run: bool | None = None,
+    confirm_token: str | None = None,
+) -> WorkspaceSettingsEditRequest:
+    return WorkspaceSettingsEditRequest(
+        workspace_id=workspace_id,
+        operation=GeneralMinGoTimeOperation(kind="general.minGoTime", value=value),
+        dry_run=dry_run,
+        confirm_token=confirm_token,
     )
 
+
+def test_workspace_settings_edit_request_schema_accepts_min_go_time_contract() -> None:
+    model = _request(0.4, dry_run=True, confirm_token="confirm:workspaceSettings:v1:test")
+
     assert str(model.workspace_id) == WORKSPACE_ID
-    assert model.operation == "minGoTime"
-    assert model.value == pytest.approx(0.4)
+    assert model.operation.kind == "general.minGoTime"
+    assert model.operation.value == pytest.approx(0.4)
     assert model.dry_run is True
     assert model.confirm_token == "confirm:workspaceSettings:v1:test"
 
 
 @pytest.mark.parametrize("workspace_id", ["ws-1", "selected", "11111111-1111-4111-8111-11111111111z"])
-def test_general_settings_edit_input_validation_rejects_non_uuid_workspace_ids(workspace_id: str) -> None:
+def test_workspace_settings_edit_request_validation_rejects_non_uuid_workspace_ids(workspace_id: str) -> None:
     with pytest.raises(ValidationError):
-        GeneralSettingsEditInput(workspace_id=workspace_id, operation="minGoTime", value=0.4)
+        _request(0.4, workspace_id=workspace_id)
 
 
 @pytest.mark.parametrize(
@@ -50,38 +60,53 @@ def test_general_settings_edit_input_validation_rejects_non_uuid_workspace_ids(w
         "urn:uuid:11111111-1111-4111-8111-111111111111",
     ],
 )
-def test_general_settings_edit_input_validation_rejects_non_canonical_uuid_forms(workspace_id: str) -> None:
+def test_workspace_settings_edit_request_validation_rejects_non_canonical_uuid_forms(workspace_id: str) -> None:
     with pytest.raises(ValidationError):
-        GeneralSettingsEditInput(workspace_id=workspace_id, operation="minGoTime", value=0.4)
+        _request(0.4, workspace_id=workspace_id)
 
 
 @pytest.mark.parametrize("value", [True, False, "0.4", None])
-def test_general_settings_edit_input_validation_rejects_non_numeric_values(value: object) -> None:
+def test_workspace_settings_edit_request_validation_rejects_non_numeric_values(value: object) -> None:
     with pytest.raises(ValidationError):
-        GeneralSettingsEditInput(workspace_id=WORKSPACE_ID, operation="minGoTime", value=value)
+        WorkspaceSettingsEditRequest(
+            workspace_id=WORKSPACE_ID,
+            operation={"kind": "general.minGoTime", "value": value},
+        )
 
 
-def test_general_settings_edit_input_rejects_deferred_operations() -> None:
+def test_workspace_settings_edit_request_rejects_deferred_operations() -> None:
     with pytest.raises(ValidationError):
-        GeneralSettingsEditInput(workspace_id=WORKSPACE_ID, operation="selectionIsPlayhead", value=0.4)
+        WorkspaceSettingsEditRequest(
+            workspace_id=WORKSPACE_ID,
+            operation={"kind": "general.selectionIsPlayhead", "value": True},
+        )
 
 
 @pytest.mark.parametrize("value", [-0.1, math.inf, -math.inf, math.nan])
-def test_general_settings_edit_input_validation_rejects_invalid_numeric_values(value: float) -> None:
+def test_workspace_settings_edit_request_validation_rejects_invalid_numeric_values(value: float) -> None:
     with pytest.raises(ValidationError):
-        GeneralSettingsEditInput(workspace_id=WORKSPACE_ID, operation="minGoTime", value=value)
+        WorkspaceSettingsEditRequest(
+            workspace_id=WORKSPACE_ID,
+            operation={"kind": "general.minGoTime", "value": value},
+        )
 
 
 @pytest.mark.parametrize("value", [2_147_483_648, -2_147_483_649])
-def test_general_settings_edit_input_validation_rejects_values_outside_osc_int32_range(value: int) -> None:
+def test_workspace_settings_edit_request_validation_rejects_values_outside_osc_int32_range(value: int) -> None:
     with pytest.raises(ValidationError):
-        GeneralSettingsEditInput(workspace_id=WORKSPACE_ID, operation="minGoTime", value=value)
+        WorkspaceSettingsEditRequest(
+            workspace_id=WORKSPACE_ID,
+            operation={"kind": "general.minGoTime", "value": value},
+        )
 
 
 @pytest.mark.parametrize("value", [3.5e38, -3.5e38])
-def test_general_settings_edit_input_validation_rejects_values_outside_osc_float32_range(value: float) -> None:
+def test_workspace_settings_edit_request_validation_rejects_values_outside_osc_float32_range(value: float) -> None:
     with pytest.raises(ValidationError):
-        GeneralSettingsEditInput(workspace_id=WORKSPACE_ID, operation="minGoTime", value=value)
+        WorkspaceSettingsEditRequest(
+            workspace_id=WORKSPACE_ID,
+            operation={"kind": "general.minGoTime", "value": value},
+        )
 
 
 @pytest.mark.parametrize(
@@ -95,21 +120,21 @@ def test_general_settings_edit_input_validation_rejects_values_outside_osc_float
         (struct.unpack(">f", struct.pack(">f", 3.4028235e38))[0], float),
     ],
 )
-def test_general_settings_edit_input_validation_accepts_transport_representable_values(
+def test_workspace_settings_edit_request_validation_accepts_transport_representable_values(
     value: int | float, expected_type: type[int] | type[float]
 ) -> None:
-    model = GeneralSettingsEditInput(workspace_id=WORKSPACE_ID, operation="minGoTime", value=value)
+    model = _request(value)
 
-    assert isinstance(model.value, expected_type)
-    assert model.value == pytest.approx(float(value))
+    assert isinstance(model.operation.value, expected_type)
+    assert model.operation.value == pytest.approx(float(value))
 
 
-def test_general_settings_edit_result_exposes_typed_contract_fields() -> None:
-    result = GeneralSettingsEditResult(
+def test_workspace_settings_edit_result_exposes_typed_contract_fields() -> None:
+    result = WorkspaceSettingsEditResult(
         ok=True,
         status="updated",
         workspace_id=WORKSPACE_ID,
-        operation="minGoTime",
+        operation="general.minGoTime",
         dry_run=False,
         requested_value=0.4,
         baseline=0.2,
@@ -129,17 +154,19 @@ def test_general_settings_edit_result_exposes_typed_contract_fields() -> None:
         message="updated",
     )
 
-    assert result.operation == "minGoTime"
+    assert result.operation == "general.minGoTime"
     assert result.requested_value == pytest.approx(0.4)
     assert result.readback == pytest.approx(0.4)
     assert result.retry_unsafe is False
 
 
-def test_general_settings_contract_type_aliases_are_narrow() -> None:
-    assert get_args(GeneralSettingsOperation) == ("minGoTime",)
-    assert get_args(GeneralSettingsWriteStatus) == (
+def test_workspace_settings_contract_type_aliases_are_narrow() -> None:
+    assert WorkspaceSettingsOperation is GeneralMinGoTimeOperation
+    assert get_args(WorkspaceSettingsWriteStatus) == (
         "dry_run",
         "dry_run_preflight_failed",
+        "unsupported",
+        "unchanged",
         "updated",
         "updated_with_confirmed_timeouts",
         "preflight_failed",
@@ -164,6 +191,25 @@ class _SettingsFakeReader(WorkspaceSettingsWriteMixin):
         self.setter_done = False
         self.workspace_id = workspace_id
         self.calls: list[tuple[str, tuple[object, ...]]] = []
+
+    def edit_general_settings(
+        self,
+        workspace_id: str,
+        operation: str,
+        value: int | float,
+        dry_run: bool | None = None,
+        confirm_token: str | None = None,
+    ) -> WorkspaceSettingsEditResult:
+        """Keep existing lifecycle tests focused while the public API is renamed."""
+        assert operation == "minGoTime"
+        return self.edit_workspace_settings(
+            _request(
+                value,
+                workspace_id=workspace_id,
+                dry_run=dry_run,
+                confirm_token=confirm_token,
+            )
+        )
 
     def get_workspaces(self) -> dict[str, object]:
         return {"workspaces": [{"uniqueID": self.workspace_id, "displayName": "Demo"}]}
@@ -192,7 +238,7 @@ def test_workspace_settings_registry_is_one_exact_saved_operation() -> None:
     assert MIN_GO_TIME_SPEC.readback_path == MIN_GO_TIME_SPEC.osc_path
     assert MIN_GO_TIME_SPEC.activity_policy == "running_or_paused_zero"
     with pytest.raises(ValueError):
-        get_workspace_settings_write_spec("selectionIsPlayhead")
+        get_workspace_settings_write_spec("general.selectionIsPlayhead")
 
 
 def test_workspace_settings_uuid_resolution_preserves_qlab_canonical_case(
@@ -208,6 +254,20 @@ def test_workspace_settings_uuid_resolution_preserves_qlab_canonical_case(
     assert result.status == "dry_run"
     assert result.workspace_id == WORKSPACE_ID.upper()
     assert result.planned_operations[0]["address"] == f"/workspace/{WORKSPACE_ID.upper()}/settings/general/minGoTime"
+
+
+def test_workspace_settings_lifecycle_accepts_typed_request_and_qualified_operation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    reader = _SettingsFakeReader()
+    result = reader.edit_workspace_settings(_request(0.4, dry_run=True))
+
+    assert result.status == "dry_run"
+    assert result.operation == "general.minGoTime"
+    assert result.planned_operations[0]["property"] == "general.minGoTime"
 
 
 def test_workspace_settings_readback_keeps_existing_numeric_tolerance() -> None:
@@ -228,6 +288,21 @@ def test_workspace_settings_dry_run_issues_token_without_setter(monkeypatch: pyt
     assert result.confirm_token and result.confirm_token.startswith("confirm:workspaceSettings:v1:")
     assert result.planned_operations[0]["address"] == f"/workspace/{WORKSPACE_ID}/settings/general/minGoTime"
     assert result.executed_operations == []
+    assert [args for _, args in reader.calls if args] == []
+
+
+def test_workspace_settings_dry_run_reports_unchanged_without_token_or_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import qlab_mcp.settings.write_operations as write_operations
+
+    monkeypatch.setattr(write_operations, "check_write_readiness", lambda *_: {"ok": True, "status": "ready"})
+    reader = _SettingsFakeReader()
+    result = reader.edit_general_settings(WORKSPACE_ID, "minGoTime", 0.2, dry_run=True)
+
+    assert result.status == "unchanged"
+    assert result.confirm_token is None
+    assert result.planned_operations == []
     assert [args for _, args in reader.calls if args] == []
 
 
@@ -342,9 +417,9 @@ def test_workspace_settings_token_bindings_reject_workspace_operation_and_value(
     spec = MIN_GO_TIME_SPEC
 
     for workspace_id, operation, requested_value in (
-        ("22222222-2222-4222-8222-222222222222", "minGoTime", 0.4),
-        (WORKSPACE_ID, "selectionIsPlayhead", 0.4),
-        (WORKSPACE_ID, "minGoTime", 0.5),
+        ("22222222-2222-4222-8222-222222222222", "general.minGoTime", 0.4),
+        (WORKSPACE_ID, "general.unknown", 0.4),
+        (WORKSPACE_ID, "general.minGoTime", 0.5),
     ):
         token = write_operations.encode_confirm_token(
             write_operations.SETTINGS_TOKEN_FAMILY,

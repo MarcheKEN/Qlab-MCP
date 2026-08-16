@@ -19,7 +19,7 @@ schemas or the server-side safety checks.
 | Create one cue from a template | `qlab_create_cue` | Initial setters, playback, or GO |
 | Create an ordered sequence | `qlab_create_cues` | Atomic transactions or automatic rollback |
 | Edit allowlisted properties and operations | `qlab_edit_cues` | Create, Move, Delete, playback, or raw OSC |
-| Edit one exact saved general setting | `qlab_edit_general_settings` | Other settings writes, playback, GO, or raw OSC |
+| Edit one exact saved workspace setting | `qlab_edit_workspace_settings` | Other settings writes, playback, GO, or raw OSC |
 | Move existing cues structurally | `qlab_move_cues` | Playback or Cart writes not runtime-proven |
 | Delete leaves, one empty Group, or empty one preserved container | `qlab_delete_cues` | Deleting the requested root or automatic rollback |
 
@@ -177,11 +177,11 @@ The invalid example uses an implicit selection and skips readiness, dry-run, and
 per-operation confirmation. Edit does not expose Create, Move, Delete,
 playback, or raw OSC operations.
 
-## Edit general settings
+## Edit workspace settings
 
-`qlab_edit_general_settings` is the first and only Workspace Settings write
-slice. It accepts one exact workspace UUID, `operation="minGoTime"`, a finite
-non-negative seconds value, optional `dry_run`, and the exact fresh
+`qlab_edit_workspace_settings` is the first and only Workspace Settings write
+slice. It accepts one exact workspace UUID, a typed operation with
+`kind="general.minGoTime"`, a finite non-negative seconds value, optional `dry_run`, and the exact fresh
 `confirm:workspaceSettings:v1:` token returned by the reviewed dry-run.
 
 The dry-run reads fresh readiness, exact workspace identity, current
@@ -204,8 +204,10 @@ Good shape:
 ```json
 {
   "workspace_id": "<workspace-uuid>",
-  "operation": "minGoTime",
-  "value": 0.5,
+  "operation": {
+    "kind": "general.minGoTime",
+    "value": 0.5
+  },
   "dry_run": true
 }
 ```
@@ -215,8 +217,10 @@ Invalid or unsafe shape:
 ```json
 {
   "workspace_id": "selected",
-  "operation": "selectionIsPlayhead",
-  "value": "0.5",
+  "operation": {
+    "kind": "general.unknown",
+    "value": 0.5
+  },
   "dry_run": false
 }
 ```

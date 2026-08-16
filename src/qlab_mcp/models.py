@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import math
 import struct
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, field_validator
 
 
 UpdateCueProfile = Literal[
@@ -86,10 +86,12 @@ UpdateCuesStatus = Literal[
     "workspace_ambiguous",
     "workspace_unavailable",
 ]
-GeneralSettingsOperation = Literal["minGoTime"]
-GeneralSettingsWriteStatus = Literal[
+WorkspaceSettingsOperationId = Literal["general.minGoTime"]
+WorkspaceSettingsWriteStatus = Literal[
     "dry_run",
     "dry_run_preflight_failed",
+    "unsupported",
+    "unchanged",
     "updated",
     "updated_with_confirmed_timeouts",
     "preflight_failed",
@@ -116,6 +118,36 @@ def _general_settings_numeric_value(value: object) -> int | float:
     except (OverflowError, struct.error) as exc:
         raise ValueError("value must fit the OSC float32 range.") from exc
     return value
+
+
+class GeneralMinGoTimeOperation(BaseModel):
+    """The only executable Workspace Settings operation in Wave 1."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["general.minGoTime"]
+    value: Annotated[
+        StrictInt | StrictFloat,
+        Field(
+            ge=0,
+            json_schema_extra={"minimum": 0},
+            description=(
+                "Finite non-negative seconds for the allowlisted general.minGoTime setting. "
+                "The OSC encoder preserves integer versus float transport types."
+            ),
+        ),
+    ]
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def validate_value(cls, value: object) -> int | float:
+        return _general_settings_numeric_value(value)
+
+
+# Keep the public request shape extensible without advertising a one-item union
+# in FastMCP's JSON Schema. Add the next typed operation and promote this alias
+# to an Annotated discriminated union in that operation's implementation wave.
+WorkspaceSettingsOperation = GeneralMinGoTimeOperation
 
 
 class QlabConnectionCheckResult(BaseModel):
@@ -205,12 +237,13 @@ class WorkspaceSettingsResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class GeneralSettingsEditInput(BaseModel):
-    """Typed input for qlab_edit_general_settings."""
+class WorkspaceSettingsEditRequest(BaseModel):
+    """Typed input for the unified Workspace Settings write tool."""
+
+    model_config = ConfigDict(extra="forbid")
 
     workspace_id: UUID = Field(description="Exact workspace UUID.")
-    operation: GeneralSettingsOperation
-    value: int | float
+    operation: WorkspaceSettingsOperation
     dry_run: bool | None = None
     confirm_token: str | None = None
 
@@ -227,19 +260,14 @@ class GeneralSettingsEditInput(BaseModel):
             raise ValueError("workspace_id must be an exact workspace UUID.")
         return value
 
-    @field_validator("value", mode="before")
-    @classmethod
-    def validate_value(cls, value: object) -> int | float:
-        return _general_settings_numeric_value(value)
 
-
-class GeneralSettingsEditResult(BaseModel):
-    """Result for the gated general workspace setting write slice."""
+class WorkspaceSettingsEditResult(BaseModel):
+    """Result for the gated Workspace Settings write slice."""
 
     ok: bool
-    status: GeneralSettingsWriteStatus = Field(description="Machine-readable workspace settings write result status.")
+    status: WorkspaceSettingsWriteStatus = Field(description="Machine-readable workspace settings write result status.")
     workspace_id: str
-    operation: GeneralSettingsOperation
+    operation: WorkspaceSettingsOperationId
     dry_run: bool
     requested_value: int | float
     baseline: int | float | None = None

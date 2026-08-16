@@ -64,7 +64,7 @@ annotations.
 | `qlab_create_cue` | One template-backed structural creation | Gated, additive structural write; not initial setters or GO |
 | `qlab_create_cues` | Ordered sequential creation, 1–50 items | Gated, non-atomic batch; no automatic rollback |
 | `qlab_edit_cues` | Allowlisted property/operation edits, 1–50 items | Gated, per-operation confirmation, non-atomic |
-| `qlab_edit_general_settings` | One exact `general.minGoTime` saved-setting write | Gated, one setter, fresh token, fresh readback |
+| `qlab_edit_workspace_settings` | One exact `general.minGoTime` saved-setting write | Gated, one setter, fresh token, fresh readback |
 | `qlab_move_cues` | Sequential structural moves, 1–10 UUID targets | Gated, destructive metadata hint, non-atomic |
 | `qlab_delete_cues` | Explicit leaves, one empty Group, or root-preserving recursive emptying | Gated destructive, sequential, non-atomic |
 
@@ -84,7 +84,7 @@ do not silently claim a complete show inventory.
 
 ## Safe write flow
 
-Every real Create, Edit, Move, Delete, or General Settings write follows this
+Every real Create, Edit, Move, Delete, or Workspace Settings write follows this
 compact sequence:
 
 1. Resolve one explicit workspace and exact cue/container UUIDs.
@@ -95,9 +95,9 @@ compact sequence:
 5. Execute once; never automatically retry timeout or identity ambiguity.
 6. Require fresh structural/property readback before deciding on recovery.
 
-`qlab_edit_general_settings` is intentionally narrower than cue editing: it
-accepts one exact workspace UUID, `operation="minGoTime"`, and a finite
-non-negative seconds value. The dry-run returns one fresh
+`qlab_edit_workspace_settings` is intentionally narrower than cue editing: it
+accepts one exact workspace UUID and a typed `operation` object with
+`kind="general.minGoTime"` plus a finite non-negative seconds value. The dry-run returns one fresh
 `confirm:workspaceSettings:v1:` token and one exact saved-settings setter plan.
 Real execution rechecks readiness, exact workspace identity, baseline, and
 zero running/paused cues, then sends exactly one qualified

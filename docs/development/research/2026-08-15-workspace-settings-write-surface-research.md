@@ -27,8 +27,10 @@ The preferred future backend is therefore **capability-specific OSC**, with no
 AppleScript fallback and no raw OSC escape hatch. The first real write candidate
 is the documented General `minGoTime` scalar. `selectionIsPlayhead` is also a
 documented setter, but it changes the operator's selection/playhead workflow and
-should follow a separate human/runtime proof. Audio, Video, Light, Network, and
-MIDI settings require separate capability gates; many are read-only, unsupported,
+should follow a separate human/runtime proof. Its current status is
+`NEEDS_RUNTIME_RESEARCH`; it is not a public or executable Wave 1 operation.
+Audio, Video, Light, Network, and MIDI settings require separate capability
+gates; many are read-only, unsupported,
 or have ambiguous permission rows in the imported dictionary.
 
 The recommended MCP shape is an internal, typed settings-operation registry plus
@@ -36,6 +38,11 @@ small fixed public domain tools. Do not begin with a generic path/value tool, a
 dynamic tool factory, arbitrary AppleScript, or a cross-domain batch API. Keep the
 existing read contract read-only. A first public settings write would be an
 additive contract change and should ship as **0.4.0**, not a patch release.
+
+The approved 2026-08-16 design supersedes only the public tool-count recommendation:
+the registry remains internal, while one unified typed
+`qlab_edit_workspace_settings` tool exposes the currently enabled operation.
+The evidence and deferral boundaries in this research remain unchanged.
 
 The safety invariant remains:
 

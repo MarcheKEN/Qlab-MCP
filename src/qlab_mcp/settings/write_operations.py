@@ -11,7 +11,7 @@ import time
 from typing import Any
 
 from ..errors import OscTimeoutError, QLabReplyError
-from ..models import GeneralSettingsEditInput, GeneralSettingsEditResult
+from ..models import WorkspaceSettingsEditRequest, WorkspaceSettingsEditResult
 from ..osc.addressing import _workspace_address
 from ..write.comparison import SETTINGS_NUMERIC_MATCH_REL_TOLERANCE, numeric_values_match
 from ..write.safety import check_write_readiness, ensure_write_ready, resolve_dry_run
@@ -157,33 +157,24 @@ def _settings_setter_operation(
 class WorkspaceSettingsWriteMixin:
     """Single-operation Workspace Settings write surface."""
 
-    def edit_general_settings(
+    def edit_workspace_settings(
         self,
-        workspace_id: str,
-        operation: str,
-        value: int | float,
-        dry_run: bool | None = None,
-        confirm_token: str | None = None,
-    ) -> GeneralSettingsEditResult:
-        request = GeneralSettingsEditInput(
-            workspace_id=workspace_id,
-            operation=operation,
-            value=value,
-            dry_run=dry_run,
-            confirm_token=confirm_token,
-        )
+        request: WorkspaceSettingsEditRequest,
+    ) -> WorkspaceSettingsEditResult:
         workspace = str(request.workspace_id)
         is_dry_run = resolve_dry_run(self, request.dry_run)
-        spec = get_workspace_settings_write_spec(request.operation)
+        operation = request.operation.kind
+        value = request.operation.value
+        spec = get_workspace_settings_write_spec(operation)
         readiness: dict[str, Any] | None = None
         activity: dict[str, Any] | None = None
         baseline: int | float | None = None
         setter_address = _workspace_address(workspace, spec.osc_path)
         planned = [
             _settings_setter_operation(
-                request.operation,
+                operation,
                 setter_address,
-                request.value,
+                value,
                 mode=spec.mode,
                 risk_tier=spec.risk_tier,
                 real_write_enabled=spec.real_write_enabled,
@@ -225,12 +216,32 @@ class WorkspaceSettingsWriteMixin:
                 message="Workspace Settings write was blocked during preflight.",
             )
 
+        if is_dry_run and baseline is not None and numeric_values_match(
+            baseline,
+            value,
+            rel_tol=SETTINGS_NUMERIC_MATCH_REL_TOLERANCE,
+        ):
+            return self._settings_result(
+                request,
+                workspace,
+                True,
+                baseline,
+                baseline,
+                [],
+                [],
+                readiness=readiness,
+                activity=activity,
+                status="unchanged",
+                verification={"matched": True, "readback_available": True},
+                message="Workspace Settings already matched the requested value; no setter was planned.",
+            )
+
         warnings = ["The activity reader cannot prove workspace-wide Audition state; keep Audition disabled."]
         if is_dry_run:
             token = encode_confirm_token(
                 SETTINGS_TOKEN_FAMILY,
                 SETTINGS_TOKEN_VERSION,
-                _token_payload(workspace, request.operation, baseline, request.value, spec),
+                _token_payload(workspace, operation, baseline, value, spec),
                 _SETTINGS_TOKEN_SECRET,
             )
             return self._settings_result(
@@ -241,7 +252,7 @@ class WorkspaceSettingsWriteMixin:
 
         try:
             payload, token_error = _token_error(
-                request.confirm_token, workspace, request.operation, baseline, request.value, spec
+                request.confirm_token, workspace, operation, baseline, value, spec
             )
             if token_error or payload is None:
                 return self._settings_result(
@@ -293,13 +304,13 @@ class WorkspaceSettingsWriteMixin:
                 message="Workspace Settings write was blocked before the setter.",
             )
 
-        executed = [_settings_setter_operation(request.operation, setter_address, request.value)]
+        executed = [_settings_setter_operation(operation, setter_address, value)]
         setter_error: str | None = None
         setter_timeout = False
         try:
             reply = self._request(
                 setter_address,
-                request.value,
+                value,
                 workspace_id=workspace,
                 request_timeout=setter_reply_timeout(self, 1),
             )
@@ -322,7 +333,7 @@ class WorkspaceSettingsWriteMixin:
             try:
                 readback = self._read_settings_number(workspace, spec)
                 if (
-                    numeric_values_match(readback, request.value, rel_tol=SETTINGS_NUMERIC_MATCH_REL_TOLERANCE)
+                    numeric_values_match(readback, value, rel_tol=SETTINGS_NUMERIC_MATCH_REL_TOLERANCE)
                     or attempt == len(AFTER_READ_RETRY_DELAYS)
                 ):
                     break
@@ -343,7 +354,7 @@ class WorkspaceSettingsWriteMixin:
             )
         matched = readback is not None and numeric_values_match(
             readback,
-            request.value,
+            value,
             rel_tol=SETTINGS_NUMERIC_MATCH_REL_TOLERANCE,
         )
         if matched:
@@ -393,7 +404,7 @@ class WorkspaceSettingsWriteMixin:
 
     @staticmethod
     def _settings_result(
-        request: GeneralSettingsEditInput,
+        request: WorkspaceSettingsEditRequest,
         workspace_id: str,
         dry_run: bool,
         baseline: int | float | None,
@@ -413,14 +424,14 @@ class WorkspaceSettingsWriteMixin:
         error_code: str | None = None,
         suggested_action: str | None = None,
         message: str,
-    ) -> GeneralSettingsEditResult:
-        return GeneralSettingsEditResult(
-            ok=status in {"dry_run", "updated", "updated_with_confirmed_timeouts"},
+    ) -> WorkspaceSettingsEditResult:
+        return WorkspaceSettingsEditResult(
+            ok=status in {"dry_run", "unchanged", "updated", "updated_with_confirmed_timeouts"},
             status=status,
             workspace_id=workspace_id,
-            operation=request.operation,
+            operation=request.operation.kind,
             dry_run=dry_run,
-            requested_value=request.value,
+            requested_value=request.operation.value,
             baseline=baseline,
             readback=readback,
             planned_operations=planned,

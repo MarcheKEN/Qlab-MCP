@@ -18,7 +18,7 @@ annotations, and result models.
 | `qlab_create_cue` | One template-backed structural creation | Initial setters, playback, or GO | [Create](agent-workflows.md#create-one-cue) |
 | `qlab_create_cues` | Ordered sequential creation, 1–50 items | Atomic transaction or rollback | [Create batch](agent-workflows.md#create-a-sequence) |
 | `qlab_edit_cues` | Allowlisted property/operation edits, 1–50 items | Create, Move, Delete, playback, or raw OSC | [Edit](agent-workflows.md#edit-existing-cues) |
-| `qlab_edit_general_settings` | One exact `general.minGoTime` write in seconds | Other settings writes, playback, GO, or raw OSC | [General settings](agent-workflows.md#edit-general-settings) |
+| `qlab_edit_workspace_settings` | One exact `general.minGoTime` write in seconds | Other settings writes, playback, GO, or raw OSC | [Workspace settings](agent-workflows.md#edit-workspace-settings) |
 | `qlab_move_cues` | Sequential structural moves, 1–10 UUID targets | Playback or unproven Cart writes | [Move](agent-workflows.md#move-existing-cues) |
 | `qlab_delete_cues` | Explicit leaves, one empty Group, or root-preserving recursive emptying | Root deletion or automatic rollback | [Delete](agent-workflows.md#delete-cues) |
 
@@ -27,7 +27,7 @@ annotations, and result models.
 - Writes default to dry-run and require readiness, exact targets, fresh
   confirmation, and post-write readback.
 - Edit confirmation is per planned operation; Create, Move, Delete, and
-  `qlab_edit_general_settings` use dedicated confirmation flows.
+  `qlab_edit_workspace_settings` uses a dedicated confirmation flow.
 - Batches are sequential/non-transactional unless a tool description says
   otherwise. Timeout or identity ambiguity means inspect first; do not retry.
 - `destructiveHint` is MCP metadata, not authorization. Runtime gates remain

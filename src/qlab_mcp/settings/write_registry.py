@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 
-WorkspaceSettingsOperation = Literal["minGoTime"]
+WorkspaceSettingsOperation = Literal["general.minGoTime"]
 
 
 @dataclass(frozen=True)
@@ -23,7 +23,7 @@ class WorkspaceSettingsWriteSpec:
 
 
 MIN_GO_TIME_SPEC = WorkspaceSettingsWriteSpec(
-    operation="minGoTime",
+    operation="general.minGoTime",
     osc_path="settings/general/minGoTime",
     readback_path="settings/general/minGoTime",
     value_kind="non_negative_finite_number",
@@ -35,7 +35,7 @@ MIN_GO_TIME_SPEC = WorkspaceSettingsWriteSpec(
 )
 
 WORKSPACE_SETTINGS_WRITE_REGISTRY: dict[WorkspaceSettingsOperation, WorkspaceSettingsWriteSpec] = {
-    "minGoTime": MIN_GO_TIME_SPEC,
+    "general.minGoTime": MIN_GO_TIME_SPEC,
 }
 
 

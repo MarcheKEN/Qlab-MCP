@@ -31,8 +31,9 @@ from .models import (
     WorkspaceSettingDetailsResult,
     WorkspaceOverviewResult,
     WorkspaceSettingsResult,
-    GeneralSettingsEditResult,
-    GeneralSettingsOperation,
+    WorkspaceSettingsEditRequest,
+    WorkspaceSettingsEditResult,
+    WorkspaceSettingsOperation,
 )
 from .qlab import QLabReader
 from .cues.details import MAX_BATCH_CUE_DETAILS
@@ -1207,25 +1208,14 @@ def qlab_edit_cues(
 
 
 @mcp.tool(
-    title="Edit QLab General Settings",
+    title="Edit QLab Workspace Settings",
     tags={"qlab", "settings", "general-settings", "write-mode", "gated-write"},
     annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
     timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT,
 )
-def qlab_edit_general_settings(
+def qlab_edit_workspace_settings(
     workspace_id: UUID,
-    operation: GeneralSettingsOperation,
-    value: Annotated[
-        StrictInt | StrictFloat,
-        Field(
-            ge=0,
-            json_schema_extra={"minimum": 0},
-            description=(
-                "Finite non-negative seconds for the allowlisted general.minGoTime setting. "
-                "The OSC encoder preserves integer versus float transport types."
-            ),
-        ),
-    ],
+    operation: WorkspaceSettingsOperation,
     dry_run: Annotated[
         bool | None,
         Field(description="Plan without mutating OSC; omitted uses QLAB_WRITE_DRY_RUN_DEFAULT."),
@@ -1234,7 +1224,7 @@ def qlab_edit_general_settings(
         str | None,
         Field(description="Exact fresh confirm:workspaceSettings:v1 token returned by the reviewed dry-run."),
     ] = None,
-) -> GeneralSettingsEditResult:
+) -> WorkspaceSettingsEditResult:
     """Plan or execute the gated general.minGoTime Workspace Settings write.
 
     Target an exact workspace UUID and use seconds as the value. Dry-run performs
@@ -1245,15 +1235,15 @@ def qlab_edit_general_settings(
     activity reader cannot prove workspace-wide Audition state, so keep Audition
     disabled. This tool has no GO, playback, panic, /live, or raw OSC behavior.
     """
+    request = WorkspaceSettingsEditRequest(
+        workspace_id=workspace_id,
+        operation=operation,
+        dry_run=dry_run,
+        confirm_token=confirm_token,
+    )
     return _run_tool(
-        lambda reader: GeneralSettingsEditResult.model_validate(
-            reader.edit_general_settings(
-                workspace_id=str(workspace_id),
-                operation=operation,
-                value=value,
-                dry_run=dry_run,
-                confirm_token=confirm_token,
-            )
+        lambda reader: WorkspaceSettingsEditResult.model_validate(
+            reader.edit_workspace_settings(request)
         ),
         timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT,
     )

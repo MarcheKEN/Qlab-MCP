@@ -267,5 +267,6 @@ runtime-report, hygiene, and authoritative-base gates are documented.
 
 ## Next Gate
 
-Await user authorization to push `feature/workspace-settings-write` and create
-a Draft PR against `main`. No merge authorization exists.
+Completed: the user-authorized closure commit was pushed to
+`feature/workspace-settings-write`, and PR #16 is open against `main` with CI
+passing. Manual merge remains a separate user-authorized action.

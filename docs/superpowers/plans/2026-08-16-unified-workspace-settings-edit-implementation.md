@@ -170,5 +170,7 @@ git status --short --untracked-files=all
 - [x] Confirm PR #16 is open, non-draft, mergeable, and clean against `main`.
 - [x] Close the bounded Wave 1 scope without adding another Workspace Settings
   operation.
+- [x] Publish the verified closure commit to `feature/workspace-settings-write`
+  after explicit authorization; CI passed on the published HEAD.
 - [ ] Manual merge remains a separate user-authorized action; this closure pass
-  does not push, merge, tag, or release.
+  does not merge, tag, or release.

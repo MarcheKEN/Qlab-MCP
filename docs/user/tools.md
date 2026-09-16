@@ -27,7 +27,7 @@ annotations, and result models.
 - Writes default to dry-run and require readiness, exact targets, fresh
   confirmation, and post-write readback.
 - Edit confirmation is per planned operation; Create, Move, Delete, and
-  `qlab_edit_workspace_settings` uses a dedicated confirmation flow.
+  `qlab_edit_workspace_settings` use dedicated confirmation flows.
 - Batches are sequential/non-transactional unless a tool description says
   otherwise. Timeout or identity ambiguity means inspect first; do not retry.
 - `destructiveHint` is MCP metadata, not authorization. Runtime gates remain

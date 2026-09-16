@@ -2,16 +2,16 @@
 
 ## Audio cues
 
-Un **Audio cue** necesita un `file target` y un `audio output patch`. El patch conecta el cue al hardware o a una salida de red y define routing y canales. QLab recomienda AIFF, WAV y CAF; MP3 puede introducir un retraso variable al iniciar y no es recomendable cuando el timing exacto importa.
+An **Audio cue** needs a `file target` and an `audio output patch`. The patch connects the cue to hardware or a network output and defines routing and channels. QLab recommends AIFF, WAV, and CAF; MP3 can introduce a variable delay on start and is not recommended when exact timing matters.
 
-Fuente: [Audio Cues](https://reference.qlab.app/docs/v5/audio/audio-cues/) y [Audio Output Patch Editor](https://reference.qlab.app/docs/v5/audio/audio-output-patch-editor/).
+Source: [Audio Cues](https://reference.qlab.app/docs/v5/audio/audio-cues/) and [Audio Output Patch Editor](https://reference.qlab.app/docs/v5/audio/audio-output-patch-editor/).
 
 ## Mic cues
 
-Un **Mic cue** pasa audio en vivo desde un `audio input patch` a un `audio output patch`, con el mismo sistema de cueing, routing y efectos que Audio cues. Requiere permiso de micrófono de macOS y normalmente corre indefinidamente hasta detenerse o darle duración finita.
+A **Mic cue** passes live audio from an `audio input patch` to an `audio output patch`, using the same cueing, routing, and effects system as Audio cues. It requires macOS microphone permission and normally runs indefinitely until stopped or given a finite duration.
 
-Fuente: [Mic Cues](https://reference.qlab.app/docs/v5/audio/mic-cues/).
+Source: [Mic Cues](https://reference.qlab.app/docs/v5/audio/mic-cues/).
 
-## Configuración práctica
+## Practical configuration
 
-Para configurar un `Audio Output Patch`, abre `Workspace Settings → Audio → Audio Outputs`, crea el patch, define dispositivo y routing, y selecciónalo en el tab `I/O` del cue. No confundas el patch con el archivo objetivo ni con un `Audio Input Patch`.
+To configure an `Audio Output Patch`, open `Workspace Settings → Audio → Audio Outputs`, create the patch, set the device and routing, and select it in the cue's `I/O` tab. Do not confuse the patch with the target file or an `Audio Input Patch`.

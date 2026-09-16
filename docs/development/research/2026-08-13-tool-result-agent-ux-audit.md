@@ -124,11 +124,11 @@ to improve error text and document aggregate-count semantics; typed result
 models, a universal `next_action`, and schema XOR redesign remain deferred.
 
 ```text
-resultado MCP comprensible
+understandable MCP result
 ≠
-runtime validado
+runtime validated
 ≠
-show listo para GO
+show ready for GO
 ```
 
 ## Completion record

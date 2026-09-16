@@ -1,16 +1,16 @@
 # Codebase Graphs
 
-Proyecto Codebase MCP: `<CODEBASE_PROJECT_ID>`.
+Codebase MCP project: `<CODEBASE_PROJECT_ID>`.
 
-Snapshot regenerado con `codebase-memory-mcp` el 2026-07-09.
+Snapshot regenerated with `codebase-memory-mcp` on 2026-07-09.
 
-- 2363 nodos, 14148 relaciones.
-- Nodos principales: 1037 funciones, 403 secciones, 338 variables, 285 metodos, 106 modulos, 105 archivos, 52 clases.
-- Relaciones principales: 3582 `SEMANTICALLY_RELATED`, 3568 `CALLS`, 2221 `DEFINES`, 1762 `USAGE`, 1248 `TESTS`, 691 `WRITES`.
-- Lenguajes indexados: Python 44 archivos, TOML 1 archivo.
+- 2363 nodes, 14148 relationships.
+- Main nodes: 1037 functions, 403 sections, 338 variables, 285 methods, 106 modules, 105 files, 52 classes.
+- Main relationships: 3582 `SEMANTICALLY_RELATED`, 3568 `CALLS`, 2221 `DEFINES`, 1762 `USAGE`, 1248 `TESTS`, 691 `WRITES`.
+- Indexed languages: Python 44 files, TOML 1 file.
 - Entry point: `qlab-mcp = qlab_mcp.server:main`.
 - Runtime FastMCP: `src/qlab_mcp/server.py:mcp`.
-- Persistencia del indice local: el MCP respondio `artifact_present:false`; no se encontro `.codebase-memory/graph.db.zst` dentro del repo.
+- Local index persistence: the MCP returned `artifact_present:false`; `.codebase-memory/graph.db.zst` was not found in the repository.
 
 ## Arquitectura
 
@@ -42,7 +42,7 @@ flowchart TD
     OSC --> QLab["QLab 5 OSC"]
 ```
 
-## Herramientas MCP Expuestas
+## Exposed MCP Tools
 
 ```mermaid
 flowchart LR
@@ -59,7 +59,7 @@ flowchart LR
     Tools --> UpdateAlias["qlab_update_cues<br/>compatibility alias"]
 ```
 
-## Flujo Read-Only Recomendado
+## Recommended Read-Only Flow
 
 ```mermaid
 sequenceDiagram
@@ -86,7 +86,7 @@ sequenceDiagram
     S-->>User: CueDetailsResult
 ```
 
-## Flujo Write Gated
+## Gated Write Flow
 
 ```mermaid
 flowchart TD
@@ -146,16 +146,16 @@ flowchart LR
 - `text_basic`: common fields, text content basics, selected visual properties, and rich text/style paths. Phase 3F real writes remain blocked where fresh readback is unreliable.
 - Public preferred tool name is `qlab_edit_cues`; `qlab_update_cues` remains a compatibility alias.
 
-## Cambio Seguro: Donde Tocar
+## Safe Changes: Where to Work
 
-- Nueva tool MCP: empezar en `src/qlab_mcp/server.py`, delegar a `QLabReader`, no cambiar firmas publicas sin decision explicita.
-- Nueva lectura de cues: mirar `src/qlab_mcp/cues/*`; usar `_request_data` y perfiles de `cues.profiles`.
-- Nueva lectura de settings: mirar `src/qlab_mcp/settings/workspace.py`.
-- Nuevo write profile: mirar primero `src/qlab_mcp/write/registry.py`; luego el minimo helper en `src/qlab_mcp/write/operations.py`.
-- Refactor de write: extraer una responsabilidad cada vez desde `src/qlab_mcp/write/operations.py`; no dividir todas las familias en una sola PR.
-- Cambios OSC bajo nivel: tocar `src/qlab_mcp/osc/client.py` solo si el problema es transporte, timeout, parseo o passcode.
+- New MCP tool: start in `src/qlab_mcp/server.py`, delegate to `QLabReader`, and do not change public signatures without an explicit decision.
+- New cue read: inspect `src/qlab_mcp/cues/*`; use `_request_data` and the `cues.profiles` profiles.
+- New settings read: inspect `src/qlab_mcp/settings/workspace.py`.
+- New write profile: inspect `src/qlab_mcp/write/registry.py` first, then add the smallest helper in `src/qlab_mcp/write/operations.py`.
+- Write refactor: extract one responsibility at a time from `src/qlab_mcp/write/operations.py`; do not split every family in one PR.
+- Low-level OSC changes: touch `src/qlab_mcp/osc/client.py` only when the problem is transport, timeout, parsing, or passcode handling.
 
-## Checks Minimos
+## Minimum Checks
 
 ```bash
 uv run pytest tests/test_server_tools.py

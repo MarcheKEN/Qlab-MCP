@@ -5,62 +5,61 @@ description: "Use when researching QLab topics covered by the imported Figure 53
 
 # QClass Research
 
-Usa esta skill para investigar únicamente los transcriptos Markdown de las
-clases QClass 5.5 de Figure 53 almacenados en `docs/qclass/`. Son registros de
-clases en directo sobre QLab, no un manual normativo ni una prueba de
-comportamiento runtime.
+Use this skill to research only the Markdown transcripts of Figure 53 QClass
+5.5 classes stored in `docs/qclass/`. They are records of live QLab classes,
+not a normative manual or a runtime behavior test.
 
-## Alcance y fuentes
+## Scope and sources
 
-La única fuente permitida es esta carpeta:
+The only permitted source is this directory:
 
-- `docs/qclass/README.md`, índice de días, temas y timestamps.
+- `docs/qclass/README.md`, index of days, topics, and timestamps.
 - `docs/qclass/September 2025 QClass 5.5 at the Voxel - Day 1.md`.
 - `docs/qclass/September 2025 QClass 5.5 at the Voxel - Day 2.md`.
 - `docs/qclass/September 2025 QClass 5.5 at the Voxel - Day 3.md`.
 
-Los nombres `.txt` mencionados dentro de los Markdown son metadatos del
-transcripto importado; no los trates como archivos disponibles. No consultes
-otras carpetas del repositorio, documentación web, código, ni fuentes externas
-para completar una respuesta QClass.
+The `.txt` names mentioned inside the Markdown are metadata for the imported
+transcript; do not treat them as available files. Do not consult other
+repository directories, web documentation, code, or external sources to
+complete a QClass answer.
 
-## Flujo obligatorio
+## Required workflow
 
-1. Lee primero `docs/qclass/README.md`. Identifica el día y el tema más cercano
-   a la pregunta; conserva el timestamp mostrado en el índice.
-2. Busca términos concretos en el Markdown correspondiente. Por ejemplo:
+1. Read `docs/qclass/README.md` first. Identify the day and topic closest to the
+   question; preserve the timestamp shown in the index.
+2. Search for concrete terms in the corresponding Markdown. For example:
 
    ```sh
    rg -n -i "geometry|camera|video fx" "docs/qclass/September 2025 QClass 5.5 at the Voxel - Day 2.md"
    ```
 
-3. Lee el contexto alrededor de cada coincidencia con `sed -n` u otra lectura
-   acotada. Si el tema cruza días, repite la búsqueda en cada transcripto y
-   separa las evidencias por día.
-4. Responde separando:
-   - **Evidencia**: lo que el transcripto dice, con día, sección y timestamp.
-   - **Interpretación**: síntesis o conexión razonable derivada del texto.
-   - **Límites**: lo que no aparece o no puede confirmarse en estos transcriptos.
-5. Si no encuentras evidencia suficiente, dilo explícitamente. No rellenes
-   huecos con conocimiento general de QLab ni conviertas una explicación oral
-   en una afirmación normativa.
+3. Read the context around each match with `sed -n` or another bounded read. If
+   the topic spans days, repeat the search in each transcript and separate the
+   evidence by day.
+4. Respond with separate sections:
+   - **Evidence**: what the transcript says, with day, section, and timestamp.
+   - **Interpretation**: a synthesis or reasonable connection derived from the text.
+   - **Limits**: what does not appear or cannot be confirmed in these transcripts.
+5. If you do not find sufficient evidence, say so explicitly. Do not fill gaps
+   with general QLab knowledge or turn an oral explanation into a normative
+   claim.
 
-## Reglas de lectura
+## Reading rules
 
-- Conserva literalmente nombres de controles, cue types, comandos y términos
-  técnicos cuando aparezcan en el texto; explica en español cuando convenga.
-- No edites los transcriptos. Añade navegación solo al índice si el usuario lo
-  solicita expresamente y mantiene intacto el texto importado.
-- Esta skill es de investigación documental: no ejecuta QLab, no envía OSC o
-  AppleScript y no autoriza cambios en workspaces, cues ni archivos de show.
-- Si la pregunta necesita una fuente fuera de `docs/qclass/`, informa que está
-  fuera del alcance de QClass en vez de consultarla automáticamente.
+- Preserve control names, cue types, commands, and technical terms literally
+  when they appear in the text; explain them in English when useful.
+- Do not edit the transcripts. Add navigation only to the index if the user
+  explicitly requests it, and keep the imported text intact.
+- This skill is for documentary research: it does not run QLab, send OSC or
+  AppleScript, or authorize changes to workspaces, cues, or show files.
+- If the question requires a source outside `docs/qclass/`, report that it is
+  outside the scope of QClass instead of consulting it automatically.
 
-## Formato recomendado
+## Recommended format
 
 ```text
-Fuente: Day N — <tema/sección> — <timestamp>
-Evidencia: <paráfrasis breve o cita corta del transcripto>
-Interpretación: <síntesis, si procede>
-Límites: <qué no confirma el transcripto>
+Source: Day N — <topic/section> — <timestamp>
+Evidence: <brief paraphrase or short transcript quote>
+Interpretation: <synthesis, if applicable>
+Limits: <what the transcript does not confirm>
 ```

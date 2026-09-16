@@ -1,23 +1,23 @@
 # Fundamentals
 
-## Workspace y estructura
+## Workspace and structure
 
-Un **Workspace** contiene cue lists, cue carts, cues, patches y configuración. `Workspace Settings` pertenece al workspace que está al frente; sus cambios no afectan otros workspaces y viajan con él. Fuente: [Workspace Settings](https://reference.qlab.app/docs/v5/fundamentals/workspace-settings/).
+A **Workspace** contains cue lists, cue carts, cues, patches, and configuration. `Workspace Settings` belongs to the frontmost workspace; its changes do not affect other workspaces and travel with it. Source: [Workspace Settings](https://reference.qlab.app/docs/v5/fundamentals/workspace-settings/).
 
-`Cue Lists` sirven para secuencias; `Cue Carts` para disparos no secuenciales. El `Inspector` expone tabs comunes (`Basics`, `Triggers`) y tabs específicos del cue.
+`Cue Lists` are for sequences; `Cue Carts` are for non-sequential triggering. The `Inspector` exposes common tabs (`Basics`, `Triggers`) and cue-specific tabs.
 
 ## Group cues
 
-Un **Group cue** contiene child cues, incluso otros Groups. El modo del parent determina el flujo:
+A **Group cue** contains child cues, including other Groups. The parent mode determines the flow:
 
-- `Timeline`: los hijos empiezan simultáneamente.
-- `Playlist`: hijos secuenciales, con crossfading, looping y shuffling opcionales.
-- `Start First And Enter`: el playhead entra en el primer hijo.
-- `Start First`: arranca el primer hijo y el playhead continúa después del Group.
-- `Start Random`: elige un hijo armado y no activo; mantiene una memoria round-robin hasta reabrir el workspace.
+- `Timeline`: children start simultaneously.
+- `Playlist`: children run sequentially, with optional crossfading, looping, and shuffling.
+- `Start First And Enter`: the playhead enters the first child.
+- `Start First`: starts the first child and the playhead continues after the Group.
+- `Start Random`: chooses an armed, inactive child; it maintains round-robin memory until the workspace is reopened.
 
-Fuente: [Group Cues](https://reference.qlab.app/docs/v5/fundamentals/group-cues/). No extrapoles side effects de reproducción a una edición MCP sin una prueba específica.
+Source: [Group Cues](https://reference.qlab.app/docs/v5/fundamentals/group-cues/). Do not extrapolate playback side effects to an MCP edit without a specific test.
 
-## Targets y seguridad de lectura
+## Targets and read safety
 
-Distingue cue number, unique cue ID, selected cue, playhead cue y workspace-qualified target. Una consulta ambigua no debe convertirse en una escritura. Para nombres y rutas OSC exactas, usa la skill OSC separada.
+Distinguish cue number, unique cue ID, selected cue, playhead cue, and workspace-qualified target. An ambiguous query must not become a write. For exact names and OSC paths, use the separate OSC skill.

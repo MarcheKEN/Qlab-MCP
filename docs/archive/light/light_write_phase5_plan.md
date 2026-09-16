@@ -1,37 +1,37 @@
-# PLAN LUCES Phase 5 — flags guardados de Light Cue
+# LIGHT PLAN Phase 5 — saved Light Cue flags
 
-## Alcance
+## Scope
 
-Phase 5 habilita en `qlab_update_cues` la escritura real de una sola propiedad booleana guardada —`alwaysCollate` o `subcontroller`— sobre una sola cue de tipo exacto `Light`, con `profile="light_basic"` y modo `saved`.
+Phase 5 enables real writing of one saved Boolean property—`alwaysCollate` or `subcontroller`—on one cue of exact type `Light` through `qlab_update_cues`, with `profile="light_basic"` and `saved` mode.
 
-No habilita acciones live, Dashboard, playback, raw OSC, Light Patch, `lightCommandText` combinado ni ninguna otra operación Light.
+It does not enable live actions, Dashboard, playback, raw OSC, the Light Patch, combined `lightCommandText`, or any other Light operation.
 
-## Contrato y preflight
+## Contract and preflight
 
-Un dry-run confirmable devuelve `real_write_possible=true`, `requires_confirm_token=true`, `phase5_light_behavior_candidate=true`, `real_write_enabled=false`, `planned_only_reason="light_behavior_requires_confirm_token"` y token `confirm:lightBehavior:v1:...`.
+A confirmable dry-run returns `real_write_possible=true`, `requires_confirm_token=true`, `phase5_light_behavior_candidate=true`, `real_write_enabled=false`, `planned_only_reason="light_behavior_requires_confirm_token"`, and token `confirm:lightBehavior:v1:...`.
 
-La escritura real exige write mode habilitado, passcode, `/connect` con edit scope, QLab Edit Mode, workspace UUID explícito, una cue, una property, token exacto, baseline fresh booleano y cue tipo `Light`. Batch, propiedades mezcladas y modo live se bloquean antes de cualquier setter.
+Real writing requires write mode enabled, a passcode, `/connect` with edit scope, QLab Edit Mode, an explicit workspace UUID, one cue, one property, an exact token, a fresh Boolean baseline, and a cue of type `Light`. Batches, mixed properties, and live mode are blocked before any setter.
 
-El token HMAC liga versión, `operation_kind="phase5_light_behavior_flag_write"`, workspace, cue ref/UUID, profile, property, path, mode, baseline, requested, risk y capability gate. Es válido durante la vida del proceso y no es single-use. Rollback requiere nuevo dry-run y token nuevo.
+The HMAC token binds the version, `operation_kind="phase5_light_behavior_flag_write"`, workspace, cue ref/UUID, profile, property, path, mode, baseline, requested, risk, and capability gate. It is valid for the lifetime of the process and is not single-use. Rollback requires a new dry-run and a new token.
 
-Tras el setter se limpia cache y se exige readback booleano exacto. Un baseline cambiado devuelve `stale_light_behavior_baseline`; un readback distinto devuelve `verification_failed`.
+After the setter, the cache is cleared and an exact Boolean readback is required. A changed baseline returns `stale_light_behavior_baseline`; a different readback returns `verification_failed`.
 
-## Operaciones bloqueadas
+## Blocked operations
 
-- `alwaysCollate` y `subcontroller` juntos.
-- Cualquiera de ellos junto a `lightCommandText` u otra property.
-- `collateAndStart`, `setLight`, `replaceLightCommand`, `removeLightCommandsMatching`, `safeSort`, `prune` y aliases.
-- Dashboard, playback, GO, start, stop, panic, audition, preview, raw OSC y ediciones de patch/DMX.
+- `alwaysCollate` and `subcontroller` together.
+- Either of them together with `lightCommandText` or another property.
+- `collateAndStart`, `setLight`, `replaceLightCommand`, `removeLightCommandsMatching`, `safeSort`, `prune`, and aliases.
+- Dashboard, playback, GO, start, stop, panic, audition, preview, raw OSC, and patch/DMX edits.
 
-## Matriz de tests
+## Test matrix
 
-Fake-client cubre ambos sentidos de ambos flags, token/contexto, rollback, baseline stale, cue no Light o ausente, batch, mezclas, modo live, readiness, readback mismatch y ausencia de direcciones prohibidas. Phase 4 permanece como regresión obligatoria.
+The fake client covers both directions of both flags, token/context, rollback, stale baseline, a non-Light or missing cue, batches, mixed operations, live mode, readiness, readback mismatch, and the absence of prohibited addresses. Phase 4 remains mandatory regression coverage.
 
-## Protocolo runtime Phase 5B
+## Phase 5B runtime protocol
 
-Solo en `<TEST_WORKSPACE_NAME>`, con workspace UUID explícito y sin ejecutar cues:
+Use only `<TEST_WORKSPACE_NAME>`, with an explicit workspace UUID and without running cues:
 
-1. Confirmar readiness y baseline fresh.
-2. L1: `alwaysCollate false → true`; readback; nuevo dry-run/token; rollback `true → false`; readback final.
-3. L2: `subcontroller true → false`; readback; nuevo dry-run/token; rollback `false → true`; readback final.
-4. Abortar ante baseline inesperado, preflight fallido o mismatch. No continuar después de un fallo.
+1. Confirm readiness and a fresh baseline.
+2. L1: `alwaysCollate false → true`; read back; run a new dry-run/token; roll back `true → false`; read back the final value.
+3. L2: `subcontroller true → false`; read back; run a new dry-run/token; roll back `false → true`; read back the final value.
+4. Abort on an unexpected baseline, failed preflight, or mismatch. Do not continue after a failure.

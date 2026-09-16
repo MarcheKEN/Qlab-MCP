@@ -2,9 +2,9 @@
 
 ## Correlation and transport concepts
 
-La fuente documenta UDP en port 53000, replies UDP por 53001 por defecto y TCP con SLIP. Un mensaje que llega a un puerto puede ser recibido por todos los workspaces abiertos que escuchen ese puerto; workspace-qualified paths o puertos distintos aíslan el destino.
+The source documents UDP on port 53000, UDP replies on port 53001 by default, and TCP with SLIP. A message arriving on a port may be received by every open workspace listening on that port; workspace-qualified paths or distinct ports isolate the destination.
 
-## Replies y updates
+## Replies and updates
 
 Reply:
 
@@ -12,18 +12,18 @@ Reply:
 /reply/{/invoked/osc/method} json_string
 ```
 
-El JSON puede incluir `workspace_id`, `address`, `status` (`ok`, `error`, `denied`) y `data`. Las notifications de estado usan `/update/workspace/{workspace_id}` y variantes de cue/cue list; se habilitan con `/updates 1` y se detienen con `/updates 0`.
+The JSON may include `workspace_id`, `address`, `status` (`ok`, `error`, `denied`), and `data`. Status notifications use `/update/workspace/{workspace_id}` and cue/cue list variants; enable them with `/updates 1` and stop them with `/updates 0`.
 
-## Acceso y booleanos
+## Access and booleans
 
-Lee la tabla de cada entrada: `view`, `edit`, `control`, `query`, `+/-?`, `Live`. QLab acepta boolean OSC, números y strings según las reglas de la fuente; `toggle` solo existe donde el diccionario lo permite.
+Read each entry's table: `view`, `edit`, `control`, `query`, `+/-?`, `Live`. QLab accepts OSC booleans, numbers, and strings according to the source rules; `toggle` exists only where the dictionary permits it.
 
-## Targets y variantes
+## Targets and variants
 
 - Cue number: `/cue/{cue_number}/...`.
-- Selected cue: `/cue/selected/...` cuando la entrada lo permite.
-- Unique ID y workspace-qualified address: usa exactamente las formas documentadas.
-- Live: añade `/live` al final.
-- Increment/decrement: usa `/+` o `/-` y respeta el orden `/+/live`.
+- Selected cue: `/cue/selected/...` when the entry permits it.
+- Unique ID and workspace-qualified address: use exactly the documented forms.
+- Live: append `/live` at the end.
+- Increment/decrement: use `/+` or `/-` and preserve the `/+/live` order.
 
-Estas reglas son navegación; la firma real siempre se copia de la entrada original.
+These rules are for navigation; always copy the actual signature from the original entry.

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Adds the gated `qlab_edit_workspace_settings` tool for the single proven
+  `general.minGoTime` saved-setting operation. The scope is intentionally
+  complete for this PR; other Workspace Settings writes remain deferred until
+  separately researched and approved.
 - Defines the local threat model, security invariants, reportable findings, and
   accepted risks in `SECURITY.md`.
 - Documents the PR-1 through PR-4 input limits, canonical script profile

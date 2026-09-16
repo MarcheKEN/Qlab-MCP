@@ -1,8 +1,8 @@
-# 1. Estado actual del proyecto (rama “main”)
+# 1. Current Project State (`main` branch)
 
-El repositorio **Qlab-MCP** es un servidor FastMCP que expone herramientas (tools) para interactuar con QLab 5 vía OSC, enfocándose en leer datos (workspaces, cues, settings, estado, detalles) y en efectuar operaciones de escritura seguras (con dry-run y confirmación). El **entry point** parece ser el archivo `src/qlab_mcp/server.py`: allí se crea una instancia `FastMCP(...)`, se decoran funciones como `@mcp.tool` para cada operación, y finalmente se arranca el servidor (`mcp.run()`). Las *tools* públicas corresponden a esas funciones registradas en `server.py`; por ejemplo, habrá tools para listar cues, obtener detalles de cue, leer workspace settings, etc. 
+The **Qlab-MCP** repository is a FastMCP server that exposes tools for interacting with QLab 5 via OSC, focusing on reading data (workspaces, cues, settings, status, details) and carrying out safe write operations (with dry-run and confirmation). The **entry point** appears to be `src/qlab_mcp/server.py`: it creates a `FastMCP(...)` instance, decorates functions such as `@mcp.tool` for each operation, and finally starts the server (`mcp.run()`). The public *tools* correspond to those functions registered in `server.py`; for example, there will be tools for listing cues, getting cue details, reading workspace settings, and so on.
 
-El inicializador de FastMCP está probablemente en `server.py`, algo como:
+The FastMCP initializer is probably in `server.py`, something like:
 ```python
 mcp = FastMCP("QLab MCP", timeout=..., ...)
 @mcp.tool
@@ -11,378 +11,378 @@ def nombre_tool(...): ...
 if __name__ == "__main__":
     mcp.run()
 ```
-(la documentación de FastMCP recomienda declarar cada tool con `@mcp.tool` y dejar que el framework genere esquemas y validación automáticamente).
+(FastMCP documentation recommends declaring each tool with `@mcp.tool` and letting the framework generate schemas and validation automatically.)
 
-**Responsabilidades actuales:** 
-- `server.py` se encarga de inicializar FastMCP, registrar las herramientas y quizá transformar los datos de entrada/salida. Debería delegar la lógica real a otros módulos (por ejemplo, usando *QLabReader*). 
-- `QLabReader` (probablemente definido en `src/qlab_mcp/qlab.py`) actúa como fachada para interactuar con QLab: envía comandos OSC, recibe respuestas JSON, mantiene cachés y resuelve identificadores de workspace. 
-- El paquete `osc` incluye el cliente OSC y la lógica de direccionamiento (por ej. `osc/client.py`, `osc/addressing.py`), responsables de gestionar la comunicación UDP/TCP con QLab. 
-- El paquete `cues` (con módulos como `overview.py`, `details.py`, `query.py`, `profiles.py`) maneja todo lo relativo a leer información de cues: resúmenes de lista de cues, detalles de una cue, búsqueda de cues, perfiles de propiedades, etc. 
-- El paquete `settings` (e.g. `workspace.py`, `summarizers.py`) lee la configuración del workspace (p. ej. ajustes de OSC, grupos, etc.) y resume estados relevantes. 
-- El paquete `runtime` (aunque no se detalló, quizás gestiona estado en tiempo real de QLab). 
-- El paquete `write` contiene la lógica de escritura “gateada”: incluye `operations.py` (definición de operaciones de escritura), `registry.py` (registro de operaciones disponibles), `allowlist.py` (lista de OSC permitidos), `safety.py` (medidas de seguridad), `osc_inventory.py` (inventario de comandos OSC de QLab). 
-- Los modelos Pydantic (`models.py`) definen las estructuras de datos para conexiones, estados, cues, settings, write readiness, etc., usados tanto como tipos de entrada de las tools como en las respuestas. 
-- `tests/` contiene tests unitarios y de contrato, p.ej. `test_server_tools.py` (pruebas de las herramientas públicas vía snapshots o hashes), `test_write_mode.py` (pruebas de la lógica de escritura), `test_qlab_reader.py` (pruebas de QLabReader). 
-- `docs/` alberga documentación interna y especificaciones del proyecto, aparte de la documentación oficial de FastMCP/QLab. 
+**Current responsibilities:**
+- `server.py` initializes FastMCP, registers the tools, and may transform input/output data. It should delegate the actual logic to other modules (for example, by using *QLabReader*).
+- `QLabReader` (probably defined in `src/qlab_mcp/qlab.py`) acts as a facade for interacting with QLab: it sends OSC commands, receives JSON responses, maintains caches, and resolves workspace identifiers.
+- The `osc` package includes the OSC client and addressing logic (for example, `osc/client.py`, `osc/addressing.py`), responsible for managing UDP/TCP communication with QLab.
+- The `cues` package (with modules such as `overview.py`, `details.py`, `query.py`, `profiles.py`) handles everything related to reading cue information: cue-list summaries, cue details, cue searches, property profiles, and so on.
+- The `settings` package (for example, `workspace.py`, `summarizers.py`) reads workspace configuration (for example, OSC settings, groups, and so on) and summarizes relevant states.
+- The `runtime` package (although it was not detailed) may manage QLab's real-time state.
+- The `write` package contains the “gated” write logic: `operations.py` (write-operation definitions), `registry.py` (registry of available operations), `allowlist.py` (allowed OSC list), `safety.py` (safety measures), and `osc_inventory.py` (inventory of QLab OSC commands).
+- The Pydantic models (`models.py`) define data structures for connections, states, cues, settings, write readiness, and so on; they are used both as tool input types and in responses.
+- `tests/` contains unit and contract tests, for example `test_server_tools.py` (tests of public tools using snapshots or hashes), `test_write_mode.py` (write-logic tests), and `test_qlab_reader.py` (QLabReader tests).
+- `docs/` contains internal documentation and project specifications, in addition to the official FastMCP/QLab documentation.
 
-**Interfaz pública vs implementación interna:** Los *endpoints* MCP (los nombres y parámetros de cada `@mcp.tool`) constituyen la interfaz pública. Todo lo demás (código en `osc/`, `cues/`, `settings/`, `write/`, etc.) es implementación interna. Deberían considerarse estables los nombres de las tools y los modelos de respuesta: cualquier cambio afectaría el contrato externo. Por ello, los tests de herramientas (`test_server_tools.py`) parecen validar la respuesta pública contra snapshots, lo que refuerza que esos outputs son parte del contrato que no debe romperse sin aviso.
+**Public interface vs. internal implementation:** The MCP *endpoints* (the names and parameters of each `@mcp.tool`) form the public interface. Everything else (code in `osc/`, `cues/`, `settings/`, `write/`, and so on) is an internal implementation. Tool names and response models should be considered stable: any change would affect the external contract. For that reason, the tool tests (`test_server_tools.py`) appear to validate the public response against snapshots, reinforcing that these outputs are part of the contract and must not be broken without notice.
 
-**Flujo de petición MCP (mapa claro):** Un cliente MCP (p.ej. un agente AI) invoca una tool definida en `server.py`. El handler de la tool (tal vez directamente o usando `QLabReader`) construye una solicitud OSC (usando `osc/addressing.py` para crear la dirección correcta `/workspace/{id}/...`). Luego usa el cliente OSC (`osc/client.py`) para enviar el mensaje a QLab (UDP en puerto 53000 o TCP con SLIP). QLab ejecuta la acción y responde con un mensaje OSC (JSON). El código recibe la respuesta, la parsea (quizá usando modelos Pydantic en `models.py`) y la convierte en el formato MCP. FastMCP formatea esto como JSON de respuesta al cliente, incluyendo bloques de contenido y/o datos estructurados (p.ej. usando `ToolResult`). En resumen: 
+**MCP request flow (clear map):** An MCP client (for example, an AI agent) invokes a tool defined in `server.py`. The tool handler (perhaps directly or through `QLabReader`) builds an OSC request (using `osc/addressing.py` to create the correct `/workspace/{id}/...` address). It then uses the OSC client (`osc/client.py`) to send the message to QLab (UDP on port 53000 or TCP with SLIP). QLab performs the action and responds with an OSC (JSON) message. The code receives and parses the response (perhaps using Pydantic models in `models.py`) and converts it to MCP format. FastMCP formats this as a JSON response to the client, including content blocks and/or structured data (for example, using `ToolResult`). In summary:
 
-> **Cliente MCP** → `server.py:@mcp.tool` → *handler* → **QLabReader/Módulo interno** → `osc.client` envía OSC → **QLab** → OSC respuesta JSON → parseo a modelo Pydantic → **respuesta MCP** al cliente.
+> **MCP client** → `server.py:@mcp.tool` → *handler* → **QLabReader/Internal module** → `osc.client` sends OSC → **QLab** → OSC JSON response → parse into a Pydantic model → **MCP response** to the client.
 
-# 2. Análisis de la PR abierta #9 (“feat: add light command dry-run analysis”)
+# 2. Analysis of Open PR #9 (“feat: add light command dry-run analysis”)
 
-La PR **#9** introduce un nuevo comando de luces (light commands) con soporte de dry-run. Sin acceder al código, cabe inferir que toca: 
-- Código runtime: probablemente `write/operations.py` (agregar operaciones para comandos de iluminación, p.ej. `/workspace/{id}/dashboard/setLight`) y quizás `write/registry.py` (registrar la nueva operación), así como modelos en `models.py` para los argumentos de luz. 
-- Documentación: tal vez actualizaciones en `docs/` o un roadmap interno para reflejar este nuevo comando. 
-- Tests: seguramente añade casos en `test_write_mode.py` o `test_server_tools.py` para verificar comportamiento de luz (dry-run vs real). 
-- La PR parece mezclar varias preocupaciones: código de operaciones de luz, la lógica de dry-run/confirmación (posiblemente en `write/`), actualizaciones de tests de contratos, e incluso ajustes de docs/roadmap. 
+PR **#9** introduces a new light command with dry-run support. Without accessing the code, it can be inferred that it touches:
+- Runtime code: probably `write/operations.py` (adding operations for lighting commands, for example `/workspace/{id}/dashboard/setLight`) and perhaps `write/registry.py` (registering the new operation), as well as models in `models.py` for light arguments.
+- Documentation: perhaps updates in `docs/` or an internal roadmap to reflect this new command.
+- Tests: it likely adds cases in `test_write_mode.py` or `test_server_tools.py` to verify light behavior (dry-run vs. real).
+- The PR appears to mix several concerns: light-operation code, dry-run/confirmation logic (possibly in `write/`), contract-test updates, and even docs/roadmap adjustments.
 
-**Tamaño y riesgos:** Si efectivamente cubre múltiples capas (escritura, tests, docs), es probablemente demasiado grande. Cada bloque (agregar operaciones de luz, modificar registros, crear tests, cambiar docs) podría aislarse en PRs más pequeñas: por ejemplo, primero definir un helper para operaciones de luces en `write/operations`, luego otro PR para integrar el dry-run sobre ellas, y otro para tests y docs. Una PR tan amplia añade riesgo de *conflictos*: `write/operations.py`, `write/registry.py`, `write/allowlist.py`, `models.py` y `server.py` son módulos críticos que cambian con frecuencia. Revisar muchos cambios juntos hace la revisión tediosa y propensa a errores. 
+**Size and risks:** If it actually covers multiple layers (write, tests, docs), it is probably too large. Each block (adding light operations, modifying registries, creating tests, changing docs) could be isolated into smaller PRs: for example, first define a helper for light operations in `write/operations`, then use another PR to integrate dry-run support, and another for tests and docs. Such a broad PR adds *conflict* risk: `write/operations.py`, `write/registry.py`, `write/allowlist.py`, `models.py`, and `server.py` are critical modules that change frequently. Reviewing many changes together makes review tedious and error-prone.
 
-**Estrategia de división:** Se debería:
-- **Separar la documentación:** Cualquier cambio en archivos de docs/roadmap no debería mezclarse con código lógico. 
-- **Dividir el feature:** Por ejemplo, una PR para *definir los nuevos modelos* (inputs/schemas para comandos de luces), otra para *implementar la operación* en `write/operations`, otra para *actualizar el registry* y *allowlist*, y finalmente *pruebas* (dry-run y real). 
-- **Atomizar tests:** Si la PR actual añade tests grandes, podrían dividirse por caso (p.ej. uno para dry-run válido de luz, otro para rechazo). 
-- **No mezclar tareas:** Evitar en una sola PR combinar perfil de cues, settings u otros no relacionados. Cada PR idealmente haga sólo una cosa (añadir un comando de luz, o mejorar tests, etc.).
+**Splitting strategy:** It should:
+- **Separate documentation:** Changes to docs/roadmap files should not be mixed with logic code.
+- **Split the feature:** For example, one PR to *define the new models* (inputs/schemas for light commands), another to *implement the operation* in `write/operations`, another to *update the registry* and *allowlist*, and finally *tests* (dry-run and real).
+- **Atomize tests:** If the current PR adds large tests, they could be split by case (for example, one for a valid light dry-run and another for rejection).
+- **Do not mix tasks:** Avoid combining cue profiles, settings, or other unrelated work in one PR. Each PR should ideally do one thing (add a light command, improve tests, and so on).
 
-# 3. Hotspots del código
+# 3. Code Hotspots
 
-A continuación se identifican los archivos/proyectos de mayor riesgo de cuellos de botella, con sus responsabilidades actuales y recomendaciones:
+The following identifies the files/projects with the greatest bottleneck risk, along with their current responsibilities and recommendations:
 
-- **`src/qlab_mcp/server.py`:** *Responsabilidad:* Inicializa FastMCP y registra todas las tools MCP. Actualmente probablemente contiene gran parte de la lógica de enrutamiento de cada tool. *¿Por qué hotspot?* Todas las herramientas públicas pasan por aquí, por lo que cualquier cambio (nombres de parámetros, esquemas de entrada/salida) afecta el contrato MCP. Su tamaño crece con nuevas tools. *Problema:* Mezcla registro de tools con quizás lógica de validación y respuesta. *Cambios seguros:* Agregar nuevas tools (funciones decoradas) o mejorar documentación interna. *Peligroso:* Renombrar o eliminar parámetros de una tool existente (rompe la API), cambiar el valor predeterminado de `timeout` o `mask_error_details` (puede afectar manejo de errores). *Pruebas protectoras:* `test_server_tools.py` parece validar todas las herramientas, atrapando regresiones de contrato (snapshots/hashes). *Faltan tests:* Es útil testear errores (e.g. inputs inválidos) y tiempo de espera. *Reducir conflictos:* Extraer lógica común (conversiones de datos, manejo de errores) a helpers o modelos. Minimizar las ediciones concurrentes: por ejemplo, si se añade una herramienta nueva, en lugar de modificar el mismo archivo `server.py` en paralelo, podría hacerse mediante import de una función definida en otro módulo. 
+- **`src/qlab_mcp/server.py`:** *Responsibility:* Initializes FastMCP and registers all MCP tools. It currently probably contains much of each tool’s routing logic. *Why a hotspot?* All public tools pass through here, so any change (parameter names, input/output schemas) affects the MCP contract. Its size grows with new tools. *Problem:* It mixes tool registration with perhaps validation and response logic. *Safe changes:* Add new tools (decorated functions) or improve internal documentation. *Dangerous:* Renaming or removing parameters from an existing tool (breaks the API), changing the default value of `timeout` or `mask_error_details` (may affect error handling). *Protective tests:* `test_server_tools.py` appears to validate all tools, catching contract regressions (snapshots/hashes). *Missing tests:* It would be useful to test errors (e.g. invalid inputs) and timeouts. *Reducing conflicts:* Extract common logic (data conversions, error handling) into helpers or models. Minimize concurrent edits: for example, when adding a new tool, instead of modifying the same `server.py` file in parallel, it could be implemented by importing a function defined in another module.
 
-- **`src/qlab_mcp/qlab.py` (posible *QLabReader*):** *Responsabilidad:* Fachada para interactuar con QLab. Puede incluir mixins para distintos aspectos (conexión, consultas, resolución de workspace), métodos privados (`_request_data`, `_resolve_workspace`, etc.), y manejo de caché. *Por qué hotspot:* Todas las herramientas de lectura (cues, settings, status) dependen de ella; es punto único de error si falla la comunicación OSC. Si está sobrecargada (muchos métodos), puede ser frágil. *Problema:* Demasiadas responsabilidades juntas (gestión de sesión, construcción de comandos, parseo de JSON). *Cambios seguros:* Refactorizar internamente (p.ej. extraer submétodos) si hay buena cobertura de tests. *Peligroso:* Modificar la resolución de workspace o el cliente OSC podría romper muchas herramientas. *Pruebas protectoras:* `test_qlab_reader.py` cubre casos de lectura de datos. *Faltan tests:* Casos de error (e.g. desconexión, passcode inválido), concurrencia, y devoluciones parciales. *Reducir conflictos:* Si es un *God class*, se podría dividir en clases más pequeñas (e.g. `WorkspaceReader`, `CueReader`), o pasar de herencia (mixins) a composición para aislar funcionalidades. Hacerlo en fases, probando que cada lector compacto cubre un subdominio. 
+- **`src/qlab_mcp/qlab.py` (possible *QLabReader*):** *Responsibility:* Facade for interacting with QLab. It may include mixins for different aspects (connection, queries, workspace resolution), private methods (`_request_data`, `_resolve_workspace`, etc.), and cache handling. *Why a hotspot?* All read tools (cues, settings, status) depend on it; it is a single point of failure if OSC communication fails. If overloaded (many methods), it may be fragile. *Problem:* Too many responsibilities together (session management, command construction, JSON parsing). *Safe changes:* Refactor internally (e.g. extract submethods) if test coverage is good. *Dangerous:* Modifying workspace resolution or the OSC client could break many tools. *Protective tests:* `test_qlab_reader.py` covers data-reading cases. *Missing tests:* Error cases (e.g. disconnection, invalid passcode), concurrency, and partial responses. *Reducing conflicts:* If it is a *God class*, it could be split into smaller classes (e.g. `WorkspaceReader`, `CueReader`), or inheritance (mixins) could be replaced with composition to isolate functionality. Do this in phases, testing that each compact reader covers a subdomain.
 
-- **`src/qlab_mcp/models.py`:** *Responsabilidad:* Define todos los modelos Pydantic usados para inputs ( argumentos de tools) y outputs (respuestas estructuradas: overview, status, cue details, settings, etc.). *Hotspot:* Es potencialmente voluminoso, y cambios aquí repercuten en contratos de tools. *Problema:* Se concentra mucha lógica de validación en un solo archivo. *Cambios seguros:* Agregar nuevos modelos o campos opcionales. *Peligroso:* Cambiar nombres de campos existentes o estructura (rompe clientes); reasignar tipos. *Pruebas protectoras:* No hay tests directos de modelos, pero `test_server_tools.py` probablemente detecta si la salida ya no encaja en el contrato JSON esperado. *Faltan tests:* Validación de casos límite (p.ej. campos obligatorios ausentes en JSON). *Reducir conflictos:* Si crece mucho, considerar dividir en módulos (`models/cues.py`, `models/settings.py`, `models/write.py`, etc.), pero esto debe hacerse poco a poco, actualizando importaciones y tests conjuntamente. 
+- **`src/qlab_mcp/models.py`:** *Responsibility:* Defines all Pydantic models used for inputs (tool arguments) and outputs (structured responses: overview, status, cue details, settings, etc.). *Hotspot:* It is potentially large, and changes here affect tool contracts. *Problem:* A great deal of validation logic is concentrated in one file. *Safe changes:* Add new models or optional fields. *Dangerous:* Changing existing field names or structure (breaks clients); reassigning types. *Protective tests:* There are no direct model tests, but `test_server_tools.py` probably detects if the output no longer fits the expected JSON contract. *Missing tests:* Validation of edge cases (e.g. required fields missing from JSON). *Reducing conflicts:* If it grows too much, consider splitting it into modules (`models/cues.py`, `models/settings.py`, `models/write.py`, etc.), but this should be done gradually, updating imports and tests together.
 
-- **`src/qlab_mcp/write/operations.py`:** *Responsabilidad:* Contiene la lógica de cada operación de escritura (p.ej. planificar un cambio en QLab, realizar dry-run, aplicar el cambio). *Hotspot:* Probablemente muy grande: todas las operaciones de write (audio, video, texto, luz, etc.) residen aquí. *Problema:* Alta complejidad y a menudo cambiante cuando se añaden nuevos tipos de operaciones. *Cambios seguros:* Encapsular partes en funciones auxiliares; fragmentarlo por responsabilidad (plan vs ejecución) de forma incremental. *Peligroso:* Reestructurar bruscamente (mover funciones) puede romper la registry o tests de write. *Pruebas protectoras:* `test_write_mode.py` verifica el comportamiento en modo dry-run y real. *Faltan tests:* Unitaros para validación previa a la escritura, simulación de timeouts o fallos de confirmación. *Reducir conflictos:* Dividir este módulo: por ejemplo, separar las fases – planificación (`write/planner.py`), validación (`write/validator.py`), ejecución (`write/executor.py`). Así, distintas personas pueden trabajar en diferentes fases sin pisarse. También podríamos agrupar por tipo de media (en video, audio, luz, etc.), si tiene sentido. 
+- **`src/qlab_mcp/write/operations.py`:** *Responsibility:* Contains the logic for each write operation (e.g. planning a change in QLab, performing a dry run, applying the change). *Hotspot:* It is probably very large: all write operations (audio, video, text, lighting, etc.) reside here. *Problem:* High complexity and frequent change when new operation types are added. *Safe changes:* Encapsulate parts in helper functions; split it by responsibility (plan vs. execution) incrementally. *Dangerous:* Abrupt restructuring (moving functions) may break the registry or write tests. *Protective tests:* `test_write_mode.py` verifies dry-run and real-mode behavior. *Missing tests:* Unit tests for pre-write validation, simulated timeouts, or confirmation failures. *Reducing conflicts:* Split this module; for example, separate the phases into planning (`write/planner.py`), validation (`write/validator.py`), and execution (`write/executor.py`). This allows different people to work on different phases without stepping on one another. We could also group by media type (video, audio, lighting, etc.), if that makes sense.
 
-- **`src/qlab_mcp/write/registry.py`:** *Responsabilidad:* Registra las operaciones de write disponibles (posiblemente mapea nombres de tools a funciones en `operations`). *Hotspot:* Cada operación nueva requiere editar este archivo. *Problema:* Si varios features añaden operaciones simultáneamente, habrá conflictos. *Cambios seguros:* Dinamizar el registro (p.ej. descubrir operaciones automáticamente) para evitar editar manualmente. *Peligroso:* Cambiar el orden o eliminar registros; causaría operaciones faltantes. *Pruebas:* Podrían existir tests que verifiquen que el registro contenga ciertas operaciones base. 
+- **`src/qlab_mcp/write/registry.py`:** *Responsibility:* Registers available write operations (possibly mapping tool names to functions in `operations`). *Hotspot:* Every new operation requires editing this file. *Problem:* If several features add operations simultaneously, conflicts will occur. *Safe changes:* Make registration dynamic (e.g. discover operations automatically) to avoid manual editing. *Dangerous:* Changing the order or removing registrations; this would cause operations to be missing. *Tests:* There may be tests that verify that the registry contains certain base operations.
 
-- **`src/qlab_mcp/write/allowlist.py`:** *Responsabilidad:* Define qué comandos OSC están permitidos o bloqueados. *Hotspot:* Si QLab agrega nuevas OSC en actualizaciones, este archivo se modifica. *Problema:* Puede crecer sin control. *Cambios seguros:* Mantener este listado actualizado con tests de validación. *Peligroso:* Permitir comandos no seguros sin gate (contrato de seguridad); o bloquear comandos necesarios. *Pruebas:* Idealmente validar que solo están permitidos comandos intencionados. 
+- **`src/qlab_mcp/write/allowlist.py`:** *Responsibility:* Defines which OSC commands are allowed or blocked. *Hotspot:* If QLab adds new OSC commands in updates, this file must be modified. *Problem:* It may grow without control. *Safe changes:* Keep this list updated with validation tests. *Dangerous:* Allowing unsafe commands without a gate (security contract); or blocking necessary commands. *Tests:* Ideally validate that only intended commands are allowed.
 
-- **`src/qlab_mcp/cues/profiles.py`** (y similares en `cues/`): *Responsabilidad:* Quizá define perfiles de consulta de cues (por ejemplo, leer ciertas propiedades específicas). *Hotspot:* Si hay muchos tipos de cues (audio, video, luz) y perfiles, puede crecer. *Problema:* Mezcla lógica de cada tipo de cue. *Cambios seguros:* Agregar nuevos perfiles; *Peligroso:* Cambiar lógica compartida entre cues. *Pruebas:* `test_server_tools.py` probablemente cubre output de consultas de cues generales. Faltaría tests específicos por tipo de cue. 
+- **`src/qlab_mcp/cues/profiles.py`** (and similar files in `cues/`): *Responsibility:* It perhaps defines cue-query profiles (for example, reading certain specific properties). *Hotspot:* If there are many cue types (audio, video, lighting) and profiles, it may grow. *Problem:* It mixes logic for each cue type. *Safe changes:* Add new profiles; *Dangerous:* Change logic shared between cues. *Tests:* `test_server_tools.py` probably covers general cue-query output. Type-specific cue tests are missing.
 
-- **`src/qlab_mcp/cues/details.py`, `query.py`, `overview.py`:** Responsabilidades análogas para detalles de cues, consultas genéricas, y listados. Podrían fragmentarse si crecen. Testearlos asegura la precisión de la información leída. 
+- **`src/qlab_mcp/cues/details.py`, `query.py`, `overview.py`:** Analogous responsibilities for cue details, generic queries, and listings. They could be split further if they grow. Testing them ensures the accuracy of the information read.
 
-- **`src/qlab_mcp/settings/workspace.py`, `summarizers.py`:** Se encargan de leer y resumir settings de workspace. Riesgo medio: no cambian tan a menudo como cues, pero cambios de QLab en OSC afectarán aquí. 
+- **`src/qlab_mcp/settings/workspace.py`, `summarizers.py`:** These handle reading and summarizing workspace settings. Medium risk: they do not change as often as cues, but QLab OSC changes will affect them.
 
-- **`src/qlab_mcp/osc/client.py`, `addressing.py`:** Manejadores de OSC. Responsabilidad: enviar/marcar mensajes OSC. Son críticos: errores aquí rompen toda la comunicación. Rara vez cambian (solo si actualiza protocolo OSC de QLab). Testeables con mocks de sockets. 
+- **`src/qlab_mcp/osc/client.py`, `addressing.py`:** OSC handlers. Responsibility: sending/marking OSC messages. They are critical: errors here break all communication. They rarely change (only if QLab’s OSC protocol is updated). They can be tested with socket mocks.
 
-- **Test files (`test_server_tools.py`, `test_write_mode.py`, `test_qlab_reader.py`):** *test_server_tools.py* protege el contrato público: probablemente compara respuestas de cada tool con un hash/snapshot. Esto es crucial para detectar cambios no deseados en la salida. Sin embargo, los tests basados en snapshots pueden ser frágiles ante cambios mínimos. *test_write_mode.py* verifica la lógica de escritura/dry-run; cualquier cambio en operaciones orquestadas requiere actualizarlo. *test_qlab_reader.py* valida la lectura de datos QLab; si QLab cambia o hay errores de socket, se debe actualizar. Debemos revisarlos para asegurar que cada área tenga su suite dedicada. Por ejemplo, separar tests de OSC de tests de lógica de negocio. 
+- **Test files (`test_server_tools.py`, `test_write_mode.py`, `test_qlab_reader.py`):** *test_server_tools.py* protects the public contract: it probably compares each tool’s responses with a hash/snapshot. This is crucial for detecting unwanted output changes. However, snapshot-based tests can be fragile in response to minor changes. *test_write_mode.py* verifies write/dry-run logic; any change to orchestrated operations requires updating it. *test_qlab_reader.py* validates reading data from QLab; if QLab changes or socket errors occur, it must be updated. We should review them to ensure each area has its own dedicated suite. For example, separate OSC tests from business-logic tests.
 
-# 4. Evaluación de `server.py` como capa MCP
+# 4. Evaluation of `server.py` as an MCP layer
 
-El archivo `server.py` debería funcionar como capa delgada de presentación de herramientas MCP: definir herramientas y delegar. Según FastMCP, las herramientas deben ser funciones Python simples, dejando que el framework genere esquemas y valide. Cualquier lógica compleja (formateo de errores, mezcla de datos, etc.) idealmente debe salir de `server.py`.
+The `server.py` file should function as a thin presentation layer for MCP tools: define tools and delegate. According to FastMCP, tools should be simple Python functions, leaving schema generation and validation to the framework. Any complex logic (error formatting, data merging, etc.) should ideally be moved out of `server.py`.
 
-- **Registro de herramientas:** Se realiza con `@mcp.tool`. Esto está bien en `server.py`. Para reducir conflictos, podría registrarse herramientas importadas desde otros módulos. Extraer la definición de schemas no es necesario, FastMCP lo hace automáticamente. 
+- **Tool registration:** This is done with `@mcp.tool`. That is appropriate in `server.py`. To reduce conflicts, tools imported from other modules could be registered here. Extracting schema definitions is unnecessary; FastMCP does this automatically.
 
-- **Anotaciones de herramientas:** FastMCP permite metadatos (title, hints de lectura/destrucción). Por ejemplo, cada tool puede anotar `read_only_hint=True` si no modifica nada. Esto es importante para marcar operaciones destrucivas vs seguras, como indican las buenas prácticas de FastMCP. Dichas anotaciones podrían definirse junto a la herramienta, o generarse desde la lógica de write-mode si coincide con ACL. No es imprescindible extraerlas, a menos que haya muchas herramientas similares (en cuyo caso podrían definirse en un helper común).
+- **Tool annotations:** FastMCP supports metadata (title, read/destructive hints). For example, each tool can be annotated with `read_only_hint=True` if it does not modify anything. This is important for marking destructive versus safe operations, as recommended by FastMCP best practices. These annotations could be defined alongside the tool, or generated from write-mode logic if it matches the ACL. Extracting them is not essential unless there are many similar tools (in which case they could be defined in a common helper).
 
-- **Timeouts:** Si las herramientas llaman a QLab, podrían bloquear. FastMCP permite definir `timeout=` en la decoración. Si `server.py` fija tiempos de espera o modo background en herramientas, conviene mantenerlo aquí. No parece necesario extraer esta lógica; es parte de la definición del servidor. Sin embargo, asegúrese de que herramientas de largo plazo usen `task=True` en lugar de solo timeout. 
+- **Timeouts:** If tools call QLab, they could block. FastMCP allows defining `timeout=` in the decorator. If `server.py` sets timeouts or background mode for tools, it is sensible to keep this here. Extracting this logic does not appear necessary; it is part of the server definition. However, ensure that long-running tools use `task=True` rather than only a timeout.
 
-- **Manejo de errores:** FastMCP ya convierte excepciones en respuestas de error. Si `server.py` incluye “helpers de error” personalizados (e.g. catch de excepciones y conversión manual), probablemente es redundante. Sería mejor confiar en `ToolError` y en `mask_error_details` de FastMCP. Por ejemplo, en [20] se indica que lanzar `ValueError` o `ToolError` ya genera el mensaje de error al cliente, y que enmascarar detalles se controla en el servidor, no en cada herramienta. Si existen rutinas específicas de formateo (como armar siempre un JSON con “status” y “data”), convendría extraerlas como utilidades genéricas.
+- **Error handling:** FastMCP already converts exceptions into error responses. If `server.py` includes custom “error helpers” (e.g. catching exceptions and converting them manually), that is probably redundant. It would be better to rely on `ToolError` and FastMCP’s `mask_error_details`. For example, [20] indicates that raising `ValueError` or `ToolError` already generates the error message for the client, and that masking details is controlled at the server level, not in each tool. If specific formatting routines exist (such as always constructing JSON with “status” and “data”), they should probably be extracted into generic utilities.
 
-- **Normalización de payloads:** De manera similar, FastMCP forma automáticamente las respuestas JSON (incluyendo `ToolResult`). Si `server.py` tiene funciones auxiliares para envolver respuestas, podría extraer ese código a un módulo aparte. En particular, si se construyen manualmente diccionarios con `status`/`data`, se podría simplificar usando `ToolResult` o `mcp.types`. Extraer validaciones repetitivas (p. ej. convertir strings a ID) también puede mejorar claridad.
+- **Payload normalization:** Similarly, FastMCP automatically forms JSON responses (including `ToolResult`). If `server.py` has helper functions for wrapping responses, that code could be extracted into a separate module. In particular, if dictionaries with `status`/`data` are built manually, this could be simplified by using `ToolResult` or `mcp.types`. Extracting repetitive validation (e.g. converting strings to IDs) could also improve clarity.
 
-- **Conversión a modelos Pydantic:** Asegurarse de que `server.py` reciba objetos Pydantic directamente como retorno de funciones (FastMCP soporta retornos como objetos Python que castea a JSON). Si `server.py` convierte la respuesta a instancia de modelo (p.ej. `MyModel.parse_obj(response)`), podría delegar esa tarea a FastMCP (el cual genera el esquema de salida) o moverla a los handlers de QLabReader. Es importante que la **lógica de negocio** (lo que hace cada tool) no esté mezclada con detalles de MCP.
+- **Conversion to Pydantic models:** Ensure that `server.py` receives Pydantic objects directly as function return values (FastMCP supports return values as Python objects that it serializes to JSON). If `server.py` converts the response into a model instance (e.g. `MyModel.parse_obj(response)`), it could delegate that task to FastMCP (which generates the output schema) or move it to the QLabReader handlers. It is important that the **business logic** (what each tool does) not be mixed with MCP details.
 
-**Recomendaciones de extracción:** 
-- **Registro de herramientas:** No es necesario extraer; es parte del framework. 
-- **Anotaciones de herramienta:** Se pueden dejar con la herramienta, quizá crear constantes si se repiten. 
-- **Schemas/tipos de herramientas:** FastMCP genera casi todo automáticamente; no es vital extraer. 
-- **Mapeadores de error/respuestas:** Si existen, conviene extraer. Por ejemplo, un módulo `errors.py` que convierta excepciones de QLab en `ToolError` uniformes. Esto mejora pruebas unitarias. 
-- **Handlers de herramientas:** Si la función del tool hace demasiado, extraer la lógica a funciones en otros módulos (p.ej. en `cues/` o `write/`), dejando en `server.py` solo la invocación. 
-- **Snapshots de contrato público:** Las respuestas de las tools (modelos Pydantic) constituyen el contrato; estos archivos (`server.py` y modelos) deben considerarse estables. Cambiarlos solo si es necesario, y con cuidado de actualizar `test_server_tools.py`.
+**Extraction recommendations:**
+- **Tool registration:** No need to extract it; it is part of the framework.
+- **Tool annotations:** They can remain with the tool; perhaps create constants if they are repeated.
+- **Tool schemas/types:** FastMCP generates almost everything automatically; extraction is not vital.
+- **Error/response mappers:** If they exist, extracting them is advisable. For example, an `errors.py` module that converts QLab exceptions into uniform `ToolError` instances. This improves unit testing.
+- **Tool handlers:** If a tool function does too much, extract the logic into functions in other modules (e.g. in `cues/` or `write/`), leaving only the invocation in `server.py`.
+- **Public-contract snapshots:** Tool responses (Pydantic models) constitute the contract; these files (`server.py` and the models) should be considered stable. Change them only when necessary, and carefully update `test_server_tools.py`.
 
-En resumen, no movería las decoraciones ni registro de herramientas fuera de `server.py`, pero sí extraería cualquier lógica que no sea imprescindible allí. El beneficio real es reducir las responsabilidades de `server.py` para evitar cuellos de botella y conflictos (p.ej. separar validación común, manejo de errores y formateo de respuestas). 
+In summary, I would not move the decorators or tool registration out of `server.py`, but I would extract any logic that is not essential there. The real benefit is reducing `server.py`’s responsibilities to avoid bottlenecks and conflicts (e.g. separating common validation, error handling, and response formatting).
 
-# 5. Evaluación de *QLabReader*
+# 5. Evaluation of *QLabReader*
 
-**Responsabilidad:** `QLabReader` (vía `src/qlab_mcp/qlab.py`) funciona como fachada de QLab. Según la descripción, usa mixins y métodos compartidos (`_request_data`, `_request_data_with_tcp_fallback`, `_resolve_workspace`, `_workspace_data`) para abstraer la conexión OSC, resolución del workspace activo/seleccionado y la comunicación con el cliente OSC. También maneja caché de lecturas frecuentes y puede tener métodos legacy. 
+**Responsibility:** `QLabReader` (via `src/qlab_mcp/qlab.py`) functions as a facade for QLab. According to the description, it uses mixins and shared methods (`_request_data`, `_request_data_with_tcp_fallback`, `_resolve_workspace`, `_workspace_data`) to abstract OSC connection, resolution of the active/selected workspace, and communication with the OSC client. It also handles caching of frequent reads and may have legacy methods.
 
-**¿Demasiada responsabilidad?** Si `QLabReader` utiliza herencia múltiple (mixins) y agrupa muchas funcionalidades (conexión, consultas varias, caching), corre el riesgo de convertirse en una “God class”. Cada módulo (cues, settings, runtime) lo utiliza intensamente, generando acoplamiento. Sin el código fuente es difícil medir, pero *podría* estar haciendo demasiado. 
+**Too much responsibility?** If `QLabReader` uses multiple inheritance (mixins) and groups many functions (connection, various queries, caching), it risks becoming a “God class.” Each module (cues, settings, runtime) uses it heavily, creating coupling. Without the source code it is difficult to measure, but it *could* be doing too much.
 
-**Aspectos a evaluar:** 
-- *Mixins y herencia:* Si cada mixin aporta métodos relacionados (p.ej. `CueReaderMixin`, `SettingsReaderMixin`), podría ser más claro: cada mixin sería responsable de una categoría de operaciones. Eso está bien. Pero si se llega a una jerarquía compleja, quizás convenga refactorizar a composición. 
-- *Clientes OSC:* QLabReader depende directamente de un cliente OSC (`osc/client.py`). Idealmente, sería el encargado único de gestionar puertos y fallbacks (UDP vs TCP), lo que está bien. 
-- *Caché de lectura:* Si existe, mejora el rendimiento pero añade complejidad de invalidación. Ver si está bien encapsulado. 
-- *Resolución de workspace:* Método `_resolve_workspace` probablemente identifica qué workspace usar (por ID, nombre o el actual). Bien en esta clase, pero podría abstraerse. 
-- *Compatibilidad/legacy:* Si hay métodos para versiones antiguas o sin soporte de ciertas funciones, conviene marcarlos y evaluar remover o refactorizar más tarde. 
+**Aspects to evaluate:**
+- *Mixins and inheritance:* If each mixin contributes related methods (e.g. `CueReaderMixin`, `SettingsReaderMixin`), it could be clearer: each mixin would be responsible for one category of operations. That is fine. But if the hierarchy becomes complex, refactoring to composition may be preferable.
+- *OSC clients:* QLabReader depends directly on an OSC client (`osc/client.py`). Ideally, it should be solely responsible for managing ports and fallbacks (UDP vs. TCP), which is appropriate.
+- *Read cache:* If one exists, it improves performance but adds invalidation complexity. Check whether it is properly encapsulated.
+- *Workspace resolution:* The `_resolve_workspace` method probably identifies which workspace to use (by ID, name, or the current one). It belongs in this class, but could be abstracted.
+- *Compatibility/legacy:* If there are methods for older versions or unsupported functions, mark them and evaluate removing or refactoring them later.
 
-**Recomendaciones:** Mantener `QLabReader` como fachada es razonable por ahora (centraliza la interacción con QLab). Sin embargo, para disminuir acoplamiento:
-- Se podría reducir la herencia: en lugar de tener `class QLabReader(Base, CueMixin, SettingsMixin, ...)`, usar **composición**: `self.cue_reader = CueReader(self)`, etc., para que cada parte use al cliente principal. Esto facilita testing. 
-- Extraer servicios internos: por ejemplo, un `WorkspaceService` para todo lo de workspace (conexión, status), y otro `CueService` para cues. Cada uno operaría con el cliente OSC. 
-- Interfaces pequeñas: definir interfaces (p.ej. `get_cue_list(workspace)` vs `get_workspace_settings(id)`). 
-- Pero: ya que el proyecto es joven y la arquitectura está definida, tal refactor sería grande. La prioridad debería ser no romper funcionalidad. Por ello, quizá quede para una fase posterior, tras reforzar tests. 
+**Recommendations:** Keeping `QLabReader` as a facade is reasonable for now (it centralizes interaction with QLab). However, to reduce coupling:
+- Inheritance could be reduced: instead of having `class QLabReader(Base, CueMixin, SettingsMixin, ...)`, use **composition**: `self.cue_reader = CueReader(self)`, etc., so each part uses the primary client. This facilitates testing.
+- Extract internal services: for example, a `WorkspaceService` for everything related to the workspace (connection, status), and another `CueService` for cues. Each would operate with the OSC client.
+- Small interfaces: define interfaces (e.g. `get_cue_list(workspace)` vs. `get_workspace_settings(id)`).
+- But since the project is young and the architecture is already defined, such a refactor would be large. The priority should be not breaking functionality. Therefore, it might be deferred to a later phase, after strengthening tests.
 
-En conclusión, la recomendación pragmática es: **dejar QLabReader como está en el corto plazo** (es la fachada obvia), pero a medida que crezca, contemplar dividirlo: p.ej. `QLabWorkspaceReader`, `QLabCueReader`, cada una con su `osc_client`. Primero enfocarse en que `QLabReader` esté bien cubierto por tests; si falla la claridad, entonces empezar a extraer en ramas separadas, sin desmantelar todo de golpe. En resumidas cuentas: dividir por fases, guiado por necesidad (síntomas de código difuso) más que por simpatía. 
+In conclusion, the pragmatic recommendation is to **leave QLabReader as it is in the short term** (it is the obvious facade), but as it grows, consider splitting it: e.g. `QLabWorkspaceReader`, `QLabCueReader`, each with its own `osc_client`. First focus on ensuring that `QLabReader` is well covered by tests; if clarity suffers, then begin extracting into separate branches, without dismantling everything at once. In short, split in phases, guided by need (symptoms of diffuse code) rather than preference.
 
-# 6. Modelo OSC/QLab
+# 6. OSC/QLab Model
 
-Comparando el diseño del proyecto con el **OSC Dictionary oficial de QLab 5**, se observa:
+Comparing the project design with the **official QLab 5 OSC Dictionary**, the following emerges:
 
-- **Construcción de direcciones OSC:** QLab usa rutas como `/workspace/{id}/...`. Según la doc, un mensaje `/workspace/{id}/cueLists` obtiene datos sólo del workspace especificado. Si se omite `/workspace`, el mensaje se envía a *todos* los workspaces abiertos en ese puerto. El código debería usar siempre `/workspace/{id}` para asegurar la dirección correcta. Se nota en [46] que se recomienda prefijar con `/workspace/{id}` o `{name}` para dirigir mensajes. El proyecto debe manejar *ID o nombre* del workspace, pues ambos son válidos. 
-- **Transporte OSC (UDP/TCP):** QLab escucha OSC en UDP puerto 53000 (por defecto) y responde en 53001. En TCP utiliza encapsulado SLIP doble. El proyecto OSC client debe soportar ambos, probando UDP y cayendo a TCP si falla, tal como sugiere `_request_data_with_tcp_fallback`. 
-- **Parsing JSON y estados:** QLab devuelve respuestas JSON con campo `status` y (posiblemente) `data`. El diccionario indica que `status` será `"ok"`, `"error"` o `"denied"`. El código debe interpretar `"error"` y `"denied"` adecuadamente (por ejemplo, lanzar excepción de control de acceso o validación). Es crítico: `"denied"` ocurre si no se ha conectado con passcode o sin permisos. 
-- **Manejo de “connect” y passcode:** QLab requiere enviar `/workspace/{id}/connect {passcode}` para autenticarse. El servidor debe manejar ese paso; incluso recordar si ya se conectó. La doc nota que `/version` y `/workspaces` no requieren passcode, pero todos los demás (p.ej. `/cueLists`) sí. 
-- **Permisos (view/edit/control):** El diccionario clasifica cada comando según privilegios (columnas *view*, *edit*, *control*). La app debería contemplar esto: operaciones de solo lectura se pueden hacer en cualquier modo, pero operaciones destructivas (p.ej. `/workspace/{id}/go`, `/delete`, `/cue/{num}/panic`) requieren permisos mayores. Esto se refleja en `annotations` de FastMCP (p.ej. `destructive_hint` debería ser `true` para `/go` o `/delete`). 
-- **Cue IDs vs Cue números:** QLab distingue *cue number* (orden dentro de la lista) de *cue ID* (UUID). El dict. muestra rutas para ambos: p.ej. `/workspace/{id}/delete/{cue_number}` y `/delete_id/{cue_id}`. El código debe permitir ambas referencias (quizá un parámetro permite número o ID). 
-- **Comandos read-only vs read/write:** Por ejemplo, `/cue/10/preWait` lee un valor; `/cue/10/preWait 5` lo modifica (read/write). El proyecto debería usar ese patrón: separar herramientas de solo lectura de las de escritura. Las herramientas read-only podrían marcarse con `read_only_hint=True`. 
-- **Operaciones peligrosas:** Según la doc, `/go`, `/cue/x/fire`, `/delete`, `/panic`, etc., no envían respuesta por defecto y son destructivas. Estas deben tener “dry-run” y gates en el código. Por ejemplo, la operación de luz (`/dashboard/setLight`) probablemente sea considerada destructiva y se implementaría similarmente (como sugiere el contexto de PR #9). 
+- **OSC address construction:** QLab uses routes such as `/workspace/{id}/...`. According to the documentation, a `/workspace/{id}/cueLists` message retrieves data only from the specified workspace. If `/workspace` is omitted, the message is sent to *all* workspaces open on that port. The code should always use `/workspace/{id}` to ensure correct addressing. This is reflected in [46], which recommends prefixing with `/workspace/{id}` or `{name}` to direct messages. The project must support either a workspace *ID or name*, since both are valid.
+- **OSC transport (UDP/TCP):** QLab listens for OSC on UDP port 53000 (by default) and responds on 53001. Over TCP, it uses double SLIP encapsulation. The project OSC client should support both, trying UDP and falling back to TCP if it fails, as suggested by `_request_data_with_tcp_fallback`.
+- **JSON parsing and statuses:** QLab returns JSON responses with a `status` field and possibly `data`. The dictionary indicates that `status` will be `"ok"`, `"error"`, or `"denied"`. The code must interpret `"error"` and `"denied"` appropriately, for example by raising an access-control or validation exception. This is critical: `"denied"` occurs when the client has not connected with a passcode or lacks permission.
+- **Handling `connect` and passcodes:** QLab requires sending `/workspace/{id}/connect {passcode}` for authentication. The server should handle this step and perhaps remember whether it has already connected. The documentation notes that `/version` and `/workspaces` do not require a passcode, but all other endpoints, such as `/cueLists`, do.
+- **Permissions (view/edit/control):** The dictionary classifies each command according to privilege level through the *view*, *edit*, and *control* columns. The application should account for this: read-only operations can be performed in any mode, but destructive operations, such as `/workspace/{id}/go`, `/delete`, and `/cue/{num}/panic`, require higher privileges. This is reflected in FastMCP `annotations`; for example, `destructive_hint` should be `true` for `/go` or `/delete`.
+- **Cue IDs vs. cue numbers:** QLab distinguishes a *cue number* (its order within the list) from a *cue ID* (UUID). The dictionary shows routes for both, such as `/workspace/{id}/delete/{cue_number}` and `/delete_id/{cue_id}`. The code should support both references, perhaps through a parameter that accepts either a number or an ID.
+- **Read-only vs. read/write commands:** For example, `/cue/10/preWait` reads a value, while `/cue/10/preWait 5` modifies it (read/write). The project should follow this pattern by separating read-only tools from write tools. Read-only tools could be marked with `read_only_hint=True`.
+- **Dangerous operations:** According to the documentation, `/go`, `/cue/x/fire`, `/delete`, `/panic`, and similar commands are destructive and do not send a response by default. These should have dry-run and gating in the code. For example, the lighting operation (`/dashboard/setLight`) would probably be considered destructive and implemented similarly, as suggested by the context of PR #9.
 
-**En resumen:** El diseño ideal **debería seguir el diccionario OSC**: 
-1. **Prefijos claros:** Cada mensaje usa `/workspace/{id}` para dirigirlo.  
-2. **Transportes separados:** UDP (puerto 53000/53001) y TCP (SLIP) gestionados internamente.  
-3. **Respuestas y errores:** El código debe interpretar correctamente `status: ok/error/denied`, lanzando errores o abortando según corresponda.  
-4. **Permisos:** Implementar gating según hint (read_only, destructive, etc.), alineado a permisos view/edit/control del OSC Dict.  
-5. **Seguridad:** Ejecutar `connect` con passcode antes de operaciones críticas.  
-6. **Abstracciones propias:** Más allá del protocolo, el proyecto puede tener abstracciones (models Pydantic, operaciones planificadas) para facilitar el trabajo, pero no deben ocultar detalles esenciales del protocolo (p.ej. direcciones OSC correctas, parseo JSON estándar).
+**In summary:** The ideal design **should follow the OSC dictionary**:
+1. **Clear prefixes:** Every message uses `/workspace/{id}` for routing.
+2. **Separate transports:** UDP (ports 53000/53001) and TCP (SLIP) are managed internally.
+3. **Responses and errors:** The code must correctly interpret `status: ok/error/denied`, raising errors or aborting as appropriate.
+4. **Permissions:** Implement gating according to the hint (`read_only`, `destructive`, etc.), aligned with the OSC Dictionary's view/edit/control permissions.
+5. **Security:** Execute `connect` with a passcode before critical operations.
+6. **Project-specific abstractions:** Beyond the protocol, the project may use abstractions such as Pydantic models and planned operations to facilitate development, but they must not hide essential protocol details, such as correct OSC addresses and standard JSON parsing.
 
-# 7. Evaluación de `models.py`
+# 7. Evaluation of `models.py`
 
-`models.py` contiene los modelos Pydantic que definen los datos intercambiados. Posibles agrupaciones: conexión (`ConnectionModel`), overview de cues, settings de workspace, estado de cue, resultados de queries, datos de readiness de escritura, datos para crear/actualizar cues, esquemas de herramientas de entrada. 
+`models.py` contains the Pydantic models that define the data exchanged. Possible groupings include connection (`ConnectionModel`), cue overviews, workspace settings, cue state, query results, write-readiness data, data for creating/updating cues, and tool-input schemas.
 
-**¿Dividir?** En principio, separar modelos por dominio (por ejemplo, `models/connection.py`, `models/workspace.py`, `models/cues.py`, `models/settings.py`, `models/write.py`, `models/errors.py`) puede mejorar la organización. **Ventajas:** reduce tamaño de cada archivo, evita confusiones al importar, agrupa relacionados. **Inconvenientes:** reestructurar imports en todo el código, actualizar tests y herramientas que usen esos modelos. Sería un refactor considerable con alto riesgo de conflictos si se hace de golpe.
+**Split?** In principle, separating models by domain, for example `models/connection.py`, `models/workspace.py`, `models/cues.py`, `models/settings.py`, `models/write.py`, and `models/errors.py`, could improve organization. **Advantages:** it reduces the size of each file, avoids import confusion, and groups related models. **Disadvantages:** imports throughout the code would need to be reorganized, and tests and tools using those models would need to be updated. It would be a substantial refactor with a high risk of conflicts if done all at once.
 
-**Coste/riesgo:** Los modelos están intimamente ligados al contrato público. Un cambio de archivo (nombre o ubicación) afectaría a todo `server.py` y tests. Se tendrían que ajustar múltiples `import`. Dado el tamaño actual (desconocido, pero puede ser grande), el beneficio de claridad podría ser contra-restado por la complejidad de reorganizar. 
+**Cost/risk:** The models are closely tied to the public contract. Changing a file's name or location would affect all of `server.py` and the tests. Multiple `import`s would need to be adjusted. Given the current size, which is unknown but may be large, the clarity benefit could be offset by the complexity of reorganizing everything.
 
-**Recomendación:** Primero reforzar cobertura de tests de los modelos (p. ej. validación de esquemas). Si se observa que `models.py` se ha vuelto difícil de manejar, entonces en fases posteriores se podría dividir. Pero hacerlo solo tras tener una razón fuerte (por ejemplo, muchos cambios concurrentes) y bajo tests intensivos. En resumen, **no dividir inmediatamente**. Mantenerlo intacto en el corto plazo para evitar errores de import, y quizá planificar su refactor en etapas pequeñas una vez que otras dependencias estén listas.
+**Recommendation:** First strengthen model test coverage, such as schema validation. If `models.py` becomes difficult to manage, it could then be split in later phases. Do so only after there is a strong reason, such as many concurrent changes, and under intensive testing. In short, **do not split it immediately**. Keep it intact in the short term to avoid import errors, and perhaps plan its refactor in small stages once other dependencies are ready.
 
-# 8. Evaluación del *write mode*
+# 8. Evaluation of *write mode*
 
-La arquitectura actual de escritura “gateada” implica: `write/operations.py`, `registry.py`, `allowlist.py`, `safety.py`, `osc_inventory.py`, más tests. Contempla dry-run, confirm tokens, actual execution con verificación posterior. 
+The current gated write architecture involves `write/operations.py`, `registry.py`, `allowlist.py`, `safety.py`, `osc_inventory.py`, and additional tests. It includes dry-run, confirmation tokens, actual execution, and subsequent verification.
 
-**Responsabilidades:** 
-- `operations.py` probablemente crea el plan (lista de comandos OSC), la envía en modo dry-run (sin efecto real) y luego (al confirmarse) lo ejecuta en QLab. 
-- `registry.py` mapea operaciones escritas a funciones.
-- `allowlist.py` lista comandos permitidos para seguridad.
-- `safety.py` quizás decide qué hacer en caso de errores o si abortar.
-- `osc_inventory.py` puede contener metadatos de OSC disponibles. 
+**Responsibilities:**
+- `operations.py` probably creates the plan, a list of OSC commands, sends it in dry-run mode without real effect, and then executes it in QLab once confirmed.
+- `registry.py` maps write operations to functions.
+- `allowlist.py` lists commands permitted for security.
+- `safety.py` may decide what to do in case of errors or whether to abort.
+- `osc_inventory.py` may contain metadata about available OSC commands.
 
-**Separación interna:** Actualmente puede que `operations.py` haga todo: generación del plan, validación de parámetros, ejecución con QLabReader, verificación de resultados. Sería mejor dividirlo en fases: 
+**Internal separation:** Currently, `operations.py` may do everything: plan generation, parameter validation, execution with QLabReader, and result verification. It would be better to divide it into phases:
 
-1. **Planificación (`planning`):** Dado un requerimiento (por ej. “setear luz” o “insertar cue”), construir un plan *abstracto* (lista de cambios a realizar). Este plan no toca QLab. Facilita tests unitarios aislados. 
-2. **Validación (`validation`):** Antes de ejecutar, chequear coherencia del plan (p.ej. que los cue IDs existen). Se puede lanzar error si hay inconsistencia. 
-3. **Confirmación / Token:** Obtener un token o permiso (actualmente lo pide el usuario). Esto ya existe con el concepto de “dry-run” y confirmación. Solo debe orquestar calls.
-4. **Ejecución (`execution`):** Enviar los comandos al QLab (posiblemente en batch) usando el cliente OSC. 
-5. **Verificación (`verification`):** Leer de QLab para confirmar que el resultado fue el deseado (p.ej. verificar que una cue fue creada o modificada). Esto puede requerir re-lectura del estado (¿quizá con QLabReader?). 
-6. **Construcción de resultados (`result builder`):** Formar la respuesta de la operación (p.ej. cuántos cambios aplicados, nuevos IDs). 
+1. **Planning (`planning`):** Given a requirement, such as “set light” or “insert cue,” build an *abstract* plan, a list of changes to make. This plan does not touch QLab, which facilitates isolated unit tests.
+2. **Validation (`validation`):** Before execution, check the plan's consistency, such as whether the cue IDs exist. An error can be raised if there is an inconsistency.
+3. **Confirmation / Token:** Obtain a token or permission, currently requested from the user. This already exists through the dry-run and confirmation concept. It should only orchestrate calls.
+4. **Execution (`execution`):** Send the commands to QLab, possibly in a batch, using the OSC client.
+5. **Verification (`verification`):** Read from QLab to confirm that the desired result was achieved, such as verifying that a cue was created or modified. This may require rereading the state, perhaps through QLabReader.
+6. **Result construction (`result builder`):** Build the operation response, such as the number of changes applied and new IDs.
 
-Además, dentro de operaciones podrían diferenciarse por tipo de media: audio, video, text, light tienen detalles propios. 
+Additionally, operations could be differentiated by media type: audio, video, text, and light have their own details.
 
-**¿Dividir `write/operations.py`?** Sí, conviene si está muy grande. Se podría crear submódulos:
-- `write/planner.py`: funciones para generar planes.
-- `write/executor.py`: funciones que realmente envían los OSC y validan. 
-- `write/validator.py`: comprueba antes y después que los objetivos se cumplan. 
-- `write/confirm.py`: maneja tokens/semaforización. 
-- O bien dividir por dominio (video, text, etc.), pero eso puede fragmentar la lógica general. Prefiero por fase, ya que es más genérico.
+**Split `write/operations.py`?** Yes, if it is very large. Submodules could be created:
+- `write/planner.py`: functions for generating plans.
+- `write/executor.py`: functions that actually send OSC and validate.
+- `write/validator.py`: checks before and after that the objectives were met.
+- `write/confirm.py`: handles tokens/gating.
+- Alternatively, it could be divided by domain, such as video and text, but that could fragment the general logic. I prefer dividing by phase because it is more generic.
 
-**Riesgos/beneficios:** Refactorizar write-mode es delicado por la naturaleza crítica de las operaciones. Pero dividir reduce conflictos futuros (varias personas pueden trabajar en diferente fase). El riesgo es introducir bugs en la secuencia. Para mitigarlo: primero caracterizar con tests las operaciones existentes (como en un juego de pruebas de caja negra), luego extraer partes gradualmente. 
+**Risks/benefits:** Refactoring write mode is delicate because of the critical nature of these operations. However, splitting it reduces future conflicts, since several people can work on different phases. The risk is introducing bugs into the sequence. To mitigate this, first characterize the existing operations with tests, as in black-box testing, and then extract parts gradually.
 
-En concreto, **si se recomienda división:** Hacerlo en pasos, p. ej.:
-- Extraer un “planificador” que genere lista de (address, args).
-- Crear un módulo de validación que las verifique.
-- El executor envía cada comando con QLabReader. 
-- Dejar la función principal de cada tool como coordinador: llamada a planificador, confirmación, luego a executor y verificador. 
+Specifically, **if splitting is recommended:** Do it in steps, for example:
+- Extract a planner that generates a list of `(address, args)`.
+- Create a validation module that verifies them.
+- Have the executor send each command through QLabReader.
+- Leave each tool's main function as the coordinator: call the planner, perform confirmation, then call the executor and verifier.
 
-Esto mejora la claridad y testabilidad de cada componente.
+This improves the clarity and testability of each component.
 
-# 9. Evaluación de los tests como red de seguridad
+# 9. Evaluation of the Tests as a Safety Net
 
-**Cobertura actual:** Los tests existentes parecen cubrir:
-- Contrato de las herramientas públicas (mediante snapshots/hashes) en `test_server_tools.py`. Protege las respuestas MCP (estructura y contenido) que los clientes esperan. 
-- Modo escritura (`test_write_mode.py`): verifica que las operaciones dry-run realicen una simulación correcta y que la ejecución real aplique los cambios esperados, además de gates (tokens). 
-- Lectura QLab (`test_qlab_reader.py`): valida que QLabReader construya correctamente las consultas y procese las respuestas (probablemente usando mocks). 
+**Current coverage:** The existing tests appear to cover:
+- The public tool contract, through snapshots/hashes in `test_server_tools.py`. This protects the MCP responses, including the structure and content expected by clients.
+- Write mode (`test_write_mode.py`): verifies that dry-run operations perform a correct simulation and that real execution applies the expected changes, in addition to enforcing gates such as tokens.
+- QLab reading (`test_qlab_reader.py`): validates that QLabReader correctly constructs queries and processes responses, probably using mocks.
 
-**Protecciones:**
-- El comportamiento público de las tools está protegido en `test_server_tools.py`. Cada herramienta (por ejemplo, “listar cues”, “leer settings”) debe devolver un JSON que corresponde al contrato. Este test es clave: si se rompe algo en el código, este test fallará (indicando que la respuesta cambió). 
-- Validaciones de FastMCP (esquemas de entrada, manejo de errores) se incluyen implícitamente: si una herramienta no respeta su tipo, FastMCP lo rechaza y podría fallar el test. 
-- Los contratos de modelos Pydantic también están protegidos indirectamente: si JSON difiere del esquema, FastMCP lanzará error o la validación de test detectará inconsistencias. 
+**Protections:**
+- Public tool behavior is protected in `test_server_tools.py`. Each tool, such as “list cues” or “read settings,” must return JSON corresponding to the contract. This test is essential: if something breaks in the code, the test will fail and indicate that the response changed.
+- FastMCP validations, including input schemas and error handling, are included implicitly: if a tool does not respect its type, FastMCP rejects it and the test may fail.
+- Pydantic model contracts are also protected indirectly: if the JSON differs from the schema, FastMCP raises an error or test validation detects inconsistencies.
 
-**Tests como characterization:** Parece que `test_server_tools.py` actúa como test de caracterización: asegura que el comportamiento actual se mantenga. Cualquier refactor requerirá actualizar estos snapshots. 
+**Tests as characterization:** `test_server_tools.py` appears to act as a characterization test, ensuring that current behavior is maintained. Any refactor will require updating these snapshots.
 
-**Tamaño/fragilidad:** Los tests que usan snapshots o hashes pueden ser frágiles: un cambio legítimo (por ejemplo, añadir un campo extra o reformatear un string) requiere actualizar manualmente el snapshot. Si el test es monolítico (prueba todo en bloque), puede ser difícil aislar qué cambió. Sería mejor separar pruebas por tool individual. 
+**Size/fragility:** Tests that use snapshots or hashes can be fragile: a legitimate change, such as adding an extra field or reformatting a string, requires manually updating the snapshot. If the test is monolithic and tests everything in one block, it can be difficult to isolate what changed. It would be better to separate tests by individual tool.
 
-**Separación de tests:** 
-- Puede haber tests muy grandes (p.ej. uno solo que comprueba todas las herramientas). Sería útil dividirlos: un test por tool (o al menos por categoría: cues, settings, workspace). Así, cambios en una tool no rompen todos.
-- Similar para write: quizás un test específico por operación write, en lugar de un solo test general. 
-- Tests de QLabReader deberían enfocarse solo en métodos públicos, con un cliente OSC simulado. Por ejemplo, pruebas unitarias que pasen un diccionario JSON y verifiquen que retorna el modelo correcto. 
+**Test separation:**
+- There may be very large tests, such as one test that checks all tools. It would be useful to split them into one test per tool, or at least by category: cues, settings, and workspace. That way, changes to one tool do not break everything.
+- Similarly for write mode, there could be one test per write operation instead of one general test.
+- QLabReader tests should focus only on public methods, using a mocked OSC client. For example, unit tests could pass a JSON dictionary and verify that the correct model is returned.
 
-**Tests faltantes:** 
-- Comportamiento en caso de errores de QLab (timeouts, errores OSC, datos inesperados).
-- Estado de edge cases (cue no existe, workspace invalid). 
-- Escenarios multi-workspace: si se envía sin `/workspace`, ¿qué hace el código? 
-- Confirmaciones de tokens inválidos. 
-- Permisos (ver que al usar passcode incorrecto obtenga “denied”). 
+**Missing tests:**
+- Behavior when QLab returns errors, including timeouts, OSC errors, and unexpected data.
+- Edge-case handling, such as a nonexistent cue or invalid workspace.
+- Multi-workspace scenarios: if a request is sent without `/workspace`, what does the code do?
+- Invalid token confirmations.
+- Permissions, including verifying that an incorrect passcode produces `"denied"`.
 
-**Tests específicos por área:** Se sugiere separar tests según funcionalidad: 
-- **Servidor/Tools:** Ejecutar siempre los tests que cubren las herramientas públicas (`test_server_tools.py`), pues garantizan estabilidad de la API. 
-- **OSC:** Tal vez un test que verifique construcción de direcciones OSC, puertos, etc. 
-- **Lectura de cues:** Tests unitarios de `cues/*` usando QLabReader simulado. 
-- **Settings:** Similar para `settings/*`. 
-- **Write mode:** `test_write_mode.py` debe ejecutarse en cada PR que modifique `write/`. 
-- **Docs-only PRs:** No necesitan correr lógicamente los tests funcionales, pero se podría ejecutar una validación de formatos o links. 
+**Tests by area:** It is suggested that tests be separated by functionality:
+- **Server/Tools:** Always run the tests covering public tools (`test_server_tools.py`), since they guarantee API stability.
+- **OSC:** Possibly add a test that verifies OSC address construction, ports, and so on.
+- **Cue reading:** Unit tests for `cues/*` using a mocked QLabReader.
+- **Settings:** Similarly, tests for `settings/*`.
+- **Write mode:** `test_write_mode.py` should run on every PR that modifies `write/`.
+- **Docs-only PRs:** Functional tests do not need to be run for these logically, but format or link validation could be performed.
 
-En especial, **`test_server_tools.py` es crítico**: protege el contrato público de las tools. Antes de refactorizar cualquier tool, hay que actualizar su correspondiente snapshot en este test. Esto funciona como red de seguridad (characterization): refleja el comportamiento actual y permite compararlo tras cambios. 
+In particular, **`test_server_tools.py` is critical**: it protects the public tool contract. Before refactoring any tool, its corresponding snapshot in this test must be updated. This acts as a characterization safety net: it reflects current behavior and allows comparison after changes.
 
-En conclusión, la suite de tests debe revisarse para asegurarse de que **cada área clave tenga tests dedicados** y que ningún test sea demasiado grande. Los tests existentes conforman una base, pero convendría aumentarlos para cubrir casos de error y separar mejor las responsabilidades. 
+In conclusion, the test suite should be reviewed to ensure that **each key area has dedicated tests** and that no test is too large. The existing tests provide a foundation, but error cases should be covered more extensively and responsibilities should be separated more clearly.
 
-# 10. Estrategia de modularización futura
+# 10. Future Modularization Strategy
 
-Basándonos en el repo actual, proponemos una arquitectura modular en capas:
+Based on the current repository, we propose a layered modular architecture:
 
-- **`server/` (o en raíz):** Contiene `server.py` mínimo y tal vez un subpaquete `tools/` si las definiciones crecen. *Responsabilidad:* Solo el arranque del servidor y registro de herramientas. *Estado actual:* `server.py` grande. *Problema:* Cuello de botella, conflictos. *Cambio:* Dejar solo inicialización y registrar herramientas (incluir solo importaciones de handlers), extraer lógica a módulos `handlers/`. *Riesgo:* Moderado al principio (porque hay que reorganizar imports en tests). *Beneficio:* Facilita paralelismo (una persona trabaja en una herramienta sin tocar el core). *Orden:* Fase temprana. *Tests:* `test_server_tools.py`.
+- **`server/` (or at the root):** Contains a minimal `server.py` and perhaps a `tools/` subpackage if the definitions grow. *Responsibility:* Only server startup and tool registration. *Current state:* `server.py` is large. *Problem:* Bottleneck and conflicts. *Change:* Leave only initialization and register tools (include only handler imports), extracting logic into `handlers/` modules. *Risk:* Moderate initially (because imports in tests must be reorganized). *Benefit:* Facilitates parallel work (one person can work on a tool without touching the core). *Order:* Early phase. *Tests:* `test_server_tools.py`.
 
-- **`osc/`:** *Responsabilidad:* Lógica OSC de bajo nivel: enviar/recibir paquetes, armar direcciones. *Estado:* Ya existe. *Problema:* Podría crecer poco. *Cambio:* Mantener separado. Posible mejora: exponer interfaz estable para enviar OSC, y quizá tests unitarios para direcciones construidas. *Riesgo:* Bajo. *Beneficio:* Código centralizado de comunicaciones. *Tests:* Validar funciones de addressing, cliente. 
+- **`osc/`:** *Responsibility:* Low-level OSC logic: sending/receiving packets and building addresses. *State:* Already exists. *Problem:* It may grow only a little. *Change:* Keep it separate. Possible improvement: expose a stable interface for sending OSC, and perhaps add unit tests for constructed addresses. *Risk:* Low. *Benefit:* Centralized communications code. *Tests:* Validate addressing and client functions.
 
-- **`qlab_reader/` (anterior `qlab.py`):** *Responsabilidad:* Interfaz de lectura a QLab (composición de osc). *Estado:* Demasiado grande; basado en mixins. *Cambio:* Eventualmente dividirlo por dominios (ej. `WorkspaceReader`, `CueReader`, `SettingsReader`). *Riesgo:* Alto de inicio, debe hacerse después de tests. *Beneficio:* Mayor claridad, menos acoplamiento. *Orden:* Fase 3. *Tests:* `test_qlab_reader.py` y nuevos tests para subclases.
+- **`qlab_reader/` (formerly `qlab.py`):** *Responsibility:* Interface for reading from QLab (OSC composition). *State:* Too large; mixin-based. *Change:* Eventually split it by domain (e.g. `WorkspaceReader`, `CueReader`, `SettingsReader`). *Risk:* High initially; it must be done after testing. *Benefit:* Greater clarity and less coupling. *Order:* Phase 3. *Tests:* `test_qlab_reader.py` and new tests for subclasses.
 
-- **`models/`:** *Responsabilidad:* Esquemas Pydantic. *Estado:* Actualmente único archivo. *Problema:* Tamaño, muchas dependencias. *Cambio:* Si se divide (p.ej. `models/cues.py`, etc.), hacerlo cuidadosamente. *Riesgo:* Alto (conflitos de import, tests). *Beneficio:* Organización. *Orden:* Fase 4 (solo si es necesario). *Tests:* Testear validación de esquemas nuevos, nada más específico.
+- **`models/`:** *Responsibility:* Pydantic schemas. *State:* Currently a single file. *Problem:* Size and many dependencies. *Change:* If it is split (e.g. `models/cues.py`, etc.), do so carefully. *Risk:* High (import conflicts, tests). *Benefit:* Organization. *Order:* Phase 4 (only if necessary). *Tests:* Test validation of new schemas, nothing more specific.
 
-- **`cues/`:** *Responsabilidad:* Lectura de cues. Subcarpetas/module por funcionalidad: 
-  - `cues/overview.py` (listar cues), 
-  - `cues/details.py` (detalles de un cue), 
-  - `cues/query.py` (búsqueda por nombre/ID), 
-  - `cues/profiles.py` (listas de propiedades a leer). 
-  *Estado:* Separado ya. *Cambio:* Podría requerir refactor si un archivo crece mucho. *Riesgo:* Medio. *Beneficio:* Mantenibilidad. *Orden:* Puede mantenerse, refactor en fases según necesidad. *Tests:* Agregar tests específicos para cada módulo.
+- **`cues/`:** *Responsibility:* Cue reading. Subdirectories/modules by functionality:
+  - `cues/overview.py` (list cues),
+  - `cues/details.py` (cue details),
+  - `cues/query.py` (search by name/ID),
+  - `cues/profiles.py` (lists of properties to read).
+  *State:* Already separated. *Change:* It may require refactoring if a file grows too much. *Risk:* Medium. *Benefit:* Maintainability. *Order:* It can remain as is; refactor in phases as needed. *Tests:* Add specific tests for each module.
 
-- **`settings/`:** *Responsabilidad:* Leer settings de workspace (ajustes de OSC, carpetas de media, etc.). Seguir una división similar si hay subsecciones (por ejemplo, `settings/workspace.py`, `settings/routing.py`, etc.). *Estado:* Módulos existentes `workspace.py`, `summarizers.py`. *Cambio:* Ver si necesitan más separación (p.ej. `settings/osc_settings.py`). *Riesgo:* Bajo/medio. *Tests:* Tests unitarios para resúmenes de settings. 
+- **`settings/`:** *Responsibility:* Read workspace settings (OSC settings, media folders, etc.). Follow a similar split if there are subsections (e.g. `settings/workspace.py`, `settings/routing.py`, etc.). *State:* Existing modules `workspace.py`, `summarizers.py`. *Change:* See whether they need more separation (e.g. `settings/osc_settings.py`). *Risk:* Low/medium. *Tests:* Unit tests for settings summaries.
 
-- **`runtime/`:** *Responsabilidad:* Estado en tiempo real (e.g. ejecución actual, playhead). *Estado:* Incógnito. *Cambio:* Si existe mucha lógica, modularizar (ej. `runtime/state.py`, `runtime/queries.py`). *Riesgo:* Medio. *Tests:* Para actualizaciones de estado. 
+- **`runtime/`:** *Responsibility:* Real-time state (e.g. current execution, playhead). *State:* Unknown. *Change:* If there is a lot of logic, modularize it (e.g. `runtime/state.py`, `runtime/queries.py`). *Risk:* Medium. *Tests:* For state updates.
 
-- **`write/`** (reestructuración): *Responsabilidad:* Escritura gateada. 
-  - `write/registry.py` (mapea operaciones) – *Estado:* existente. *Problema:* Colisión si varios agregan operaciones. *Cambio:* Tal vez cargar módulos dinámicamente (p.ej. un decorador en operaciones que registra). *Riesgo:* Medio. *Tests:* Confirma registro correcto.
-  - `write/planner.py` (nuevo): genera planes a partir de peticiones. 
-  - `write/validator.py` (nuevo): valida planes. 
-  - `write/executor.py` (nuevo): ejecuta comandos en QLabReader. 
-  - `write/verifier.py` (nuevo): lee de QLab después para asegurar consistencia. 
-  - `write/allowlist.py` (actual): cont. de comandos permitidos. *Cambio:* Documentar mejor qué contiene, quizá refinarlo. 
-  - `write/safety.py`: manejos de bloqueo/fallos, dejarlo como utilidad. 
-  - `write/osc_inventory.py`: inventario de comandos QLab, podría mantenerse. 
-  *Problema:* `operations.py` actual es un bottleneck. *Orden:* Separar operaciones por fase (planner primero, luego executor, etc.). *Riesgo:* Alto si no se testea bien. *Tests:* `test_write_mode.py`, dividir en tests unitarios por fase.
+- **`write/`** (restructuring): *Responsibility:* Gated writes.
+  - `write/registry.py` (maps operations) – *State:* existing. *Problem:* Collision if several people add operations. *Change:* Perhaps load modules dynamically (e.g. a decorator in operations that registers them). *Risk:* Medium. *Tests:* Confirm correct registration.
+  - `write/planner.py` (new): generates plans from requests.
+  - `write/validator.py` (new): validates plans.
+  - `write/executor.py` (new): executes commands in QLabReader.
+  - `write/verifier.py` (new): reads from QLab afterward to ensure consistency.
+  - `write/allowlist.py` (current): list of permitted commands. *Change:* Better document what it contains, perhaps refine it.
+  - `write/safety.py`: lock/failure handling; leave it as a utility.
+  - `write/osc_inventory.py`: inventory of QLab commands; it could remain as is.
+  *Problem:* The current `operations.py` is a bottleneck. *Order:* Split operations by phase (planner first, then executor, etc.). *Risk:* High if not tested properly. *Tests:* `test_write_mode.py`, split into unit tests by phase.
 
-- **`docs/` y `reference/`:** Contienen guías y especificaciones. *Cambio:* Organizar en subcarpetas por tema (FastMCP, QLab, arquitectura). Mantener separados de código. *Riesgo:* Bajo. *Tests:* Validación de enlaces o formato si se desea. 
+- **`docs/` and `reference/`:** Contain guides and specifications. *Change:* Organize them into topic-based subdirectories (FastMCP, QLab, architecture). Keep them separate from code. *Risk:* Low. *Tests:* Link or format validation if desired.
 
-- **`tests/`:** Estructurar en paralelo a `src/`: 
-  - `tests/server/` (para herramientas), 
-  - `tests/osc/` (para addressing y client), 
-  - `tests/qlab/` (cubrimiento de QLabReader y modelos), 
-  - `tests/write/` (para cada parte: planner, executor), 
-  - `tests/cues/`, `tests/settings/` para sus áreas. 
-  *Cambio:* Mover test_ files a carpetas temáticas. *Riesgo:* Bajo. *Beneficio:* Claridad. *Orden:* Fase 1 (reorganización sencilla). 
+- **`tests/`:** Structure them in parallel with `src/`:
+  - `tests/server/` (for tools),
+  - `tests/osc/` (for addressing and client),
+  - `tests/qlab/` (QLabReader and model coverage),
+  - `tests/write/` (for each part: planner, executor),
+  - `tests/cues/`, `tests/settings/` for their respective areas.
+  *Change:* Move `test_` files into thematic directories. *Risk:* Low. *Benefit:* Clarity. *Order:* Phase 1 (simple reorganization).
 
-Esta arquitectura por módulos permitirá que equipos/parches trabajen en paralelo: por ejemplo, uno puede implementar nuevas *tools* de cues leyendo sin tocar `write/`, otro puede mejorar la capa OSC, otro puede refinar el registro de writes, etc. Las áreas con baja interdependencia (p.ej. `osc/` vs `write/`) pueden hacerse concurrentemente. 
+This modular architecture will allow teams/patches to work in parallel: for example, one can implement new cue-reading *tools* without touching `write/`, another can improve the OSC layer, another can refine write registration, and so on. Areas with low interdependence (e.g. `osc/` vs. `write/`) can be developed concurrently.
 
-# 11. Estrategia de ramas y PRs
+# 11. Branch and PR strategy
 
-Para coordinar múltiples colaboradores (o “chats de Codex”), proponemos:
+To coordinate multiple collaborators (or “Codex chats”), we propose:
 
-- **Convención de nombres:** Usar prefijos claros: `feature/`, `fix/`, `refactor/`, `docs/`. Por ejemplo: `feature/light-commands`, `refactor/write-planner`, `docs/architecture`. Incluir issue/PR si aplica. 
+- **Naming convention:** Use clear prefixes: `feature/`, `fix/`, `refactor/`, `docs/`. For example: `feature/light-commands`, `refactor/write-planner`, `docs/architecture`. Include the issue/PR if applicable.
 
-- **Tamaño máximo PR:** Idealmente no mayor a ~200-300 líneas de cambio y pocas decenas de archivos. Cada PR debe tener un objetivo único claro. Evitar PRs con mezclas de varios temas (ni tests, ni docs, ni código en un solo PR grande). 
+- **Maximum PR size:** Ideally no more than ~200–300 lines of changes and a few dozen files. Each PR should have one clear objective. Avoid PRs that mix several topics (tests, docs, and code should not all be in one large PR).
 
-- **Cambios a no mezclar:** Nunca mezclar lógicas diferentes: p.ej., *no* juntar cambios de arquitectura (`models.py`) con nuevas features de usuario. Docs sólo con docs, tests sólo con tests de la misma área, refactorizaciones sólo con código relacionado. 
+- **Changes not to mix:** Never mix different logic; e.g. do *not* combine architecture changes (`models.py`) with new user features. Docs only with docs, tests only with tests from the same area, and refactors only with related code.
 
-- **Archivos de secuencia única:** 
-  - *server.py* y *models.py* son contratos públicos; editar solo cuando sea imprescindible (nuevas tools o campos). Coordinar con el equipo para no duplicar esfuerzos aquí. Por ejemplo, si se va a añadir un nuevo campo al modelo de cue, hacerlo antes de que otra rama lo use. 
-  - *write/operations.py* tiende a crecer mucho; quizás hacer merge secuencial por bloques de operaciones (p.ej. primero audio, luego video, luego texto), en lugar de que varios lo editen simultáneamente. 
-  - *tests/test_write_mode.py* depende de operaciones; mejor actualizarlo al final de cada refactor de write. 
+- **Single-sequence files:**
+  - *server.py* and *models.py* are public contracts; edit them only when essential (new tools or fields). Coordinate with the team to avoid duplicating efforts here. For example, if a new field is going to be added to the cue model, add it before another branch uses it.
+  - *write/operations.py* tends to grow significantly; it may be better to merge sequentially by blocks of operations (e.g. audio first, then video, then text), rather than having several people edit it simultaneously.
+  - *tests/test_write_mode.py* depends on operations; it is better to update it at the end of each write refactor.
 
-- **Archivos paralelos:** 
-  - Diferentes partes de cues (`overview.py`, `details.py`, etc.) pueden trabajarse en paralelo. 
-  - `osc/addressing.py` vs `osc/client.py`: cambios en uno no deberían afectar tanto al otro, así paralelizable. 
-  - Nuevas operaciones de write (nuevas clases o funciones) idealmente en archivos separados al principio, luego integrarlos en el flujo existente. 
+- **Parallel files:**
+  - Different parts of cues (`overview.py`, `details.py`, etc.) can be worked on in parallel.
+  - `osc/addressing.py` versus `osc/client.py`: changes in one should not affect the other much, so they are parallelizable.
+  - New write operations (new classes or functions) should ideally be placed in separate files initially and then integrated into the existing flow.
 
-- **Separación de features grandes:** Por ejemplo, la característica de soporte completo de luz debería dividirse: una PR solo crea los modelos (inputs) para un comando de luz; otra PR define la función en `operations.py`; otra actualiza `registry.py`; otra agrega tests; otra ajusta docs. 
+- **Splitting large features:** For example, full lighting support should be divided: one PR creates only the input models for a lighting command; another PR defines the function in `operations.py`; another updates `registry.py`; another adds tests; and another adjusts the docs.
 
-- **Uso de ramas base intermedias:** Si un feature A depende del refactor B, hacer primero una rama para B, luego en B crear A. No mezclar en una sola. Por ejemplo, si se quiere agregar un módulo de planificación de operaciones, primero crear PR `feature/write-planner`, mergear, luego ramificar `feature/write-light-dryrun` desde `main`. 
+- **Use of intermediate base branches:** If feature A depends on refactor B, create a branch for B first, then create A from B. Do not combine them into one. For example, if an operations-planning module is to be added, first create PR `feature/write-planner`, merge it, and then branch `feature/write-light-dryrun` from `main`.
 
-- **Cuándo mergear a main:** Mergear PRs que añadan features atómicos o refactors con tests completos. Dejar `main` siempre en estado funcionando (p.ej. ejecutando tests). 
+- **When to merge into main:** Merge PRs that add atomic features or refactors with complete tests. Keep `main` always in working condition (e.g. by running the tests).
 
-- **Ramas “umbrella”:** Usar solo si varias PRs pequeñas forman parte de un gran feature. Por ejemplo, crear una rama `feature/write-refactor` desde la cual salen sub-PRs (aunque cada PR debería tener su propia rama en origen). Luego fusionar la rama umbrella a main al final, asegurando que todas las sub-PRs estén integradas. Esto evita conflictos repetidos de merge. 
+- **“Umbrella” branches:** Use them only when several small PRs form part of a large feature. For example, create a `feature/write-refactor` branch from which sub-PRs emerge (although each PR should have its own source branch). Then merge the umbrella branch into `main` at the end, ensuring that all sub-PRs are integrated. This avoids repeated merge conflicts.
 
-- **Evitar PRs gigantes:** Si una PR creció demasiado, es mejor cerrarla y reabrir múltiples. Se debe revisar en draft frecuentemente. 
+- **Avoid giant PRs:** If a PR grows too large, it is better to close it and reopen several smaller ones. Review it frequently in draft form.
 
-- **Priorizar merges tempranos:** No dejar PRs viejos abiertos sin merge por mucho tiempo. Si algo está hecho y testeado, fusionarlo en main pronto para que otros partan de la última versión. 
+- **Prioritize early merges:** Do not leave old PRs open without merging for too long. If something is complete and tested, merge it into `main` soon so others can start from the latest version.
 
-**Ejemplos de PRs ideales:** 
-- *“feat/cues-overview-tool”*: agrega la tool para listar cues. Afecta `server.py` (registro), `cues/overview.py` (lógica), `models.py` (modelo de respuesta), tests específicos de cues. 
-- *“refactor/write-planner”*: extrae funciones de planificación de `operations.py` a `write/planner.py` y adapta llamadas. Afecta `operations.py`, nuevo `planner.py`, tests de planificación. 
-- *“docs/architecture-update”*: mejora la documentación interna, sin tocar código de lógica. Podría actualizar diagramas o README. 
+**Examples of ideal PRs:**
+- *“feat/cues-overview-tool”*: adds the tool for listing cues. Affects `server.py` (registration), `cues/overview.py` (logic), `models.py` (response model), and cue-specific tests.
+- *“refactor/write-planner”*: extracts planning functions from `operations.py` into `write/planner.py` and adapts the calls. Affects `operations.py`, the new `planner.py`, and planning tests.
+- *“docs/architecture-update”*: improves internal documentation without touching logic code. It could update diagrams or the README.
 
-Estos PRs segmentados facilitan revisión y reducen conflictos, cumpliendo que `server.py`, `models.py`, `operations.py` y los tests clave no sean file de conflicto constante.
+These segmented PRs make review easier and reduce conflicts, ensuring that `server.py`, `models.py`, `operations.py`, and the key tests do not become constant conflict files.
 
-# 12. Plan de refactorización incremental
+# 12. Incremental refactoring plan
 
-Dividimos el refactor en fases pequeñas, cada una con objetivos claros:
+We divide the refactor into small phases, each with clear objectives:
 
-1. **Caracterización de tests:** **Objetivo:** Aumentar cobertura con tests de caracterización. Archivos: *tests existentes*, principalmente. Cambios: escribir tests unitarios para funciones críticas (p.ej. métodos de QLabReader y validadores en write). **No tocar:** Lógica de producción. **Riesgo:** Bajo. **Beneficio:** Seguridad para refactorizaciones futuras. **Tests obligatorios:** Todos de lectura y escritura. **Paralelo:** Varios pueden escribir tests diferentes al mismo tiempo. **Prompt Codex sugerido:** “Analiza los tests actuales y genera ejemplos de tests unitarios faltantes para cubrir casos borde de `QLabReader`.”
+1. **Characterization tests:** **Objective:** Increase coverage with characterization tests. Files: primarily *existing tests*. Changes: write unit tests for critical functions (e.g. QLabReader methods and validators in write). **Do not touch:** Production logic. **Risk:** Low. **Benefit:** Safety for future refactors. **Required tests:** All read and write tests. **Parallel:** Several people can write different tests at the same time. **Suggested Codex prompt:** “Analyze the current tests and generate examples of missing unit tests to cover edge cases of `QLabReader`.”
 
-2. **Extraer helpers de error/response de `server.py`:** **Objetivo:** Mover lógica de manejo de errores o normalización de respuestas a un módulo separado (ej. `server/errors.py`). Archivos: `server.py`, nuevo `errors.py`. Cambios: Identificar código repetido (p.ej. manejo de exceptions) y moverlo. **No tocar:** Definiciones de herramientas o modelos. **Riesgo:** Bajo/Medio (puede romper el formateo de respuestas si no se hace bien). **Beneficio:** Menos peso en `server.py`. **Tests:** `test_server_tools.py` debe seguir pasando. **Paralelo:** Puede hacerse mientras otros trabajan en módulos `cues/`, etc. **Prompt Codex:** “Extrae la lógica de manejo de excepciones de las funciones en `server.py` a un nuevo módulo de utilidades, modificando las llamadas.”
+2. **Extract error/response helpers from `server.py`:** **Objective:** Move error-handling or response-normalization logic into a separate module (e.g. `server/errors.py`). Files: `server.py`, new `errors.py`. Changes: Identify repeated code (e.g. exception handling) and move it. **Do not touch:** Tool or model definitions. **Risk:** Low/Medium (response formatting could break if this is not done correctly). **Benefit:** Less weight in `server.py`. **Tests:** `test_server_tools.py` must continue to pass. **Parallel:** This can be done while others work on `cues/`, etc. **Codex prompt:** “Extract the exception-handling logic from the functions in `server.py` into a new utility module, modifying the calls.”
 
-3. **Extraer tipos/schemas de tools:** **Objetivo:** Si hay argumentos que usan Pydantic o `Annotated`, extraer definiciones de tipos en `models.py`. Archivos: `server.py`, `models.py`. Cambios: Mover definiciones complejas (enums, Literal) a `models`. **No tocar:** Funcionalidad, solo refactor de import. **Riesgo:** Bajo. **Beneficio:** Claridad en `server.py`. **Tests:** Ninguno nuevo, solo revisar comportamiento. **Paralelo:** Sí, varios handlers pueden hacer esto por separado. **Prompt:** “Crea modelos Pydantic para los argumentos de las tools de `server.py` y actualiza las firmas de las funciones para usarlos.”
+3. **Extract tool types/schemas:** **Objective:** If arguments use Pydantic or `Annotated`, extract type definitions into `models.py`. Files: `server.py`, `models.py`. Changes: Move complex definitions (enums, Literal) to `models`. **Do not touch:** Functionality, only import refactoring. **Risk:** Low. **Benefit:** Clarity in `server.py`. **Tests:** None new; only review behavior. **Parallel:** Yes, several handlers can do this separately. **Prompt:** “Create Pydantic models for the arguments of the tools in `server.py` and update the function signatures to use them.”
 
-4. **Reducir hotspots en operaciones de write:** **Objetivo:** Dividir `write/operations.py` en partes. Archivos: `write/operations.py`, crear `write/planner.py`, `write/executor.py`, etc. Cambios: Mover funciones coherentes a los nuevos módulos y modificar llamadas. **No tocar:** Lógica interna de cada función (aún). **Riesgo:** Medio/Alto (error en imports o lógica de secuencia). **Beneficio:** Menos conflictos al agregar nuevas operaciones. **Tests:** `test_write_mode.py` para confirmar que nada cambia externamente. **Paralelo:** Otro puede trabajar en operaciones específicas mientras se reestructura. **Prompt:** “Refactoriza el archivo `write/operations.py` separando la parte de planificación de la parte de ejecución en módulos distintos, manteniendo el mismo comportamiento.”
+4. **Reduce hotspots in write operations:** **Objective:** Split `write/operations.py` into parts. Files: `write/operations.py`, create `write/planner.py`, `write/executor.py`, etc. Changes: Move coherent functions into the new modules and modify calls. **Do not touch:** The internal logic of each function (yet). **Risk:** Medium/High (import or sequencing errors). **Benefit:** Fewer conflicts when adding new operations. **Tests:** `test_write_mode.py` to confirm that nothing changes externally. **Parallel:** Someone else can work on specific operations while the restructuring takes place. **Prompt:** “Refactor `write/operations.py` by separating command planning from execution into different modules, preserving the same behavior.”
 
-5. **Reorganizar modelos (`models.py`):** **Objetivo:** Dividir `models.py` en varios archivos según dominio. Archivos: `models.py` reemplazado por carpeta `models/` con `workspace.py`, `cues.py`, etc. Cambios: Crear nuevos archivos de modelos, ajustar imports en el código. **No tocar:** semántica de modelos. **Riesgo:** Alto (múltiples imports en todo el proyecto). **Beneficio:** Mejor organización a largo plazo. **Tests:** Todos, para asegurarse de que los modelos se cargan correctamente. **Paralelo:** Sí, pero coordinar para no duplicar esfuerzos en importar modelos. **Prompt:** “Divide `models.py` en archivos por categoría (p.ej. cues, settings, write) y actualiza las referencias en el proyecto.”
+5. **Reorganize models (`models.py`):** **Objective:** Split `models.py` into several files by domain. Files: `models.py` replaced by a `models/` folder with `workspace.py`, `cues.py`, etc. Changes: Create new model files and adjust imports in the code. **Do not touch:** Model semantics. **Risk:** High (multiple imports throughout the project). **Benefit:** Better long-term organization. **Tests:** All tests, to ensure that the models load correctly. **Parallel:** Yes, but coordinate to avoid duplicating efforts on model imports. **Prompt:** “Split `models.py` into files by category (e.g. cues, settings, write) and update references throughout the project.”
 
-6. **Mejorar documentación de arquitectura:** **Objetivo:** Añadir diagramas o explicaciones claras en `docs/`. Archivos: en `docs/`. Cambios: Crear un documento de arquitectura con flujo de datos. **No tocar:** Código. **Riesgo:** Bajo. **Beneficio:** Ayuda a nuevos contribuyentes a entender modularización. **Tests:** No aplica. **Paralelo:** Sí. **Prompt:** “Genera un diagrama y texto explicativo del flujo de datos en el servidor MCP para `docs/arquitectura.md`.”
+6. **Improve architecture documentation:** **Objective:** Add diagrams or clear explanations in `docs/`. Files: in `docs/`. Changes: Create an architecture document with data flow. **Do not touch:** Code. **Risk:** Low. **Benefit:** Helps new contributors understand modularization. **Tests:** Not applicable. **Parallel:** Yes. **Prompt:** “Generate a diagram and explanatory text for the data flow in the MCP server for `docs/arquitectura.md`.”
 
-7. **Reglas para futuras features:** **Objetivo:** Escribir guía (tal vez en `docs/`) con buenas prácticas para este proyecto (basadas en MCP y QLab). Archivos: nuevo documento en `docs/`. **Riesgo:** Bajo. **Beneficio:** Previene crecimiento desordenado. **Tests:** No. **Paralelo:** Sí. **Prompt:** “Redacta un documento de reglas de arquitectura para este proyecto, incluyendo pautas sobre tools, modelos y segregación de lógicas.”
+7. **Rules for future features:** **Objective:** Write a guide (perhaps in `docs/`) with good practices for this project (based on MCP and QLab). Files: new document in `docs/`. **Risk:** Low. **Benefit:** Prevents disorderly growth. **Tests:** None. **Parallel:** Yes. **Prompt:** “Draft an architecture-rules document for this project, including guidelines for tools, models, and separation of logic.”
 
-Cada fase debe ser una PR independiente, suficientemente pequeña para revisión. Se puede trabajar en paralelo en áreas distintas (p.ej. un desarrollador mejora tests mientras otro extrae helpers).
+Each phase should be an independent PR, small enough for review. Work can be done in parallel in different areas (e.g. one developer improves tests while another extracts helpers).
 
-# 13. Riesgo de conflictos (por archivo)
+# 13. Conflict risk (by file)
 
-| **Archivo**                   | **Motivo de conflicto**                                             | **Frecuencia de cambios** | **Riesgo**  | **Quienes lo tocan**         | **Estrategia para reducir conflictos**               | **Tests asociados**                    | **Recomendación**               |
+| **File**                      | **Reason for conflict**                                             | **Change frequency**      | **Risk**    | **Who touches it**           | **Strategy to reduce conflicts**                     | **Associated tests**                 | **Recommendation**             |
 |-------------------------------|--------------------------------------------------------------------|---------------------------|-------------|-----------------------------|-----------------------------------------------------|----------------------------------------|-------------------------------|
-| `server.py`                   | Registro de herramientas (cualquier nueva tool)                    | Alto (nuevo feature)      | Alto        | Módulos de features, integradores de API | Extraer lógica repetitiva, minimizar cambios de firmas | `test_server_tools.py`                | Evitar tocar salvo necesidad; manejar secuencialmente |
-| `qlab.py` (QLabReader)        | Lógica de comunicación con QLab (muy central)                     | Medio                     | Alto        | Funcionalidad de lectura/escritura    | Refactorizar en fases, cubrir con tests antes     | `test_qlab_reader.py`                 | Tocar sólo con gran cuidado (facade)   |
-| `models.py`                   | Modelos de datos compartidos (muchas dependencias)                 | Medio                     | Alto        | Cualquier tool o validación        | Consolidar antes de dividir, revisar imports       | Varios tests de output               | Solo cambios planificados secuencialmente |
-| `write/operations.py`         | Lógica de cada operación de escritura                              | Alto (nuevas ops)         | Alto        | Desarrollo de features de write    | Dividir por responsabilidades (planner/executor)   | `test_write_mode.py`                 | Evitar edición simultánea de varias operaciones |
-| `write/registry.py`          | Registro de operaciones (agregar nuevas)                          | Medio                     | Medio       | Desarrollo de features de write    | Auto-registro basado en decoradores               | `test_write_mode.py`                 | Coordinar paralelismo (una persona añade ops a la vez) |
-| `write/allowlist.py`         | Lista de comandos permitidos (actualizaciones de lista)           | Bajo                      | Medio       | Seguridad/Permisos               | Mantener actualizado con tests de permisos        | N/A (implicito en tests de write)    | Cambios ocasionales, baja concurrencia |
-| `cues/overview.py` y co.     | Lógica de lectura de cues (alta demanda de features)              | Medio                     | Medio       | Desarrollo features de cues       | Modularizar funcionalidades independientes         | `test_server_tools.py` (salida cues)  | Múltiples pueden trabajar (una cue tipo por PR) |
-| `settings/`                  | Lectura de settings del workspace                                 | Bajo                      | Bajo        | Mejoras de config/OSC         | Seguir modularidad existente                      | `test_server_tools.py` (salida settings) | Cambio poco frecuente, paralelizable |
-| `osc/client.py`, `addressing.py` | Comunicación básica OSC (poca lógica de negocio)                  | Bajo                      | Bajo        | Raremente; solo evoluciones protocol | Asegurar interfase estable; tests de unitarios      | Tests unitarios de OSC (pendiente)   | Poco conflictivo, paralelo posible |
-| `tests/test_server_tools.py`  | Snapshots de todas las tools (actualizaciones contractuales)       | Alto (con nuevas tools)   | Alto        | Integradores de features         | Usar tests por herramienta para aislar impactos    | N/A (mismo test)                     | Ejecutar siempre; evitar ediciones manuales simultáneas |
-| `tests/test_write_mode.py`    | Verificación integral de write-mode (cubre todo `operations.py`) | Alto (cambios en write)   | Alto        | Desarrollo de write-mode        | Dividir tests por escenario (dry-run, real, fallo) | N/A (mismo test)                     | Tocar secuencialmente al modificar write/ops |
+| `server.py`                   | Tool registration (any new tool)                                   | High (new feature)       | High        | Feature modules, API integrators | Extract repetitive logic, minimize signature changes | `test_server_tools.py`              | Avoid touching unless necessary; handle sequentially |
+| `qlab.py` (QLabReader)        | QLab communication logic (highly central)                          | Medium                    | High        | Read/write functionality       | Refactor in phases, add test coverage first        | `test_qlab_reader.py`             | Touch only with great care (facade) |
+| `models.py`                   | Shared data models (many dependencies)                             | Medium                    | High        | Any tool or validation         | Consolidate before splitting, review imports       | Various output tests              | Only planned sequential changes |
+| `write/operations.py`         | Logic for each write operation                                     | High (new ops)            | High        | Write feature development     | Split by responsibility (planner/executor)         | `test_write_mode.py`             | Avoid simultaneous editing of multiple operations |
+| `write/registry.py`          | Operation registry (adding new ones)                               | Medium                    | Medium      | Write feature development     | Auto-registration based on decorators              | `test_write_mode.py`             | Coordinate parallel work (one person adds ops at a time) |
+| `write/allowlist.py`          | Allowed command list (list updates)                                | Low                       | Medium      | Security/permissions          | Keep updated with permission tests                 | N/A (implicit in write tests)    | Occasional changes, low concurrency |
+| `cues/overview.py` and peers | Cue-reading logic (high demand for features)                       | Medium                    | Medium      | Cue feature development       | Modularize independent functionality               | `test_server_tools.py` (cue output) | Multiple people can work (one cue type per PR) |
+| `settings/`                  | Workspace settings reading                                         | Low                       | Low         | Config/OSC improvements       | Follow existing modularity                         | `test_server_tools.py` (settings output) | Infrequent change, parallelizable |
+| `osc/client.py`, `addressing.py` | Basic OSC communication (little business logic)                | Low                       | Low         | Rarely; protocol evolution only | Ensure a stable interface; unit tests             | OSC unit tests (pending)          | Low conflict, parallel work possible |
+| `tests/test_server_tools.py`  | Snapshots of all tools (contract updates)                          | High (with new tools)     | High        | Feature integrators           | Use per-tool tests to isolate impacts              | N/A (same test)                   | Always run; avoid simultaneous manual edits |
+| `tests/test_write_mode.py`    | Comprehensive write-mode verification (covers all `operations.py`) | High (write changes)      | High        | Write-mode development        | Split tests by scenario (dry-run, real, failure)   | N/A (same test)                   | Touch sequentially when modifying write/ops |
 
-La tabla indica que *server.py*, *qlab.py*, *models.py* y los tests de contrato tienen alto riesgo de conflicto. Deben ser modificados con cuidado y preferiblemente en ramas separadas. Otras áreas (`osc/`, `cues/`, `settings/`) presentan riesgo menor y pueden trabajarse en paralelo.
+The table indicates that *server.py*, *qlab.py*, *models.py*, and the contract tests have a high risk of conflict. They should be modified carefully and preferably in separate branches. Other areas (`osc/`, `cues/`, `settings/`) have lower risk and can be worked on in parallel.
 
-# 14. Reglas de arquitectura para el futuro
+# 14. Architecture rules for the future
 
-Para evitar que el código crezca desordenado, proponemos reglas concretas basadas en las prácticas anteriores:
+To prevent the code from growing disorderly, we propose concrete rules based on the practices above:
 
-- **Las tools MCP deben ser delgadas:** Cada herramienta definida en `server.py` no debe contener lógica de negocio compleja. Si la tarea es complicada, delegar a funciones auxiliares fuera de `server.py`. (FastMCP sugiere que la herramienta solo invoque lógica externa.) 
-- **Names/parámetros de tools son contrato público:** No cambiar nombres de herramientas ni parámetros existentes salvo motivo crítico. Cualquier modificación debe implicar actualización de tests de contrato y versión mayor. 
-- **Modelos Pydantic de respuesta son contrato:** Los campos de las respuestas enviadas a cliente no deben cambiar sin revisión. Testear esquemas con tests de contrato. 
-- **Cliente OSC sin lógica de negocio:** El cliente OSC (`osc/client.py`) y direccionamiento (`osc/addressing.py`) solo deberían encargarse de transporte, no de decidir lógicas de QLab. Esto facilita cambios en el protocolo sin tocar negocio. 
-- **Modo write bien segmentado:** El flujo de escritura debe separar claramente las fases: *planificación* (dry-run), *ejecución real*, *verificación*. Cada herramienta write debe manejar dry-run primero y solo ejecutar tras confirmación. 
-- **Clasificación de operaciones QLab:** Documentar en el código (comentarios o en docs) si cada operación es *read-only*, *read/write*, *control*, *view*, o *destructiva*. Usar esas etiquetas en `@mcp.tool(annotations=...)`. Por ejemplo, herramientas destructivas (`/go`, `/delete`, `/panic`) deben marcarse con `destructive_hint=True` y default a `readOnlyHint=False`. 
-- **Dry-run obligatorio:** Cualquier nueva familia de operaciones de escritura (p.ej. soporte para un tipo de cue o setting) debe implementarse primero con dry-run simulado y tests que validen que el plan es correcto, antes de permitir la ejecución real. 
-- **Cobertura de contrato con snapshots:** Al añadir nuevas tools, siempre actualizar los snapshots en `test_server_tools.py`. Toda nueva herramienta debe tener un test que cubra al menos una ejecución típica y verifique la salida. 
-- **Rechazos y errores:** Para cada operación real (escritura), debe implementarse el caso de rechazo y dry-run. Además, siempre probar ejecución con rollback/verification: si la operación falla a mitad, ¿qué hace el sistema? Documentarlo. 
-- **Datos estructurados vs humanos:** Si una herramienta puede devolver datos estructurados (JSON) además de texto, usar `ToolResult(structured_content=...)` para que clientes puedan procesarlos. 
-- **Separar documentación grande:** Los documentos de diseño o guía no deben mezclarse en un mismo PR con lógica de código, para simplificar revisiones. 
-- **Actualización gradual:** No proponer reescrituras completas. Cualquier refactor grande debe dividirse e ir fusionándose a `main` por fases pequeñas. 
+- **MCP tools should be thin:** Each tool defined in `server.py` should not contain complex business logic. If the task is complicated, delegate to helper functions outside `server.py`. (FastMCP suggests that the tool should only invoke external logic.)
+- **Tool names/parameters are a public contract:** Do not change existing tool names or parameters except for a critical reason. Any modification must entail updating contract tests and a major version bump.
+- **Pydantic response models are a contract:** Fields in responses sent to clients must not change without review. Test schemas with contract tests.
+- **OSC client without business logic:** The OSC client (`osc/client.py`) and addressing (`osc/addressing.py`) should only handle transport, not make decisions about QLab logic. This facilitates protocol changes without touching business logic.
+- **Well-segmented write mode:** The write flow must clearly separate the phases: *planning* (dry-run), *real execution*, and *verification*. Each write tool must handle dry-run first and execute only after confirmation.
+- **QLab operation classification:** Document in code (comments or docs) whether each operation is *read-only*, *read/write*, *control*, *view*, or *destructive*. Use those labels in `@mcp.tool(annotations=...)`. For example, destructive tools (`/go`, `/delete`, `/panic`) should be marked with `destructive_hint=True` and default to `readOnlyHint=False`.
+- **Dry-run required:** Any new family of write operations (e.g. support for a cue type or setting) must first be implemented with a simulated dry-run and tests that validate the plan is correct, before real execution is allowed.
+- **Contract coverage with snapshots:** When adding new tools, always update the snapshots in `test_server_tools.py`. Every new tool must have a test covering at least one typical execution and verifying the output.
+- **Rejections and errors:** For each real operation (write), the rejection and dry-run cases must be implemented. Also, always test execution with rollback/verification: if the operation fails halfway through, what does the system do? Document it.
+- **Structured vs. human data:** If a tool can return structured data (JSON) in addition to text, use `ToolResult(structured_content=...)` so clients can process it.
+- **Separate large documentation:** Design or guide documents should not be mixed in the same PR with code logic, to simplify reviews.
+- **Gradual updates:** Do not propose complete rewrites. Any large refactor should be divided and merged into `main` in small phases.
 
-Estas reglas, si se siguen, guiarán las futuras contribuciones a mantener el proyecto modular, probado y estable.
+If followed, these rules will guide future contributions toward keeping the project modular, tested, and stable.
 
-# 15. Resultado final esperado
+# 15. Expected final result
 
-Tras la refactorización, el proyecto debería quedar así:
+After the refactoring, the project should look like this:
 
-- **Estructura de carpetas:**   
+- **Folder structure:**
   ```
   qlab_mcp/
-    server.py      # entrypoint mínimo, registra tools
-    osc/           # cliente y direccionamiento OSC
-    qlab/          # (o qlab_reader/) clases lectoras de QLab
-    models/        # modelos Pydantic (divididos por dominio)
+    server.py      # minimal entrypoint, registers tools
+    osc/           # OSC client and addressing
+    qlab/          # (or qlab_reader/) QLab reader classes
+    models/        # Pydantic models (split by domain)
     cues/
       overview.py
       details.py
@@ -400,7 +400,7 @@ Tras la refactorización, el proyecto debería quedar así:
       allowlist.py
       safety.py
       osc_inventory.py
-    tests/         # tests separados por módulo
+    tests/         # tests separated by module
       server/
       osc/
       qlab/
@@ -412,42 +412,42 @@ Tras la refactorización, el proyecto debería quedar así:
       rules.md
       (…)
   ```
-- **Flujo de petición MCP:** (como mapeado en el diagrama del docs)  
-  Cliente MCP → `server.py:@mcp.tool` (entrada) → delega a función handler que usa QLabReader y módulos internos → `osc.client` envía OSC → QLab (respuesta JSON) → `QLabReader` / `models` parsean a objeto Python → se devuelve respuesta MCP (posiblemente usando `ToolResult`). 
+- **MCP request flow:** (as mapped in the docs diagram)
+  MCP client → `server.py:@mcp.tool` (entry) → delegates to a handler function that uses QLabReader and internal modules → `osc.client` sends OSC → QLab (JSON response) → `QLabReader` / `models` parse it into a Python object → an MCP response is returned (possibly using `ToolResult`).
 
-- **Flujo de lectura QLab:** `QLabReader` hace `client.send_and_receive(address, args)` → recibe JSON → convierte a Pydantic model en `models/` → retorna resultado. 
+- **QLab read flow:** `QLabReader` calls `client.send_and_receive(address, args)` → receives JSON → converts it to a Pydantic model in `models/` → returns the result.
 
-- **Flujo write dry-run:** Tool write crea `plan = planner.create_plan(args)` → valida plan con `validator` → retorna resumen del plan al usuario (dry-run). 
+- **Write dry-run flow:** The write tool creates `plan = planner.create_plan(args)` → validates the plan with `validator` → returns a summary of the plan to the user (dry-run).
 
-- **Flujo write real:** Tras confirmación, tool llama a `planner`, luego `executor.execute(plan)` (envía OSC a QLab), luego `verifier.verify(plan)` para confirmar cambios. 
+- **Real write flow:** After confirmation, the tool calls `planner`, then `executor.execute(plan)` (sends OSC to QLab), then `verifier.verify(plan)` to confirm changes.
 
-- **Zonas no-hotspot:** Los archivos más conflictivos (server.py, models, operations) deberían quedar más pequeños o con lógica delegada, reduciendo futuros conflictos. Los contratos públicos (nombres de tools, modelos de salida) se mantienen claros y documentados. 
+- **Non-hotspot areas:** The most conflict-prone files (server.py, models, operations) should be smaller or delegate their logic, reducing future conflicts. Public contracts (tool names, output models) remain clear and documented.
 
-- **Zonas paralelizables:** Por ejemplo, se podrá trabajar en paralelo en `osc/` (cliente), `cues/overview`, `settings/`, y `write/executor` porque están desacoplados. Mientras, trabajos secuenciales irán en áreas de mayor fricción (p.ej. actualizar `server.py` solo cuando todas las herramientas estén listas).
+- **Parallelizable areas:** For example, work can proceed in parallel in `osc/` (client), `cues/overview`, `settings/`, and `write/executor` because they are decoupled. Meanwhile, sequential work will take place in higher-friction areas (e.g. update `server.py` only once all tools are ready).
 
-En resumen, el producto final será un código más modular, con responsabilidades claramente separadas, tests ampliados, y un flujo de petición MCP-documentado que cualquiera pueda seguir. Las áreas centrales de contrato se habrán consolidado y testeado para evitar roturas inadvertidas.
+In summary, the final product will be more modular code, with clearly separated responsibilities, expanded tests, and a documented MCP request flow that anyone can follow. The central contract areas will have been consolidated and tested to prevent inadvertent breakage.
 
-# 16. Prompts ejecutables para Codex
+# 16. Executable prompts for Codex
 
-1. **Tests de caracterización:**  
-   `"Analiza los tests en tests/test_server_tools.py y los modelos de salida actuales. Escribe nuevos casos de prueba de caracterización para funciones faltantes de QLabReader que validen respuestas JSON típicas (por ejemplo, leer el estado de una cue y obtener los campos esperados)."`
+1. **Characterization tests:**
+   `"Analyze the tests in tests/test_server_tools.py and the current output models. Write new characterization test cases for missing QLabReader functions that validate typical JSON responses (for example, read the state of a cue and retrieve the expected fields)."`
 
-2. **Extraer helpers de `server.py`:**  
-   `"Identifica cualquier lógica repetida de manejo de errores o formateo de respuestas en `src/qlab_mcp/server.py`. Extrae esa lógica a un nuevo módulo `src/qlab_mcp/server_errors.py` (o similar) e importa allí las funciones para simplificar `server.py`. Asegúrate de mantener el mismo comportamiento."`
+2. **Extract helpers from `server.py`:**
+   `"Identify any repeated error-handling or response-formatting logic in `src/qlab_mcp/server.py`. Extract that logic into a new module `src/qlab_mcp/server_errors.py` (or similar) and import the functions there to simplify `server.py`. Make sure to preserve the same behavior."`
 
-3. **Dividir `write/operations.py`:**  
-   `"Refactoriza `src/qlab_mcp/write/operations.py` separando la parte de planificación de comandos (`planning`) y la de ejecución (`executor`) en dos archivos nuevos (`write/planner.py` y `write/executor.py`). Actualiza las referencias en el resto del código para que usen estas nuevas funciones sin cambiar la lógica externa."`
+3. **Split `write/operations.py`:**
+   `"Refactor `src/qlab_mcp/write/operations.py` by separating command planning (`planning`) and execution (`executor`) into two new files (`write/planner.py` and `write/executor.py`). Update references throughout the rest of the code to use these new functions without changing the external logic."`
 
-4. **Separar modelos Pydantic (si se considera):**  
-   `"Crea una carpeta `src/qlab_mcp/models/` y divide `models.py` en archivos por tema: por ejemplo, `cues.py` para modelos de cues, `settings.py` para modelos de workspace, `write.py` para esquemas de escritura. Actualiza los imports en el código y tests para usar los nuevos módulos."`
+4. **Split Pydantic models (if considered):**
+   `"Create a `src/qlab_mcp/models/` folder and split `models.py` into files by topic: for example, `cues.py` for cue models, `settings.py` for workspace models, and `write.py` for write schemas. Update imports in the code and tests to use the new modules."`
 
-5. **Partir la PR #9 en PRs más pequeñas (ejemplo de prompt):**  
-   `"En la PR actual que añade comandos de luz con dry-run, identifica componentes separados. Sugiere dos PRs: uno que defina los modelos y funciones básicas para 'setLight' en `write/operations.py` (dry-run incluido) y otro PR que añada el registro en `registry.py`, tests actualizados y documentación. Describe los cambios específicos para cada PR."`
+5. **Split PR #9 into smaller PRs (prompt example):**
+   `"In the current PR that adds light commands with dry-run, identify separate components. Suggest two PRs: one defining the basic models and functions for 'setLight' in `write/operations.py` (including dry-run), and another PR adding the registry entry in `registry.py`, updated tests, and documentation. Describe the specific changes for each PR."`
 
-6. **Actualizar documentación de arquitectura:**  
-   `"Escribe un breve documento `docs/arquitectura.md` que describa el flujo de una petición MCP en este servidor: qué hace cada módulo (`server.py`, `QLabReader`, `osc`, etc.) y cómo se conectan. Incluye un diagrama ASCII simple si es útil."`
+6. **Update architecture documentation:**
+   `"Write a brief `docs/arquitectura.md` document describing the flow of an MCP request in this server: what each module (`server.py`, `QLabReader`, `osc`, etc.) does and how they connect. Include a simple ASCII diagram if useful."`
 
-7. **Guía de trabajo con ramas/PRs:**  
-   `"Redacta una guía de convención para ramas y PRs en este proyecto: incluye formato de nombres (por ejemplo `feature/xyz`), tamaño recomendado de PR (cambios de ~200 líneas), y ejemplos de cómo dividir un feature grande (por ejemplo, agregar soporte de video-light en cues). Indica qué tipos de cambios deben estar en PRs separados (docs, código, tests)."`
+7. **Branch/PR workflow guide:**
+   `"Draft a branch and PR convention guide for this project: include the naming format (for example `feature/xyz`), recommended PR size (changes of ~200 lines), and examples of how to split a large feature (for example, adding video-light support in cues). Indicate which types of changes should be in separate PRs (docs, code, tests)."`
 
-Cada prompt debe centrarse en un cambio concreto, permitiendo a Codex realizar tareas pequeñas y manejables, tal como se solicita.
+Each prompt should focus on one concrete change, allowing Codex to perform small, manageable tasks as requested.

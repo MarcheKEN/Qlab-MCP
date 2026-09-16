@@ -177,7 +177,7 @@ break. It must not be hidden inside the method move.
 The heaviest README block is the write-safety/runtime material around lines
 173–440. Tool signatures around lines 591–651 duplicate `docs/user/tools.md`.
 Repeated token, dry-run, readback, playback, and runtime-evidence explanations
-create the “sopa de letras” effect even when each statement is individually
+create a “word-salad” effect even when each statement is individually
 correct.
 
 ### 4.2 Concrete truth/navigation defects
@@ -246,9 +246,9 @@ shape:
 6. the evidence boundary:
 
    ```text
-   estructura programada
-   ≠ runtime validado
-   ≠ show listo para GO
+   planned structure
+   ≠ runtime validated
+   ≠ show ready for GO
    ```
 
 7. links to user, security, development, status, and reference docs.

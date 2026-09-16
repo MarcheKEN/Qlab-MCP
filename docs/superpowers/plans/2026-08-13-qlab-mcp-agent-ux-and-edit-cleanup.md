@@ -1,5 +1,9 @@
 # QLab MCP 0.3.0 Agent UX and Edit Cleanup Implementation Plan
 
+> Historical pre-Workspace-Settings plan. Its fixed 13-tool boundary describes
+> the baseline before PR #16; the current branch has 14 tools, documented in
+> the current README and public tool catalogue.
+
 > **Execution gate:** This plan is not authorization to implement. Obtain explicit
 > user approval, then execute task by task. Do not run QLab mutations.
 
@@ -37,9 +41,9 @@ Markdown.
 - Keep this distinction explicit:
 
   ```text
-  estructura programada
-  != runtime validado
-  != show listo para GO
+  planned structure
+  != runtime validated
+  != show ready for GO
   ```
 
 ## Approval decisions before Task 1

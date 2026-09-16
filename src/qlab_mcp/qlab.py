@@ -29,6 +29,7 @@ from .cues.overview import CueOverviewMixin
 from .cues.query import CueQueryMixin
 from .runtime.read_cache import cache_profile_is_safe, client_cache_namespace, shared_read_cache
 from .settings.workspace import WorkspaceSettingsMixin
+from .settings.write_operations import WorkspaceSettingsWriteMixin
 from .write import QLabWriteMixin
 
 
@@ -43,6 +44,7 @@ class QLabReader(
     WorkspaceConnectionMixin,
     CueOverviewMixin,
     WorkspaceSettingsMixin,
+    WorkspaceSettingsWriteMixin,
     WorkspaceStatusMixin,
     CueQueryMixin,
     CueDetailsMixin,

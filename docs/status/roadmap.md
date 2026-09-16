@@ -8,6 +8,12 @@ The canonical dated inventory is [`current-state.md`](current-state.md). The
 current snapshot is provisional on the preparation branch; a docs-only PR will
 replace it after the 0.3.0 merge into `main` and before the release tag.
 
+> Branch update (2026-09-16): PR #16 is complete for its bounded Workspace
+> Settings scope (`qlab_edit_workspace_settings`,
+> `general.minGoTime`). The branch exposes 14 tools. Additional settings remain
+> deferred and are not a prerequisite for this PR's review or merge. The
+> preparation counts and gates below describe the dated pre-PR snapshot.
+
 Final local preflight: the full suite passed with `2595 passed, 41 subtests
 passed` outside the managed socket sandbox. FastMCP inspection reports 13 tools
 and wheel/sdist builds report `0.3.0`; an isolated Python 3.11 installation of

@@ -1,9 +1,9 @@
 # Project-local Agent Skills
 
-Este repositorio usa `skills/` como convención explícita para skills locales reutilizables.
-Las skills generadas aquí no sustituyen las fuentes oficiales ni el código del proyecto.
+This repository uses `skills/` as the explicit convention for reusable local skills.
+The skills generated here do not replace official sources or project code.
 
-- `qlab-5-5-10-reference`: navegación y referencia conceptual de la documentación oficial de QLab 5.5.10.
-- `qlab-5-5-10-osc`: navegación exacta del OSC Dictionary suministrado por el repositorio.
-- `qlab-5-applescript`: consulta exacta del AppleScript Dictionary de QLab 5.
-- `qclass-research`: investigación exclusiva de los transcriptos QClass locales en `docs/qclass/`.
+- `qlab-5-5-10-reference`: navigation and conceptual reference for the official QLab 5.5.10 documentation.
+- `qlab-5-5-10-osc`: exact navigation of the OSC Dictionary supplied by the repository.
+- `qlab-5-applescript`: exact lookup in the QLab 5 AppleScript Dictionary.
+- `qclass-research`: research limited to the local QClass transcripts in `docs/qclass/`.

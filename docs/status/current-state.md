@@ -6,6 +6,13 @@ This document describes the QLab MCP 0.3.0 preparation branch. The definitive
 canonical snapshot will be updated through a docs-only PR after the merge into
 `main`, before the `v0.3.0` tag.
 
+> Branch update (2026-09-16): PR #16 supersedes the preparation counts below
+> with 14 public tools, including the bounded
+> `qlab_edit_workspace_settings` write for `general.minGoTime`. That scope is
+> complete for the PR; other Workspace Settings operations are deferred and do
+> not block review or merge. The dated 13-tool text below is retained as the
+> historical preparation snapshot.
+
 ## Preparation Git State
 
 ```text

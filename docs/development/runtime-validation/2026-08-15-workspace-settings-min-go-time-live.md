@@ -1,5 +1,9 @@
 # Workspace Settings `minGoTime` Runtime Validation
 
+> Historical runtime record. The validation predates the public rename from
+> `qlab_edit_general_settings` to `qlab_edit_workspace_settings`; its QLab
+> observations and outcomes are retained unchanged.
+
 Date: 2026-08-15
 Result: bounded runtime validation completed; one positive activity-gate case was safely skipped; workspace restored.
 

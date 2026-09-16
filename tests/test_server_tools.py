@@ -1291,6 +1291,44 @@ def test_workspace_settings_tool_rejects_non_enabled_operation_before_handler(
     assert called is False
 
 
+@pytest.mark.parametrize(
+    "workspace_id",
+    [
+        "11111111111141118111111111111111",
+        "{11111111-1111-4111-8111-111111111111}",
+        "urn:uuid:11111111-1111-4111-8111-111111111111",
+    ],
+)
+def test_workspace_settings_tool_rejects_non_canonical_uuid_before_handler(
+    monkeypatch: pytest.MonkeyPatch,
+    workspace_id: str,
+) -> None:
+    called = False
+
+    class FakeReader:
+        def edit_workspace_settings(self, _request: object) -> None:
+            nonlocal called
+            called = True
+            raise AssertionError("non-canonical UUID reached the settings handler")
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+
+    async def call_tool():
+        async with Client(mcp) as client:
+            return await client.call_tool(
+                "qlab_edit_workspace_settings",
+                {
+                    "workspace_id": workspace_id,
+                    "operation": {"kind": "general.minGoTime", "value": 0.4},
+                    "dry_run": True,
+                },
+            )
+
+    with pytest.raises(ToolError, match=r"validation error(?:s)? for call\[qlab_edit_workspace_settings\]"):
+        asyncio.run(call_tool())
+    assert called is False
+
+
 def test_workspace_settings_tool_forwards_typed_request_to_reader(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 

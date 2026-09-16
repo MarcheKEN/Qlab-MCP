@@ -165,8 +165,10 @@ git diff --check
 git status --short --untracked-files=all
 ```
 
-- [ ] Confirm no QLab mutation occurred.
-- [ ] Confirm the final public tool inventory is fourteen tools.
-- [ ] Confirm PR #16 remains open and unmerged.
-- [ ] Create one bounded follow-up commit only after all verification passes.
-- [ ] Push only `feature/workspace-settings-write`; never merge PR #16.
+- [x] Confirm no QLab mutation occurred during this closure pass.
+- [x] Confirm the final public tool inventory is fourteen tools.
+- [x] Confirm PR #16 is open, non-draft, mergeable, and clean against `main`.
+- [x] Close the bounded Wave 1 scope without adding another Workspace Settings
+  operation.
+- [ ] Manual merge remains a separate user-authorized action; this closure pass
+  does not push, merge, tag, or release.

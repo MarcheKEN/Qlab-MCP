@@ -243,9 +243,10 @@ press GO, start playback, use `/live`, or touch connected show-critical output.
 
 ## PR #16 Strategy
 
-Use the existing `feature/workspace-settings-write` branch. Keep PR #16 open,
-do not merge it, and do not modify `main`. Push only the bounded implementation
-follow-up after tests and documentation are complete.
+Use the existing `feature/workspace-settings-write` branch. The bounded Wave 1
+scope is complete for PR #16: review and merge may proceed without implementing
+the deferred settings matrix. Do not modify `main` or add another Workspace
+Settings operation in this PR.
 
 ## Non-Goals
 

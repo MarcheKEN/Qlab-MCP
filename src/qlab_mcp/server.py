@@ -34,6 +34,7 @@ from .models import (
     WorkspaceSettingsEditRequest,
     WorkspaceSettingsEditResult,
     WorkspaceSettingsOperation,
+    CanonicalWorkspaceUUID,
 )
 from .qlab import QLabReader
 from .cues.details import MAX_BATCH_CUE_DETAILS
@@ -1214,7 +1215,7 @@ def qlab_edit_cues(
     timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT,
 )
 def qlab_edit_workspace_settings(
-    workspace_id: UUID,
+    workspace_id: CanonicalWorkspaceUUID,
     operation: WorkspaceSettingsOperation,
     dry_run: Annotated[
         bool | None,

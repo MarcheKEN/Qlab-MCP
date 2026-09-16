@@ -1,5 +1,9 @@
 # Executive Summary
 
+> Historical audit snapshot. Its contract observations predate the public rename
+> to `qlab_edit_workspace_settings`; consult the current README and tool catalog
+> for the present 14-tool contract.
+
 This audit migrated repository-authored prose to English while preserving code, tests, identifiers, safety wording, and runtime behavior. The primary migration commit is `9bccefa` (`docs: migrate repository-authored prose to English`), based on `8037aacaa1f653f7e2ea10d530c9b093a0388a7f`; follow-up archive cleanup is included in the final worktree.
 
 No production Python or test files changed. The resulting repository-authored documentation and skills are English, with the intentional non-English test/runtime data listed below.

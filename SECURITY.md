@@ -89,7 +89,7 @@ supported, uses a new dry-run and fresh gate.
 
 ### General settings
 
-`qlab_edit_general_settings` is limited to one exact workspace UUID, one
+`qlab_edit_workspace_settings` is limited to one exact workspace UUID, one
 allowlisted operation (`general.minGoTime`), and one finite non-negative
 seconds value. It uses one dedicated `confirm:workspaceSettings:v1` token,
 requires zero running or paused cues before token issuance and again before the

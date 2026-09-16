@@ -1,5 +1,9 @@
 # Workspace Settings Write Foundation + `minGoTime` Implementation Plan
 
+> Superseded plan. The implemented public contract is now
+> `qlab_edit_workspace_settings`; this dated plan retains the original
+> branch-local name and Wave 1 design history.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** Add the first gated Workspace Settings write capability, `qlab_edit_general_settings`, supporting only `general.minGoTime`.

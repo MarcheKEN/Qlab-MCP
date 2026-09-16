@@ -1,5 +1,12 @@
 # QLab MCP — Workspace Settings Write Pre-PR Audit
 
+> Historical pre-PR record. The subsequent branch rename promoted
+> `qlab_edit_workspace_settings` as the public tool; the bounded
+> `general.minGoTime` scope is complete for PR #16, and deferred settings do
+> not block its review or merge. Use the current branch/status documents for
+> present contract and merge state; the historical findings and evidence below
+> are retained unchanged.
+
 Audit date: 2026-08-16
 Repository: `MarcheKEN/Qlab-MCP`
 Branch: `feature/workspace-settings-write`

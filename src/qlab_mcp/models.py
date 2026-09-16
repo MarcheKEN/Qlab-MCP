@@ -7,7 +7,7 @@ import struct
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, field_validator
+from pydantic import BeforeValidator, BaseModel, ConfigDict, Field, StrictFloat, StrictInt, field_validator
 
 
 UpdateCueProfile = Literal[
@@ -118,6 +118,21 @@ def _general_settings_numeric_value(value: object) -> int | float:
     except (OverflowError, struct.error) as exc:
         raise ValueError("value must fit the OSC float32 range.") from exc
     return value
+
+
+def _canonical_workspace_uuid(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    try:
+        canonical = str(UUID(value))
+    except ValueError as exc:
+        raise ValueError("workspace_id must be an exact workspace UUID.") from exc
+    if canonical.casefold() != value.casefold():
+        raise ValueError("workspace_id must be an exact workspace UUID.")
+    return value
+
+
+CanonicalWorkspaceUUID = Annotated[UUID, BeforeValidator(_canonical_workspace_uuid)]
 
 
 class GeneralMinGoTimeOperation(BaseModel):
@@ -242,24 +257,10 @@ class WorkspaceSettingsEditRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    workspace_id: UUID = Field(description="Exact workspace UUID.")
+    workspace_id: CanonicalWorkspaceUUID = Field(description="Exact workspace UUID.")
     operation: WorkspaceSettingsOperation
     dry_run: bool | None = None
     confirm_token: str | None = None
-
-    @field_validator("workspace_id", mode="before")
-    @classmethod
-    def validate_workspace_id(cls, value: object) -> object:
-        if not isinstance(value, str):
-            return value
-        try:
-            canonical = str(UUID(value))
-        except ValueError as exc:
-            raise ValueError("workspace_id must be an exact workspace UUID.") from exc
-        if canonical.casefold() != value.casefold():
-            raise ValueError("workspace_id must be an exact workspace UUID.")
-        return value
-
 
 class WorkspaceSettingsEditResult(BaseModel):
     """Result for the gated Workspace Settings write slice."""

@@ -1,5 +1,9 @@
 # Task 2 report — Workspace Settings write core
 
+> Historical task snapshot. The internal method was later unified as
+> `edit_workspace_settings`; the safety and test evidence below remains valid
+> historical evidence for the same single `general.minGoTime` operation.
+
 ## Result
 
 Implemented the dedicated one-entry `minGoTime` registry and `WorkspaceSettingsWriteMixin`, composed into `QLabReader`. No public FastMCP tool or documentation was changed.

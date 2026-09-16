@@ -1,5 +1,9 @@
 # Task 9 report — Documentation
 
+> Historical task snapshot. The documented public name was later unified as
+> `qlab_edit_workspace_settings`; the documentation scope and safety evidence
+> below describe the same bounded `general.minGoTime` slice.
+
 ## Result
 
 Updated the public inventory and safety/workflow documentation for the first

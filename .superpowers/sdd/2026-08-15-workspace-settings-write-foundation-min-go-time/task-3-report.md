@@ -1,5 +1,9 @@
 # Task 3 report — FastMCP public tool
 
+> Historical task snapshot. The public name in this registration step was
+> later renamed to `qlab_edit_workspace_settings`; the final contract still
+> exposes 14 tools and no legacy alias.
+
 ## Result
 
 Registered `qlab_edit_general_settings` with the exact flat UUID/literal/numeric/dry-run/token contract, conservative write annotations, five approved tags, typed output, and a 60-second bounded timeout. Updated the server instructions to describe six gated write tools. The public inventory is now 14 tools; no legacy alias was added.

@@ -4,6 +4,10 @@
 **Status:** Research-only. No production code, public MCP tool, QLab workspace, branch, PR, or version was changed.
 **Scope:** QLab 5.5 Workspace Settings writes, with the current QLab MCP OSC architecture as the constraint.
 
+> Historical research snapshot. Examples and baseline counts below predate the
+> public rename to `qlab_edit_workspace_settings`; the current executable scope
+> is documented in the public tool catalogue and the unified design.
+
 Evidence labels used below:
 
 - **D** — official QLab documentation/reference.

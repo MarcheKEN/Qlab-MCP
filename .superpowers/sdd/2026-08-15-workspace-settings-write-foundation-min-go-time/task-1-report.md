@@ -1,5 +1,9 @@
 # Task 1 report
 
+> Historical task snapshot. The intermediate model names and RED/GREEN output
+> below are retained as implementation evidence; the final public request model
+> is `WorkspaceSettingsEditRequest`.
+
 ## Changed files
 
 - `src/qlab_mcp/models.py`

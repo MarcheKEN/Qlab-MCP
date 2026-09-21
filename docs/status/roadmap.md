@@ -1,5 +1,8 @@
 # Active Roadmap
 
+Development update (2026-09-21): combined List/Cart inventory and separate
+UUID-only List and Cart detail tools are implemented (23 public tools).
+
 Status: 2026-08-13 — 0.3.0 preparation
 
 ## Current state snapshot

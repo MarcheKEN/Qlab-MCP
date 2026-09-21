@@ -1,5 +1,11 @@
 # Current Project State
 
+Development update (2026-09-21): 23 tools (17 read-only, 6 gated writes).
+The combined Cue List / Cue Cart inventory feeds two UUID-only detail tools.
+Cart details expose dimensions and occupied cell coordinates; both detail tools
+share validation, timecode and state reads. Older runtime observations below
+describe the contracts tested on their stated dates.
+
 Provisional preparation snapshot: **2026-08-13 Europe/Madrid**.
 
 This document describes the QLab MCP 0.3.0 preparation branch. The definitive

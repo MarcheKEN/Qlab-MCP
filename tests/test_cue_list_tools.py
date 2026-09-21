@@ -35,11 +35,13 @@ class Osc:
             "timecodeStartBehavior": 3, "timecodeStopBehavior": 1,
             "timecodeFreewheelTime": 0.25, "timecodeLookbackTime": 4,
             "currentTimecode": 100, "currentTimecode/text": "00:00:04:00",
+            "timecodeTrigger": {"hours": 1, "minutes": 0, "seconds": 0, "frames": 0, "bits": 0},
         }
         self.children = {LIST: [root("cue-1", "Memo"), root("group-1", "Group")],
                          "group-1": [root("cue-2", "Audio")]}
         self.failures = {}
         self.tcp_calls = []
+        self.cell_values = {}
 
     def request(self, address, *args, **kwargs):
         self.calls.append((address, args))
@@ -60,8 +62,9 @@ class Osc:
             value = self.current
         elif address.endswith("/valuesForKeys"):
             keys = json.loads(args[0])
-            value = ({k: v for k, v in self.values.items() if k in keys}
-                     if isinstance(self.values, dict) else self.values)
+            source = self.cell_values.get(address.split("/")[-2], self.values)
+            value = ({k: v for k, v in source.items() if k in keys}
+                     if isinstance(source, dict) else source)
         elif address.endswith("/children/shallow"):
             value = self.children[address.split("/")[-3]]
         else:
@@ -82,7 +85,9 @@ def test_inventory_is_compact_and_handles_current_cart(osc):
     osc.current = CART
     result = QLabReader(osc).get_cue_list_inventory(WS.lower())
     assert result.ok and result.workspace_id == WS
-    assert result.cue_list_count == 1 and result.excluded_cue_cart_count == 1
+    assert result.cue_list_count == 1 and result.cue_cart_count == 1
+    assert result.container_count == 2 and result.excluded_cue_cart_count == 0
+    assert result.cue_lists[1].uniqueID == CART and result.cue_lists[1].is_current
     assert result.current_cue_list_id is None and result.current_container_id == CART
     assert result.cue_lists[0].is_current is False
     assert result.cue_lists[0].root_position == 0
@@ -115,6 +120,7 @@ def test_details_are_typed_ordered_and_scoped(osc):
     assert result.identity.uniqueID == LIST and result.state.armed is True
     assert result.playhead.uniqueID == "cue-1" and result.playhead.present is True
     assert result.incoming_timecode.sync_mode.label == "MTC"
+    assert result.incoming_timecode.trigger.hours == 1
     assert result.incoming_timecode.smpte_format.value == 2
     assert result.contents.direct_child_count == 2 and result.contents.returned_count == 3
     assert [c.uniqueID for c in result.contents.children] == ["cue-1", "group-1"]
@@ -262,7 +268,7 @@ def test_fastmcp_roundtrip_and_validation(monkeypatch, osc):
     async def run():
         async with Client(server.mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-            assert len(tools) == 22
+            assert len(tools) == 23
             detail_schema = tools["qlab_get_cue_list_details"].inputSchema
             assert detail_schema["properties"]["cue_list_id"]["format"] == "uuid"
             for key, minimum, maximum in [("max_depth", 0, 5), ("max_cues", 1, 5000)]:
@@ -287,3 +293,113 @@ def test_fastmcp_roundtrip_and_validation(monkeypatch, osc):
                     await client.call_tool("qlab_get_cue_list_details", {"workspace_id": WS, "cue_list_id": LIST, key: value})
                 assert osc.calls == []
     asyncio.run(run())
+
+
+def prepare_cart(osc):
+    osc.values = {**osc.values, **root(CART, "Cue Cart"), "cartRows": 3, "cartColumns": 4, "mode": 5}
+    osc.children[CART] = [root("cell-a", "Audio"), root("cell-b", "Memo")]
+    osc.cell_values = {
+        "cell-a": {**root("cell-a", "Audio"), "cartPosition": [0, 0]},
+        "cell-b": {**root("cell-b", "Memo"), "cartPosition": [2, 3]},
+    }
+
+
+def test_cart_grid_and_timecode_are_scoped_without_playhead(osc):
+    prepare_cart(osc)
+    result = QLabReader(osc).get_cue_cart_details(WS.lower(), CART.lower(), "technical")
+    assert result.ok and result.grid.complete and result.identity.uniqueID == CART
+    assert (result.grid.rows, result.grid.columns) == (3, 4)
+    assert [(c.row, c.column) for c in result.grid.cells] == [(0, 0), (2, 3)]
+    assert result.incoming_timecode.sync_mode.label == "MTC"
+    assert result.technical_payload["cartRows"] == 3
+    assert "playhead" not in result.model_dump()
+    assert all(LIST not in address and "/live" not in address for address, _ in osc.calls)
+    keys = [k for address, args in osc.calls if address.endswith("valuesForKeys") for k in json.loads(args[0])]
+    assert not any("playhead" in k or "playbackPosition" in k or "playlist" in k for k in keys)
+
+
+@pytest.mark.parametrize("position", [None, [True, 0], [0.5, 0], ["0", 0], [-1, 0], [0], {}, [0, 0, 0]])
+def test_invalid_cart_positions_preserve_partial_details(osc, position):
+    prepare_cart(osc)
+    osc.cell_values["cell-a"]["cartPosition"] = position
+    result = QLabReader(osc).get_cue_cart_details(WS, CART)
+    assert result.ok and result.partial and not result.grid.complete
+    assert result.grid.cells[0].row is None and result.grid.cells[1].row == 2
+
+
+def test_cart_empty_truncated_duplicate_and_identity_mismatch(osc):
+    prepare_cart(osc)
+    reader = QLabReader(osc)
+    result = reader.get_cue_cart_details(WS, CART, max_cues=1)
+    assert result.contents.truncated and not result.grid.complete and len(result.grid.cells) == 1
+    osc.cell_values["cell-b"]["cartPosition"] = [0, 0]
+    assert reader.get_cue_cart_details(WS, CART).partial
+    osc.cell_values["cell-a"]["uniqueID"] = OTHER
+    assert reader.get_cue_cart_details(WS, CART).partial
+    osc.children[CART] = []
+    result = reader.get_cue_cart_details(WS, CART)
+    assert result.grid.complete and result.grid.cells == []
+    osc.values["uniqueID"] = OTHER
+    assert reader.get_cue_cart_details(WS, CART).error_code == "cue_cart_identity_mismatch"
+
+
+@pytest.mark.parametrize("value", [0, 5001, True, 1.5, "2"])
+def test_cart_invalid_limits_before_io(osc, value):
+    assert QLabReader(osc).get_cue_cart_details(WS, CART, max_cues=value).error_code == "validation_failed"
+    assert not osc.calls
+
+
+def test_cart_wrong_type_and_missing_reference(osc):
+    reader = QLabReader(osc)
+    assert reader.get_cue_cart_details(WS, LIST).error_code == "cue_cart_type_mismatch"
+    assert reader.get_cue_cart_details(WS, OTHER).error_code == "cue_cart_not_found"
+    assert not any(a.endswith("valuesForKeys") for a, _ in osc.calls)
+
+
+def test_cart_public_tool_roundtrip(monkeypatch, osc):
+    prepare_cart(osc)
+    monkeypatch.setattr(server, "_reader", lambda: QLabReader(osc))
+    async def run():
+        async with Client(server.mcp) as client:
+            result = await client.call_tool("qlab_get_cue_cart_details", {"workspace_id": WS, "cue_cart_id": CART})
+            assert result.structured_content["grid"]["complete"]
+            osc.calls.clear()
+            with pytest.raises(Exception):
+                await client.call_tool("qlab_get_cue_cart_details", {"workspace_id": WS, "cue_cart_id": CART, "max_cues": True})
+            assert not osc.calls
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("value", [0, True, 2.5, "4", [], {}])
+def test_cart_invalid_dimensions_are_partial(osc, value):
+    prepare_cart(osc)
+    osc.values["cartRows"] = value
+    result = QLabReader(osc).get_cue_cart_details(WS, CART)
+    assert result.partial and not result.grid.complete and result.grid.rows is None
+    assert len(result.grid.cells) == 2 and "cartRows" in result.errors
+
+
+def test_cart_position_timeout_has_no_retry_and_keeps_other_cells(osc):
+    prepare_cart(osc)
+    route = f"/workspace/{WS}/cue/cell-a/valuesForKeys"
+    osc.failures[route] = OscTimeoutError("Timed out")
+    result = QLabReader(osc).get_cue_cart_details(WS, CART)
+    assert result.partial and result.grid.cells[1].row == 2
+    assert sum(a == route for a, _ in osc.calls) == 1 and not osc.tcp_calls
+
+
+def test_notes_are_only_requested_in_technical_profile(osc):
+    osc.values["notes"] = "Private production note"
+    reader = QLabReader(osc)
+    result = reader.get_cue_list_details(WS, LIST)
+    assert result.basics.notes is None
+    assert all("notes" not in json.loads(args[0]) for a, args in osc.calls if a.endswith("valuesForKeys"))
+    result = reader.get_cue_list_details(WS, LIST, "technical")
+    assert result.basics.notes == "Private production note"
+
+
+@pytest.mark.parametrize("value", [4, [], {"hours": True}, {"hours": 0, "minutes": 0, "seconds": 0, "frames": 0, "bits": -1}])
+def test_invalid_timecode_trigger_is_partial(osc, value):
+    osc.values["timecodeTrigger"] = value
+    result = details(osc)
+    assert result.partial and result.incoming_timecode.trigger is None

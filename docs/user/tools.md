@@ -1,6 +1,6 @@
 # Public MCP Tools
 
-QLab MCP exposes exactly 22 tools on the current development branch. This page is a compact human
+QLab MCP exposes exactly 23 tools on the current development branch. This page is a compact human
 catalogue; decorated functions, generated schemas, and
 `tests/test_server_tools.py` remain the source of truth for exact parameters,
 annotations, and result models.
@@ -19,8 +19,9 @@ annotations, and result models.
 | `qlab_get_workspace_network_settings` | Network Patch inventory or exact patch | The complete Network panel | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_workspace_midi_settings` | MIDI Patch inventory or exact patch | The complete MIDI panel | [Read](agent-workflows.md#read-sequence) |
 | `qlab_query_cues` | Bounded filtered cue discovery | Full Inspector payloads | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_cue_lists` | Compact Cue List inventory and current container | Children or Cue Cart details | [Read](agent-workflows.md#cue-lists) |
+| `qlab_get_cue_lists` | Compact combined Cue List / Cue Cart inventory and current container | Child or deep container details | [Read](agent-workflows.md#cue-lists) |
 | `qlab_get_cue_list_details` | Exact list identity, state, playhead, incoming timecode and bounded tree | AppleScript-only timecode source settings | [Read](agent-workflows.md#cue-lists) |
+| `qlab_get_cue_cart_details` | Exact cart identity, state, timecode, grid and occupied cell positions | Playhead, nested Groups or deep child Inspector | [Read](agent-workflows.md#cue-lists) |
 | `qlab_get_cue_details` | Exact cue properties and health | Ambiguous write target resolution | [Read](agent-workflows.md#read-sequence) |
 | `qlab_check_write_readiness` | Read-only preflight before any write | Confirmation or authorization alone | [Common write gate](agent-workflows.md#common-write-gate) |
 | `qlab_create_cue` | One template-backed structural creation | Initial setters, playback, or GO | [Create](agent-workflows.md#create-one-cue) |

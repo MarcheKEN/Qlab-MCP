@@ -20,8 +20,9 @@ schemas or the server-side safety checks.
 | Read Network Patch inventory or one exact patch | `qlab_get_workspace_network_settings` | The complete Network panel |
 | Read MIDI Patch inventory or one exact patch | `qlab_get_workspace_midi_settings` | The complete MIDI panel |
 | Find a bounded set of cues with filters | `qlab_query_cues` | Full Inspector payloads |
-| Find Cue List UUIDs and the current container | `qlab_get_cue_lists` | Child inspection or Cue Carts |
+| Find Cue List / Cue Cart UUIDs and the current container | `qlab_get_cue_lists` | Child inspection |
 | Inspect one Cue List and its bounded contents | `qlab_get_cue_list_details` | Cue Cart details or mutation |
+| Inspect one Cue Cart and its occupied grid cells | `qlab_get_cue_cart_details` | Cue List playhead or deep child Inspector |
 | Inspect exact cue properties | `qlab_get_cue_details` | Resolving an ambiguous write target |
 | Check write-mode preconditions without mutating | `qlab_check_write_readiness` | Confirmation or authorization by itself |
 | Create one cue from a template | `qlab_create_cue` | Initial setters, playback, or GO |
@@ -71,10 +72,24 @@ read-only OSC or AppleScript APIs.
 
 Call `qlab_get_cue_lists(workspace_id)` for a compact inventory, then
 `qlab_get_cue_list_details(workspace_id, cue_list_id)` with a returned exact UUID.
-Names and cue numbers are not accepted as `cue_list_id`. The inventory excludes
-Cue Carts and reports their count. `current_container_id` may identify a Cart;
+Names and cue numbers are not accepted as `cue_list_id`. The `cue_lists` array
+includes both Cue Lists and Cue Carts, distinguished by `type`. `cue_list_count`
+counts lists only, `cue_cart_count` counts carts, and `container_count` counts both.
+The legacy `excluded_cue_cart_count` is always zero. `current_container_id` may identify a Cart;
 `current_cue_list_id` is null in that case. Missing shallow health fields stay null.
 Root positions are zero-based.
+
+For a Cue Cart, pass its UUID as `cue_cart_id` to `qlab_get_cue_cart_details`.
+This shares identity, basics, state and timecode reads with List details, but returns
+`grid.rows`, `grid.columns` and bounded occupied `grid.cells` with OSC row/column
+coordinates. It has no playhead or depth parameter: carts cannot contain Groups.
+Inspect `grid.complete`, `contents.truncated` and per-cell errors before inferring
+empty cells. Missing positions remain null. Use generic Cue Details for the deep
+Inspector of each contained cue. Notes are available only with `profile="technical"`.
+Technical payload redaction is key-based; free-text notes may contain sensitive text.
+
+Source: [Cue Carts](https://qlab.app/docs/v5/fundamentals/cue-carts/) and the
+repository OSC Dictionary, Group cue/List/Cart and cartPosition messages.
 
 Details include typed identity/state, playhead and playback-position aliases,
 incoming timecode and an ordered bounded tree. Default `max_depth=2` reads two

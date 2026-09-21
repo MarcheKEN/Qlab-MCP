@@ -20,6 +20,7 @@ class CueListIdentity(BaseModel):
 
 
 class CueListInventoryItem(CueListIdentity):
+    type: Literal["Cue List", "Cue Cart", "Cart"] = "Cue List"
     armed: StrictBool | None = None
     flagged: StrictBool | None = None
     isBroken: StrictBool | None = None
@@ -41,6 +42,18 @@ class CueListState(BaseModel):
     isOverridden: StrictBool | None = None
     isChildAuditioning: StrictBool | None = None
     isChildFlagged: StrictBool | None = None
+    isPanicking: StrictBool | None = None
+    isTailingOut: StrictBool | None = None
+
+
+class CueContainerBasics(BaseModel):
+    defaultName: StrictStr | None = None
+    notes: StrictStr | None = None
+    mode: StrictInt | None = None
+    autoLoad: StrictBool | None = None
+    skipIfDisarmed: StrictBool | None = None
+    secondTriggerAction: StrictInt | None = None
+    secondTriggerOnRelease: StrictBool | None = None
 
 
 class CueListPosition(BaseModel):
@@ -57,6 +70,14 @@ class CueListEnum(BaseModel):
 FiniteNumber = Annotated[float, Field(strict=True, allow_inf_nan=False)]
 
 
+class CueTimecodeComponents(BaseModel):
+    hours: Annotated[StrictInt, Field(ge=0)]
+    minutes: Annotated[StrictInt, Field(ge=0)]
+    seconds: Annotated[StrictInt, Field(ge=0)]
+    frames: Annotated[StrictInt, Field(ge=0)]
+    bits: Annotated[StrictInt, Field(ge=0)]
+
+
 class CueListTimecode(BaseModel):
     current: FiniteNumber | None = None
     text: StrictStr | None = None
@@ -66,6 +87,8 @@ class CueListTimecode(BaseModel):
     stop_behavior: CueListEnum | None = None
     freewheel_seconds: Annotated[FiniteNumber, Field(ge=0, le=2)] | None = None
     lookback_seconds: Annotated[FiniteNumber, Field(ge=0)] | None = None
+    trigger: CueTimecodeComponents | None = None
+    trigger_text: StrictStr | None = None
 
 
 class CueListChild(BaseModel):
@@ -118,6 +141,8 @@ class CueListReadResult(BaseModel):
 
 class CueListsResult(CueListReadResult):
     cue_list_count: StrictInt = 0
+    cue_cart_count: StrictInt = 0
+    container_count: StrictInt = 0
     current_cue_list_id: str | None = None
     current_container_id: str | None = None
     excluded_cue_cart_count: StrictInt = 0
@@ -128,9 +153,46 @@ class CueListDetailsResult(CueListReadResult):
     cue_list_id: str
     profile: Literal["safe", "technical"] = "safe"
     identity: CueListIdentity | None = None
+    basics: CueContainerBasics | None = None
     state: CueListState | None = None
     playhead: CueListPosition | None = None
     playback_position: CueListPosition | None = None
     incoming_timecode: CueListTimecode | None = None
     contents: CueListContents | None = None
+    technical_payload: JsonValue = None
+
+
+class CueCartIdentity(CueListIdentity):
+    type: Literal["Cue Cart", "Cart"] = "Cue Cart"
+
+
+class CueCartCell(CueListChild):
+    row: Annotated[StrictInt, Field(ge=0)] | None = None
+    column: Annotated[StrictInt, Field(ge=0)] | None = None
+
+
+class CueCartGrid(BaseModel):
+    rows: Annotated[StrictInt, Field(ge=1)] | None = None
+    columns: Annotated[StrictInt, Field(ge=1)] | None = None
+    cells: list[CueCartCell] = Field(default_factory=list)
+    complete: bool = False
+
+
+class CueCartContents(BaseModel):
+    direct_child_count: StrictInt | None = None
+    returned_count: StrictInt = 0
+    max_cues: StrictInt
+    truncated: bool = False
+    truncation_reasons: list[str] = Field(default_factory=list)
+
+
+class CueCartDetailsResult(CueListReadResult):
+    cue_cart_id: str
+    profile: Literal["safe", "technical"] = "safe"
+    identity: CueCartIdentity | None = None
+    basics: CueContainerBasics | None = None
+    state: CueListState | None = None
+    incoming_timecode: CueListTimecode | None = None
+    contents: CueCartContents | None = None
+    grid: CueCartGrid | None = None
     technical_payload: JsonValue = None

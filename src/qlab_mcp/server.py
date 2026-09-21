@@ -44,7 +44,7 @@ from .models import (
 )
 from .qlab import QLabReader
 from .cues.details import MAX_BATCH_CUE_DETAILS
-from .cues.list_models import CueListsResult, CueListDetailsResult
+from .cues.list_models import CueListsResult, CueListDetailsResult, CueCartDetailsResult
 from .cues.limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES
 from .cues.query import MAX_SENSITIVE_QUERY_RESULTS
 from .sanitizer import sanitize_exception_message
@@ -245,7 +245,7 @@ mcp = FastMCP(
     version=__version__,
     mask_error_details=True,
     instructions="""
-QLab MCP exposes sixteen read-only tools plus six gated write tools over OSC.
+QLab MCP exposes seventeen read-only tools plus six gated write tools over OSC.
 Write mode requires QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; it remains dry-run first.
 This server does not expose GO, stop, panic, playback, audition, /live writes, AppleScript writes, or raw OSC passthrough.
 
@@ -982,10 +982,10 @@ def qlab_get_workspace_midi_settings(
     timeout=CUE_DETAILS_TIMEOUT,
 )
 def qlab_get_cue_lists(workspace_id: WorkspaceId) -> CueListsResult:
-    """Return a compact Cue List inventory with exact UUIDs and the current container.
+    """Return all Cue Lists and Cue Carts with exact UUIDs, types and current-container status.
 
-    Cue Carts are counted separately and excluded from cue_lists. No children are read.
-    Follow with qlab_get_cue_list_details for one exact Cue List's state, timecode and contents.
+    cue_lists contains both types; counts distinguish lists, carts and total containers. No children are read.
+    Follow with qlab_get_cue_list_details or qlab_get_cue_cart_details according to type.
     """
     return _run_tool(lambda reader: reader.get_cue_list_inventory(workspace_id), timeout=CUE_DETAILS_TIMEOUT)
 
@@ -1011,6 +1011,29 @@ def qlab_get_cue_list_details(
     """
     return _run_tool(
         lambda reader: reader.get_cue_list_details(workspace_id, str(cue_list_id), profile, max_depth, max_cues),
+        timeout=WORKSPACE_OVERVIEW_TIMEOUT,
+    )
+
+
+@mcp.tool(
+    title="Get QLab Cue Cart Details",
+    tags={"qlab", "cue-carts", "details", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_OVERVIEW_TIMEOUT,
+)
+def qlab_get_cue_cart_details(
+    workspace_id: WorkspaceId,
+    cue_cart_id: Annotated[UUID, Field(description="Exact Cue Cart UUID from qlab_get_cue_lists.")],
+    profile: Literal["safe", "technical"] = "safe",
+    max_cues: Annotated[StrictInt, Field(ge=1, le=5000, description="Maximum cart cells to inspect.")] = 1000,
+) -> CueCartDetailsResult:
+    """Read one exact Cue Cart: identity, state, timecode, grid dimensions and occupied cell positions.
+
+    Cue Carts have no playhead and no nested Groups. Inspect coverage, errors and grid.complete.
+    technical adds a redacted allowlisted payload. Use qlab_get_cue_details for a cell's cue Inspector.
+    """
+    return _run_tool(
+        lambda reader: reader.get_cue_cart_details(workspace_id, str(cue_cart_id), profile, max_cues),
         timeout=WORKSPACE_OVERVIEW_TIMEOUT,
     )
 

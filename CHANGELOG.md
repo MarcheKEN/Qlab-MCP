@@ -5,7 +5,11 @@
 - Adds `qlab_get_cue_lists` and UUID-only `qlab_get_cue_list_details`, with
   typed identity/state, playhead, incoming timecode and bounded ordered contents.
   Technical reads retain typed sections and add a redacted allowlisted payload.
-  Cue Carts remain separate. Public inventory: 22 tools (16 read-only, 6 writes).
+  The inventory includes both lists and carts, with separate type counts.
+  Adds UUID-only `qlab_get_cue_cart_details` for typed dimensions, occupied cell
+  positions, state and timecode, sharing the container reader and validation.
+  Both details include common basics; notes are read only in technical profile.
+  Public inventory: 23 tools (17 read-only, 6 writes).
 - Removes Cue List detail reads from `qlab_get_cue_details`. Single and batch
   calls return an actionable structured redirect to `qlab_get_cue_list_details`;
   Cue Cart reads remain supported by the generic tool.

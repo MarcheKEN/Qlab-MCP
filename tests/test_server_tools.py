@@ -54,7 +54,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["cue-lists", "inventory", "qlab", "safe-read"],
         "input_schema_hash": "a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578",
-        "output_schema_hash": "7d4c01c1d8c357bc54b44bebe2547a0aefc4e353ff57fcc09b3126af988bbe6c",
+        "output_schema_hash": "72329cf1fd3194ec46570ff7a7a6fdde33bc2d5862106ced9392407d35f23f83",
     },
     "qlab_get_cue_list_details": {
         "title": "Get QLab Cue List Details",
@@ -62,7 +62,15 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["cue-lists", "details", "qlab", "safe-read"],
         "input_schema_hash": "68b54234cee80c21538edc3dbf02ab6a83c78959a9b1135044e00dec8a26862b",
-        "output_schema_hash": "8ab6047bf8695c14c0b04d23ca9e3b2620410071d7fb2ade81f6b94f6d2e5020",
+        "output_schema_hash": "2d11a59e3d4d0501a083a1a75ba0fa32af0d4729828e1c522928c47c5f96f982",
+    },
+    "qlab_get_cue_cart_details": {
+        "title": "Get QLab Cue Cart Details",
+        "timeout": WORKSPACE_OVERVIEW_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["cue-carts", "details", "qlab", "safe-read"],
+        "input_schema_hash": "5d384b1bc7b5a4c5e36ae75a006d97e7547ae710b00cd2e744d3186f7a067f25",
+        "output_schema_hash": "9153624690036f77b78b5c022f3280530962c6e9bc73b5bac42df574fa6b7539",
     },
     "qlab_check_connection": {
         "title": "Check QLab Connection",
@@ -256,8 +264,9 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
     },
 }
 EXPECTED_TOOL_CONCEPTS = {
-    "qlab_get_cue_lists": ("compact Cue List inventory", "Cue Carts", "qlab_get_cue_list_details"),
+    "qlab_get_cue_lists": ("Cue Lists and Cue Carts", "No children", "qlab_get_cue_list_details"),
     "qlab_get_cue_list_details": ("exact Cue List", "incoming timecode", "bounded tree"),
+    "qlab_get_cue_cart_details": ("exact Cue Cart", "grid dimensions", "no playhead"),
     "qlab_check_connection": ("passcode", "permission scopes", "write authorization"),
     "qlab_get_workspace_overview": ("first structural read", "bounded and shallow", "qlab_query_cues"),
     "qlab_get_workspace_status": ("workspace status", "full workspace status window clone", "derived operational status"),
@@ -444,6 +453,7 @@ def test_read_tool_call_shapes_remain_explicit() -> None:
     expected = {
         "qlab_get_cue_lists": {"workspace_id"},
         "qlab_get_cue_list_details": {"workspace_id", "cue_list_id", "profile", "max_depth", "max_cues"},
+        "qlab_get_cue_cart_details": {"workspace_id", "cue_cart_id", "profile", "max_cues"},
         "qlab_check_connection": {"workspace_id", "require_read_access"},
         "qlab_get_workspace_overview": {
             "workspace_id", "max_depth", "max_cues", "include_live_state",
@@ -540,7 +550,7 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
     tools = asyncio.run(list_tools())
     tool_names = {tool.name for tool in tools}
 
-    assert len(tools) == 22
+    assert len(tools) == 23
     assert tool_names == set(EXPECTED_FASTMCP_TOOL_CONTRACTS)
     forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
     assert all(
@@ -1109,6 +1119,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert set(tools) == {
         "qlab_get_cue_lists",
         "qlab_get_cue_list_details",
+        "qlab_get_cue_cart_details",
         "qlab_check_connection",
         "qlab_get_workspace_overview",
         "qlab_get_workspace_status",

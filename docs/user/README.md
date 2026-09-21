@@ -72,7 +72,7 @@ planned structure
 != show ready for GO
 ```
 
-See the [22-tool catalogue](tools.md),
+See the [23-tool catalogue](tools.md),
 [security policy](../../SECURITY.md), and
 [Create checklist](../development/runtime-validation/create-cues.md) and
 [Edit checklist](../development/runtime-validation/edit-cues.md).

@@ -16,7 +16,7 @@ traffic.
 
 ## Public boundary
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 22 decorated tools,
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 23 decorated tools,
 their schemas, annotations, timeouts, and result models. Each call creates a
 fresh `QLabReader` and closes it after the operation. `qlab-mcp` maps to
 `qlab_mcp.server:main`.

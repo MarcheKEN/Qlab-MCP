@@ -65,8 +65,9 @@ annotations.
 | `qlab_get_workspace_network_settings` | Network Patch inventory or exact patch | Partial OSC coverage; not the complete Network panel |
 | `qlab_get_workspace_midi_settings` | MIDI Patch inventory or exact patch | Partial OSC coverage; not the complete MIDI panel |
 | `qlab_query_cues` | Bounded filtered cue discovery | Read-only; not full payload inspection |
-| `qlab_get_cue_lists` | Compact Cue List inventory and current container | Read-only; excludes Cue Carts and children |
+| `qlab_get_cue_lists` | Compact combined Cue List / Cue Cart inventory and current container | Read-only; no child reads |
 | `qlab_get_cue_list_details` | Exact Cue List state, playhead, timecode and bounded contents | Read-only; UUID-only; safe or technical |
+| `qlab_get_cue_cart_details` | Exact Cue Cart state, timecode, dimensions and occupied cell positions | Read-only; UUID-only; bounded cells; no playhead |
 | `qlab_get_cue_details` | Exact cue properties and health | Read-only; use exact refs for later writes |
 | `qlab_check_write_readiness` | Preflight before any real write | Read-only report; not a confirmation token |
 | `qlab_create_cue` | One template-backed structural creation | Gated, additive structural write; not initial setters or GO |
@@ -86,8 +87,9 @@ The normal read path is progressive rather than a full-show dump:
 4. `qlab_query_cues` finds a bounded target set.
 5. `qlab_get_cue_details` inspects exact properties.
 
-For Cue Lists, use `qlab_get_cue_lists` followed by `qlab_get_cue_list_details`
-with a returned UUID. Generic Cue Details returns a structured redirect for
+For lists and carts, use `qlab_get_cue_lists`, then select `qlab_get_cue_list_details`
+or `qlab_get_cue_cart_details` according to the returned type and UUID.
+Generic Cue Details returns a structured redirect for
 Cue Lists; Cue Cart reads remain supported there.
 
 Workspace Status warnings combine cue warning/broken/flagged fields with known

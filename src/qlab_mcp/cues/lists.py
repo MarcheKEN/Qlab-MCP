@@ -9,6 +9,7 @@ from ..osc.addressing import _workspace_address
 from ..sanitizer import sanitize_exception_message
 from ..settings.redaction import _redact_payload
 from .list_models import (
+    CueCartCell, CueCartContents, CueCartDetailsResult, CueCartGrid, CueCartIdentity, CueContainerBasics,
     CueListChild, CueListContents, CueListDetailsResult, CueListIdentity,
     CueListInventoryItem, CueListPosition, CueListState, CueListTimecode, CueListsResult,
 )
@@ -31,12 +32,17 @@ TIMECODE_FIELDS = {
     "sync_mode": "timecodeSyncMode", "smpte_format": "timecodeSMPTEFormat",
     "start_behavior": "timecodeStartBehavior", "stop_behavior": "timecodeStopBehavior",
     "freewheel_seconds": "timecodeFreewheelTime", "lookback_seconds": "timecodeLookbackTime",
+    "trigger": "timecodeTrigger", "trigger_text": "timecodeTrigger/text",
 }
 DETAIL_KEYS = list(dict.fromkeys([
     *CueListIdentity.model_fields, *CueListState.model_fields,
+    *CueContainerBasics.model_fields,
     "playhead", "playheadID", "playbackPosition", "playbackPositionID",
     *TIMECODE_FIELDS.values(),
 ]))
+CART_DETAIL_KEYS = [key for key in DETAIL_KEYS if key not in {
+    "playhead", "playheadID", "playbackPosition", "playbackPositionID",
+}] + ["cartRows", "cartColumns"]
 
 
 def _error(result: Any, code: str, message: str, route: str, *, workspace: bool = False) -> Any:
@@ -46,7 +52,7 @@ def _error(result: Any, code: str, message: str, route: str, *, workspace: bool 
     result.coverage.failed_routes = list(result.errors)
     result.suggested_action = (
         "Call qlab_check_connection and use an exact workspace UUID."
-        if workspace else "Call qlab_get_cue_lists and use an exact cue_lists[].uniqueID."
+        if workspace else "Call qlab_get_cue_lists and use an exact cue_lists[].uniqueID with the matching type's detail tool."
     )
     return result
 
@@ -160,12 +166,14 @@ class CueListsMixin:
             roots = _inventory(self, result.workspace_id)
             items = [CueListInventoryItem.model_validate({
                 **root, "root_position": index, "is_current": None,
-            }) for index, root in enumerate(roots) if root["type"] == "Cue List"]
+            }) for index, root in enumerate(roots)]
         except Exception as exc:
             return _error(result, "cue_list_payload_invalid", sanitize_exception_message(exc), "cueLists/shallow")
         result.cue_lists = items
-        result.cue_list_count = len(items)
-        result.excluded_cue_cart_count = len(roots) - len(items)
+        result.cue_list_count = sum(item.type == "Cue List" for item in items)
+        result.cue_cart_count = len(items) - result.cue_list_count
+        result.container_count = len(items)
+        result.excluded_cue_cart_count = 0
         result.coverage.notes = ["Inventory fields absent from shallow OSC remain null; root_position is zero-based."]
         try:
             current = self._request_data(_workspace_address(result.workspace_id, "currentCueListID"),
@@ -180,14 +188,27 @@ class CueListsMixin:
                 if current_root["type"] == "Cue List":
                     result.current_cue_list_id = current_root["uniqueID"]
             for item in items:
-                item.is_current = item.uniqueID == result.current_cue_list_id
+                item.is_current = item.uniqueID == result.current_container_id
         except Exception as exc:
             result.errors["currentCueListID"] = sanitize_exception_message(exc)
         return _finish(result)
 
     def get_cue_list_details(self, workspace_id: str, cue_list_id: str, profile: str = "safe",
                              max_depth: int = 2, max_cues: int = 1000) -> CueListDetailsResult:
-        result = CueListDetailsResult(workspace_id=workspace_id, cue_list_id=str(cue_list_id))
+        return self._get_container_details(workspace_id, cue_list_id, profile, max_depth, max_cues, cart=False)
+
+    def get_cue_cart_details(self, workspace_id: str, cue_cart_id: str, profile: str = "safe",
+                             max_cues: int = 1000) -> CueCartDetailsResult:
+        return self._get_container_details(workspace_id, cue_cart_id, profile, 1, max_cues, cart=True)
+
+    def _get_container_details(self, workspace_id: str, cue_list_id: str, profile: str,
+                               max_depth: int, max_cues: int, *, cart: bool):
+        prefix = "cue_cart" if cart else "cue_list"
+        result = (CueCartDetailsResult(workspace_id=workspace_id, cue_cart_id=str(cue_list_id)) if cart
+                  else CueListDetailsResult(workspace_id=workspace_id, cue_list_id=str(cue_list_id)))
+        identity_model = CueCartIdentity if cart else CueListIdentity
+        keys = [key for key in (CART_DETAIL_KEYS if cart else DETAIL_KEYS) if key != "notes" or profile == "technical"]
+        expected_types = {"Cue Cart", "Cart"} if cart else {"Cue List"}
         try:
             target = str(UUID(str(cue_list_id)))
             if profile not in {"safe", "technical"}:
@@ -207,28 +228,33 @@ class CueListsMixin:
         try:
             roots = _inventory(self, result.workspace_id)
         except Exception as exc:
-            return _error(result, "cue_list_payload_invalid", sanitize_exception_message(exc), "cueLists/shallow")
+            return _error(result, f"{prefix}_payload_invalid", sanitize_exception_message(exc), "cueLists/shallow")
         root = next((root for root in roots if root["uniqueID"].casefold() == target), None)
         if root is None:
-            return _error(result, "cue_list_not_found", "No root Cue List has this UUID", "cueLists/shallow")
-        if root["type"] != "Cue List":
-            return _error(result, "cue_list_type_mismatch", "The UUID identifies a Cue Cart, not a Cue List", "cueLists/shallow")
-        result.cue_list_id = root["uniqueID"]
+            return _error(result, f"{prefix}_not_found", "No root container has this UUID", "cueLists/shallow")
+        if root["type"] not in expected_types:
+            return _error(result, f"{prefix}_type_mismatch", "The UUID identifies a different container type", "cueLists/shallow")
+        setattr(result, f"{prefix}_id", root["uniqueID"])
         try:
-            values = self.read_cue_values(result.workspace_id, result.cue_list_id, DETAIL_KEYS, cacheable=False)["values"]
+            values = self.read_cue_values(result.workspace_id, root["uniqueID"], keys, cacheable=False)["values"]
             if not isinstance(values, dict) or not isinstance(values.get("uniqueID"), str):
                 raise ValueError("valuesForKeys must return an object with uniqueID and type")
             if values["uniqueID"].casefold() != target:
-                return _error(result, "cue_list_identity_mismatch", "OSC returned a different cue UUID", "valuesForKeys")
-            if values.get("type") != "Cue List":
-                return _error(result, "cue_list_type_mismatch", "OSC returned a different cue type", "valuesForKeys")
-            identity = CueListIdentity.model_validate(values)
+                return _error(result, f"{prefix}_identity_mismatch", "OSC returned a different cue UUID", "valuesForKeys")
+            if values.get("type") not in expected_types:
+                return _error(result, f"{prefix}_type_mismatch", "OSC returned a different cue type", "valuesForKeys")
+            identity = identity_model.model_validate(values)
         except Exception as exc:
-            return _error(result, "cue_list_payload_invalid", sanitize_exception_message(exc), "valuesForKeys")
+            return _error(result, f"{prefix}_payload_invalid", sanitize_exception_message(exc), "valuesForKeys")
         result.identity = identity
+        result.basics = _section(CueContainerBasics, {key: key for key in CueContainerBasics.model_fields if key in keys}, values, result)
+        if result.basics.mode is not None and result.basics.mode != (5 if cart else 0):
+            result.errors["mode"] = "OSC mode does not match the container type"
+            result.basics.mode = None
         result.state = _section(CueListState, {key: key for key in CueListState.model_fields}, values, result)
-        result.playhead = _position(values, "playhead", result)
-        result.playback_position = _position(values, "playbackPosition", result)
+        if not cart:
+            result.playhead = _position(values, "playhead", result)
+            result.playback_position = _position(values, "playbackPosition", result)
         result.incoming_timecode = _section(CueListTimecode, TIMECODE_FIELDS, values, result)
         result.coverage.unavailable_via_osc = ["sync_enabled", "mtc_source_name", "ltc_input_patch", "ltc_sync_channel"]
         result.coverage.notes = [
@@ -237,11 +263,43 @@ class CueListsMixin:
             "Depth 0 reads no children; max_cues counts descendants, excluding the list root.",
             "Reads are sequential observations, not an atomic snapshot.",
         ]
-        result.contents = _contents(self, result.workspace_id, root, max_depth, max_cues, result)
+        contents = _contents(self, result.workspace_id, root, max_depth, max_cues, result)
+        result.contents = CueCartContents.model_validate(contents.model_dump()) if cart else contents
+        if cart:
+            result.coverage.notes = [
+                "Cue Carts have a grid, no playhead, and cannot contain Group cues.",
+                "Cells contain bounded child identities, not deep child Inspector details.",
+                "Timecode configuration does not prove synchronization is enabled or signal is present.",
+                "Reads are sequential observations, not an atomic snapshot.",
+            ]
+            result.grid = _section(CueCartGrid, {"rows": "cartRows", "columns": "cartColumns"}, values, result)
+            occupied = set()
+            for child in contents.children:
+                cell = CueCartCell.model_validate(child.model_dump())
+                route = f"cells/{child.uniqueID}/cartPosition"
+                try:
+                    position = self.read_cue_values(result.workspace_id, child.uniqueID,
+                        ["uniqueID", "type", "cartPosition"], cacheable=False)["values"]
+                    if not isinstance(position, dict) or position.get("uniqueID") != child.uniqueID or position.get("type") != child.type:
+                        raise ValueError("Cell identity mismatch")
+                    coords = position.get("cartPosition")
+                    if not isinstance(coords, list) or len(coords) != 2 or any(type(n) is not int or n < 0 for n in coords):
+                        raise ValueError("cartPosition must contain two non-negative integers")
+                    cell.row, cell.column = coords
+                    if tuple(coords) in occupied:
+                        raise ValueError("Duplicate cell position in sequential OSC observations")
+                    occupied.add(tuple(coords))
+                    if child.type in CONTAINER_CUE_TYPES:
+                        raise ValueError("Cue Carts cannot contain container cues")
+                except Exception as exc:
+                    result.errors[route] = sanitize_exception_message(exc)
+                result.grid.cells.append(cell)
+            result.grid.complete = not result.contents.truncated and not result.errors and all(
+                value is not None for value in (result.grid.rows, result.grid.columns))
         if profile == "technical":
             # Only requested allowlisted properties enter the technical payload.
             result.technical_payload = _redact_payload(
-                {key: values[key] for key in DETAIL_KEYS if key in values and key not in result.errors},
-                section="cue_list", profile="technical", redactions=[],
+                {key: values[key] for key in keys if key in values and key not in result.errors},
+                section=prefix, profile="technical", redactions=[],
             )
         return _finish(result)

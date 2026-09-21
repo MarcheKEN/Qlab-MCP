@@ -461,10 +461,27 @@ class QLabOscClient:
         status = payload.get("status")
         if not isinstance(status, str):
             raise OscProtocolError("QLab reply JSON missing string status")
+        if status not in {"ok", "error", "denied"}:
+            raise OscProtocolError("QLab reply JSON has unknown status", error_code="osc_reply_invalid")
+        if status == "ok" and "data" not in payload:
+            raise OscProtocolError("QLab successful reply JSON missing data", error_code="osc_reply_invalid")
 
         workspace_id = payload.get("workspace_id")
         if workspace_id is not None and not isinstance(workspace_id, str):
             raise OscProtocolError("QLab reply workspace_id must be a string when present")
+        if isinstance(workspace_id, str) and not workspace_id.strip():
+            raise OscProtocolError("QLab reply workspace_id must not be empty", error_code="osc_reply_invalid")
+        invoked_parts = invoked.split("/")
+        if (
+            workspace_id is not None
+            and len(invoked_parts) >= 2
+            and invoked_parts[0] == "workspace"
+            and invoked_parts[1].casefold() != workspace_id.casefold()
+        ):
+            raise OscProtocolError(
+                "QLab reply workspace_id does not match the reply address",
+                error_code="osc_workspace_identity_mismatch",
+            )
 
         return QLabReply(
             invoked_address=invoked,

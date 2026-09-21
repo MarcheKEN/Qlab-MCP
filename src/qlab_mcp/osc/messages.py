@@ -119,4 +119,7 @@ def decode_message(packet: bytes) -> OscMessage:
         else:
             raise OscProtocolError(f"Unsupported OSC typetag in reply: {tag!r}")
 
+    if offset != len(packet):
+        raise OscProtocolError("OSC message contains trailing bytes", error_code="osc_reply_invalid")
+
     return OscMessage(address=address, args=tuple(args))

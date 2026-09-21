@@ -4,7 +4,7 @@ QLab MCP `0.3.0` is a FastMCP server for inspecting QLab 5 workspaces over OSC
 and requesting narrowly gated structural writes. It is read-only by default;
 write mode is disabled unless explicitly configured and remains dry-run-first.
 
-The public surface is intentionally small: 8 read-only tools and 6 gated write
+The public surface is intentionally focused: 16 read-only tools and 6 gated write
 tools. The server exposes no playback or raw-protocol escape hatch.
 
 ## Capability boundaries
@@ -55,10 +55,18 @@ annotations.
 | --- | --- | --- |
 | `qlab_check_connection` | Reachability, workspace candidates, scopes, and mode | Read-only; not write authorization |
 | `qlab_get_workspace_overview` | Bounded cue-list/group/cart structure | Read-only; not deep Inspector detail |
-| `qlab_get_workspace_status` | Derived status, warnings, and timecode context | Read-only; not a full Status-window clone |
-| `qlab_get_workspace_settings` | Settings summary or independent detail requests | Read-only; no patch mutation |
-| `qlab_get_workspace_setting_details` | One settings detail request | Read-only compatibility route; not batch discovery |
+| `qlab_get_workspace_status` | Derived cue warnings, known Video Settings problems, and timecode context | Read-only; warning coverage is partial, not a full Status-window clone |
+| `qlab_get_workspace_general_settings` | Documented General settings | Partial OSC coverage: minimum GO time and selection/playhead lock |
+| `qlab_get_workspace_audio_settings` | Audio overview; exact patch routing, mute/solo, and one optional matrix crosspoint | Read-only; Audio Maps and full-matrix scans are excluded |
+| `qlab_get_workspace_video_settings` | Compact Video input, route, and stage inventory | Read-only; three bulk OSC reads |
+| `qlab_get_video_stage` | One stage and its regions | Read-only; exact stage UUID, safe or technical profile |
+| `qlab_get_video_output_route` | One output route and its destination | Read-only; exact route UUID, safe or technical profile |
+| `qlab_get_workspace_light_settings` | Light Patch summary or redacted technical payload | Read-only; no Light Definitions or Dashboard settings |
+| `qlab_get_workspace_network_settings` | Network Patch inventory or exact patch | Partial OSC coverage; not the complete Network panel |
+| `qlab_get_workspace_midi_settings` | MIDI Patch inventory or exact patch | Partial OSC coverage; not the complete MIDI panel |
 | `qlab_query_cues` | Bounded filtered cue discovery | Read-only; not full payload inspection |
+| `qlab_get_cue_lists` | Compact Cue List inventory and current container | Read-only; excludes Cue Carts and children |
+| `qlab_get_cue_list_details` | Exact Cue List state, playhead, timecode and bounded contents | Read-only; UUID-only; safe or technical |
 | `qlab_get_cue_details` | Exact cue properties and health | Read-only; use exact refs for later writes |
 | `qlab_check_write_readiness` | Preflight before any real write | Read-only report; not a confirmation token |
 | `qlab_create_cue` | One template-backed structural creation | Gated, additive structural write; not initial setters or GO |
@@ -74,13 +82,28 @@ The normal read path is progressive rather than a full-show dump:
 
 1. `qlab_get_workspace_overview` maps bounded structure.
 2. `qlab_get_workspace_status` adds derived operational context.
-3. `qlab_get_workspace_settings(mode="summary")` summarizes infrastructure.
+3. Use the relevant `qlab_get_workspace_*_settings` tool for infrastructure.
 4. `qlab_query_cues` finds a bounded target set.
 5. `qlab_get_cue_details` inspects exact properties.
 
-Use `mode="details"` or technical/sensitive profiles only for a deliberate
-diagnostic. Query and details limits report truncation or partial results; they
-do not silently claim a complete show inventory.
+For Cue Lists, use `qlab_get_cue_lists` followed by `qlab_get_cue_list_details`
+with a returned UUID. Generic Cue Details returns a structured redirect for
+Cue Lists; Cue Cart reads remain supported there.
+
+Workspace Status warnings combine cue warning/broken/flagged fields with known
+problems derived from documented Video Settings reads. Category counts may
+overlap and are not a unique warning total. QLab does not expose its complete
+Warnings list, Logs, Art-Net discovery, or Video Metrics through documented
+read-only OSC or AppleScript APIs, so those coverage limits remain explicit.
+
+Audio uses a typed `view` plus optional exact `ref` for focused details.
+Video overview supplies UUIDs for `qlab_get_video_stage` and
+`qlab_get_video_output_route`; these require exact UUIDs and default to `safe`.
+Video input patches expose only names and UUIDs. Output devices are observable
+only through route destinations, not an independent device inventory.
+Use technical/sensitive profiles only for a deliberate diagnostic.
+Query and details limits report truncation or partial results; they do not
+silently claim a complete show inventory.
 
 ## Safe write flow
 

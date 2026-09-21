@@ -139,8 +139,9 @@ def _bounded_cue_refs_from_shallow(
     max_depth: int | None = None,
     cacheable: bool = True,
     fallback_child_ids: bool = False,
+    root_cues: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Walk cueLists/shallow + children/shallow without global uniqueIDs."""
+    """Walk supplied roots or cueLists/shallow, then bounded children/shallow."""
     if limit < 1:
         raise ValueError("limit must be 1 or greater")
 
@@ -161,9 +162,18 @@ def _bounded_cue_refs_from_shallow(
             return
         if not isinstance(cue, dict):
             errors[f"depth:{depth}:item:{len(refs)}"] = "QLab shallow cue entry must be an object"
+            if root_cues is not None:
+                mark_truncated("invalid_payload")
             return
 
         cue_id_value = cue.get("uniqueID")
+        if root_cues is not None and (
+            not isinstance(cue_id_value, str) or not cue_id_value.strip()
+            or not isinstance(cue.get("type"), str) or not cue["type"].strip()
+        ):
+            errors[f"depth:{depth}:item:{len(refs)}"] = "QLab shallow cue identity and type must be non-empty strings"
+            mark_truncated("invalid_payload")
+            return
         cue_id = str(cue_id_value) if cue_id_value else None
         current_cue_list_id = (
             cue_id
@@ -171,6 +181,9 @@ def _bounded_cue_refs_from_shallow(
             else cue_list_id
         )
         if cue_id and cue_id in seen:
+            if root_cues is not None:
+                errors[cue_id] = "Duplicate or cyclic cue identity in scoped traversal"
+                mark_truncated("invalid_payload")
             return
         if cue_id:
             seen.add(cue_id)
@@ -307,7 +320,7 @@ def _bounded_cue_refs_from_shallow(
             append_cue(child, parent_id=cue_id, cue_list_id=current_cue_list_id, depth=depth + 1)
 
     try:
-        cue_lists = reader.get_cue_lists(
+        cue_lists = root_cues if root_cues is not None else reader.get_cue_lists(
             workspace_id,
             include_children=False,
             cacheable=cacheable,

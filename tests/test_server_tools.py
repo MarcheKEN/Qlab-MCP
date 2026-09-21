@@ -26,15 +26,18 @@ from qlab_mcp.server import (
     UPDATE_CUES_TIMEOUT,
     WORKSPACE_OVERVIEW_TIMEOUT,
     WORKSPACE_STATUS_TIMEOUT,
-    WORKSPACE_SETTING_DETAILS_TIMEOUT,
     WORKSPACE_SETTINGS_TIMEOUT,
     WRITE_READINESS_TIMEOUT,
     _run_tool,
     mcp,
     qlab_get_workspace_overview,
     qlab_get_workspace_status,
-    qlab_get_workspace_setting_details,
-    qlab_get_workspace_settings,
+    qlab_get_workspace_audio_settings,
+    qlab_get_workspace_general_settings,
+    qlab_get_workspace_light_settings,
+    qlab_get_workspace_midi_settings,
+    qlab_get_workspace_network_settings,
+    qlab_get_workspace_video_settings,
     qlab_get_cue_details,
     qlab_query_cues,
 )
@@ -45,6 +48,22 @@ from qlab_mcp.server_responses import overview_success_payload
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_NOISE_KEYS: frozenset[str] = frozenset()
 EXPECTED_FASTMCP_TOOL_CONTRACTS = {
+    "qlab_get_cue_lists": {
+        "title": "Get QLab Cue Lists",
+        "timeout": CUE_DETAILS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["cue-lists", "inventory", "qlab", "safe-read"],
+        "input_schema_hash": "a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578",
+        "output_schema_hash": "7d4c01c1d8c357bc54b44bebe2547a0aefc4e353ff57fcc09b3126af988bbe6c",
+    },
+    "qlab_get_cue_list_details": {
+        "title": "Get QLab Cue List Details",
+        "timeout": WORKSPACE_OVERVIEW_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["cue-lists", "details", "qlab", "safe-read"],
+        "input_schema_hash": "68b54234cee80c21538edc3dbf02ab6a83c78959a9b1135044e00dec8a26862b",
+        "output_schema_hash": "8ab6047bf8695c14c0b04d23ca9e3b2620410071d7fb2ade81f6b94f6d2e5020",
+    },
     "qlab_check_connection": {
         "title": "Check QLab Connection",
         "timeout": CHECK_CONNECTION_TIMEOUT,
@@ -100,39 +119,87 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "timeout": WORKSPACE_OVERVIEW_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["orientation", "qlab", "safe-read", "structure"],
-        "input_schema_hash": "02908bfb5dd7d423c04a7d1e071a711db5cf76ce5b00d0355de38585df5a0608",
+        "input_schema_hash": "fddc30b27b0b2a8ca4fa5f9601004eaa565c724a5c9b145bcea65cb5be1317f1",
         "output_schema_hash": "dcf4a4fc455bb3ebc3e62b0ca04e3cbc75bd91fc7e19fdb978283796f3f50454",
     },
-    "qlab_get_workspace_setting_details": {
-        "title": "Get QLab Workspace Setting Details",
-        "timeout": WORKSPACE_SETTING_DETAILS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["details", "patches", "qlab", "routing", "safe-read", "settings"],
-        "input_schema_hash": "9bf79634d0ff17fccb9fc8b3bfe70bbbbdaed6ccbb8f709a52ad9e1cb8170ac0",
-        "output_schema_hash": "21e6efa3493bb4c6108339758493006c3b27ef4fe6e884201372db7c77dc7d3f",
-    },
-    "qlab_get_workspace_settings": {
-        "title": "Get QLab Workspace Settings",
+    "qlab_get_workspace_audio_settings": {
+        "title": "Get QLab Workspace Audio Settings",
         "timeout": WORKSPACE_SETTINGS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["inventory", "patches", "qlab", "routing", "safe-read", "settings"],
-        "input_schema_hash": "d7267c1e7ab87ba58b13c0efadbd7d30ad9e431445844779f6656fec8ee1bca1",
-        "output_schema_hash": "3c4381ac3b10af3e7655c8cb65240d8909bf89f3c0c58d04513299380781b8d0",
+        "tags": ["audio", "patches", "qlab", "routing", "safe-read", "settings"],
+        "input_schema_hash": "778accc3d890828923b8bd71f2babc30482c825a1f3f5602a054f5b3456e97e5",
+        "output_schema_hash": "036b2a4a566ea9b4401b1b2081ac2e956e4f32f529ae41f52d4071c7ed4d4083",
+    },
+    "qlab_get_workspace_general_settings": {
+        "title": "Get QLab Workspace General Settings",
+        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["general", "qlab", "safe-read", "settings"],
+        "input_schema_hash": "a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578",
+        "output_schema_hash": "0a581c8c1c98d61315b2d5d327070551bedd58fc5cd1533efa0141531316ce5f",
+    },
+    "qlab_get_workspace_light_settings": {
+        "title": "Get QLab Workspace Light Settings",
+        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["light", "patches", "qlab", "safe-read", "settings"],
+        "input_schema_hash": "cfd70c189348699a8f4f7e24a2dd2c81fc85b3aeeda35d9ff8ac4e00f607a495",
+        "output_schema_hash": "93e4e2e0895dd0c773398ac9771cf0a32fef26a54bfc06e9ee10a9ff5e8319b9",
+    },
+    "qlab_get_workspace_midi_settings": {
+        "title": "Get QLab Workspace MIDI Settings",
+        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["midi", "patches", "qlab", "safe-read", "settings"],
+        "input_schema_hash": "eaaf315895e69c71d1110546fa037ae8bea54384d8eac79583a07207a2c9b86f",
+        "output_schema_hash": "a1246ab669e39937ba01a4f2865289a72a1354c022a1536f1aec11652dd08f9e",
+    },
+    "qlab_get_workspace_network_settings": {
+        "title": "Get QLab Workspace Network Settings",
+        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["network", "patches", "qlab", "safe-read", "settings"],
+        "input_schema_hash": "eaaf315895e69c71d1110546fa037ae8bea54384d8eac79583a07207a2c9b86f",
+        "output_schema_hash": "048f6d873b4a6a4c5ba97f5e076e1a0d431250d04448fc90934c31cb5aff745f",
+    },
+    "qlab_get_workspace_video_settings": {
+        "title": "Get QLab Workspace Video Settings",
+        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["patches", "qlab", "routing", "safe-read", "settings", "video"],
+        "input_schema_hash": "a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578",
+        "output_schema_hash": "2bd14258702379f541a6942b3ff15e4011fa5184ab6dab34db3c3512a1434fb6",
+    },
+    "qlab_get_video_stage": {
+        "title": "Get QLab Video Stage",
+        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["qlab", "safe-read", "settings", "stages", "video"],
+        "input_schema_hash": "a6bfcb9c9e86f1d3b384f14dd3cff7b47db7a60e6847776690627b9209c4d2bc",
+        "output_schema_hash": "72445d77a981af018e106077a7b37a5bdf0b4cfef9c635177927a47cb6f41c5e",
+    },
+    "qlab_get_video_output_route": {
+        "title": "Get QLab Video Output Route",
+        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["qlab", "routing", "safe-read", "settings", "video"],
+        "input_schema_hash": "fa883e96fc21221c758cbdff15858a326aa8826e4c835960574d70437863f4ad",
+        "output_schema_hash": "cec321cbeac30e023f9c1d71d3b5ce9f73fe4f70584d2fc8017820a40bdf8195",
     },
     "qlab_get_workspace_status": {
         "title": "Get QLab Workspace Status",
         "timeout": WORKSPACE_STATUS_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["diagnostics", "qlab", "safe-read", "status", "timecode"],
-        "input_schema_hash": "e2257d4dd2a0f5ad860001e3fb2e58347fbd1802d4fc0ca35dfe1c4712bffd46",
-        "output_schema_hash": "a313d8fccd6b881ef920a3782fa3381f17854dcd88ce902b5f376ef2fdfc8a8a",
+        "input_schema_hash": "a85c42414b1b3a1c4405349720920ac5983f1c8933422013adaf9957e84ed45d",
+        "output_schema_hash": "ccb2ea4d8bc34c308ddcc35e416d418d96efa6bfda67d2fc2cd4e61aa0ed949c",
     },
     "qlab_query_cues": {
         "title": "Query QLab Cues",
         "timeout": QUERY_CUES_TIMEOUT,
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
         "tags": ["details", "inventory", "qlab", "query", "safe-read"],
-        "input_schema_hash": "500535ba62fbc315e4af2af2fcd7074e41e16e0389bc4496925804a80edeb511",
+        "input_schema_hash": "d06af63d14c70324eb62b16f81c07fd3967a39cc4eebd5c3fe0a9e7e8b6dcdf9",
         "output_schema_hash": "16613ad3378154e2b01bb1dabe40ba6d56ff1394ffea2ad960ae14cd775549a5",
     },
     "qlab_edit_cues": {
@@ -189,11 +256,19 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
     },
 }
 EXPECTED_TOOL_CONCEPTS = {
+    "qlab_get_cue_lists": ("compact Cue List inventory", "Cue Carts", "qlab_get_cue_list_details"),
+    "qlab_get_cue_list_details": ("exact Cue List", "incoming timecode", "bounded tree"),
     "qlab_check_connection": ("passcode", "permission scopes", "write authorization"),
     "qlab_get_workspace_overview": ("first structural read", "bounded and shallow", "qlab_query_cues"),
     "qlab_get_workspace_status": ("workspace status", "full workspace status window clone", "derived operational status"),
-    "qlab_get_workspace_settings": ("summary mode", "one failed request does not block", 'mode="details"'),
-    "qlab_get_workspace_setting_details": ("backwards-compatible wrapper", "safe profile", "single request"),
+    "qlab_get_workspace_general_settings": ("general settings", "minimum go time", "selection/playhead"),
+    "qlab_get_workspace_audio_settings": ("audio settings overview", "exact output patch", "technical"),
+    "qlab_get_workspace_video_settings": ("input patches", "uniqueIDs", "no independent device inventory"),
+    "qlab_get_video_stage": ("exact Video stage", "regions", "redacted OSC payload"),
+    "qlab_get_video_output_route": ("exact Video output route", "guides", "hardware metadata"),
+    "qlab_get_workspace_light_settings": ("light patch", "safe summary", "technical payload"),
+    "qlab_get_workspace_network_settings": ("network patch inventory", "exact network patch", "complete network settings panel"),
+    "qlab_get_workspace_midi_settings": ("midi patch inventory", "exact midi patch", "complete midi settings panel"),
     "qlab_query_cues": ("optional and filters", "truncation metadata", "qlab_get_cue_details"),
     "qlab_get_cue_details": ("editable for update capability discovery", "exhaustive only for deep audits", "qlab_query_cues"),
     "qlab_check_write_readiness": ("without sending any mutating osc commands", "edit mode", "read-only preflight"),
@@ -367,20 +442,81 @@ def test_fastmcp_tool_context_size_report_is_deterministic() -> None:
 
 def test_read_tool_call_shapes_remain_explicit() -> None:
     expected = {
+        "qlab_get_cue_lists": {"workspace_id"},
+        "qlab_get_cue_list_details": {"workspace_id", "cue_list_id", "profile", "max_depth", "max_cues"},
         "qlab_check_connection": {"workspace_id", "require_read_access"},
         "qlab_get_workspace_overview": {
             "workspace_id", "max_depth", "max_cues", "include_live_state",
             "include_cue_index", "max_index_cues", "cue_index_profile", "include_global_count",
         },
         "qlab_get_workspace_status": {"workspace_id", "profile", "include_timecode", "max_cues_scanned", "sample_limit"},
-        "qlab_get_workspace_settings": {"workspace_id", "mode", "sections", "requests", "profile"},
-        "qlab_get_workspace_setting_details": {"workspace_id", "section", "kind", "ref", "profile"},
+        "qlab_get_workspace_general_settings": {"workspace_id"},
+        "qlab_get_workspace_audio_settings": {
+            "workspace_id", "view", "ref", "profile", "input_channel", "output_channel",
+        },
+        "qlab_get_workspace_video_settings": {"workspace_id"},
+        "qlab_get_video_stage": {"workspace_id", "stage_id", "profile"},
+        "qlab_get_video_output_route": {"workspace_id", "route_id", "profile"},
+        "qlab_get_workspace_light_settings": {"workspace_id", "profile"},
+        "qlab_get_workspace_network_settings": {"workspace_id", "ref", "profile"},
+        "qlab_get_workspace_midi_settings": {"workspace_id", "ref", "profile"},
         "qlab_query_cues": {"workspace_id", "primary_filter", "primary_value", "optional_filters", "profile", "max_results", "max_cues_scanned"},
         "qlab_get_cue_details": {"workspace_id", "cue_ref", "profile"},
         "qlab_check_write_readiness": {"workspace_id"},
     }
     for tool_name, parameter_names in expected.items():
         assert set(inspect.signature(getattr(server_module, tool_name)).parameters) == parameter_names
+
+
+def test_read_tool_limit_schemas_are_strict_and_bounded() -> None:
+    async def list_tools():
+        async with Client(mcp) as client:
+            return {tool.name: tool for tool in await client.list_tools()}
+
+    tools = asyncio.run(list_tools())
+    expected = {
+        ("qlab_get_workspace_overview", "max_depth"): (0, 5),
+        ("qlab_get_workspace_overview", "max_cues"): (1, 5000),
+        ("qlab_get_workspace_overview", "max_index_cues"): (1, 5000),
+        ("qlab_get_workspace_status", "max_cues_scanned"): (1, 5000),
+        ("qlab_get_workspace_status", "sample_limit"): (0, 50),
+        ("qlab_query_cues", "max_results"): (1, 5000),
+        ("qlab_query_cues", "max_cues_scanned"): (1, 5000),
+    }
+    for (tool_name, field), (minimum, maximum) in expected.items():
+        schema = tools[tool_name].inputSchema["properties"][field]
+        assert schema["type"] == "integer"
+        assert schema["minimum"] == minimum
+        assert schema["maximum"] == maximum
+
+
+def test_read_tool_limits_reject_coerced_values_before_reader(monkeypatch) -> None:
+    reader_calls = []
+
+    def unexpected_reader():
+        reader_calls.append(True)
+        raise AssertionError("invalid limits must not construct a reader")
+
+    monkeypatch.setattr(server_module, "_reader", unexpected_reader)
+
+    async def rejected():
+        async with Client(mcp) as client:
+            cases = [
+                ("qlab_get_workspace_overview", {"workspace_id": "ws-1", "max_depth": True}),
+                ("qlab_get_workspace_overview", {"workspace_id": "ws-1", "max_depth": "3"}),
+                ("qlab_get_workspace_overview", {"workspace_id": "ws-1", "max_depth": 6}),
+                ("qlab_get_workspace_status", {"workspace_id": "ws-1", "sample_limit": True}),
+                (
+                    "qlab_query_cues",
+                    {"workspace_id": "ws-1", "primary_filter": "type", "primary_value": "Audio", "max_results": "10"},
+                ),
+            ]
+            for tool_name, arguments in cases:
+                with pytest.raises(Exception):
+                    await client.call_tool(tool_name, arguments)
+                assert reader_calls == []
+
+    asyncio.run(rejected())
 
 
 def test_readme_tool_inventory_matches_current_public_surface() -> None:
@@ -404,7 +540,7 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
     tools = asyncio.run(list_tools())
     tool_names = {tool.name for tool in tools}
 
-    assert len(tools) == 14
+    assert len(tools) == 22
     assert tool_names == set(EXPECTED_FASTMCP_TOOL_CONTRACTS)
     forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
     assert all(
@@ -971,11 +1107,19 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
     assert set(tools) == {
+        "qlab_get_cue_lists",
+        "qlab_get_cue_list_details",
         "qlab_check_connection",
         "qlab_get_workspace_overview",
         "qlab_get_workspace_status",
-        "qlab_get_workspace_settings",
-        "qlab_get_workspace_setting_details",
+        "qlab_get_workspace_general_settings",
+        "qlab_get_workspace_audio_settings",
+        "qlab_get_workspace_video_settings",
+        "qlab_get_video_stage",
+        "qlab_get_video_output_route",
+        "qlab_get_workspace_light_settings",
+        "qlab_get_workspace_network_settings",
+        "qlab_get_workspace_midi_settings",
         "qlab_query_cues",
         "qlab_get_cue_details",
         "qlab_check_write_readiness",
@@ -998,8 +1142,8 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert overview.title == "Get QLab Workspace Overview"
     assert "first structural read" in overview.description
     assert overview.inputSchema["properties"]["cue_index_profile"]["default"] == "minimal"
-    assert "maximum" not in overview.inputSchema["properties"]["max_cues"]
-    assert "maximum" not in overview.inputSchema["properties"]["max_index_cues"]
+    assert overview.inputSchema["properties"]["max_cues"]["maximum"] == 5000
+    assert overview.inputSchema["properties"]["max_index_cues"]["maximum"] == 5000
     assert overview.inputSchema["properties"]["max_index_cues"]["default"] == 5000
     assert overview.inputSchema["properties"]["include_global_count"]["default"] is False
     assert "cueLists/uniqueIDs" in overview.inputSchema["properties"]["include_global_count"]["description"]
@@ -1025,46 +1169,61 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert status.inputSchema["properties"]["profile"]["default"] == "summary"
     assert "enum" not in status.inputSchema["properties"]["profile"]
     assert status.inputSchema["properties"]["max_cues_scanned"]["default"] == 1000
-    assert "maximum" not in status.inputSchema["properties"]["sample_limit"]
+    assert status.inputSchema["properties"]["sample_limit"]["maximum"] == 50
     assert "sections" in status.outputSchema["properties"]
+    sections_schema = status.outputSchema["properties"]["sections"]
+    sections_properties = sections_schema["properties"]
+    warnings_properties = sections_properties["warnings_summary"]["properties"]
+    assert {
+        "coverage",
+        "evidence_sources",
+        "cue_evidence_available",
+        "settings_evidence_available",
+        "sample_flagged_cues",
+        "known_settings_problem_count",
+        "known_settings_problem_counts",
+        "sample_settings_problems",
+    } <= set(warnings_properties)
     assert status.annotations.readOnlyHint is True
     assert status.annotations.destructiveHint is False
 
-    settings = tools["qlab_get_workspace_settings"]
-    assert settings.title == "Get QLab Workspace Settings"
-    assert "Workspace Settings" in settings.description
-    assert settings.annotations.readOnlyHint is True
-    assert settings.annotations.destructiveHint is False
-    assert settings.inputSchema["properties"]["mode"]["default"] == "summary"
-    assert "enum" not in settings.inputSchema["properties"]["mode"]
-    assert settings.inputSchema["properties"]["profile"]["default"] == "safe"
-    assert "enum" not in settings.inputSchema["properties"]["profile"]
-    assert "requests" in settings.inputSchema["properties"]
-    requests_schema = settings.inputSchema["properties"]["requests"]
-    assert requests_schema["maxItems"] == 50
-    sections_schema = settings.inputSchema["properties"]["sections"]
-    assert sections_schema["maxItems"] == 6
-    assert "available_detail_requests" in settings.outputSchema["properties"]
-    assert "succeeded_count" in settings.outputSchema["properties"]
-    assert "failed_count" in settings.outputSchema["properties"]
-    assert "summary" in settings.description
-    assert "one failed request does not block" in settings.description
+    settings_tools = {
+        name: tools[name]
+        for name in (
+            "qlab_get_workspace_general_settings",
+            "qlab_get_workspace_audio_settings",
+            "qlab_get_workspace_video_settings",
+            "qlab_get_workspace_light_settings",
+            "qlab_get_workspace_network_settings",
+            "qlab_get_workspace_midi_settings",
+        )
+    }
+    for settings in settings_tools.values():
+        assert settings.annotations.readOnlyHint is True
+        assert settings.annotations.destructiveHint is False
+        assert "data" in settings.outputSchema["properties"]
+        assert "domain" in settings.outputSchema["properties"]
+        assert "coverage" in settings.outputSchema["properties"]
+        assert {"section", "mode", "sections", "requests", "kind"}.isdisjoint(
+            settings.inputSchema["properties"]
+        )
 
-    setting_details = tools["qlab_get_workspace_setting_details"]
-    assert setting_details.title == "Get QLab Workspace Setting Details"
-    assert "Backwards-compatible wrapper" in setting_details.description
-    assert setting_details.inputSchema["properties"]["profile"]["default"] == "safe"
-    assert "enum" not in setting_details.inputSchema["properties"]["profile"]
-    assert setting_details.annotations.readOnlyHint is True
-    assert setting_details.annotations.destructiveHint is False
+    audio_settings = settings_tools["qlab_get_workspace_audio_settings"]
+    assert audio_settings.title == "Get QLab Workspace Audio Settings"
+    assert audio_settings.inputSchema["properties"]["view"]["default"] == "overview"
+    assert audio_settings.inputSchema["properties"]["profile"]["enum"] == ["safe", "technical", "exhaustive"]
+
+    video_settings = settings_tools["qlab_get_workspace_video_settings"]
+    assert video_settings.title == "Get QLab Workspace Video Settings"
+    assert set(video_settings.inputSchema["properties"]) == {"workspace_id"}
 
     query = tools["qlab_query_cues"]
     assert query.title == "Query QLab Cues"
     assert "optional AND filters" in query.description
     assert query.inputSchema["properties"]["max_results"]["default"] == 500
-    assert "maximum" not in query.inputSchema["properties"]["max_results"]
+    assert query.inputSchema["properties"]["max_results"]["maximum"] == 5000
     assert query.inputSchema["properties"]["max_cues_scanned"]["default"] == 500
-    assert "maximum" not in query.inputSchema["properties"]["max_cues_scanned"]
+    assert query.inputSchema["properties"]["max_cues_scanned"]["maximum"] == 5000
     assert "enum" not in query.inputSchema["properties"]["primary_filter"]
     assert "query_completeness" in query.outputSchema["properties"]
     assert "query_completeness_reasons" in query.outputSchema["properties"]
@@ -1411,8 +1570,12 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
                 "qlab_check_connection",
                 "qlab_get_workspace_overview",
                 "qlab_get_workspace_status",
-                "qlab_get_workspace_settings",
-                "qlab_get_workspace_setting_details",
+                "qlab_get_workspace_general_settings",
+                "qlab_get_workspace_audio_settings",
+                "qlab_get_workspace_video_settings",
+                "qlab_get_workspace_light_settings",
+                "qlab_get_workspace_network_settings",
+                "qlab_get_workspace_midi_settings",
                 "qlab_query_cues",
                 "qlab_get_cue_details",
                 "qlab_check_write_readiness",
@@ -1427,8 +1590,12 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
         "qlab_check_connection": CHECK_CONNECTION_TIMEOUT,
         "qlab_get_workspace_overview": WORKSPACE_OVERVIEW_TIMEOUT,
         "qlab_get_workspace_status": WORKSPACE_STATUS_TIMEOUT,
-        "qlab_get_workspace_settings": WORKSPACE_SETTINGS_TIMEOUT,
-        "qlab_get_workspace_setting_details": WORKSPACE_SETTING_DETAILS_TIMEOUT,
+        "qlab_get_workspace_general_settings": WORKSPACE_SETTINGS_TIMEOUT,
+        "qlab_get_workspace_audio_settings": WORKSPACE_SETTINGS_TIMEOUT,
+        "qlab_get_workspace_video_settings": WORKSPACE_SETTINGS_TIMEOUT,
+        "qlab_get_workspace_light_settings": WORKSPACE_SETTINGS_TIMEOUT,
+        "qlab_get_workspace_network_settings": WORKSPACE_SETTINGS_TIMEOUT,
+        "qlab_get_workspace_midi_settings": WORKSPACE_SETTINGS_TIMEOUT,
         "qlab_query_cues": QUERY_CUES_TIMEOUT,
         "qlab_get_cue_details": CUE_DETAILS_TIMEOUT,
         "qlab_check_write_readiness": WRITE_READINESS_TIMEOUT,
@@ -1561,7 +1728,7 @@ def test_public_tool_validation_returns_structured_json_error() -> None:
     assert "Traceback" not in json.dumps(payload)
 
 
-def test_structured_domain_failure_stays_in_payload_not_mcp_error() -> None:
+def test_schema_validation_rejects_invalid_domain_input_before_tool_call() -> None:
     async def call_tool():
         async with Client(mcp) as client:
             return await client.call_tool(
@@ -1569,11 +1736,8 @@ def test_structured_domain_failure_stays_in_payload_not_mcp_error() -> None:
                 {"workspace_id": "ws-1", "primary_filter": "type", "primary_value": "Audio", "max_results": 0},
             )
 
-    result = asyncio.run(call_tool())
-    assert result.is_error is False
-    assert result.structured_content["ok"] is False
-    assert result.structured_content["status"] == "error"
-    assert result.structured_content["error_code"] == "validation_failed"
+    with pytest.raises(ToolError, match="greater than or equal to 1"):
+        asyncio.run(call_tool())
 
 
 def test_python_surface_has_no_plural_update_alias() -> None:
@@ -1583,44 +1747,6 @@ def test_python_surface_has_no_plural_update_alias() -> None:
     paths = [*sorted((PROJECT_ROOT / "src").rglob("*.py")), *sorted((PROJECT_ROOT / "tests").rglob("*.py"))]
     matches = [str(path.relative_to(PROJECT_ROOT)) for path in paths if pattern.search(path.read_text())]
     assert matches == []
-
-
-def test_workspace_settings_batch_limit_is_structured_and_pre_transport(monkeypatch) -> None:
-    class ExplodingReader:
-        def get_workspace_settings(self, **kwargs):
-            raise AssertionError("reader must not be constructed for an oversized batch")
-
-    monkeypatch.setattr(server_module, "_reader", lambda: ExplodingReader())
-
-    result = qlab_get_workspace_settings(
-        "ws-1",
-        mode="details",
-        requests=[{"section": "light", "kind": "light_patch"}] * 51,
-    )
-    payload = result.model_dump()
-
-    assert payload["ok"] is False
-    assert payload["error_code"] == "workspace_detail_batch_too_large"
-    assert payload["received"] == {"request_count": 51}
-    assert payload["allowed"] == {"max_requests": 50}
-
-
-def test_workspace_settings_section_limit_is_structured_and_pre_transport(monkeypatch) -> None:
-    class ExplodingReader:
-        def get_workspace_settings(self, **kwargs):
-            raise AssertionError("reader must not be constructed for too many sections")
-
-    monkeypatch.setattr(server_module, "_reader", lambda: ExplodingReader())
-
-    payload = qlab_get_workspace_settings(
-        "ws-1",
-        sections=["audio", "video", "network", "midi", "light", "general", "audio"],
-    ).model_dump()
-
-    assert payload["ok"] is False
-    assert payload["error_code"] == "workspace_sections_too_many"
-    assert payload["received"] == {"section_count": 7}
-    assert payload["allowed"] == {"max_sections": 6}
 
 
 def test_query_cues_rejects_exhaustive_profile_before_reader(monkeypatch) -> None:
@@ -1710,8 +1836,12 @@ def test_public_read_tools_redact_internal_exception_paths(monkeypatch) -> None:
     results = [
         qlab_get_workspace_overview("ws-1").model_dump(),
         qlab_get_workspace_status("ws-1").model_dump(),
-        qlab_get_workspace_settings("ws-1").model_dump(),
-        qlab_get_workspace_setting_details("ws-1", "audio", "bad_kind").model_dump(),
+        qlab_get_workspace_general_settings("ws-1").model_dump(),
+        qlab_get_workspace_audio_settings("ws-1").model_dump(),
+        qlab_get_workspace_video_settings("ws-1").model_dump(),
+        qlab_get_workspace_light_settings("ws-1").model_dump(),
+        qlab_get_workspace_network_settings("ws-1").model_dump(),
+        qlab_get_workspace_midi_settings("ws-1").model_dump(),
         qlab_query_cues("ws-1", "type", "Audio").model_dump(),
         qlab_get_cue_details("ws-1", "10", "bad_profile").model_dump(),
     ]
@@ -1726,26 +1856,6 @@ def test_public_read_tools_redact_internal_exception_paths(monkeypatch) -> None:
         assert "/qlab-mcp-osc/" not in serialized
         assert "Traceback" not in serialized
         assert "pydantic" not in serialized.lower()
-
-
-def test_public_setting_details_validation_error_preserves_received_allowed_details(monkeypatch) -> None:
-    class FakeReader:
-        def get_workspace_setting_details(self, **kwargs):
-            raise ValueError("Unsupported setting kind: bad_kind")
-
-    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
-
-    result = qlab_get_workspace_setting_details("ws-1", "audio", "bad_kind", profile="bad_profile")
-    payload = result.model_dump()
-
-    assert payload["ok"] is False
-    assert payload["status"] == "error"
-    assert payload["partial"] is False
-    assert payload["error_code"] == "validation_failed"
-    assert payload["received"] == {"section": "audio", "kind": "bad_kind", "ref": None, "profile": "bad_profile"}
-    assert "audio" in payload["allowed"]["sections"]
-    assert "output_patch" in payload["allowed"]["kinds"]
-    assert payload["details"] is None
 
 
 def test_public_read_success_shapes_have_meaningful_ok_status_partial(monkeypatch) -> None:
@@ -1971,6 +2081,11 @@ def test_workspace_status_public_tool_preserves_sections(monkeypatch) -> None:
                 "sections": {
                     "warnings_summary": {"source": "derived_from_cues", "available": True, "broken_count": 1},
                     "logs": {"source": "not_exposed", "available": False},
+                    "timecode_live_status": {
+                        "source": "qlab_osc",
+                        "available": True,
+                        "sample": [{"cue_ref": "list-1", "currentTimecode/text": "01:02:03:04"}],
+                    },
                 },
                 "summary": {"cue_scan_completeness": "complete", "scanned_count": 12},
                 "limits": {"max_cues_scanned": 1000, "sample_limit": 10},
@@ -1985,6 +2100,10 @@ def test_workspace_status_public_tool_preserves_sections(monkeypatch) -> None:
 
     assert payload["sections"]["warnings_summary"]["broken_count"] == 1
     assert payload["sections"]["logs"]["source"] == "not_exposed"
+    assert payload["sections"]["timecode_live_status"]["sample"][0] == {
+        "cue_ref": "list-1",
+        "currentTimecode/text": "01:02:03:04",
+    }
 
 
 def test_query_public_tool_preserves_completeness_fields(monkeypatch) -> None:

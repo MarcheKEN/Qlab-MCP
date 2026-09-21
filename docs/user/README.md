@@ -20,8 +20,8 @@ uv run fastmcp inspect fastmcp.json
 
 1. Call `qlab_check_connection` and choose one workspace by exact UUID.
 2. Read `qlab_get_workspace_overview` for bounded structure.
-3. Read `qlab_get_workspace_status` for derived operational context and
-   `qlab_get_workspace_settings(mode="summary")` for infrastructure context.
+3. Read `qlab_get_workspace_status` for derived operational context and call
+   only the relevant `qlab_get_workspace_*_settings` domain tools for infrastructure.
 4. Discover targets with `qlab_query_cues`; inspect exact properties with
    `qlab_get_cue_details`.
 
@@ -72,7 +72,7 @@ planned structure
 != show ready for GO
 ```
 
-See the [14-tool catalogue](tools.md),
+See the [22-tool catalogue](tools.md),
 [security policy](../../SECURITY.md), and
 [Create checklist](../development/runtime-validation/create-cues.md) and
 [Edit checklist](../development/runtime-validation/edit-cues.md).

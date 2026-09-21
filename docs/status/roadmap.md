@@ -8,11 +8,17 @@ The canonical dated inventory is [`current-state.md`](current-state.md). The
 current snapshot is provisional on the preparation branch; a docs-only PR will
 replace it after the 0.3.0 merge into `main` and before the release tag.
 
-> Branch update (2026-09-16): PR #16 is complete for its bounded Workspace
-> Settings scope (`qlab_edit_workspace_settings`,
-> `general.minGoTime`). The branch exposes 14 tools. Additional settings remain
-> deferred and are not a prerequisite for this PR's review or merge. The
+> Development update (2026-09-18): PR #16 is complete for its bounded Workspace
+> Settings write scope (`qlab_edit_workspace_settings`,
+> `general.minGoTime`). That snapshot exposed 20 tools after splitting the
+> broad Workspace Settings reads into six documented domains and separating
+> exact Video stage and output-route reads from the Video overview. Additional
+> settings writes remain deferred. The
 > preparation counts and gates below describe the dated pre-PR snapshot.
+
+Cue List update (2026-09-20): the current surface has 22 tools. Dedicated
+inventory/detail reads are available; generic Cue Details returns a structured
+redirect for Cue Lists while retaining Cue Cart support.
 
 Final local preflight: the full suite passed with `2595 passed, 41 subtests
 passed` outside the managed socket sandbox. FastMCP inspection reports 13 tools

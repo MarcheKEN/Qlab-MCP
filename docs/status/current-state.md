@@ -13,6 +13,50 @@ canonical snapshot will be updated through a docs-only PR after the merge into
 > not block review or merge. The dated 13-tool text below is retained as the
 > historical preparation snapshot.
 
+Development update (2026-09-20): the current checkout exposes 22 tools
+(16 read-only, 6 gated writes) after adding the Cue List inventory and exact
+detail readers. Generic Cue Details returns a structured redirect for Cue Lists
+and retains Cue Cart support. Cue List details reuse bounded traversal and
+expose explicit OSC coverage, including unknown timecode sync activation/source
+settings.
+
+Cue List read-only STDIO validation (2026-09-20, QLab 5.5.10): inventory returned
+17 lists and 1 excluded Cart in `mcp_prueba.qlab5`, 5 lists in
+`Memoria de la nisal - Filarmónica.qlab5`, and 8 lists in `MATADERO - FILAR.qlab5`.
+Safe and technical detail passed for `Main Cue List`
+(`CC4DF6DC-175E-4346-92A1-43CCB6062390`, 25 direct / 27 returned descendants),
+`Master` (`063BD7D0-7105-4FB9-8AE5-53615FBAD173`, 151 / 215), and `Full show`
+(`D80B01AB-18D8-466D-9FB7-269FA5337FD1`, 22 / 128). Depth-2 truncation was
+explicit for Main and Full show. Current timecode was unavailable in these
+samples; MTC configuration was readable. Generic details retained the payload
+and returned the deprecation notice in each workspace. These observations used
+fresh temporary STDIO processes, the configured MCP credentials where needed,
+and disabled write mode; no cue execution, setters or save occurred.
+The desktop MCP process still needs a restart to load the added tools.
+
+Historical development update (2026-09-18): the checkout exposed 20 tools
+(14 read-only and 6 gated writes), including six Workspace Settings domains
+and separate UUID-only Video Stage and Output Route readers. The preparation
+snapshot below remains historical; see the current [tool catalog](../user/tools.md).
+
+Video split verification: `PYTHONPATH=src .venv/bin/python -m pytest -q
+-p no:cacheprovider` passed with **2681 tests and 41 subtests**. FastMCP
+inspection reported 20 tools. Read-only STDIO calls against QLab 5.5.10,
+workspace `mcp_prueba.qlab5` (`95F0A03D-140E-4673-974A-E76748EBB023`), returned
+3 input patches, 5 routes, and 9 stages. Exact Stage
+`4ADC86C9-4975-40A2-A1E7-34E07D55C452` and Route
+`A8DCBB7D-309D-479F-B60E-19F1D9B2EFEA` passed both safe and technical reads.
+A nonexistent Stage UUID returned `video_stage_not_found` after a same-domain
+inventory check. No QLab setters, playback, or save commands were used.
+This validates the local checkout; a running MCP process must reload source
+changes before it serves the latest error-handling behavior.
+
+Contract-hardening verification (2026-09-19): the full synthetic suite passed
+with **2745 tests and 41 subtests**. Audio Maps are no longer public; exact
+Output Patch reads cover routing, cue outputs, mute/solo, and one optional
+matrix crosspoint. Bounds are schema-enforced, and malformed OSC/settings
+payloads are rejected rather than summarized as empty success.
+
 ## Preparation Git State
 
 ```text

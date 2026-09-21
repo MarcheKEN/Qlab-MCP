@@ -10,10 +10,18 @@ schemas or the server-side safety checks.
 | --- | --- | --- |
 | Check QLab reachability, workspaces, scopes, and mode | `qlab_check_connection` | Write authorization or cue detail |
 | Map cue lists, groups, carts, and bounded structure | `qlab_get_workspace_overview` | Deep properties or operational status |
-| Read derived status, warnings, and timecode context | `qlab_get_workspace_status` | A full QLab Workspace Status clone |
-| Read settings summary or independent detail requests | `qlab_get_workspace_settings` | Mutating patches or routes |
-| Read one settings item | `qlab_get_workspace_setting_details` | Batch settings discovery |
+| Read derived cue warnings, known Video Settings problems, and timecode context | `qlab_get_workspace_status` | A complete QLab Workspace Status clone |
+| Read documented General settings | `qlab_get_workspace_general_settings` | The complete General panel |
+| Read Audio settings or one exact output/input patch | `qlab_get_workspace_audio_settings` | Audio Maps or patch mutation |
+| Inventory Video inputs, stages, and output routes | `qlab_get_workspace_video_settings` | Exact object detail |
+| Inspect one stage and its regions by UUID | `qlab_get_video_stage` | Name selection or mutation |
+| Inspect one output route and destination by UUID | `qlab_get_video_output_route` | Independent device inventory or mutation |
+| Read the Light Patch | `qlab_get_workspace_light_settings` | Light Definitions or Dashboard settings |
+| Read Network Patch inventory or one exact patch | `qlab_get_workspace_network_settings` | The complete Network panel |
+| Read MIDI Patch inventory or one exact patch | `qlab_get_workspace_midi_settings` | The complete MIDI panel |
 | Find a bounded set of cues with filters | `qlab_query_cues` | Full Inspector payloads |
+| Find Cue List UUIDs and the current container | `qlab_get_cue_lists` | Child inspection or Cue Carts |
+| Inspect one Cue List and its bounded contents | `qlab_get_cue_list_details` | Cue Cart details or mutation |
 | Inspect exact cue properties | `qlab_get_cue_details` | Resolving an ambiguous write target |
 | Check write-mode preconditions without mutating | `qlab_check_write_readiness` | Confirmation or authorization by itself |
 | Create one cue from a template | `qlab_create_cue` | Initial setters, playback, or GO |
@@ -28,15 +36,71 @@ schemas or the server-side safety checks.
 1. Call `qlab_check_connection` and select one workspace by exact UUID when
    several candidates are available.
 2. Call `qlab_get_workspace_overview` for the bounded structural map. Use
-   `qlab_get_workspace_status` for derived operational context and
-   `qlab_get_workspace_settings(mode="summary")` for infrastructure context.
+   `qlab_get_workspace_status` for derived operational context. Call only the
+   relevant General, Audio, Video, Light, Network, or MIDI settings tool for
+   the infrastructure context needed by the task.
 3. Use `qlab_query_cues` to discover a bounded set of targets.
 4. Use `qlab_get_cue_details` with exact cue numbers or unique IDs for the
    properties needed by a later decision. Do not turn `selected`, `playhead`,
    or `active` into a write target.
 
-Read profiles and limits are part of each tool schema. Prefer compact profiles;
-use technical or exhaustive reads only when the result is justified.
+Audio defaults to `view="overview"`; use `output_patch` or `input_patch` with an
+exact name/UUID `ref` when needed. Audio Maps are intentionally not public.
+An exact Output Patch also returns routing, cue-output count/names, mute, and
+solo. To read one matrix value, provide both `input_channel` (1–128) and
+`output_channel` (at least 1) with `view="output_patch"`; neither profile scans
+the complete matrix.
+Network and MIDI accept an optional exact `ref`.
+For Video, call `qlab_get_workspace_video_settings(workspace_id)` first, then
+pass a returned UUID as `stage_id` to `qlab_get_video_stage` or as `route_id` to
+`qlab_get_video_output_route`. Both exact tools default to `profile="safe"`;
+use `technical` for the redacted raw payload. The overview has no profile,
+view, or ref parameter. Video input patches expose only name and UUID, and
+device information is limited to destinations assigned to output routes.
+Prefer `safe`; use technical or exhaustive reads only when justified.
+
+`qlab_get_workspace_status.sections.warnings_summary` has partial coverage. It
+combines cue warning, broken, and flagged categories with problems derived from
+documented Video Settings reads. These categories can overlap, so do not sum
+them as a unique warning total. `evidence_sources` and the two
+`*_evidence_available` flags show which reads succeeded. Logs, Art-Net discovery,
+Video Metrics, and QLab's complete Warnings list are not exposed by documented
+read-only OSC or AppleScript APIs.
+
+## Cue Lists
+
+Call `qlab_get_cue_lists(workspace_id)` for a compact inventory, then
+`qlab_get_cue_list_details(workspace_id, cue_list_id)` with a returned exact UUID.
+Names and cue numbers are not accepted as `cue_list_id`. The inventory excludes
+Cue Carts and reports their count. `current_container_id` may identify a Cart;
+`current_cue_list_id` is null in that case. Missing shallow health fields stay null.
+Root positions are zero-based.
+
+Details include typed identity/state, playhead and playback-position aliases,
+incoming timecode and an ordered bounded tree. Default `max_depth=2` reads two
+child layers; `0` skips children. `max_cues=1000` counts descendants only (range
+1..5000); depth is limited to 0..5. Inspect `contents.truncated`, reasons and
+`coverage` before claiming complete contents. A missing child count is unknown,
+not zero. Reads are sequential observations, not an atomic show snapshot.
+
+Use `profile="technical"` to add the redacted allowlisted OSC payload while
+retaining typed sections. MTC/LTC mode does not prove sync is enabled. OSC does
+not document the sync-enabled flag, MTC device or LTC input/channel for this
+read family; current timecode can be absent when not receiving timecode.
+See the [OSC Dictionary](../references/qlab_osc_dictionary.md), Cue List/Group
+messages, for enumerations and documented read conditions.
+
+Example call arguments (substitute UUIDs returned by the inventory):
+
+```json
+{"workspace_id": "<workspace UUID>", "cue_list_id": "<Cue List UUID>", "profile": "safe", "max_depth": 2, "max_cues": 1000}
+```
+
+Overview retains structural context, Query retains list filtering and Status
+retains aggregate operational information. `qlab_get_cue_details` returns a
+structured redirect for Cue Lists, including in batches; use the dedicated
+tool with the exact UUID. Cue Cart reads remain available through the generic
+tool.
 
 ## Common write gate
 

@@ -16,7 +16,7 @@ traffic.
 
 ## Public boundary
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 14 decorated tools,
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 22 decorated tools,
 their schemas, annotations, timeouts, and result models. Each call creates a
 fresh `QLabReader` and closes it after the operation. `qlab-mcp` maps to
 `qlab_mcp.server:main`.
@@ -41,6 +41,19 @@ another public start command.
 Reads use explicit workspace qualification once a workspace is selected.
 Sensitive profiles are opt-in. Cache entries are invalidated around writes;
 verification reads are fresh.
+
+Workspace Settings reads use six domain tools and the shared domain executor.
+Video has a three-query overview plus UUID-only Stage and Output Route tools.
+The exact tools reuse the settings transport/redaction helpers and provide typed
+summaries with an optional redacted technical payload. Internal settings readers
+remain available to Workspace Status and Cue Details; their Video overview uses
+embedded regions from the bulk stages response without per-stage queries.
+An explicit generic QLab error on an exact Video object triggers one same-domain
+inventory read to distinguish confirmed absence from a read failure. Timeouts
+and denied replies do not trigger this check or a retry.
+Shared validation rejects malformed OSC envelopes and documented settings
+payload shapes before summarization. Invalid overview routes become partial
+errors; invalid exact reads return `setting_payload_invalid`.
 
 The public read contract keeps sensitive profiles explicit: `scriptSource` is
 canonical, `scriptText` is not a public OSC key, and `exhaustive` is available

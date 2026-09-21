@@ -6,10 +6,16 @@ from typing import Any
 
 
 ALWAYS_REDACT_KEYS = {
+    "accesskey",
+    "apikey",
+    "auth",
+    "authorization",
+    "bearer",
     "passcode",
     "passcodes",
     "password",
     "passwords",
+    "privatekey",
     "secret",
     "secrets",
     "token",

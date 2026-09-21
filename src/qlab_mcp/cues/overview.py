@@ -404,6 +404,8 @@ class CueOverviewMixin:
             include_live_state = include_selected_and_running
         if max_depth < 0:
             raise ValueError("max_depth must be 0 or greater")
+        if max_depth > 5:
+            raise ValueError("max_depth must be 5 or lower")
         if max_cues < 1:
             raise ValueError("max_cues must be 1 or greater")
         if max_cues > 5000:

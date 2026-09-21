@@ -1,6 +1,6 @@
 # Public MCP Tools
 
-QLab MCP 0.3.0 exposes exactly 14 tools. This page is a compact human
+QLab MCP exposes exactly 22 tools on the current development branch. This page is a compact human
 catalogue; decorated functions, generated schemas, and
 `tests/test_server_tools.py` remain the source of truth for exact parameters,
 annotations, and result models.
@@ -9,10 +9,18 @@ annotations, and result models.
 | --- | --- | --- | --- |
 | `qlab_check_connection` | Reachability, workspace candidates, scopes, and mode | Write readiness or cue details | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_workspace_overview` | Bounded cue-list/group/cart structure | Deep properties or operational status | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_workspace_status` | Derived status, warnings, and timecode context | A full QLab Status-window clone | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_workspace_settings` | Settings summary or independent detail requests | Mutating patches/routes | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_workspace_setting_details` | One settings detail request | Batch settings discovery | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_status` | Derived cue warnings, known Video Settings problems, and timecode context | A complete QLab Status-window warning total | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_general_settings` | Minimum GO time and selection/playhead lock | The complete General panel | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_audio_settings` | Audio overview or exact output/input patch; optional single output-patch crosspoint | Audio Maps, full-matrix scans, or patch mutation | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_video_settings` | Compact Video inputs, routes, and stages | Exact object detail | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_video_stage` | Exact stage UUID and its regions, safe or technical | Stage mutation or name selection | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_video_output_route` | Exact output route UUID and destination, safe or technical | Independent device inventory or mutation | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_light_settings` | Light Patch summary or redacted technical payload | Light Definitions or Dashboard settings | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_network_settings` | Network Patch inventory or exact patch | The complete Network panel | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_midi_settings` | MIDI Patch inventory or exact patch | The complete MIDI panel | [Read](agent-workflows.md#read-sequence) |
 | `qlab_query_cues` | Bounded filtered cue discovery | Full Inspector payloads | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_cue_lists` | Compact Cue List inventory and current container | Children or Cue Cart details | [Read](agent-workflows.md#cue-lists) |
+| `qlab_get_cue_list_details` | Exact list identity, state, playhead, incoming timecode and bounded tree | AppleScript-only timecode source settings | [Read](agent-workflows.md#cue-lists) |
 | `qlab_get_cue_details` | Exact cue properties and health | Ambiguous write target resolution | [Read](agent-workflows.md#read-sequence) |
 | `qlab_check_write_readiness` | Read-only preflight before any write | Confirmation or authorization alone | [Common write gate](agent-workflows.md#common-write-gate) |
 | `qlab_create_cue` | One template-backed structural creation | Initial setters, playback, or GO | [Create](agent-workflows.md#create-one-cue) |

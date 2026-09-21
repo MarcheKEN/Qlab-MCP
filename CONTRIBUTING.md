@@ -26,7 +26,7 @@ git diff --check
 The project does not currently configure a separate linter or type checker.
 Do not add substitute checks as if they were official.
 
-The FastMCP inspection must expose exactly the 14 tools listed in
+The FastMCP inspection must expose exactly the 22 tools listed in
 [`docs/user/tools.md`](docs/user/tools.md). The schemas and contract tests in
 `tests/test_server_tools.py` remain authoritative.
 

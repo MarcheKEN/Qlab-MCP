@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Literal
 
 from .redaction import SAFE_DEVICE_REDACT_KEYS, SAFE_NETWORK_REDACT_KEYS, _contains_any_key
 
@@ -77,22 +77,42 @@ def _setting_ref_values(item: Any) -> list[str]:
     return values
 
 
-def _select_setting_item(items: list[Any], ref: str | None) -> tuple[Any | None, list[dict[str, Any]], str | None]:
+SettingSelectionErrorCode = Literal[
+    "setting_ref_required",
+    "setting_ref_ambiguous",
+    "setting_ref_not_found",
+]
+
+
+def _select_setting_item(
+    items: list[Any],
+    ref: str | None,
+) -> tuple[Any | None, list[dict[str, Any]], str | None, SettingSelectionErrorCode | None]:
     choices = [_basic_item_summary(item) for item in items]
     if ref is None:
         if len(items) == 1:
-            return items[0], choices, None
+            return items[0], choices, None, None
         if not items:
-            return None, choices, "No matching settings items were returned by QLab."
-        return None, choices, "Multiple settings items are available; pass ref as a name or uniqueID."
+            return None, choices, "No matching settings items were returned by QLab.", None
+        return (
+            None,
+            choices,
+            "Multiple settings items are available; pass ref as a name or uniqueID.",
+            "setting_ref_required",
+        )
 
     wanted = str(ref).strip().casefold()
     matches = [item for item in items if any(value.casefold() == wanted for value in _setting_ref_values(item))]
     if len(matches) == 1:
-        return matches[0], choices, None
+        return matches[0], choices, None, None
     if len(matches) > 1:
-        return None, [_basic_item_summary(item) for item in matches], "Multiple settings items match ref; use a uniqueID."
-    return None, choices, f"No settings item matched ref {ref!r}."
+        return (
+            None,
+            [_basic_item_summary(item) for item in matches],
+            "Multiple settings items match ref; use a uniqueID.",
+            "setting_ref_ambiguous",
+        )
+    return None, choices, f"No settings item matched ref {ref!r}.", "setting_ref_not_found"
 
 
 def _count_nested(value: Any, names: tuple[str, ...]) -> int | None:
@@ -114,11 +134,21 @@ def _summarize_audio_patch(item: Any) -> dict[str, Any]:
                 summary["cue_outputs"] = cue_outputs
         routing = item.get("routing")
         if isinstance(routing, (list, dict)):
-            summary["routing_present"] = bool(_collection_items(routing))
-            summary["routing_count"] = len(_collection_items(routing))
+            routing_items = _collection_items(routing)
+            summary["routing"] = routing_items
+            summary["routing_present"] = bool(routing_items)
+            summary["routing_count"] = len(routing_items)
         elif routing is not None:
             summary["routing_present"] = bool(routing)
-        summary["device_present"] = _contains_any_key(item, {"device", "deviceid", "devicename"})
+        device_presence_known = "device_present" in item or _contains_any_key(
+            item, {"device", "deviceid", "devicename"}
+        )
+        summary["device_presence_known"] = device_presence_known
+        summary["device_present"] = (
+            bool(item["device_present"])
+            if "device_present" in item
+            else True if device_presence_known else None
+        )
     return summary
 
 
@@ -241,7 +271,8 @@ def _summarize_video_stage(item: Any, regions: Any | None = None) -> dict[str, A
             summary["region_count"] = embedded_region_count
     region_items = _collection_items(regions if regions is not None else item.get("regions") if isinstance(item, dict) else None)
     region_summaries = [_summarize_video_region(region, index) for index, region in enumerate(region_items)]
-    summary["region_count"] = len(region_summaries)
+    regions_known = regions is not None or isinstance(item, dict) and isinstance(item.get("regions"), (list, dict))
+    summary["region_count"] = len(region_summaries) if regions_known else None
     summary["regions"] = region_summaries
     route_keys: set[tuple[str, str]] = set()
     for region in region_summaries:
@@ -325,7 +356,11 @@ def _video_settings_problems(stages: list[dict[str, Any]], routes: list[dict[str
             region for region in stage.get("regions", [])
             if isinstance(region, dict) and isinstance(region.get("route"), dict) and region["route"]
         ]
-        if not routed_regions:
+        regions = stage.get("regions")
+        topology_known = stage.get("region_count") is not None and isinstance(regions, list) and all(
+            isinstance(region, dict) and "route" in region for region in regions
+        )
+        if topology_known and not routed_regions:
             problems.append({"code": "stage_without_routes", "stage": _basic_item_summary(stage)})
         if stage.get("multi_output") is True:
             problems.append({"code": "multi_output_stage", "stage": _basic_item_summary(stage)})

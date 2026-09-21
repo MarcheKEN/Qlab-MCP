@@ -24,24 +24,30 @@ from .models import (
     MoveCueInput,
     MoveCuesResult,
     QlabConnectionCheckResult,
+    WorkspaceAudioSettingsResult,
+    WorkspaceDomainSettingsResult,
+    WorkspaceGeneralSettingsResult,
+    WorkspaceLightSettingsResult,
+    WorkspaceMidiSettingsResult,
+    WorkspaceNetworkSettingsResult,
     WorkspaceStatusResult,
-    WorkspaceSettingRequestInput,
     UpdateCuesResult,
     WriteReadinessResult,
-    WorkspaceSettingDetailsResult,
     WorkspaceOverviewResult,
-    WorkspaceSettingsResult,
     WorkspaceSettingsEditRequest,
     WorkspaceSettingsEditResult,
     WorkspaceSettingsOperation,
+    WorkspaceVideoSettingsResult,
+    VideoStageResult,
+    VideoOutputRouteResult,
     CanonicalWorkspaceUUID,
 )
 from .qlab import QLabReader
 from .cues.details import MAX_BATCH_CUE_DETAILS
+from .cues.list_models import CueListsResult, CueListDetailsResult
 from .cues.limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES
 from .cues.query import MAX_SENSITIVE_QUERY_RESULTS
 from .sanitizer import sanitize_exception_message
-from .settings.workspace import MAX_WORKSPACE_DETAIL_REQUESTS, MAX_WORKSPACE_SETTINGS_SECTIONS
 from .server_responses import (
     cue_details_success_payload as _cue_details_success_payload,
     overview_success_payload as _overview_success_payload,
@@ -117,22 +123,36 @@ CueQueryFilter = Literal[
     "ambiguous_label",
     "flagged_or_broken",
 ]
-WorkspaceSettingsSection = Literal["audio", "video", "network", "midi", "light", "general"]
-WorkspaceSettingsMode = Literal["summary", "details"]
-WorkspaceSettingsProfile = Literal["safe", "technical", "exhaustive"]
-WorkspaceStatusProfile = Literal["summary", "technical"]
-WorkspaceSettingDetailKind = Literal[
-    "all",
-    "output_patch",
-    "input_patch",
-    "audio_map",
-    "route",
-    "stage",
-    "video_input_patch",
-    "network_patch",
-    "midi_patch",
-    "light_patch",
+WorkspaceSettingsProfile = Annotated[
+    Literal["safe", "technical", "exhaustive"],
+    Field(
+        description=(
+            "safe returns compact normalized data; technical and exhaustive return deeper redacted payloads. "
+            "Credentials remain redacted in every profile."
+        )
+    ),
 ]
+WorkspaceSettingsRef = Annotated[
+    str | None,
+    Field(description="Optional exact settings item name or UUID. Omit it to return the domain overview or choices."),
+]
+WorkspaceAudioSettingsView = Annotated[
+    Literal["overview", "output_patch", "input_patch"],
+    Field(description="Use overview, or select one output_patch or input_patch."),
+]
+AudioInputChannel = Annotated[
+    StrictInt | None,
+    Field(ge=1, le=128, description="Optional cue-output channel for one Audio Output Patch crosspoint read."),
+]
+AudioOutputChannel = Annotated[
+    StrictInt | None,
+    Field(ge=1, description="Optional device-output channel for one Audio Output Patch crosspoint read."),
+]
+VideoSettingsProfile = Annotated[
+    Literal["safe", "technical"],
+    Field(description="safe returns typed summaries; technical also returns the redacted OSC payload."),
+]
+WorkspaceStatusProfile = Literal["summary", "technical"]
 WritableCueType = Literal[
     "memo",
     "group",
@@ -207,7 +227,6 @@ CHECK_CONNECTION_TIMEOUT = 6.0
 WORKSPACE_OVERVIEW_TIMEOUT = 45.0
 WORKSPACE_STATUS_TIMEOUT = 60.0
 WORKSPACE_SETTINGS_TIMEOUT = 60.0
-WORKSPACE_SETTING_DETAILS_TIMEOUT = 60.0
 QUERY_CUES_TIMEOUT = 60.0
 CUE_DETAILS_TIMEOUT = 20.0
 WRITE_READINESS_TIMEOUT = 6.0
@@ -218,6 +237,7 @@ DELETE_CUES_TIMEOUT = 180.0
 WORKSPACE_SETTINGS_WRITE_TIMEOUT = 60.0
 
 T = TypeVar("T")
+WorkspaceDomainResultT = TypeVar("WorkspaceDomainResultT", bound=WorkspaceDomainSettingsResult)
 
 
 mcp = FastMCP(
@@ -225,11 +245,11 @@ mcp = FastMCP(
     version=__version__,
     mask_error_details=True,
     instructions="""
-QLab MCP 0.3.0 exposes eight read-only tools plus six gated write tools over OSC.
+QLab MCP exposes sixteen read-only tools plus six gated write tools over OSC.
 Write mode requires QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; it remains dry-run first.
 This server does not expose GO, stop, panic, playback, audition, /live writes, AppleScript writes, or raw OSC passthrough.
 
-Orient first with qlab_check_connection, then use a bounded workspace overview/status or settings read, qlab_query_cues, and qlab_get_cue_details as needed. Resolve one exact workspace before any write. Use exact UUIDs for workspace and cue writes; never infer a workspace or target from selection, playhead, or active state.
+Orient first with qlab_check_connection, then use a bounded workspace overview/status or the relevant domain-specific settings read, qlab_query_cues, and qlab_get_cue_details as needed. Resolve one exact workspace before any write. Use exact UUIDs for workspace and cue writes; never infer a workspace or target from selection, playhead, or active state.
 
 For every real write, call qlab_check_write_readiness, inspect an explicit dry-run, review warnings/errors/planned operations, supply only the exact fresh confirmation token required by that operation, execute once, and require fresh readback. Do not retry a mutation after a timeout or identity ambiguity. Batches are not automatically transactional.
 
@@ -296,39 +316,153 @@ def _workspace_status_error(workspace_id: Any, profile: Any, **error: Any) -> Wo
     return WorkspaceStatusResult.model_validate(payload)
 
 
-def _settings_error(workspace_id: Any, mode: Any, profile: Any, **error: Any) -> WorkspaceSettingsResult:
-    payload = {
-        **_structured_error_result(**error),
-        "workspace_id": str(workspace_id or ""),
-        "mode": str(mode or "summary"),
-        "profile": str(profile or "safe"),
-        "requested_profile": str(profile or "safe"),
-        "sections": {},
-        "summary": {"error_count": 1},
-        "available_detail_requests": [],
-        "results": [],
-        "redactions": [],
-        "warnings": [error["message"]],
-        "errors": {"validation": error["message"], "error_code": error["error_code"]},
-    }
-    return WorkspaceSettingsResult.model_validate(payload)
+def _workspace_domain_data(domain: str, view: str, profile: str, value: Any) -> Any:
+    if value is None:
+        return None
+    if domain == "general":
+        return value
+    if domain == "video" and view in {"stage", "route"}:
+        return value
+    if domain in {"audio", "network", "midi"} and view != "overview" and isinstance(value, dict):
+        technical_payload = value.get("technical_payload")
+        detail = {key: item for key, item in value.items() if key != "technical_payload"}
+        return {"detail": detail, "technical_payload": technical_payload}
+    if domain == "light" and isinstance(value, dict):
+        if profile == "safe":
+            return {"detail": value}
+        return {
+            "detail": {"summary": value.get("summary") or {"patch_present": False}},
+            "technical_payload": value.get("patch"),
+        }
+    if profile in {"technical", "exhaustive"}:
+        return {"technical_payload": value}
+    if view == "overview":
+        return {"overview": value}
+    return {"detail": value}
 
 
-def _setting_details_error(workspace_id: Any, section: Any, kind: Any, profile: Any, **error: Any) -> WorkspaceSettingDetailsResult:
-    payload = {
-        **_structured_error_result(**error),
-        "workspace_id": str(workspace_id or ""),
-        "section": str(section or ""),
-        "kind": str(kind or ""),
-        "profile": str(profile or "safe"),
-        "details": None,
-        "choices": [],
-        "redactions": [],
-        "warnings": [error["message"]],
-        "errors": {"validation": error["message"], "error_code": error["error_code"]},
-        "message": error["message"],
+def _workspace_domain_payload(
+    payload: dict[str, Any],
+    *,
+    domain: str,
+    view: str,
+    ref: str | None,
+    profile: str,
+) -> dict[str, Any]:
+    is_overview = "sections" in payload
+    value = (payload.get("sections") or {}).get(domain) if is_overview else payload.get("details")
+    if domain == "video" and is_overview and isinstance(value, dict):
+        value = dict(value)
+        errors = payload.get("errors") or {}
+        for key, route in (("input_patches", "inputPatchList"), ("routes", "routes"), ("stages", "stages")):
+            if f"video.{route}" in errors:
+                value[key] = None
+    normalized = {
+        key: payload.get(key)
+        for key in (
+            "ok",
+            "status",
+            "partial",
+            "error_code",
+            "suggested_action",
+            "message",
+            "received",
+            "allowed",
+        )
+        if payload.get(key) is not None
     }
-    return WorkspaceSettingDetailsResult.model_validate(payload)
+    normalized.update(
+        {
+            "workspace_id": str(payload.get("workspace_id") or ""),
+            "domain": domain,
+            "coverage": "partial",
+            "profile": str(payload.get("profile") or profile),
+            "view": view,
+            "ref": ref,
+            "data": _workspace_domain_data(domain, view, profile, value),
+            "choices": payload.get("choices") or [],
+            "redactions": payload.get("redactions") or [],
+            "warnings": payload.get("warnings") or [],
+            "errors": payload.get("errors"),
+        }
+    )
+    return _settings_success_payload(normalized)
+
+
+def _run_workspace_settings_domain(
+    workspace_id: str,
+    *,
+    domain: str,
+    view: str,
+    ref: str | None,
+    profile: WorkspaceSettingsProfile,
+    detail_kind: str | None,
+    result_model: type[WorkspaceDomainResultT],
+    allowed: dict[str, Any],
+    exact_video: bool = False,
+    detail_options: dict[str, Any] | None = None,
+    validation_error: str | None = None,
+) -> WorkspaceDomainResultT:
+    try:
+        if validation_error is not None:
+            raise ValueError(validation_error)
+        if view == "overview" and ref is not None:
+            raise ValueError("ref is not allowed when view='overview'")
+
+        def read(reader: QLabReader) -> WorkspaceDomainResultT:
+            if exact_video:
+                payload = reader.get_video_setting(
+                    workspace_id=workspace_id, kind=detail_kind, ref=ref, profile=profile,
+                )
+            elif detail_kind is None:
+                payload = reader.get_workspace_settings(
+                    workspace_id=workspace_id,
+                    mode="summary",
+                    sections=[domain],
+                    profile=profile,
+                )
+            else:
+                payload = reader.get_workspace_setting_details(
+                    workspace_id=workspace_id,
+                    section=domain,
+                    kind=detail_kind,
+                    ref=ref,
+                    profile=profile,
+                    **(detail_options or {}),
+                )
+            return result_model.model_validate(
+                _workspace_domain_payload(
+                    payload,
+                    domain=domain,
+                    view=view,
+                    ref=ref,
+                    profile=profile,
+                )
+            )
+
+        return _run_tool(read, timeout=WORKSPACE_SETTINGS_TIMEOUT, translate_errors=False)
+    except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
+        message = sanitize_exception_message(exc)
+        payload = {
+            **_structured_error_result(
+                error_code="validation_failed",
+                message=message,
+                received={"view": view, "ref": ref, "profile": profile, **(detail_options or {})},
+                allowed=allowed,
+            ),
+            "workspace_id": str(workspace_id or ""),
+            "domain": domain,
+            "coverage": "partial",
+            "profile": profile,
+            "view": view,
+            "ref": ref,
+            "data": None,
+            "choices": [],
+            "redactions": [],
+            "warnings": [message],
+            "errors": {"validation": message, "error_code": "validation_failed"},
+        }
+        return result_model.model_validate(payload)
 
 
 def _query_error(workspace_id: Any, primary_filter: Any, profile: Any, max_results: Any, max_cues_scanned: Any, **error: Any) -> CueQueryResult:
@@ -440,8 +574,10 @@ def qlab_get_workspace_overview(
         ),
     ] = None,
     max_depth: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=0,
+            le=5,
             description=(
                 "How many child layers of cue lists/groups to inspect using shallow OSC reads. "
                 "Use 0 for cue-list names only; increase only when the show map is incomplete."
@@ -449,8 +585,10 @@ def qlab_get_workspace_overview(
         ),
     ] = 2,
     max_cues: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=1,
+            le=5000,
             description=(
                 "Maximum cue/list/group nodes to include in the bounded tree preview before marking it as truncated. "
                 "Raise up to 5000 for large workspace load checks."
@@ -476,8 +614,10 @@ def qlab_get_workspace_overview(
         ),
     ] = True,
     max_index_cues: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=1,
+            le=5000,
             description=(
                 "Maximum cue IDs to include in cue_index before marking the index as truncated. "
                 "This does not change the bounded tree preview limits."
@@ -564,14 +704,18 @@ def qlab_get_workspace_status(
         Field(description="When true, include timecode config and per-list/cart currentTimecode/text samples when exposed."),
     ] = True,
     max_cues_scanned: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=1,
+            le=5000,
             description="Maximum cues to scan for cue-derived status summaries before marking them partial.",
         ),
     ] = 1000,
     sample_limit: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=0,
+            le=50,
             description="Maximum sample cue/status rows returned inside compact sections.",
         ),
     ] = 10,
@@ -608,187 +752,267 @@ def qlab_get_workspace_status(
 
 
 @mcp.tool(
-    title="Get QLab Workspace Settings",
-    tags={"qlab", "settings", "patches", "routing", "inventory", "safe-read"},
+    title="Get QLab Workspace General Settings",
+    tags={"qlab", "settings", "general", "safe-read"},
     annotations=READ_ONLY_QLAB_TOOL,
     timeout=WORKSPACE_SETTINGS_TIMEOUT,
 )
-def qlab_get_workspace_settings(
-    workspace_id: WorkspaceId,
-    mode: Annotated[
-        str,
-        Field(
-            description=(
-                "summary returns compact inventory plus available_detail_requests. "
-                "details runs one or more focused detail requests and returns a batch result."
-            ),
-        ),
-    ] = "summary",
-    sections: Annotated[
-        list[str] | None,
-        Field(
-            json_schema_extra={"maxItems": MAX_WORKSPACE_SETTINGS_SECTIONS},
-            description=(
-                "Summary mode sections to inspect. Use audio, video, network, midi, light, and/or general. "
-                "When omitted in summary mode, all sections are read. Ignored in details mode."
-            ),
-        ),
-    ] = None,
-    requests: Annotated[
-        list[WorkspaceSettingRequestInput] | None,
-        Field(
-            json_schema_extra={"maxItems": MAX_WORKSPACE_DETAIL_REQUESTS},
-            description=(
-                "Details mode requests. Each item has section, kind, and optional ref. "
-                "Examples: {'section':'audio','kind':'output_patch','ref':'Main'}, "
-                "{'section':'video','kind':'stage','ref':'TELON'}, or "
-                "{'section':'light','kind':'light_patch'}."
-            ),
-        ),
-    ] = None,
-    profile: Annotated[
-        str,
-        Field(
-            description=(
-                "Read-only profile for details mode. safe returns compact redacted summaries; technical can include "
-                "routing, regions, interfaces, IPs/ports, device data, and raw payloads when needed; exhaustive returns "
-                "the deepest allowlisted read-only data and may be large. Summary mode stays compact."
-            ),
-        ),
-    ] = "safe",
-) -> WorkspaceSettingsResult:
-    """Return read-only QLab Workspace Settings summary or batched details.
+def qlab_get_workspace_general_settings(workspace_id: WorkspaceId) -> WorkspaceGeneralSettingsResult:
+    """Return the documented read-only General settings for one exact QLab workspace.
 
-    Summary mode is the first settings read after the overview: it returns compact sections, counts, redactions,
-    errors, and available_detail_requests. Use mode="details" for focused requests. Details mode accepts one or
-    more requests and returns independent per-request results; one failed request does not block other valid requests.
+    QLab OSC exposes only minimum GO time and selection/playhead locking from the larger General settings panel.
     """
-    if isinstance(requests, (list, tuple)) and len(requests) > MAX_WORKSPACE_DETAIL_REQUESTS:
-        return _settings_error(
-            workspace_id,
-            mode,
-            profile,
-            error_code="workspace_detail_batch_too_large",
-            message=(
-                f"workspace settings details can include at most {MAX_WORKSPACE_DETAIL_REQUESTS} requests"
-            ),
-            received={"request_count": len(requests)},
-            allowed={"max_requests": MAX_WORKSPACE_DETAIL_REQUESTS},
-        )
-    if isinstance(sections, (list, tuple)) and len(sections) > MAX_WORKSPACE_SETTINGS_SECTIONS:
-        return _settings_error(
-            workspace_id,
-            mode,
-            profile,
-            error_code="workspace_sections_too_many",
-            message=(
-                f"workspace settings sections can include at most {MAX_WORKSPACE_SETTINGS_SECTIONS} entries"
-            ),
-            received={"section_count": len(sections)},
-            allowed={"max_sections": MAX_WORKSPACE_SETTINGS_SECTIONS},
-        )
-    try:
-        return _run_tool(
-            lambda reader: WorkspaceSettingsResult.model_validate(
-                _settings_success_payload(reader.get_workspace_settings(
-                    workspace_id=workspace_id,
-                    mode=mode,
-                    sections=sections,
-                    requests=[request.model_dump() if hasattr(request, "model_dump") else request for request in requests]
-                    if requests is not None
-                    else None,
-                    profile=profile,
-                ))
-            ),
-            timeout=WORKSPACE_SETTINGS_TIMEOUT,
-            translate_errors=False,
-        )
-    except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
-        return _settings_error(
-            workspace_id,
-            mode,
-            profile,
-            error_code="validation_failed",
-            message=sanitize_exception_message(exc),
-            received={"mode": mode, "sections": sections, "requests": requests, "profile": profile},
-            allowed={"mode": ["summary", "details"], "sections": ["audio", "video", "network", "midi", "light", "general"], "profile": ["safe", "technical", "exhaustive"]},
-        )
+    return _run_workspace_settings_domain(
+        workspace_id,
+        domain="general",
+        view="overview",
+        ref=None,
+        profile="safe",
+        detail_kind=None,
+        result_model=WorkspaceGeneralSettingsResult,
+        allowed={"view": ["overview"]},
+    )
 
 
 @mcp.tool(
-    title="Get QLab Workspace Setting Details",
-    tags={"qlab", "settings", "patches", "routing", "details", "safe-read"},
+    title="Get QLab Workspace Audio Settings",
+    tags={"qlab", "settings", "audio", "patches", "routing", "safe-read"},
     annotations=READ_ONLY_QLAB_TOOL,
-    timeout=WORKSPACE_SETTING_DETAILS_TIMEOUT,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
 )
-def qlab_get_workspace_setting_details(
+def qlab_get_workspace_audio_settings(
     workspace_id: WorkspaceId,
-    section: Annotated[
-        str,
-        Field(description="Workspace settings section to inspect in detail."),
-    ],
-    kind: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Specific settings item kind. Use all, output_patch, input_patch, audio_map, route, stage, "
-                "video_input_patch, network_patch, midi_patch, or light_patch. Defaults to all except light, "
-                "where it defaults to light_patch."
-            ),
-        ),
-    ] = None,
-    ref: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Optional settings item name or uniqueID. If omitted for a kind with multiple candidates, "
-                "the tool returns choices instead of guessing."
-            ),
-        ),
-    ] = None,
-    profile: Annotated[
-        str,
-        Field(
-            description=(
-                "Read-only detail profile. safe returns compact normalized details suitable for normal agent use. "
-                "technical can include diagnostic IPs, ports, interfaces, device details, raw routes, regions, "
-                "geometry, mesh/warp, audio-map levels, and light-patch payloads. Passcodes are always redacted."
-            ),
-        ),
-    ] = "safe",
-) -> WorkspaceSettingDetailsResult:
-    """Return read-only details for one workspace setting item.
+    view: WorkspaceAudioSettingsView = "overview",
+    ref: WorkspaceSettingsRef = None,
+    profile: WorkspaceSettingsProfile = "safe",
+    input_channel: AudioInputChannel = None,
+    output_channel: AudioOutputChannel = None,
+) -> WorkspaceAudioSettingsResult:
+    """Return an Audio settings overview, one exact output patch, or one exact input patch.
 
-    Backwards-compatible wrapper for a single request around qlab_get_workspace_settings(mode="details"). The default
-    safe profile summarizes large structures: light patches become instrument indexes, video stages become
-    stage/region/route summaries, and audio maps omit long level arrays. Use technical or exhaustive only for
-    explicit low-level audits; use the settings tool for a batch.
+    The safe profile returns normalized summaries. Technical and exhaustive profiles add deeper redacted payloads.
+    Provide both channel selectors with output_patch to read one matrix crosspoint; the full matrix is never scanned.
     """
-    try:
-        return _run_tool(
-            lambda reader: WorkspaceSettingDetailsResult.model_validate(
-                _settings_success_payload(reader.get_workspace_setting_details(
-                    workspace_id=workspace_id,
-                    section=section,
-                    kind=kind,
-                    ref=ref,
-                    profile=profile,
-                ))
-            ),
-            timeout=WORKSPACE_SETTING_DETAILS_TIMEOUT,
-            translate_errors=False,
-        )
-    except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
-        return _setting_details_error(
-            workspace_id,
-            section,
-            kind,
-            profile,
-            error_code="validation_failed",
-            message=sanitize_exception_message(exc),
-            received={"section": section, "kind": kind, "ref": ref, "profile": profile},
-            allowed={"sections": ["audio", "video", "network", "midi", "light", "general"], "kinds": list(WorkspaceSettingDetailKind.__args__) if hasattr(WorkspaceSettingDetailKind, "__args__") else None, "profile": ["safe", "technical", "exhaustive"]},
-        )
+    detail_kind = None if view == "overview" and profile == "safe" else "all" if view == "overview" else view
+    validation_error = None
+    if (input_channel is None) != (output_channel is None):
+        validation_error = "input_channel and output_channel must be provided together"
+    elif input_channel is not None and view != "output_patch":
+        validation_error = "channel selectors are only valid when view='output_patch'"
+    detail_options = (
+        {"input_channel": input_channel, "output_channel": output_channel}
+        if input_channel is not None or output_channel is not None
+        else {}
+    )
+    return _run_workspace_settings_domain(
+        workspace_id,
+        domain="audio",
+        view=view,
+        ref=ref,
+        profile=profile,
+        detail_kind=detail_kind,
+        result_model=WorkspaceAudioSettingsResult,
+        detail_options=detail_options,
+        validation_error=validation_error,
+        allowed={
+            "view": ["overview", "output_patch", "input_patch"],
+            "profile": ["safe", "technical", "exhaustive"],
+            "input_channel": "1..128, with output_channel and output_patch",
+            "output_channel": ">=1, with input_channel and output_patch",
+        },
+    )
+
+
+@mcp.tool(
+    title="Get QLab Workspace Video Settings",
+    tags={"qlab", "settings", "video", "patches", "routing", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_workspace_video_settings(
+    workspace_id: WorkspaceId,
+) -> WorkspaceVideoSettingsResult:
+    """List Video input patches, output routes, and stages with their exact uniqueIDs.
+
+    Use qlab_get_video_stage or qlab_get_video_output_route for exact details.
+    OSC exposes only names and uniqueIDs for input patches and no independent device inventory.
+    """
+    return _run_workspace_settings_domain(
+        workspace_id,
+        domain="video",
+        view="overview",
+        ref=None,
+        profile="safe",
+        detail_kind=None,
+        result_model=WorkspaceVideoSettingsResult,
+        allowed={},
+    )
+
+
+@mcp.tool(
+    title="Get QLab Video Stage",
+    tags={"qlab", "settings", "video", "stages", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_video_stage(
+    workspace_id: WorkspaceId,
+    stage_id: Annotated[UUID, Field(description="Exact stage uniqueID from qlab_get_workspace_video_settings.")],
+    profile: VideoSettingsProfile = "safe",
+) -> VideoStageResult:
+    """Read one exact Video stage and its regions, geometry, and assigned output routes.
+
+    Technical adds the redacted OSC payload, including full control-point and mesh data.
+    """
+    return _run_workspace_settings_domain(
+        workspace_id, domain="video", view="stage", ref=str(stage_id), profile=profile,
+        detail_kind="stage", result_model=VideoStageResult,
+        allowed={"profile": ["safe", "technical"]}, exact_video=True,
+    )
+
+
+@mcp.tool(
+    title="Get QLab Video Output Route",
+    tags={"qlab", "settings", "video", "routing", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_video_output_route(
+    workspace_id: WorkspaceId,
+    route_id: Annotated[UUID, Field(description="Exact route uniqueID from qlab_get_workspace_video_settings.")],
+    profile: VideoSettingsProfile = "safe",
+) -> VideoOutputRouteResult:
+    """Read one exact Video output route, its destination, geometry, and guides state.
+
+    Technical adds the redacted OSC payload and available destination hardware metadata.
+    """
+    return _run_workspace_settings_domain(
+        workspace_id, domain="video", view="route", ref=str(route_id), profile=profile,
+        detail_kind="route", result_model=VideoOutputRouteResult,
+        allowed={"profile": ["safe", "technical"]}, exact_video=True,
+    )
+
+
+@mcp.tool(
+    title="Get QLab Workspace Light Settings",
+    tags={"qlab", "settings", "light", "patches", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_workspace_light_settings(
+    workspace_id: WorkspaceId,
+    profile: WorkspaceSettingsProfile = "safe",
+) -> WorkspaceLightSettingsResult:
+    """Return a safe summary or redacted technical payload for the workspace Light Patch.
+
+    The Light Patch is the only documented read surface for the larger Light settings panel.
+    """
+    return _run_workspace_settings_domain(
+        workspace_id,
+        domain="light",
+        view="light_patch",
+        ref=None,
+        profile=profile,
+        detail_kind="light_patch",
+        result_model=WorkspaceLightSettingsResult,
+        allowed={"profile": ["safe", "technical", "exhaustive"]},
+    )
+
+
+@mcp.tool(
+    title="Get QLab Workspace Network Settings",
+    tags={"qlab", "settings", "network", "patches", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_workspace_network_settings(
+    workspace_id: WorkspaceId,
+    ref: WorkspaceSettingsRef = None,
+    profile: WorkspaceSettingsProfile = "safe",
+) -> WorkspaceNetworkSettingsResult:
+    """Return the Network Patch inventory or one exact Network Patch by name or UUID.
+
+    QLab OSC exposes patch names and UUIDs, not the complete Network settings panel.
+    """
+    detail_kind = None if ref is None and profile == "safe" else "network_patch" if ref is not None else "all"
+    return _run_workspace_settings_domain(
+        workspace_id,
+        domain="network",
+        view="overview" if ref is None else "network_patch",
+        ref=ref,
+        profile=profile,
+        detail_kind=detail_kind,
+        result_model=WorkspaceNetworkSettingsResult,
+        allowed={"profile": ["safe", "technical", "exhaustive"]},
+    )
+
+
+@mcp.tool(
+    title="Get QLab Workspace MIDI Settings",
+    tags={"qlab", "settings", "midi", "patches", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_workspace_midi_settings(
+    workspace_id: WorkspaceId,
+    ref: WorkspaceSettingsRef = None,
+    profile: WorkspaceSettingsProfile = "safe",
+) -> WorkspaceMidiSettingsResult:
+    """Return the MIDI Patch inventory or one exact MIDI Patch by name or UUID.
+
+    QLab OSC exposes patch names and UUIDs, not the complete MIDI settings panel.
+    """
+    detail_kind = None if ref is None and profile == "safe" else "midi_patch" if ref is not None else "all"
+    return _run_workspace_settings_domain(
+        workspace_id,
+        domain="midi",
+        view="overview" if ref is None else "midi_patch",
+        ref=ref,
+        profile=profile,
+        detail_kind=detail_kind,
+        result_model=WorkspaceMidiSettingsResult,
+        allowed={"profile": ["safe", "technical", "exhaustive"]},
+    )
+
+
+@mcp.tool(
+    title="Get QLab Cue Lists",
+    tags={"qlab", "cue-lists", "inventory", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=CUE_DETAILS_TIMEOUT,
+)
+def qlab_get_cue_lists(workspace_id: WorkspaceId) -> CueListsResult:
+    """Return a compact Cue List inventory with exact UUIDs and the current container.
+
+    Cue Carts are counted separately and excluded from cue_lists. No children are read.
+    Follow with qlab_get_cue_list_details for one exact Cue List's state, timecode and contents.
+    """
+    return _run_tool(lambda reader: reader.get_cue_list_inventory(workspace_id), timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(
+    title="Get QLab Cue List Details",
+    tags={"qlab", "cue-lists", "details", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_OVERVIEW_TIMEOUT,
+)
+def qlab_get_cue_list_details(
+    workspace_id: WorkspaceId,
+    cue_list_id: Annotated[UUID, Field(description="Exact Cue List UUID from qlab_get_cue_lists.")],
+    profile: Literal["safe", "technical"] = "safe",
+    max_depth: Annotated[StrictInt, Field(ge=0, le=5, description="Child layers; 0 reads no children.")] = 2,
+    max_cues: Annotated[StrictInt, Field(ge=1, le=5000, description="Maximum descendants, excluding the list root.")] = 1000,
+) -> CueListDetailsResult:
+    """Read one exact Cue List: identity, state, playhead, incoming timecode and a bounded tree.
+
+    safe returns typed sections; technical adds a redacted allowlisted payload.
+    Timecode settings do not prove synchronization is enabled. coverage reports OSC limitations.
+    Use qlab_get_cue_lists to resolve the UUID; Cue Carts and Groups are not Cue Lists.
+    """
+    return _run_tool(
+        lambda reader: reader.get_cue_list_details(workspace_id, str(cue_list_id), profile, max_depth, max_cues),
+        timeout=WORKSPACE_OVERVIEW_TIMEOUT,
+    )
 
 
 @mcp.tool(
@@ -841,14 +1065,18 @@ def qlab_query_cues(
         ),
     ] = "basic_safe",
     max_results: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=1,
+            le=5000,
             description="Maximum matching cues to return. Scanning may continue past this to report matched_count.",
         ),
     ] = 500,
     max_cues_scanned: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=1,
+            le=5000,
             description="Maximum cue IDs to scan from cueLists/uniqueIDs before marking the result truncated.",
         ),
     ] = 500,
@@ -960,6 +1188,7 @@ def qlab_get_cue_details(
     inspector_safe for broader non-sensitive Inspector context, editable for update capability discovery, health for
     warnings, technical/full_sensitive only when justified, and exhaustive only for deep audits or load testing
     because it can expose large/sensitive payloads.
+    Cue List calls return a structured redirect; use qlab_get_cue_list_details with their exact UUID.
     """
     if isinstance(cue_ref, list) and len(cue_ref) > MAX_BATCH_CUE_DETAILS:
         return _cue_details_error(

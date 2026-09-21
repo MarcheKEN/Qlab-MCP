@@ -50,8 +50,17 @@ def _normalize_workspace_status_profile(profile: str) -> str:
     return normalized
 
 
-def _status_section(source: str, available: bool, **values: Any) -> dict[str, Any]:
-    return {"source": source, "available": available, **values}
+def _status_section(
+    source: str,
+    available: bool,
+    *,
+    coverage: str | None = None,
+    **values: Any,
+) -> dict[str, Any]:
+    result = {"source": source, "available": available, **values}
+    if coverage is not None:
+        result["coverage"] = coverage
+    return result
 
 
 def _count_bool(cues: list[dict[str, Any]], key: str) -> int:
@@ -163,41 +172,22 @@ class WorkspaceStatusMixin:
                 suggested_action="Call qlab_check_connection to inspect the current QLab workspace response.",
             )
 
-        workspace = next(
-            (
-                item
-                for item in workspaces
-                if isinstance(item, dict) and item.get("uniqueID") == resolved_workspace_id
-            ),
-            None,
-        )
-        if workspace is None:
-            display_matches = [
-                item
-                for item in workspaces
-                if isinstance(item, dict) and item.get("displayName") == resolved_workspace_id
-            ]
-            if len(display_matches) > 1:
-                return _workspace_status_workspace_error(
-                    workspace_id=resolved_workspace_id,
-                    profile=normalized_profile,
-                    max_cues_scanned=max_cues_scanned,
-                    sample_limit=sample_limit,
-                    status="workspace_ambiguous",
-                    message="Requested workspace displayName matched multiple open workspaces.",
-                    error=f"Workspace displayName is ambiguous: {resolved_workspace_id}",
-                    suggested_action="Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
-                )
-            workspace = display_matches[0] if display_matches else None
-        if workspace is None:
+        try:
+            workspace = self._resolve_workspace_strict(workspaces, resolved_workspace_id)
+        except Exception as exc:
+            status = getattr(exc, "status", "workspace_not_found")
             return _workspace_status_workspace_error(
                 workspace_id=resolved_workspace_id,
                 profile=normalized_profile,
                 max_cues_scanned=max_cues_scanned,
                 sample_limit=sample_limit,
-                status="workspace_not_found",
-                message="Requested workspace could not be resolved.",
-                error=f"Workspace not found: {resolved_workspace_id}",
+                status=status,
+                message=(
+                    "Requested workspace displayName matched multiple open workspaces."
+                    if status == "workspace_ambiguous"
+                    else "Requested workspace could not be resolved."
+                ),
+                error=_compact_error(exc),
                 suggested_action="Call qlab_check_connection and pass one of available_workspaces[].uniqueID.",
             )
 
@@ -236,10 +226,16 @@ class WorkspaceStatusMixin:
             normalized_profile,
             errors,
         )
+        sections["warnings_summary"] = self._merge_workspace_warning_evidence(
+            sections["warnings_summary"],
+            sections["settings_summary"],
+            sample_limit,
+        )
         for section_name in ("logs", "artnet", "video_metrics"):
             sections[section_name] = _status_section(
                 "not_exposed",
                 False,
+                coverage="not_exposed",
                 notes=[
                     "No documented read-only QLab OSC endpoint was found for this Workspace Status section."
                 ],
@@ -252,12 +248,19 @@ class WorkspaceStatusMixin:
             notes=["Machine ID is intentionally not returned by default."],
         )
 
-        if cue_scan["warnings_summary"].get("warning_count", 0) or cue_scan["warnings_summary"].get("broken_count", 0):
+        if sections["warnings_summary"].get("warning_count", 0) or sections["warnings_summary"].get("broken_count", 0):
             warnings.append("Workspace has cues marked warning or broken in sampled read.")
         if cue_scan["scan_completeness"] != "complete":
             warnings.append("Workspace status cue-derived sections are partial; inspect limits and errors.")
 
         settings_errors = sections["settings_summary"].get("errors") or {}
+        video_problem_count = (sections["settings_summary"].get("summary") or {}).get(
+            "video_problem_count", 0
+        )
+        if video_problem_count:
+            warnings.append(
+                f"Workspace settings report {video_problem_count} video routing problem(s); inspect settings_summary."
+            )
         partial = cue_scan["scan_completeness"] != "complete" or bool(settings_errors)
         return {
             "ok": True,
@@ -345,6 +348,7 @@ class WorkspaceStatusMixin:
             "continueMode",
         ))
         cues: list[dict[str, Any]] = []
+        cue_value_error_count = 0
         for cue_ref in bounded.get("refs") or []:
             cue = dict(cue_ref.get("cue") or {})
             cue_id = cue_ref.get("uniqueID") or cue.get("uniqueID")
@@ -360,17 +364,28 @@ class WorkspaceStatusMixin:
                     if isinstance(values, dict):
                         cue.update(values)
                     else:
+                        cue_value_error_count += 1
                         errors[f"cue_values.{cue_id}"] = "QLab valuesForKeys response must be an object"
                 except Exception as exc:
+                    cue_value_error_count += 1
                     errors[f"cue_values.{cue_id}"] = _compact_error(exc)
             cue.setdefault("uniqueID", cue_id)
             cue["continueModeLabel"] = _continue_mode_label(cue.get("continueMode"))
             cues.append(cue)
 
-        scan_completeness = "partial" if bounded.get("truncated") or bounded.get("errors") else "complete"
-        warning_cues = [cue for cue in cues if _coerce_qlab_bool(cue.get("isWarning")) is True]
-        broken_cues = [cue for cue in cues if _coerce_qlab_bool(cue.get("isBroken")) is True]
-        flagged_cues = [cue for cue in cues if _coerce_qlab_bool(cue.get("flagged")) is True]
+        scan_completeness = (
+            "partial"
+            if bounded.get("truncated") or bounded.get("errors") or cue_value_error_count
+            else "complete"
+        )
+        health_cues = [
+            cue for cue in cues
+            if any(key in cue for key in ("isWarning", "isBroken", "flagged"))
+        ]
+        warning_evidence_available = not cues or bool(health_cues)
+        warning_cues = [cue for cue in health_cues if _coerce_qlab_bool(cue.get("isWarning")) is True]
+        broken_cues = [cue for cue in health_cues if _coerce_qlab_bool(cue.get("isBroken")) is True]
+        flagged_cues = [cue for cue in health_cues if _coerce_qlab_bool(cue.get("flagged")) is True]
         timecode_configs = [
             self._timecode_config_item(cue)
             for cue in cues
@@ -382,20 +397,36 @@ class WorkspaceStatusMixin:
             for cue in cues
         )
 
-        return {
-            "warnings_summary": _status_section(
-                "derived_from_cues",
-                True,
-                status=scan_completeness,
-                scanned_count=len(cues),
+        warning_values: dict[str, Any] = {
+            "status": scan_completeness,
+            "scanned_count": len(cues),
+            "notes": [
+                *(bounded.get("truncation_reasons") or []),
+                *(
+                    [f"Warning fields were unavailable for {cue_value_error_count} cue(s)."]
+                    if cue_value_error_count
+                    else []
+                ),
+            ],
+        }
+        if warning_evidence_available:
+            warning_values.update(
                 warning_count=len(warning_cues),
                 broken_count=len(broken_cues),
                 flagged_count=len(flagged_cues),
-                running_count=_count_bool(cues, "isRunning"),
-                paused_count=_count_bool(cues, "isPaused"),
+                running_count=_count_bool(health_cues, "isRunning"),
+                paused_count=_count_bool(health_cues, "isPaused"),
                 sample_warning_cues=[self._cue_identity(cue) for cue in warning_cues[:sample_limit]],
                 sample_broken_cues=[self._cue_identity(cue) for cue in broken_cues[:sample_limit]],
-                notes=bounded.get("truncation_reasons") or [],
+                sample_flagged_cues=[self._cue_identity(cue) for cue in flagged_cues[:sample_limit]],
+            )
+
+        return {
+            "warnings_summary": _status_section(
+                "derived_from_cues",
+                warning_evidence_available,
+                coverage="partial",
+                **warning_values,
             ),
             "trigger_summary": _status_section(
                 "derived_from_cues",
@@ -458,6 +489,16 @@ class WorkspaceStatusMixin:
         for key, value in (result.get("errors") or {}).items():
             errors[f"settings.{key}"] = str(value)
         summary = dict(result.get("summary") or {})
+        video = (result.get("sections") or {}).get("video") or {}
+        known_problems = [
+            {"domain": "video", **problem}
+            for problem in (video.get("problems") or [])
+            if isinstance(problem, dict) and problem.get("code")
+        ]
+        problem_counts = {
+            f"video.{code}": count
+            for code, count in (summary.get("video_problem_counts") or {}).items()
+        }
         status = "partial" if result.get("errors") else "available"
         if profile == "summary":
             return _status_section(
@@ -465,6 +506,8 @@ class WorkspaceStatusMixin:
                 True,
                 status=status,
                 summary=summary,
+                known_problems=known_problems,
+                problem_counts=problem_counts,
                 errors=result.get("errors") or None,
                 notes=result.get("warnings") or [],
             )
@@ -474,9 +517,72 @@ class WorkspaceStatusMixin:
             status=status,
             summary=summary,
             sections=result.get("sections") or {},
+            known_problems=known_problems,
+            problem_counts=problem_counts,
             errors=result.get("errors") or None,
             notes=result.get("warnings") or [],
         )
+
+    def _merge_workspace_warning_evidence(
+        self,
+        cue_summary: dict[str, Any],
+        settings_summary: dict[str, Any],
+        sample_limit: int,
+    ) -> dict[str, Any]:
+        merged = dict(cue_summary)
+        cue_available = bool(cue_summary.get("available"))
+        settings_errors = settings_summary.get("errors") or {}
+        video_evidence_failed = all(
+            key in settings_errors for key in ("video.routes", "video.stages")
+        )
+        settings_available = bool(settings_summary.get("available")) and not video_evidence_failed
+        evidence_sources: list[str] = []
+        if cue_available:
+            evidence_sources.append("derived_from_cues")
+        if settings_available:
+            evidence_sources.append("derived_from_settings")
+
+        problem_counts = dict(settings_summary.get("problem_counts") or {})
+        if settings_available and not problem_counts:
+            problem_counts = {
+                f"video.{code}": count
+                for code, count in ((settings_summary.get("summary") or {}).get("video_problem_counts") or {}).items()
+            }
+        known_problems = list(settings_summary.get("known_problems") or [])
+        known_problem_count = sum(problem_counts.values())
+        if not problem_counts:
+            known_problem_count = int(
+                ((settings_summary.get("summary") or {}).get("video_problem_count") or len(known_problems))
+            )
+
+        if cue_available and settings_available:
+            status = "partial" if settings_summary.get("status") == "partial" else cue_summary.get("status", "complete")
+        elif cue_available or settings_available:
+            status = "partial"
+        else:
+            status = "error"
+
+        merged.update(
+            {
+                "source": "derived_from_cues" if cue_available else "derived_from_settings",
+                "available": cue_available or settings_available,
+                "coverage": "partial",
+                "status": status,
+                "evidence_sources": evidence_sources,
+                "cue_evidence_available": cue_available,
+                "settings_evidence_available": settings_available,
+                "known_settings_problem_count": known_problem_count,
+                "known_settings_problem_counts": problem_counts,
+                "sample_settings_problems": known_problems[:sample_limit],
+                "notes": [
+                    *(cue_summary.get("notes") or []),
+                    "Counts are category counts and may overlap; they are not a unique warning total.",
+                    "QLab does not expose the complete Workspace Status Warnings list through documented OSC or AppleScript reads.",
+                    "Settings evidence currently covers only problems derived from documented Video Settings reads.",
+                ],
+            }
+        )
+        return merged
 
     def _workspace_status_timecode_live(
         self,

@@ -545,7 +545,10 @@ class WorkspaceConnectionMixin:
                         item
                         for item in workspaces
                         if isinstance(item, dict)
-                        and (item.get("uniqueID") == requested or item.get("displayName") == requested)
+                        and (
+                            str(item.get("uniqueID") or "").casefold() == requested.casefold()
+                            or item.get("displayName") == requested
+                        )
                     ),
                     None,
                 )

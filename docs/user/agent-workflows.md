@@ -485,9 +485,10 @@ The invalid example supplies two linear placement forms and no reviewed token.
 
 ## Delete cues
 
-Current limitation: real execution was blocked before deletion by `/alwaysReply`
-acknowledgement validation. A successful dry-run is not evidence that execution
-works; see [current state](../status/current-state.md). Do not retry an error blindly.
+Delete acknowledgement handling and fresh child readback are corrected locally.
+QLab 5.5.10 validation covers individual leaves, mixed batches, empty Groups and
+nested recursive deletion; see the [runtime report](../development/runtime-validation/2026-09-26-delete-cues.md).
+Reload the installed MCP to load the fixes. Do not retry an error blindly.
 
 `qlab_delete_cues` accepts either 1–10 explicit leaf UUIDs, one exact empty
 `Group` through `container_id` with `recursive=false`, or one container with

@@ -359,9 +359,11 @@ class QLabReader(
             suffix += "/shallow"
         address = _cue_address(workspace_id, cue_ref, suffix)
         if tcp_fallback_on_timeout:
-            data, read_transport = self._request_data_with_tcp_fallback(address, workspace_id=workspace_id)
+            data, read_transport = self._request_data_with_tcp_fallback(
+                address, workspace_id=workspace_id, cacheable=False
+            )
         else:
-            data = self._request_data(address, workspace_id=workspace_id)
+            data = self._request_data(address, workspace_id=workspace_id, cacheable=False)
             read_transport = "udp"
         return {
             "workspace_id": _clean_workspace_id(workspace_id),

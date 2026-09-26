@@ -320,7 +320,11 @@ class QLabOscClient:
 
             if not self._reply_sender_matches(reply_addr):
                 continue
-            reply = self._parse_reply(data, expected_address=address, ignore_unrelated=True)
+            reply = self._parse_reply(
+                data, expected_address=address, ignore_unrelated=True,
+                allow_empty_data=(address == "/alwaysReply" and bool(args))
+                or address.split("/")[-2:-1] == ["delete_id"],
+            )
             if reply is None:
                 continue
             if self._reply_matches(reply, address):
@@ -366,6 +370,8 @@ class QLabOscClient:
                     _slip_decode(frame),
                     expected_address=address,
                     ignore_unrelated=True,
+                    allow_empty_data=(address == "/alwaysReply" and bool(args))
+                    or address.split("/")[-2:-1] == ["delete_id"],
                 )
                 if reply is None:
                     continue
@@ -430,6 +436,7 @@ class QLabOscClient:
         packet: bytes,
         expected_address: str | None = None,
         ignore_unrelated: bool = False,
+        allow_empty_data: bool = False,
     ) -> QLabReply | None:
         message = decode_message(packet)
         if not message.address.startswith("/reply/"):
@@ -463,7 +470,8 @@ class QLabOscClient:
             raise OscProtocolError("QLab reply JSON missing string status")
         if status not in {"ok", "error", "denied"}:
             raise OscProtocolError("QLab reply JSON has unknown status", error_code="osc_reply_invalid")
-        if status == "ok" and "data" not in payload:
+        # QLab's alwaysReply acknowledgements omit data; read replies still require it.
+        if status == "ok" and "data" not in payload and not allow_empty_data:
             raise OscProtocolError("QLab successful reply JSON missing data", error_code="osc_reply_invalid")
 
         workspace_id = payload.get("workspace_id")

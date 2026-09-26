@@ -27,6 +27,25 @@ def test_delete_mode_reuses_canonical_container_types() -> None:
     assert deletes.CONTAINER_CUE_TYPES is CONTAINER_CUE_TYPES
 
 
+def test_delete_structure_readback_does_not_reuse_cached_children(monkeypatch: pytest.MonkeyPatch) -> None:
+    from qlab_mcp.config import QLabConfig
+    from qlab_mcp.osc.client import QLabOscClient
+    from qlab_mcp.qlab import QLabReader
+    from qlab_mcp.write.moves import _read_snapshot
+
+    client = QLabOscClient(QLabConfig(cache_ttl=60))
+    children = [{"uniqueID": FIRST_ID, "type": "Memo"}]
+    monkeypatch.setattr(client, "request", lambda *a, **k: SimpleNamespace(data=list(children)))
+    reader = QLabReader(client)
+    monkeypatch.setattr(reader, "get_cue_lists", lambda *a, **k: {
+        "cue_lists": [{"uniqueID": LIST_ID, "type": "Cue List"}],
+    })
+
+    assert FIRST_ID in _read_snapshot(reader, WORKSPACE_ID)["nodes"]
+    children.clear()
+    assert FIRST_ID not in _read_snapshot(reader, WORKSPACE_ID)["nodes"]
+
+
 class DeleteReader:
     def __init__(self) -> None:
         self.workspace_id = WORKSPACE_ID

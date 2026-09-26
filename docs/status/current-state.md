@@ -1,5 +1,27 @@
 # Current Project State
 
+## Delete fix and runtime validation — 2026-09-26
+
+The cue-editing branch fixes status-only Delete acknowledgements and stale cached
+child-structure reads. The final full suite passes: **3057 tests, 47 subtests**.
+A fresh in-process FastMCP instance using the corrected checkout deleted 55
+temporary cues in `mcp_prueba.qlab5` on QLab 5.5.10, including all 24 creatable
+types, batches of ten, and 29 nested descendants with the root preserved.
+Independent final readback confirmed the original workspace structure and
+removal of all temporary fixtures. After restarting the installed MCP, a second
+live matrix verified individual/batch/recursive deletion, token rejection and
+fresh readback; the original 17-cue list remained byte-for-byte identical in
+UUID and order. A further live test deleted one temporary child recursively
+from a nonempty Cue List, restored its original Memo, and confirmed the safety
+Group empty and the Cue List playhead restored to baseline. Anchored Create in
+a nonempty Cue List passed. Empty Cue List Create still fails before `/new`:
+the `currentCueListID` setter acknowledgement lacks `data`. This separate issue
+is documented, not changed in the Delete fix. Existing Cart contents were
+preserved.
+See the [runtime report](../development/runtime-validation/2026-09-26-delete-cues.md).
+The Move shallow-health issue remains outside this fix. The audit below records
+the earlier Delete blocker as historical evidence.
+
 ## Documentation closeout snapshot — 2026-09-26
 
 The local development surface is **48 public tools: 43 reads and 5 gated

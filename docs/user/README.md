@@ -20,10 +20,11 @@ uv run fastmcp inspect fastmcp.json
 
 1. Call `qlab_check_connection` and choose one workspace by exact UUID.
 2. Read `qlab_get_workspace_overview` for bounded structure.
-3. Read `qlab_get_workspace_status` for derived operational context and
-   `qlab_get_workspace_settings(mode="summary")` for infrastructure context.
-4. Discover targets with `qlab_query_cues`; inspect exact properties with
-   `qlab_get_cue_details`.
+3. Read `qlab_get_workspace_status` for derived operational context and call
+   only the relevant `qlab_get_workspace_*_settings` domain tools for infrastructure.
+4. Use the cue-family inventories and UUID detail tools for a known type and Cue
+   List. Use `qlab_query_cues` for cross-type discovery and `qlab_get_cue_details`
+   for generic health, target, or editable diagnostics.
 
 Use compact profiles for normal work. Technical, sensitive, and exhaustive
 profiles can expose larger or more sensitive show data.
@@ -41,9 +42,8 @@ It is a read-only preflight, not a confirmation token.
 
 ### Create
 
-Use [`qlab_create_cue`](agent-workflows.md#create-one-cue) for one
-template-backed cue, or [`qlab_create_cues`](agent-workflows.md#create-a-sequence)
-for an ordered non-atomic sequence. Creation verifies structure and placement;
+Use [`qlab_create_cues`](agent-workflows.md#create-cues) for one to 50 ordered
+template-backed cues in an exact Cue List, Group, or empty Cue Cart. Creation verifies structure and placement;
 it does not configure initial setters or claim GO readiness.
 
 ### Edit
@@ -72,7 +72,7 @@ planned structure
 != show ready for GO
 ```
 
-See the [14-tool catalogue](tools.md),
+See the [public tool catalogue](tools.md),
 [security policy](../../SECURITY.md), and
 [Create checklist](../development/runtime-validation/create-cues.md) and
 [Edit checklist](../development/runtime-validation/edit-cues.md).

@@ -1,7 +1,7 @@
 # Development
 
 - [Architecture](architecture.md)
-- [Runtime validation for `qlab_create_cue`](runtime-validation/create-cues.md)
+- [Historical runtime validation for the retired single-cue Create tool](runtime-validation/create-cues.md)
 - [Runtime validation for `qlab_edit_cues`](runtime-validation/edit-cues.md)
 - [Current coverage](../status/coverage/README.md)
 - [Current state snapshot](../status/current-state.md)

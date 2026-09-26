@@ -11,6 +11,8 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from qlab_mcp.allowlist import properties_for_profile, validate_property_path, validate_value_keys
@@ -27,6 +29,100 @@ from qlab_mcp.sanitizer import REDACTED_INTERNAL_PATH, sanitize_response
 from qlab_mcp.status import WorkspaceStatusMixin
 
 
+def test_exact_video_reader_paths_profiles_and_partial_results() -> None:
+    object_id = "11111111-2222-3333-4444-555555555555"
+    stage_path = f"/workspace/ws-1/settings/video/stageID/{object_id}"
+    route_path = f"/workspace/ws-1/settings/video/routeID/{object_id}"
+    region = {"uniqueID": "region-1", "name": "A", "controlPoints": [{"x": 0, "y": 0}]}
+    responses = {
+        stage_path: {"uniqueID": object_id, "name": "Main", "width": 1920, "height": 1080},
+        f"{stage_path}/regions": [region],
+        route_path: {"uniqueID": object_id, "name": "Output", "rotationDegrees": 90,
+                     "destinationInfo": {"name": "Display", "screenSerialNumber": "serial", "password": "secret"}},
+        f"{route_path}/enableGuides": False,
+    }
+    with FakeQlabOscServer(responses) as server:
+        reader = QLabReader(client_for(server))
+        stage = reader.get_video_setting("ws-1", kind="stage", ref=object_id)
+        route = reader.get_video_setting("ws-1", kind="route", ref=object_id, profile="technical")
+    assert stage["ok"]
+    assert stage["details"]["detail"]["regions"][0]["control_point_count"] == 1
+    assert stage["details"]["technical_payload"] is None
+    assert "controlPoints" not in json.dumps(stage["details"])
+    assert route["details"]["detail"]["enableGuides"] is False
+    assert route["details"]["detail"]["rotationDegrees"] == 90
+    assert route["details"]["technical_payload"]["destinationInfo"]["password"] == "[redacted]"
+    assert server.received == [stage_path, f"{stage_path}/regions", route_path, f"{route_path}/enableGuides"]
+
+
+def test_exact_video_reader_missing_mismatch_and_timeout() -> None:
+    object_id = "11111111-2222-3333-4444-555555555555"
+    from qlab_mcp.settings.workspace import WorkspaceSettingsMixin
+
+    class Reader(WorkspaceSettingsMixin):
+        def _resolve_workspace_id_strict(self, workspace_id):
+            return workspace_id
+
+        def _read_workspace_setting(self, workspace_id, command, errors, error_key, **kwargs):
+            self.calls.append(command)
+            if command.endswith("/regions"):
+                errors[error_key] = "timeout"
+                return None
+            return self.item
+
+    reader = Reader()
+    for item, code in ((None, "video_stage_not_found"), ({"uniqueID": "other"}, "video_stage_identity_mismatch")):
+        reader.calls, reader.item = [], item
+        result = reader.get_video_setting("ws-1", kind="stage", ref=object_id)
+        assert result["error_code"] == code
+        assert result["details"] is None
+        assert len(reader.calls) == 1
+    reader.calls, reader.item = [], {"uniqueID": object_id, "name": "Stage", "regions": ["stale"]}
+    result = reader.get_video_setting("ws-1", kind="stage", ref=object_id)
+    assert result["status"] == "partial"
+    assert result["details"]["detail"]["regions"] is None
+    assert result["details"]["detail"]["region_count"] is None
+    assert result["errors"]
+
+
+def test_video_overview_unknown_topology_has_no_missing_routes_warning() -> None:
+    from qlab_mcp.settings.summarizers import _summarize_video_stage, _video_settings_problems
+
+    for stage in ({"name": "Unknown"}, {"name": "Geometry only", "regions": [{"name": "A"}]}):
+        assert _video_settings_problems([_summarize_video_stage(stage)], []) == []
+
+
+def test_exact_video_distinguishes_absence_from_read_errors_without_retry() -> None:
+    from qlab_mcp.settings.workspace import WorkspaceSettingsMixin
+
+    identifier = "11111111-2222-3333-4444-555555555555"
+
+    class Reader(WorkspaceSettingsMixin):
+        def _resolve_workspace_id_strict(self, workspace_id):
+            return workspace_id
+
+        def _request(self, address, **kwargs):
+            self.calls.append(address)
+            if address.endswith(("/stages", "/routes")):
+                return SimpleNamespace(data=self.inventory)
+            raise self.error
+
+    reader = Reader()
+    for kind, prefix in (("stage", "video_stage"), ("route", "video_output_route")):
+        for error, inventory, code, count in (
+            (QLabReplyError("error"), [], "not_found", 2),
+            (QLabReplyError("error"), [{"uniqueID": identifier}], "read_failed", 2),
+            (QLabReplyError("denied"), [], "read_failed", 1),
+            (OscTimeoutError("timeout"), [], "read_failed", 1),
+        ):
+            reader.calls, reader.error, reader.inventory = [], error, inventory
+            result = reader.get_video_setting("ws-1", kind=kind, ref=identifier)
+            assert result["error_code"] == f"{prefix}_{code}"
+            assert result["details"] is None
+            assert len(reader.calls) == count
+            assert not any(address.endswith("/regions") for address in reader.calls)
+
+
 def test_workspace_status_reuses_profile_continue_mode_labels() -> None:
     assert not hasattr(WorkspaceStatusMixin, "_continue_mode_label")
     assert [_continue_mode_label(value) for value in (0, 1.0, "auto-follow", True, [])] == [
@@ -35,6 +131,301 @@ def test_workspace_status_reuses_profile_continue_mode_labels() -> None:
         "auto_follow",
         "unknown",
         "unknown",
+    ]
+
+
+def test_workspace_uuid_resolution_is_case_insensitive_and_preserves_qlab_id() -> None:
+    reader = QLabReader.__new__(QLabReader)
+    canonical = "A192C068-0974-4624-90BD-56D68BF0286B"
+    workspaces = [{"uniqueID": canonical, "displayName": "MATADERO.qlab5"}]
+
+    assert reader._resolve_workspace_strict(workspaces, canonical.lower())["uniqueID"] == canonical
+    assert reader._resolve_workspace_strict(workspaces, "MATADERO.qlab5")["uniqueID"] == canonical
+    with pytest.raises(Exception, match="Workspace not found"):
+        reader._resolve_workspace_strict(workspaces, "matadero.qlab5")
+
+
+def test_workspace_status_uses_shared_workspace_resolver() -> None:
+    canonical = "A192C068-0974-4624-90BD-56D68BF0286B"
+
+    class Reader(WorkspaceStatusMixin):
+        def __init__(self) -> None:
+            self.resolved = []
+
+        def get_workspaces(self):
+            return {"workspaces": [{"uniqueID": canonical, "displayName": "MATADERO.qlab5"}]}
+
+        def _resolve_workspace_strict(self, workspaces, workspace_id):
+            self.resolved.append(workspace_id)
+            return workspaces[0]
+
+        def _workspace_status_cue_scan(self, workspace_id, max_cues_scanned, sample_limit, errors):
+            unavailable = {"available": False}
+            return {
+                "warnings_summary": {"available": True, "warning_count": 0, "broken_count": 0},
+                "trigger_summary": unavailable,
+                "timecode_config": unavailable,
+                "timecode_live_refs": [],
+                "scan_completeness": "complete",
+                "scanned_count": 0,
+            }
+
+        def _workspace_status_settings(self, workspace_id, profile, errors):
+            return {"available": True, "errors": None, "summary": {}}
+
+    reader = Reader()
+    result = reader.get_workspace_status(canonical.lower(), include_timecode=False)
+
+    assert reader.resolved == [canonical.lower()]
+    assert result["ok"] is True
+    assert result["workspace_id"] == canonical
+
+
+def test_workspace_overview_rejects_depth_above_public_limit() -> None:
+    from qlab_mcp.cues.overview import CueOverviewMixin
+
+    class Reader(CueOverviewMixin):
+        def get_workspaces(self):
+            raise AssertionError("validation must happen before workspace I/O")
+
+    with pytest.raises(ValueError, match="5 or lower"):
+        Reader().get_workspace_overview("ws-1", max_depth=6)
+
+
+@pytest.mark.parametrize("payload", [None, "invalid", ["invalid"], [{}]])
+def test_workspace_setting_collection_payloads_are_validated(payload) -> None:
+    from qlab_mcp.settings.workspace import WorkspaceSettingsMixin
+
+    class Reader(WorkspaceSettingsMixin):
+        def _request(self, address, **kwargs):
+            return SimpleNamespace(data=payload)
+
+    errors = {}
+    result = Reader()._read_workspace_setting(
+        "ws-1", "midi/patchList", errors, "midi.patchList"
+    )
+
+    assert result is None
+    assert "setting_payload_invalid" in errors["midi.patchList"]
+
+
+def test_invalid_setting_detail_payload_returns_stable_error() -> None:
+    from qlab_mcp.settings.workspace import WorkspaceSettingsMixin
+
+    class Reader(WorkspaceSettingsMixin):
+        def _resolve_workspace_id_strict(self, workspace_id):
+            return workspace_id
+
+        def _request(self, address, **kwargs):
+            return SimpleNamespace(data="invalid")
+
+    result = Reader().get_workspace_setting_details(
+        "ws-1", section="midi", kind="midi_patch", ref="missing"
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "error"
+    assert result["error_code"] == "setting_payload_invalid"
+    assert result["details"] is None
+
+
+@pytest.mark.parametrize("invalid_command", ["object", "regions"])
+def test_invalid_exact_video_payload_returns_stable_error(invalid_command) -> None:
+    from qlab_mcp.settings.workspace import WorkspaceSettingsMixin
+
+    class Reader(WorkspaceSettingsMixin):
+        def _resolve_workspace_id_strict(self, workspace_id):
+            return workspace_id
+
+        def _request(self, address, **kwargs):
+            if invalid_command == "object" or address.endswith("/regions"):
+                return SimpleNamespace(data="invalid")
+            return SimpleNamespace(
+                data={"name": "Main", "uniqueID": "00000000-0000-4000-8000-000000000001"}
+            )
+
+    result = Reader().get_video_setting(
+        "ws-1",
+        kind="stage",
+        ref="00000000-0000-4000-8000-000000000001",
+    )
+
+    assert result["ok"] is False
+    assert result["status"] == "error"
+    assert result["partial"] is False
+    assert result["error_code"] == "setting_payload_invalid"
+    assert result["details"] is None
+
+
+@pytest.mark.parametrize(
+    ("command", "payload"),
+    [
+        ("general/minGoTime", "0.5"),
+        ("general/minGoTime", float("nan")),
+        ("general/minGoTime", -1),
+        ("general/selectionIsPlayhead", 1),
+        ("audio/maxVolume", float("inf")),
+    ],
+)
+def test_workspace_setting_scalar_payloads_are_validated(command, payload) -> None:
+    from qlab_mcp.settings.workspace import WorkspaceSettingsMixin
+
+    class Reader(WorkspaceSettingsMixin):
+        def _request(self, address, **kwargs):
+            return SimpleNamespace(data=payload)
+
+    errors = {}
+    result = Reader()._read_workspace_setting("ws-1", command, errors, command)
+
+    assert result is None
+    assert "setting_payload_invalid" in errors[command]
+
+
+@pytest.mark.parametrize("profile", ["safe", "technical", "exhaustive"])
+def test_workspace_settings_redacts_extended_credential_keys(profile) -> None:
+    from qlab_mcp.settings.redaction import _redact_payload
+
+    redactions = []
+    payload = {
+        "apiKey": "a",
+        "access_key": "b",
+        "privateKey": "c",
+        "authorization": "d",
+        "bearer": "e",
+        "auth": "f",
+        "key": "public-key-name",
+        "client_id": "public-client-id",
+    }
+
+    result = _redact_payload(payload, section="network", profile=profile, redactions=redactions)
+
+    for key in ("apiKey", "access_key", "privateKey", "authorization", "bearer", "auth"):
+        assert result[key] == "[redacted]"
+    assert result["key"] == "public-key-name"
+    assert result["client_id"] == "public-client-id"
+
+
+def test_workspace_settings_summary_counts_video_problems() -> None:
+    from qlab_mcp.settings.workspace import WorkspaceSettingsMixin
+
+    class Reader(WorkspaceSettingsMixin):
+        def _workspace_settings_video(self, workspace_id, profile, redactions, errors):
+            return {
+                "input_patches": [],
+                "routes": [],
+                "stages": [],
+                "problems": [
+                    {"code": "disconnected_route"},
+                    {"code": "disconnected_route"},
+                    {"code": "stage_without_routes"},
+                ],
+            }
+
+    result = Reader()._get_workspace_settings_summary("ws-1", sections=["video"])
+
+    assert result["summary"]["video_problem_count"] == 3
+    assert result["summary"]["video_problem_counts"] == {
+        "disconnected_route": 2,
+        "stage_without_routes": 1,
+    }
+
+
+def test_workspace_status_promotes_video_setting_problems() -> None:
+    class Reader(WorkspaceStatusMixin):
+        def get_workspaces(self):
+            return {"workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]}
+
+        def _resolve_workspace_strict(self, workspaces, workspace_id):
+            return workspaces[0]
+
+        def _workspace_status_cue_scan(self, workspace_id, max_cues_scanned, sample_limit, errors):
+            unavailable = {"available": False}
+            return {
+                "warnings_summary": {"available": True, "warning_count": 0, "broken_count": 0},
+                "trigger_summary": unavailable,
+                "timecode_config": unavailable,
+                "timecode_live_refs": [],
+                "scan_completeness": "complete",
+                "scanned_count": 0,
+            }
+
+        def _workspace_status_settings(self, workspace_id, profile, errors):
+            return {
+                "available": True,
+                "errors": None,
+                "summary": {
+                    "video_problem_count": 2,
+                    "video_problem_counts": {"disconnected_route": 2},
+                },
+            }
+
+    result = Reader().get_workspace_status("ws-1", include_timecode=False)
+
+    assert any("video" in warning.casefold() for warning in result["warnings"])
+    warnings_summary = result["sections"]["warnings_summary"]
+    assert warnings_summary["coverage"] == "partial"
+    assert warnings_summary["evidence_sources"] == ["derived_from_cues", "derived_from_settings"]
+    assert warnings_summary["cue_evidence_available"] is True
+    assert warnings_summary["settings_evidence_available"] is True
+    assert warnings_summary["known_settings_problem_count"] == 2
+    assert warnings_summary["known_settings_problem_counts"] == {"video.disconnected_route": 2}
+
+
+def test_workspace_status_uses_settings_warning_evidence_when_cue_scan_fails() -> None:
+    class Reader(WorkspaceStatusMixin):
+        def get_workspaces(self):
+            return {"workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]}
+
+        def _resolve_workspace_strict(self, workspaces, workspace_id):
+            return workspaces[0]
+
+        def _workspace_status_cue_scan(self, workspace_id, max_cues_scanned, sample_limit, errors):
+            unavailable = {
+                "source": "derived_from_cues",
+                "available": False,
+                "status": "error",
+                "notes": ["cue scan failed"],
+            }
+            return {
+                "warnings_summary": unavailable,
+                "trigger_summary": unavailable,
+                "timecode_config": unavailable,
+                "timecode_live_refs": [],
+                "scan_completeness": "failed",
+                "scanned_count": 0,
+            }
+
+        def _workspace_status_settings(self, workspace_id, profile, errors):
+            return {
+                "source": "derived_from_settings",
+                "available": True,
+                "status": "available",
+                "errors": None,
+                "summary": {"video_problem_count": 1},
+                "known_problems": [
+                    {
+                        "domain": "video",
+                        "code": "stage_without_routes",
+                        "stage": {"uniqueID": "stage-1", "name": "Main"},
+                    }
+                ],
+                "problem_counts": {"video.stage_without_routes": 1},
+            }
+
+    result = Reader().get_workspace_status("ws-1", include_timecode=False, sample_limit=1)
+
+    warnings_summary = result["sections"]["warnings_summary"]
+    assert warnings_summary["available"] is True
+    assert warnings_summary["status"] == "partial"
+    assert warnings_summary["cue_evidence_available"] is False
+    assert warnings_summary["settings_evidence_available"] is True
+    assert warnings_summary["known_settings_problem_count"] == 1
+    assert warnings_summary["sample_settings_problems"] == [
+        {
+            "domain": "video",
+            "code": "stage_without_routes",
+            "stage": {"uniqueID": "stage-1", "name": "Main"},
+        }
     ]
 
 
@@ -208,6 +599,8 @@ def empty_settings_summary_responses() -> dict[str, Any]:
         "/workspace/ws-1/settings/audio/cueOutputChannelCounts": [],
         "/workspace/ws-1/settings/audio/outputChannelNames": [],
         "/workspace/ws-1/settings/audio/maps": [],
+        "/workspace/ws-1/settings/audio/maxVolume": 0,
+        "/workspace/ws-1/settings/audio/minVolume": -120,
         "/workspace/ws-1/settings/video/inputPatchList": [],
         "/workspace/ws-1/settings/video/routes": [],
         "/workspace/ws-1/settings/video/stages": [],
@@ -618,6 +1011,24 @@ class QLabReaderTests(unittest.TestCase):
         self.assertFalse(result["capabilities"]["resolve_workspace"])
         self.assertEqual(server.received, ["/workspaces"])
 
+    def test_check_connection_resolves_workspace_uuid_case_insensitively(self) -> None:
+        canonical = "03D261B1-9D06-42F4-8F6A-B52E30B6821D"
+        responses = {"/workspaces": [{"uniqueID": canonical, "displayName": "demo.qlab5"}]}
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.check_connection(workspace_id=canonical.lower(), require_read_access=False)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["workspace_id"], canonical)
+        self.assertEqual(result["workspace_name"], "demo.qlab5")
+        self.assertEqual(server.received[0], "/workspaces")
+        self.assertIn(f"/workspace/{canonical}/showMode", server.received)
+        self.assertTrue(
+            all(canonical in address for address in server.received if address.startswith("/workspace/"))
+        )
+
     def test_check_connection_can_skip_read_access(self) -> None:
         workspaces = [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]
         with FakeQlabOscServer(
@@ -755,6 +1166,24 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIn("workspace_resolution", result["errors"])
         self.assertEqual(server.received, ["/workspaces"])
 
+    def test_workspace_setting_details_propagates_workspace_resolution_error(self) -> None:
+        responses = {"/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]}
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_setting_details(
+                "missing-ws",
+                section="light",
+                kind="light_patch",
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "workspace_not_found")
+        self.assertEqual(result["error_code"], "workspace_not_found")
+        self.assertIsNone(result["details"])
+        self.assertIn("workspace_resolution", result["errors"])
+        self.assertEqual(server.received, ["/workspaces"])
+
     def test_cue_details_invalid_workspace_id_returns_workspace_error_without_cue_read(self) -> None:
         responses = {"/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]}
         with FakeQlabOscServer(responses) as server:
@@ -766,8 +1195,29 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["status"], "error")
         self.assertFalse(result["partial"])
         self.assertEqual(result["errors"]["error_code"], "workspace_not_found")
+        self.assertEqual(result["error_code"], "workspace_not_found")
+        self.assertIn("qlab_check_connection", result["suggested_action"])
         self.assertEqual(result["properties"], {})
         self.assertIn("Requested workspace could not be resolved", result["warnings"][0])
+        self.assertEqual(server.received, ["/workspaces"])
+
+    def test_batch_cue_details_workspace_error_has_same_actionable_contract(self) -> None:
+        responses = {"/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}]}
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            single = reader.get_cue_details("missing-ws", "cue-1")
+            result = reader.get_cue_details("missing-ws", ["cue-1", "cue-2"])
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error_code"], "workspace_not_found")
+        self.assertIn("qlab_check_connection", result["suggested_action"])
+        self.assertEqual(result["errors"]["error_code"], "workspace_not_found")
+        self.assertEqual(result["errors"]["message"], result["message"])
+        self.assertEqual(result["message"], single["message"])
+        self.assertEqual(result["suggested_action"], single["suggested_action"])
+        self.assertEqual(result["errors"], single["errors"])
         self.assertEqual(server.received, ["/workspaces"])
 
     def test_workspace_overview_ambiguous_display_name_returns_clean_error(self) -> None:
@@ -876,6 +1326,14 @@ class QLabReaderTests(unittest.TestCase):
             "/workspace/ws-1/cue/list-id/currentTimecode/text": "01:00:12:10",
             "/workspace/ws-1/cue/tc-1/currentTimecode/text": {"status": "error", "data": "not a receiver"},
             **empty_settings_summary_responses(),
+            "/workspace/ws-1/settings/video/routes": [
+                {
+                    "uniqueID": "route-1",
+                    "name": "Projector",
+                    "connected": False,
+                    "destinationInfo": {"name": "Display", "connected": True},
+                }
+            ],
         }
         with FakeQlabOscServer(responses) as server:
             reader = QLabReader(client_for(server))
@@ -885,6 +1343,28 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["summary"]["cue_scan_completeness"], "complete")
         self.assertEqual(result["sections"]["warnings_summary"]["warning_count"], 1)
         self.assertEqual(result["sections"]["warnings_summary"]["flagged_count"], 1)
+        self.assertEqual(
+            result["sections"]["warnings_summary"]["sample_flagged_cues"],
+            [{"uniqueID": "cue-1", "number": "1", "type": "Audio"}],
+        )
+        self.assertEqual(result["sections"]["warnings_summary"]["coverage"], "partial")
+        self.assertTrue(result["sections"]["warnings_summary"]["cue_evidence_available"])
+        self.assertTrue(result["sections"]["warnings_summary"]["settings_evidence_available"])
+        self.assertEqual(result["sections"]["warnings_summary"]["known_settings_problem_count"], 1)
+        self.assertEqual(
+            result["sections"]["warnings_summary"]["known_settings_problem_counts"],
+            {"video.disconnected_route": 1},
+        )
+        self.assertEqual(
+            result["sections"]["warnings_summary"]["sample_settings_problems"],
+            [
+                {
+                    "domain": "video",
+                    "code": "disconnected_route",
+                    "route": {"uniqueID": "route-1", "name": "Projector"},
+                }
+            ],
+        )
         self.assertEqual(result["sections"]["trigger_summary"]["auto_follow_count"], 1)
         self.assertEqual(result["sections"]["trigger_summary"]["timecode_trigger_count"], 0)
         self.assertEqual(result["sections"]["timecode_config"]["configured_count"], 2)
@@ -899,6 +1379,8 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["sections"]["artnet"]["source"], "not_exposed")
         self.assertEqual(result["sections"]["video_metrics"]["source"], "not_exposed")
         self.assertIn("/workspace/ws-1/cue/list-id/currentTimecode/text", server.received)
+        self.assertEqual(server.received.count("/workspace/ws-1/settings/video/routes"), 1)
+        self.assertFalse(any("/settings/video/routeID/" in address for address in server.received))
 
     def test_workspace_status_does_not_count_default_timecode_values_as_configured(self) -> None:
         responses = {
@@ -980,10 +1462,60 @@ class QLabReaderTests(unittest.TestCase):
             result = reader.get_workspace_status("ws-1")
 
         self.assertEqual(result["summary"]["cue_scan_completeness"], "failed")
+        self.assertFalse(result["sections"]["warnings_summary"]["cue_evidence_available"])
+        self.assertFalse(result["sections"]["warnings_summary"]["settings_evidence_available"])
         self.assertFalse(result["sections"]["warnings_summary"]["available"])
+        self.assertEqual(result["sections"]["warnings_summary"]["status"], "error")
         self.assertFalse(result["sections"]["timecode_live_status"]["available"])
         self.assertEqual(result["sections"]["video_metrics"]["source"], "not_exposed")
         self.assertTrue(any(key.startswith("cue_scan.") for key in result["errors"]))
+
+    def test_workspace_status_does_not_claim_cue_warning_evidence_when_all_value_reads_fail(self) -> None:
+        responses = {
+            "/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}],
+            "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-id", "type": "Cue List"}],
+            "/workspace/ws-1/cue/list-id/children/shallow": [{"uniqueID": "cue-1", "type": "Audio"}],
+            "/workspace/ws-1/cue/list-id/valuesForKeys": {"status": "error", "data": "denied"},
+            "/workspace/ws-1/cue/cue-1/valuesForKeys": {"status": "error", "data": "denied"},
+            **empty_settings_summary_responses(),
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_status("ws-1", include_timecode=False)
+
+        warnings = result["sections"]["warnings_summary"]
+        self.assertFalse(warnings["cue_evidence_available"])
+        self.assertTrue(warnings["settings_evidence_available"])
+        self.assertEqual(warnings["status"], "partial")
+        self.assertNotIn("warning_count", warnings)
+        self.assertEqual(result["summary"]["cue_scan_completeness"], "partial")
+
+    def test_workspace_status_marks_cue_warning_evidence_partial_when_one_value_read_fails(self) -> None:
+        responses = {
+            "/workspaces": [{"uniqueID": "ws-1", "displayName": "demo.qlab5"}],
+            "/workspace/ws-1/cueLists/shallow": [{"uniqueID": "list-id", "type": "Cue List"}],
+            "/workspace/ws-1/cue/list-id/children/shallow": [{"uniqueID": "cue-1", "type": "Audio"}],
+            "/workspace/ws-1/cue/list-id/valuesForKeys": {
+                "uniqueID": "list-id",
+                "type": "Cue List",
+                "isWarning": False,
+                "isBroken": False,
+                "flagged": False,
+            },
+            "/workspace/ws-1/cue/cue-1/valuesForKeys": {"status": "error", "data": "denied"},
+            **empty_settings_summary_responses(),
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_status("ws-1", include_timecode=False)
+
+        warnings = result["sections"]["warnings_summary"]
+        self.assertTrue(warnings["cue_evidence_available"])
+        self.assertEqual(warnings["status"], "partial")
+        self.assertEqual(warnings["warning_count"], 0)
+        self.assertEqual(result["summary"]["cue_scan_completeness"], "partial")
 
     def test_workspace_cue_ids_flattens_nested_qlab_response(self) -> None:
         qlab_response = [
@@ -2101,7 +2633,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertTrue(result["partial"])
         self.assertEqual(result["status"], "partial")
-        self.assertEqual(result["sections"]["warnings_summary"]["status"], "complete")
+        self.assertEqual(result["sections"]["warnings_summary"]["status"], "partial")
         self.assertIn("settings_summary", result["sections"])
         self.assertEqual(result["sections"]["settings_summary"]["status"], "partial")
         self.assertGreater(result["summary"]["settings_error_count"], 0)
@@ -2127,6 +2659,104 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["results"][0]["details"]["items"], [])
         self.assertEqual(result["results"][0]["details"]["available"], False)
         self.assertEqual(server.received, ["/workspace/ws-1/settings/midi/patchList"])
+
+    def test_workspace_audio_settings_reads_documented_volume_limits(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/audio/patchList": [],
+            "/workspace/ws-1/settings/mic/patchList": [],
+            "/workspace/ws-1/settings/audio/cueOutputChannelCounts": {},
+            "/workspace/ws-1/settings/audio/outputChannelNames": {},
+            "/workspace/ws-1/settings/audio/maps": [],
+            "/workspace/ws-1/settings/audio/maxVolume": 12.0,
+            "/workspace/ws-1/settings/audio/minVolume": -120.0,
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_settings("ws-1", sections=["audio"])
+
+        audio = result["sections"]["audio"]
+        self.assertEqual(audio["max_volume"], 12.0)
+        self.assertEqual(audio["min_volume"], -120.0)
+        self.assertIn("/workspace/ws-1/settings/audio/maxVolume", server.received)
+        self.assertIn("/workspace/ws-1/settings/audio/minVolume", server.received)
+
+    def test_workspace_audio_output_patch_reads_documented_state_and_one_level(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/audio/patchList": [
+                {"name": "Main", "uniqueID": "patch-1", "routing": [1, 2]}
+            ],
+            "/workspace/ws-1/settings/audio/patchID/patch-1": {
+                "name": "Main", "uniqueID": "patch-1", "routing": [1, 2]
+            },
+            "/workspace/ws-1/settings/audio/patchID/patch-1/cueOutputChannels": 2,
+            "/workspace/ws-1/settings/audio/outputChannelNames": {
+                "patch-1": {"1": "Left", "2": "Right"}
+            },
+            "/workspace/ws-1/settings/audio/patchID/patch-1/muteChannels": [2],
+            "/workspace/ws-1/settings/audio/patchID/patch-1/soloChannels": [],
+            "/workspace/ws-1/settings/audio/patchID/patch-1/level/1/2": -6.0,
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_setting_details(
+                "ws-1", "audio", "output_patch", "patch-1",
+                input_channel=1, output_channel=2,
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["details"]["routing"], [1, 2])
+        self.assertEqual(result["details"]["cue_output_count"], 2)
+        self.assertEqual(
+            result["details"]["output_channel_names"],
+            [{"channel": 1, "name": "Left"}, {"channel": 2, "name": "Right"}],
+        )
+        self.assertEqual(result["details"]["mute_channels"], [2])
+        self.assertEqual(result["details"]["solo_channels"], [])
+        self.assertEqual(
+            result["details"]["level"],
+            {"input_channel": 1, "output_channel": 2, "decibels": -6.0},
+        )
+        self.assertEqual(
+            server.received,
+            [
+                "/workspace/ws-1/settings/audio/patchList",
+                "/workspace/ws-1/settings/audio/patchID/patch-1",
+                "/workspace/ws-1/settings/audio/patchID/patch-1/cueOutputChannels",
+                "/workspace/ws-1/settings/audio/outputChannelNames",
+                "/workspace/ws-1/settings/audio/patchID/patch-1/muteChannels",
+                "/workspace/ws-1/settings/audio/patchID/patch-1/soloChannels",
+                "/workspace/ws-1/settings/audio/patchID/patch-1/level/1/2",
+            ],
+        )
+
+    def test_workspace_audio_output_patch_keeps_detail_when_supplemental_read_fails(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/audio/patchList": [
+                {"name": "Main", "uniqueID": "patch-1", "routing": [1]}
+            ],
+            "/workspace/ws-1/settings/audio/patchID/patch-1": {
+                "name": "Main", "uniqueID": "patch-1", "routing": [1]
+            },
+            "/workspace/ws-1/settings/audio/patchID/patch-1/cueOutputChannels": 1,
+            "/workspace/ws-1/settings/audio/outputChannelNames": {},
+            "/workspace/ws-1/settings/audio/patchID/patch-1/soloChannels": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_setting_details(
+                "ws-1", "audio", "output_patch", "patch-1",
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["status"], "partial")
+        self.assertTrue(result["partial"])
+        self.assertEqual(result["details"]["routing"], [1])
+        self.assertIn("audio.patchID.patch-1.muteChannels", result["errors"])
+        self.assertFalse(any("/level/" in address for address in server.received))
 
     def test_workspace_overview_global_count_timeout_does_not_break_overview(self) -> None:
         class GlobalTimeoutClient:
@@ -2285,7 +2915,8 @@ class QLabReaderTests(unittest.TestCase):
                 }
             ],
             "/workspace/ws-1/settings/video/stages": [
-                {"name": "Main Stage", "uniqueID": "stage-1", "size": {"width": 1920, "height": 1080}}
+                {"name": "Main Stage", "uniqueID": "stage-1", "size": {"width": 1920, "height": 1080},
+                 "regions": [{"name": "A", "uniqueID": "region-1"}]}
             ],
             "/workspace/ws-1/settings/video/stageID/stage-1/regions": [
                 {"name": "A", "uniqueID": "region-1"}
@@ -2347,7 +2978,6 @@ class QLabReaderTests(unittest.TestCase):
                 "/workspace/ws-1/settings/video/inputPatchList",
                 "/workspace/ws-1/settings/video/routes",
                 "/workspace/ws-1/settings/video/stages",
-                "/workspace/ws-1/settings/video/stageID/stage-1/regions",
                 "/workspace/ws-1/settings/network/patchList",
             ],
         )
@@ -2389,10 +3019,11 @@ class QLabReaderTests(unittest.TestCase):
         self.assertNotIn("compound-secret", serialized)
         self.assertNotIn("token-secret", serialized)
         self.assertNotIn("auth-secret", serialized)
-        self.assertEqual(result["details"]["destinations"][0]["passcode"], "[redacted]")
-        self.assertEqual(result["details"]["destinations"][0]["oscPasscode"], "[redacted]")
-        self.assertEqual(result["details"]["destinations"][0]["apiToken"], "[redacted]")
-        self.assertEqual(result["details"]["destinations"][0]["authSecret"], "[redacted]")
+        payload = result["details"]["technical_payload"]
+        self.assertEqual(payload["destinations"][0]["passcode"], "[redacted]")
+        self.assertEqual(payload["destinations"][0]["oscPasscode"], "[redacted]")
+        self.assertEqual(payload["destinations"][0]["apiToken"], "[redacted]")
+        self.assertEqual(payload["destinations"][0]["authSecret"], "[redacted]")
         self.assertEqual(result["redactions"][0]["reason"], "credential")
         self.assertIn("credential", result["redactions"][0]["impact"])
         self.assertEqual(server.received, ["/workspace/ws-1/settings/network/patchList"])
@@ -2687,10 +3318,20 @@ class QLabReaderTests(unittest.TestCase):
                 {
                     "name": "Main Out",
                     "uniqueID": "audio-1",
-                    "routing": [{"source": 1, "destination": 1}],
+                    "routing": [1],
                     "deviceName": "Secret Audio Device",
                 }
             ],
+            "/workspace/ws-1/settings/audio/patchID/audio-1": {
+                "name": "Main Out",
+                "uniqueID": "audio-1",
+                "routing": [1],
+                "deviceName": "Secret Audio Device",
+            },
+            "/workspace/ws-1/settings/audio/patchID/audio-1/cueOutputChannels": 1,
+            "/workspace/ws-1/settings/audio/outputChannelNames": {},
+            "/workspace/ws-1/settings/audio/patchID/audio-1/muteChannels": [],
+            "/workspace/ws-1/settings/audio/patchID/audio-1/soloChannels": [],
             "/workspace/ws-1/settings/video/routes": [
                 {
                     "name": "Projector",
@@ -2742,6 +3383,11 @@ class QLabReaderTests(unittest.TestCase):
             server.received,
             [
                 "/workspace/ws-1/settings/audio/patchList",
+                "/workspace/ws-1/settings/audio/patchID/audio-1",
+                "/workspace/ws-1/settings/audio/patchID/audio-1/cueOutputChannels",
+                "/workspace/ws-1/settings/audio/outputChannelNames",
+                "/workspace/ws-1/settings/audio/patchID/audio-1/muteChannels",
+                "/workspace/ws-1/settings/audio/patchID/audio-1/soloChannels",
                 "/workspace/ws-1/settings/video/routes",
                 "/workspace/ws-1/settings/video/inputPatchList",
                 "/workspace/ws-1/settings/network/patchList",
@@ -2763,8 +3409,137 @@ class QLabReaderTests(unittest.TestCase):
 
         self.assertIsNone(result["details"])
         self.assertEqual(len(result["choices"]), 2)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "error")
+        self.assertFalse(result["partial"])
+        self.assertEqual(result["error_code"], "setting_ref_required")
+        self.assertIn("choices[].uniqueID", result["suggested_action"])
         self.assertIn("Multiple settings items", result["message"])
         self.assertEqual(server.received, ["/workspace/ws-1/settings/network/patchList"])
+
+    def test_workspace_setting_details_ambiguous_stage_name_requires_unique_id(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/video/stages": [
+                {"name": "Main", "uniqueID": "stage-1"},
+                {"name": "Main", "uniqueID": "stage-2"},
+            ],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_setting_details(
+                "ws-1",
+                section="video",
+                kind="stage",
+                ref="Main",
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "error")
+        self.assertFalse(result["partial"])
+        self.assertEqual(result["error_code"], "setting_ref_ambiguous")
+        self.assertEqual([choice["uniqueID"] for choice in result["choices"]], ["stage-1", "stage-2"])
+        self.assertIn("choices[].uniqueID", result["suggested_action"])
+        self.assertEqual(server.received, ["/workspace/ws-1/settings/video/stages"])
+
+    def test_workspace_setting_details_single_stage_without_ref_selects_it(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/video/stages": [{"name": "Main", "uniqueID": "stage-1"}],
+            "/workspace/ws-1/settings/video/stageID/stage-1/regions": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_setting_details("ws-1", section="video", kind="stage")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["details"]["stage"]["uniqueID"], "stage-1")
+        self.assertEqual(
+            server.received,
+            [
+                "/workspace/ws-1/settings/video/stages",
+                "/workspace/ws-1/settings/video/stageID/stage-1/regions",
+            ],
+        )
+
+    def test_workspace_setting_details_exact_stage_uuid_selects_one_match(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/video/stages": [
+                {"name": "Main", "uniqueID": "stage-1"},
+                {"name": "Main", "uniqueID": "stage-2"},
+            ],
+            "/workspace/ws-1/settings/video/stageID/stage-2/regions": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_setting_details(
+                "ws-1",
+                section="video",
+                kind="stage",
+                ref="stage-2",
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["details"]["stage"]["uniqueID"], "stage-2")
+        self.assertEqual(
+            server.received,
+            [
+                "/workspace/ws-1/settings/video/stages",
+                "/workspace/ws-1/settings/video/stageID/stage-2/regions",
+            ],
+        )
+
+    def test_workspace_setting_details_empty_stage_collection_is_successful_empty_result(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/video/stages": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_setting_details("ws-1", section="video", kind="stage")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["details"]["empty"])
+        self.assertEqual(result["details"]["items"], [])
+        self.assertFalse(result["details"]["available"])
+        self.assertEqual(server.received, ["/workspace/ws-1/settings/video/stages"])
+
+    def test_workspace_setting_details_empty_collection_with_ref_is_not_found(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/midi/patchList": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_setting_details(
+                "ws-1",
+                section="midi",
+                kind="midi_patch",
+                ref="missing",
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error_code"], "setting_ref_not_found")
+        self.assertIsNone(result["details"])
+        self.assertEqual(result["choices"], [])
+        self.assertEqual(server.received, ["/workspace/ws-1/settings/midi/patchList"])
+
+    def test_workspace_setting_details_empty_audio_map_collection_is_successful_empty_result(self) -> None:
+        responses = {
+            "/workspace/ws-1/settings/audio/maps": [],
+        }
+        with FakeQlabOscServer(responses) as server:
+            reader = QLabReader(client_for(server))
+
+            result = reader.get_workspace_setting_details("ws-1", section="audio", kind="audio_map")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["details"]["empty"])
+        self.assertEqual(result["details"]["items"], [])
+        self.assertFalse(result["details"]["available"])
+        self.assertEqual(server.received, ["/workspace/ws-1/settings/audio/maps"])
 
     def test_workspace_setting_details_missing_ref_returns_actionable_error(self) -> None:
         responses = {
@@ -2785,7 +3560,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], "error")
         self.assertEqual(result["error_code"], "setting_ref_not_found")
-        self.assertIn("qlab_get_workspace_settings", result["suggested_action"])
+        self.assertIn("qlab_get_workspace_network_settings", result["suggested_action"])
         self.assertIn("missing", result["suggested_action"])
 
     def test_workspace_settings_summary_lists_all_detail_request_kinds(self) -> None:
@@ -2816,7 +3591,8 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["mode"], "summary")
         self.assertIn(("audio", "output_patch", "Main"), request_keys)
         self.assertIn(("audio", "input_patch", "Mic"), request_keys)
-        self.assertIn(("audio", "audio_map", "Map"), request_keys)
+        self.assertNotIn(("audio", "audio_map", "Map"), request_keys)
+        self.assertNotIn("/workspace/ws-1/settings/audio/maps", server.received)
         self.assertIn(("video", "video_input_patch", "Camera"), request_keys)
         self.assertIn(("video", "route", "Projector"), request_keys)
         self.assertIn(("video", "stage", "TELON"), request_keys)
@@ -2852,6 +3628,11 @@ class QLabReaderTests(unittest.TestCase):
     def test_workspace_settings_details_mode_batch_mixed_requests(self) -> None:
         responses = {
             "/workspace/ws-1/settings/audio/patchList": [{"name": "Main", "uniqueID": "audio-1"}],
+            "/workspace/ws-1/settings/audio/patchID/audio-1": {"name": "Main", "uniqueID": "audio-1"},
+            "/workspace/ws-1/settings/audio/patchID/audio-1/cueOutputChannels": 1,
+            "/workspace/ws-1/settings/audio/outputChannelNames": {},
+            "/workspace/ws-1/settings/audio/patchID/audio-1/muteChannels": [],
+            "/workspace/ws-1/settings/audio/patchID/audio-1/soloChannels": [],
             "/workspace/ws-1/settings/video/stages": [{"name": "TELON", "uniqueID": "stage-1"}],
             "/workspace/ws-1/settings/video/stageID/stage-1/regions": [{"name": "A", "uniqueID": "region-1"}],
             "/workspace/ws-1/settings/light/patch": {"instruments": [{"name": "1"}], "groups": []},
@@ -2879,6 +3660,11 @@ class QLabReaderTests(unittest.TestCase):
             server.received,
             [
                 "/workspace/ws-1/settings/audio/patchList",
+                "/workspace/ws-1/settings/audio/patchID/audio-1",
+                "/workspace/ws-1/settings/audio/patchID/audio-1/cueOutputChannels",
+                "/workspace/ws-1/settings/audio/outputChannelNames",
+                "/workspace/ws-1/settings/audio/patchID/audio-1/muteChannels",
+                "/workspace/ws-1/settings/audio/patchID/audio-1/soloChannels",
                 "/workspace/ws-1/settings/video/stages",
                 "/workspace/ws-1/settings/video/stageID/stage-1/regions",
                 "/workspace/ws-1/settings/light/patch",
@@ -3004,7 +3790,10 @@ class QLabReaderTests(unittest.TestCase):
         self.assertIn("127.0.0.1", serialized)
         self.assertIn("53000", serialized)
         self.assertNotIn("secret", serialized)
-        self.assertEqual(result["results"][0]["details"]["destinations"][0]["passcode"], "[redacted]")
+        self.assertEqual(
+            result["results"][0]["details"]["technical_payload"]["destinations"][0]["passcode"],
+            "[redacted]",
+        )
         self.assertEqual(result["results"][0]["redactions"][0]["reason"], "credential")
         self.assertEqual(server.received, ["/workspace/ws-1/settings/network/patchList"])
 
@@ -6085,8 +6874,8 @@ class QLabReaderTests(unittest.TestCase):
         self.assertNotIn("removeLightCommand", capabilities["operations"])
         self.assertNotIn("dashboard/setLight", capabilities["operations"])
 
-    def test_editable_profile_exposes_group_list_cart_update_capabilities(self) -> None:
-        cases = ("Group", "Cue List", "Cue Cart")
+    def test_editable_profile_exposes_group_and_cart_update_capabilities(self) -> None:
+        cases = ("Group", "Cue Cart")
         for cue_type in cases:
             with self.subTest(cue_type=cue_type):
                 responses = {
@@ -6270,12 +7059,6 @@ class QLabReaderTests(unittest.TestCase):
 
     def test_health_summary_covers_container_network_and_clean_cues(self) -> None:
         cases = [
-            (
-                {"type": "Cue List", "isBroken": True, "isWarning": False},
-                "broken",
-                "Container reports",
-                "broken_child_cue_likely",
-            ),
             (
                 {"type": "Network", "isBroken": False, "isWarning": False, "messageError": "Bad OSC"},
                 "attention",

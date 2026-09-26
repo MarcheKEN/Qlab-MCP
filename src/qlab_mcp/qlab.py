@@ -25,6 +25,14 @@ from .osc.client import QLabOscClient
 from .runtime.connection import WorkspaceConnectionMixin
 from .status import WorkspaceStatusMixin
 from .cues.details import CueDetailsMixin
+from .cues.lists import CueListsMixin
+from .cues.audio import AudioCuesMixin
+from .cues.family import CueFamilyReadsMixin
+from .cues.mic import MicCuesMixin
+from .cues.visual import VisualCuesMixin
+from .cues.light_group import LightGroupCuesMixin
+from .cues.control import ControlCuesMixin
+from .cues.remaining import RemainingCuesMixin
 from .cues.overview import CueOverviewMixin
 from .cues.query import CueQueryMixin
 from .runtime.read_cache import cache_profile_is_safe, client_cache_namespace, shared_read_cache
@@ -48,6 +56,14 @@ class QLabReader(
     WorkspaceStatusMixin,
     CueQueryMixin,
     CueDetailsMixin,
+    CueListsMixin,
+    AudioCuesMixin,
+    CueFamilyReadsMixin,
+    MicCuesMixin,
+    VisualCuesMixin,
+    LightGroupCuesMixin,
+    ControlCuesMixin,
+    RemainingCuesMixin,
     QLabWriteMixin,
 ):
     def __init__(self, client: QLabOscClient | None = None):
@@ -203,7 +219,8 @@ class QLabReader(
             (
                 item
                 for item in workspaces
-                if isinstance(item, dict) and item.get("uniqueID") == requested
+                if isinstance(item, dict)
+                and str(item.get("uniqueID") or "").casefold() == requested.casefold()
             ),
             None,
         )

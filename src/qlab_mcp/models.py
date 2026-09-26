@@ -7,7 +7,8 @@ import struct
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BeforeValidator, BaseModel, ConfigDict, Field, StrictFloat, StrictInt, field_validator
+from pydantic import BeforeValidator, BaseModel, ConfigDict, Field, JsonValue, StrictFloat, StrictInt, field_validator
+from typing_extensions import TypedDict
 
 
 UpdateCueProfile = Literal[
@@ -224,32 +225,334 @@ class WorkspaceOverviewResult(BaseModel):
     live_state: dict[str, Any] | None = None
 
 
-class WorkspaceSettingsResult(BaseModel):
-    """Read-only workspace settings summary or batched detail result."""
+class SettingsItemIdentity(BaseModel):
+    name: str | None = None
+    uniqueID: str | None = None
+    type: str | None = None
+    number: int | None = None
+    key: str | None = None
 
+
+class WorkspaceDomainSettingsResult(BaseModel):
+    """Shared result envelope for one documented Workspace Settings domain."""
+
+    ok: bool
+    status: Literal["ok", "partial", "error"]
+    partial: bool
     workspace_id: str
-    mode: str = "summary"
-    profile: str
-    requested_profile: str | None = None
-    sections: dict[str, Any] = Field(default_factory=dict)
-    summary: dict[str, Any] = Field(default_factory=dict)
-    available_detail_requests: list[dict[str, Any]] = Field(default_factory=list)
-    ok: bool | None = None
-    status: str | None = None
-    partial: bool | None = None
+    domain: Literal["general", "audio", "video", "light", "network", "midi"]
+    coverage: Literal["partial"] = "partial"
+    profile: Literal["safe", "technical", "exhaustive"] = "safe"
+    view: str
+    ref: str | None = None
+    choices: list[SettingsItemIdentity] = Field(default_factory=list)
+    redactions: list[dict[str, str]] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    errors: dict[str, str] | None = None
     error_code: str | None = None
     suggested_action: str | None = None
     message: str | None = None
-    details: Any = None
-    received: Any = None
-    allowed: Any = None
-    requested_count: int | None = None
-    succeeded_count: int | None = None
-    failed_count: int | None = None
-    results: list[dict[str, Any]] = Field(default_factory=list)
-    redactions: list[dict[str, str]] = Field(default_factory=list)
-    errors: dict[str, str] | None = None
-    warnings: list[str] = Field(default_factory=list)
+    received: JsonValue | None = None
+    allowed: JsonValue | None = None
+
+
+class WorkspaceGeneralSettingsData(BaseModel):
+    minGoTime: Annotated[StrictInt | StrictFloat, Field(ge=0, allow_inf_nan=False)] | None = None
+    selectionIsPlayhead: bool | None = None
+
+
+class SettingsInventoryEmpty(BaseModel):
+    items: list[SettingsItemIdentity] = Field(default_factory=list, max_length=0)
+    empty: Literal[True] = True
+    available: Literal[False] = False
+
+
+class AudioOutputChannelName(BaseModel):
+    channel: Annotated[StrictInt, Field(ge=1)]
+    name: str
+
+
+class AudioPatchLevel(BaseModel):
+    input_channel: Annotated[StrictInt, Field(ge=1, le=128)]
+    output_channel: Annotated[StrictInt, Field(ge=1)]
+    decibels: Annotated[StrictInt | StrictFloat, Field(allow_inf_nan=False)] | Literal["-inf"]
+
+
+class AudioPatchSummary(SettingsItemIdentity):
+    cue_outputs: int | None = None
+    cue_output_count: int | None = None
+    routing: list[Annotated[StrictInt, Field(ge=1)]] | None = None
+    routing_present: bool | None = None
+    routing_count: int | None = None
+    device_presence_known: bool = False
+    device_present: bool | None = None
+    output_channel_names: list[AudioOutputChannelName] = Field(default_factory=list)
+
+
+class AudioOutputPatchDetail(AudioPatchSummary):
+    mute_channels: list[Annotated[StrictInt, Field(ge=1)]] = Field(default_factory=list)
+    solo_channels: list[Annotated[StrictInt, Field(ge=1)]] = Field(default_factory=list)
+    level: AudioPatchLevel | None = None
+
+
+class AudioInputPatchDetail(AudioPatchSummary):
+    pass
+
+
+class WorkspaceAudioSettingsOverview(BaseModel):
+    output_patches: list[AudioPatchSummary] = Field(default_factory=list)
+    input_patches: list[AudioPatchSummary] = Field(default_factory=list)
+    cue_output_channel_counts: JsonValue | None = None
+    output_channel_names: JsonValue | None = None
+    max_volume: Annotated[StrictInt | StrictFloat, Field(allow_inf_nan=False)] | None = None
+    min_volume: Annotated[StrictInt | StrictFloat, Field(allow_inf_nan=False)] | None = None
+
+
+class WorkspaceAudioSettingsData(BaseModel):
+    overview: WorkspaceAudioSettingsOverview | None = None
+    detail: AudioOutputPatchDetail | AudioInputPatchDetail | SettingsInventoryEmpty | None = None
+    technical_payload: JsonValue | None = None
+
+
+class VideoItemSummary(BaseModel):
+    uniqueID: str | None = None
+    name: str | None = None
+
+
+class VideoSize(BaseModel):
+    width: float | None = None
+    height: float | None = None
+
+
+class VideoBounds(VideoSize):
+    x: float | None = None
+    y: float | None = None
+
+
+class VideoDeviceSummary(BaseModel):
+    present: bool = False
+    name: str | None = None
+    type: str | None = None
+    connected: bool | None = None
+
+
+class VideoRouteAttention(BaseModel):
+    status: Literal["disconnected"]
+    message: str
+
+
+class VideoRouteSummary(VideoItemSummary):
+    connected: bool | None = None
+    destination_type: str | None = None
+    device: VideoDeviceSummary | None = None
+    destination_present: bool | None = None
+    enableGuides: bool | None = None
+    rotationDegrees: float | None = None
+    scalingMode: str | int | None = None
+    naturalSize: VideoSize | None = None
+    partialScreen: VideoBounds | bool | None = None
+    rear: bool | None = None
+    guides_present: bool | None = None
+    attention: VideoRouteAttention | None = None
+
+
+class VideoRegionSummary(VideoItemSummary):
+    index: int | None = None
+    boundsOnStage: VideoBounds | None = None
+    meshWidth: int | None = None
+    meshHeight: int | None = None
+    warpType: str | int | None = None
+    autoEdgeBlends: bool | None = None
+    edgeBlendTopPixels: float | None = None
+    edgeBlendRightPixels: float | None = None
+    edgeBlendBottomPixels: float | None = None
+    edgeBlendLeftPixels: float | None = None
+    edgeBlendPower: float | None = None
+    edgeBlendGamma: float | None = None
+    route: VideoRouteSummary | None = None
+    control_point_count: int | None = None
+    shadow_control_point_count: int | None = None
+    mesh_subregion_count: int | None = None
+
+
+class VideoStageSummary(VideoItemSummary):
+    size: VideoSize | None = None
+    region_count: int | None = None
+
+
+class VideoStageDetail(VideoStageSummary):
+    regions: list[VideoRegionSummary] | None = None
+    multi_output: bool | None = None
+
+
+class VideoInputPatchSummary(VideoItemSummary):
+    number: int | None = None
+
+
+class VideoSettingsProblem(BaseModel):
+    code: str
+    route: VideoItemSummary | None = None
+    stage: VideoItemSummary | None = None
+
+
+class WorkspaceVideoSettingsOverview(BaseModel):
+    input_patches: list[VideoInputPatchSummary] | None = None
+    routes: list[VideoRouteSummary] | None = None
+    stages: list[VideoStageSummary] | None = None
+    problems: list[VideoSettingsProblem] = Field(default_factory=list)
+
+
+class WorkspaceVideoSettingsData(BaseModel):
+    overview: WorkspaceVideoSettingsOverview | None = None
+
+
+class VideoStageData(BaseModel):
+    detail: VideoStageDetail | None = None
+    technical_payload: JsonValue | None = None
+
+
+class VideoOutputRouteData(BaseModel):
+    detail: VideoRouteSummary | None = None
+    technical_payload: JsonValue | None = None
+
+
+class LightPatchSummary(BaseModel):
+    patch_present: bool
+    top_level_count: StrictInt | None = None
+    instrument_count: StrictInt | None = None
+    group_count: StrictInt | None = None
+    definition_count: StrictInt | None = None
+    read_transport: Literal["udp", "tcp_fallback"] | None = None
+    read_transport_meaning: str | None = None
+
+
+class LightDefinitionSummary(BaseModel):
+    name: str | None = None
+    manufacturer: str | None = None
+    version: StrictInt | StrictFloat | str | None = None
+    broken: bool | None = None
+    default_parameter_index: StrictInt | str | None = None
+    default_parameter_name: str | None = None
+    parameter_count: StrictInt | None = None
+    parameter_names: list[str] = Field(default_factory=list)
+
+
+class LightInstrumentSummary(SettingsItemIdentity):
+    comment: str | None = None
+    patched: bool | None = None
+    conflicted: bool | None = None
+    definition: LightDefinitionSummary | None = None
+    parameter_count: StrictInt | None = None
+    parameter_names: list[str] = Field(default_factory=list)
+
+
+class LightGroupSummary(SettingsItemIdentity):
+    instrument_count: StrictInt = 0
+    instrument_names: list[str] = Field(default_factory=list)
+    parameter_names: list[str] = Field(default_factory=list)
+
+
+class LightParameterSummary(BaseModel):
+    scope: Literal["instrument", "group"]
+    owner_name: str | None = None
+    name: str | None = None
+    unique_name: str | None = None
+    type: str
+    broken: bool | None = None
+    home_value: StrictInt | StrictFloat | str | None = None
+    home_value_dmx: StrictInt | StrictFloat | str | None = None
+    value_is_percentage: bool | None = None
+    two_bytes: bool | None = None
+
+
+class LightInstrumentIndex(BaseModel):
+    columns: list[str] = Field(default_factory=list)
+    rows: list[list[JsonValue]] = Field(default_factory=list)
+
+
+class LightPatchDetail(BaseModel):
+    summary: LightPatchSummary
+    instruments: list[LightInstrumentSummary] = Field(default_factory=list)
+    groups: list[LightGroupSummary] = Field(default_factory=list)
+    parameters: list[LightParameterSummary] = Field(default_factory=list)
+    instrument_index: LightInstrumentIndex | None = None
+    definition_counts: dict[str, StrictInt] = Field(default_factory=dict)
+    technical_payloads_omitted: list[str] = Field(default_factory=list)
+
+
+class WorkspaceLightSettingsData(BaseModel):
+    detail: LightPatchDetail | None = None
+    technical_payload: JsonValue | None = None
+
+
+class NetworkPatchSummary(SettingsItemIdentity):
+    destination_count: StrictInt | None = None
+    destination_present: bool | None = None
+    passcode_present: bool | None = None
+
+
+class WorkspaceNetworkSettingsOverview(BaseModel):
+    patches: list[NetworkPatchSummary] = Field(default_factory=list)
+
+
+class WorkspaceNetworkSettingsData(BaseModel):
+    overview: WorkspaceNetworkSettingsOverview | None = None
+    detail: NetworkPatchSummary | SettingsInventoryEmpty | None = None
+    technical_payload: JsonValue | None = None
+
+
+class MidiPatchSummary(SettingsItemIdentity):
+    destination_present: bool | None = None
+
+
+class WorkspaceMidiSettingsOverview(BaseModel):
+    patches: list[MidiPatchSummary] = Field(default_factory=list)
+
+
+class WorkspaceMidiSettingsData(BaseModel):
+    overview: WorkspaceMidiSettingsOverview | None = None
+    detail: MidiPatchSummary | SettingsInventoryEmpty | None = None
+    technical_payload: JsonValue | None = None
+
+
+class WorkspaceGeneralSettingsResult(WorkspaceDomainSettingsResult):
+    domain: Literal["general"] = "general"
+    data: WorkspaceGeneralSettingsData | None = None
+
+
+class WorkspaceAudioSettingsResult(WorkspaceDomainSettingsResult):
+    domain: Literal["audio"] = "audio"
+    data: WorkspaceAudioSettingsData | None = None
+
+
+class WorkspaceVideoSettingsResult(WorkspaceDomainSettingsResult):
+    domain: Literal["video"] = "video"
+    data: WorkspaceVideoSettingsData | None = None
+
+
+class VideoStageResult(WorkspaceDomainSettingsResult):
+    domain: Literal["video"] = "video"
+    data: VideoStageData | None = None
+
+
+class VideoOutputRouteResult(WorkspaceDomainSettingsResult):
+    domain: Literal["video"] = "video"
+    data: VideoOutputRouteData | None = None
+
+
+class WorkspaceLightSettingsResult(WorkspaceDomainSettingsResult):
+    domain: Literal["light"] = "light"
+    data: WorkspaceLightSettingsData | None = None
+
+
+class WorkspaceNetworkSettingsResult(WorkspaceDomainSettingsResult):
+    domain: Literal["network"] = "network"
+    data: WorkspaceNetworkSettingsData | None = None
+
+
+class WorkspaceMidiSettingsResult(WorkspaceDomainSettingsResult):
+    domain: Literal["midi"] = "midi"
+    data: WorkspaceMidiSettingsData | None = None
 
 
 class WorkspaceSettingsEditRequest(BaseModel):
@@ -288,6 +591,133 @@ class WorkspaceSettingsEditResult(BaseModel):
     message: str
 
 
+WorkspaceStatusCoverage = Literal["complete", "partial", "not_exposed"]
+
+
+class WorkspaceStatusCueIdentity(BaseModel):
+    uniqueID: str | None = None
+    number: str | int | None = None
+    name: str | None = None
+    displayName: str | None = None
+    type: str | None = None
+
+
+class WorkspaceStatusKnownProblem(BaseModel):
+    domain: Literal["video"]
+    code: str
+    route: VideoItemSummary | None = None
+    stage: VideoItemSummary | None = None
+
+
+class WorkspaceStatusSectionBase(BaseModel):
+    source: str
+    available: bool
+    coverage: WorkspaceStatusCoverage | None = None
+    status: str | None = None
+    notes: list[str] = Field(default_factory=list)
+
+
+class WorkspaceStatusWarningsSection(WorkspaceStatusSectionBase):
+    evidence_sources: list[Literal["derived_from_cues", "derived_from_settings"]] = Field(default_factory=list)
+    cue_evidence_available: bool = False
+    settings_evidence_available: bool = False
+    scanned_count: StrictInt | None = None
+    warning_count: StrictInt | None = None
+    broken_count: StrictInt | None = None
+    flagged_count: StrictInt | None = None
+    running_count: StrictInt | None = None
+    paused_count: StrictInt | None = None
+    sample_warning_cues: list[WorkspaceStatusCueIdentity] = Field(default_factory=list)
+    sample_broken_cues: list[WorkspaceStatusCueIdentity] = Field(default_factory=list)
+    sample_flagged_cues: list[WorkspaceStatusCueIdentity] = Field(default_factory=list)
+    known_settings_problem_count: StrictInt = 0
+    known_settings_problem_counts: dict[str, StrictInt] = Field(default_factory=dict)
+    sample_settings_problems: list[WorkspaceStatusKnownProblem] = Field(default_factory=list)
+
+
+class WorkspaceStatusTriggerSection(WorkspaceStatusSectionBase):
+    timecode_trigger_count: StrictInt | None = None
+    auto_continue_count: StrictInt | None = None
+    auto_follow_count: StrictInt | None = None
+    default_timecode_values_seen: bool | None = None
+    default_timecode_values_not_counted: bool | None = None
+    general_trigger_status: str | None = None
+
+
+class WorkspaceStatusTimecodeConfigSection(WorkspaceStatusSectionBase):
+    configured_count: StrictInt | None = None
+    sample: list[dict[str, JsonValue]] = Field(default_factory=list)
+    default_timecode_values_seen: bool | None = None
+    default_timecode_values_not_counted: bool | None = None
+
+
+class WorkspaceStatusTimecodeLiveItem(BaseModel):
+    cue_ref: str
+    current_timecode_text: JsonValue = Field(alias="currentTimecode/text")
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class WorkspaceStatusTimecodeLiveSection(WorkspaceStatusSectionBase):
+    sample: list[WorkspaceStatusTimecodeLiveItem] = Field(default_factory=list)
+
+
+class WorkspaceStatusSettingsCounts(BaseModel):
+    requested_sections: list[str] = Field(default_factory=list)
+    returned_sections: list[str] = Field(default_factory=list)
+    section_count: StrictInt | None = None
+    error_count: StrictInt | None = None
+    redaction_count: StrictInt | None = None
+    audio_output_patch_count: StrictInt | None = None
+    audio_input_patch_count: StrictInt | None = None
+    video_route_count: StrictInt | None = None
+    video_stage_count: StrictInt | None = None
+    video_input_patch_count: StrictInt | None = None
+    video_problem_count: StrictInt = 0
+    video_problem_counts: dict[str, StrictInt] = Field(default_factory=dict)
+    network_patch_count: StrictInt | None = None
+    midi_patch_count: StrictInt | None = None
+
+
+class WorkspaceStatusSettingsSection(WorkspaceStatusSectionBase):
+    summary: WorkspaceStatusSettingsCounts | None = None
+    sections: dict[str, JsonValue] | None = None
+    errors: dict[str, str] | None = None
+    known_problems: list[WorkspaceStatusKnownProblem] = Field(default_factory=list)
+    problem_counts: dict[str, StrictInt] = Field(default_factory=dict)
+
+
+class WorkspaceStatusInfoSection(WorkspaceStatusSectionBase):
+    workspace_id: str
+    machine_id: Literal["redacted"]
+
+
+class WorkspaceStatusSections(TypedDict, total=False):
+    warnings_summary: WorkspaceStatusWarningsSection
+    trigger_summary: WorkspaceStatusTriggerSection
+    timecode_config: WorkspaceStatusTimecodeConfigSection
+    timecode_live_status: WorkspaceStatusTimecodeLiveSection
+    settings_summary: WorkspaceStatusSettingsSection
+    logs: WorkspaceStatusSectionBase
+    artnet: WorkspaceStatusSectionBase
+    video_metrics: WorkspaceStatusSectionBase
+    info: WorkspaceStatusInfoSection
+
+
+class WorkspaceStatusSummary(TypedDict, total=False):
+    available_sections: list[str]
+    unavailable_sections: list[str]
+    cue_scan_completeness: str
+    scanned_count: StrictInt
+    matched_timecode_config_count: StrictInt
+    settings_error_count: StrictInt
+
+
+class WorkspaceStatusLimits(TypedDict, total=False):
+    max_cues_scanned: StrictInt
+    sample_limit: StrictInt
+
+
 class WorkspaceStatusResult(BaseModel):
     """Read-only operational status derived from documented QLab OSC reads."""
 
@@ -302,53 +732,11 @@ class WorkspaceStatusResult(BaseModel):
     details: Any = None
     received: Any = None
     allowed: Any = None
-    sections: dict[str, Any] = Field(default_factory=dict)
-    summary: dict[str, Any] = Field(default_factory=dict)
-    limits: dict[str, Any] = Field(default_factory=dict)
+    sections: WorkspaceStatusSections = Field(default_factory=dict)
+    summary: WorkspaceStatusSummary = Field(default_factory=dict)
+    limits: WorkspaceStatusLimits = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
     errors: dict[str, str] | None = None
-
-
-class WorkspaceSettingDetailsResult(BaseModel):
-    """Read-only safe or technical details for one QLab workspace setting item."""
-
-    workspace_id: str
-    section: str
-    kind: str
-    ref: str | None = None
-    profile: str
-    ok: bool | None = None
-    status: str | None = None
-    partial: bool | None = None
-    error_code: str | None = None
-    suggested_action: str | None = None
-    received: Any = None
-    allowed: Any = None
-    details: Any = None
-    choices: list[dict[str, Any]] = Field(default_factory=list)
-    redactions: list[dict[str, str]] = Field(default_factory=list)
-    errors: dict[str, str] | None = None
-    warnings: list[str] = Field(default_factory=list)
-    message: str | None = None
-
-
-class WorkspaceSettingRequestInput(BaseModel):
-    """One workspace settings detail request for qlab_get_workspace_settings(mode='details')."""
-
-    section: str = Field(
-        description="Workspace settings section: audio, video, network, midi, light, or general."
-    )
-    kind: str | None = Field(
-        default=None,
-        description=(
-            "Detail kind. Use all, output_patch, input_patch, audio_map, route, stage, "
-            "video_input_patch, network_patch, midi_patch, or light_patch."
-        ),
-    )
-    ref: str | None = Field(
-        default=None,
-        description="Optional item name or uniqueID. Omit only when one item exists or choices are desired.",
-    )
 
 
 class CueQueryResult(BaseModel):
@@ -505,6 +893,32 @@ class CreateCueResult(BaseModel):
     message: str
 
 
+class CreateCuesDestination(BaseModel):
+    kind: Literal["cue_list", "group", "cue_cart"]
+    id: str
+    after_cue_id: str | None = None
+    resolved_after_cue_id: str | None = None
+    insertion_index: int | None = None
+    placement_mode: str | None = None
+
+
+class CreateCuesItemResult(BaseModel):
+    index: StrictInt = Field(description="Zero-based position in the requested cue_types list.")
+    cue_type: str
+    status: CreateCueStatus | Literal["planned"]
+    created_cue_id: str | None = None
+    verified: bool | None = None
+    parent_id: str | None = None
+    position_index: int | None = None
+    health_status: str | None = None
+    cleanup_required: bool = False
+    cleanup: dict[str, Any] | None = None
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    error_code: str | None = None
+    suggested_action: str | None = None
+
+
 class CreateCuesResult(BaseModel):
     """Result for an ordered, sequential multi-cue creation."""
 
@@ -521,13 +935,16 @@ class CreateCuesResult(BaseModel):
         ),
     )
     created_count: int = 0
-    results: list[dict[str, Any]] = Field(default_factory=list)
+    destination: CreateCuesDestination | None = None
+    results: list[CreateCuesItemResult] = Field(default_factory=list)
     planned_operations: list[dict[str, Any]] = Field(default_factory=list)
     executed_operations: list[dict[str, Any]] = Field(default_factory=list)
     confirm_token: str | None = Field(
         default=None,
-        description="Dedicated confirm:createCues:v1 token returned by dry-run.",
+        description="Dedicated confirm:createCues:v2 token returned by dry-run.",
     )
+    error_code: str | None = None
+    suggested_action: str | None = None
     errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
     message: str

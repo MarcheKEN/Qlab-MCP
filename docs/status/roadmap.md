@@ -1,5 +1,27 @@
 # Active Roadmap
 
+## Read-tools closeout — 2026-09-26
+
+- Align active documentation with 48 tools (43 reads, 5 gated writes) and prefer
+  family-specific UUID details for known cue types.
+- Publish and verify the local work before treating PR #17 CI as release evidence.
+  Explicitly decide whether the existing Create consolidation belongs in this
+  read-tools PR or a separate write-tools change; preserve it either way.
+- Keep Move shallow-health validation and Delete acknowledgement validation as
+  pending write-safety work. See [current state](current-state.md).
+- Do not remove historical validation/research assets without a separate review.
+
+## Historical roadmap snapshots
+
+Development update (2026-09-24): Create is consolidated into the public
+`qlab_create_cues` tool. One to 50 ordered cues require an exact destination,
+and the reviewed v2 token binds order, position, and fresh structure.
+The prior singular public tool is retired; its internal single-cue executor
+remains shared. Historical entries below retain their original scope.
+
+Development update (2026-09-21): combined List/Cart inventory and separate
+UUID-only List and Cart detail tools are implemented (23 public tools).
+
 Status: 2026-08-13 — 0.3.0 preparation
 
 ## Current state snapshot
@@ -8,11 +30,17 @@ The canonical dated inventory is [`current-state.md`](current-state.md). The
 current snapshot is provisional on the preparation branch; a docs-only PR will
 replace it after the 0.3.0 merge into `main` and before the release tag.
 
-> Branch update (2026-09-16): PR #16 is complete for its bounded Workspace
-> Settings scope (`qlab_edit_workspace_settings`,
-> `general.minGoTime`). The branch exposes 14 tools. Additional settings remain
-> deferred and are not a prerequisite for this PR's review or merge. The
+> Development update (2026-09-18): PR #16 is complete for its bounded Workspace
+> Settings write scope (`qlab_edit_workspace_settings`,
+> `general.minGoTime`). That snapshot exposed 20 tools after splitting the
+> broad Workspace Settings reads into six documented domains and separating
+> exact Video stage and output-route reads from the Video overview. Additional
+> settings writes remain deferred. The
 > preparation counts and gates below describe the dated pre-PR snapshot.
+
+Cue List update (2026-09-20): the current surface has 22 tools. Dedicated
+inventory/detail reads are available; generic Cue Details returns a structured
+redirect for Cue Lists while retaining Cue Cart support.
 
 Final local preflight: the full suite passed with `2595 passed, 41 subtests
 passed` outside the managed socket sandbox. FastMCP inspection reports 13 tools

@@ -23,7 +23,6 @@ SOURCE_URL = "https://qlab.app/docs/v5/scripting/applescript-dictionary-v5/"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HTML = PROJECT_ROOT / "docs/sources/qlab-5-applescript/applescript_dictionary_v5.local.html"
 DEFAULT_MARKDOWN = PROJECT_ROOT / "docs/references/qlab_applescript_dictionary.md"
-DEFAULT_SKILL_COPY = PROJECT_ROOT / "skills/qlab-5-applescript/references/qlab_applescript_dictionary.md"
 _UNIQUE_ANCHORS: set[str] = set()
 
 
@@ -246,7 +245,7 @@ def main() -> int:
     parser.add_argument("--source-html", type=Path, help="Use an existing HTML file instead of downloading")
     parser.add_argument("--html-output", type=Path, default=DEFAULT_HTML)
     parser.add_argument("--markdown-output", type=Path, default=DEFAULT_MARKDOWN)
-    parser.add_argument("--skill-copy", type=Path, default=DEFAULT_SKILL_COPY)
+    parser.add_argument("--skill-copy", type=Path, help="Optional local portable copy")
     parser.add_argument("--check", action="store_true", help="Check generated Markdown and portable copy")
     args = parser.parse_args()
 
@@ -254,7 +253,7 @@ def main() -> int:
         raw_html = args.html_output.read_text(encoding="utf-8")
         expected = to_markdown(raw_html)
         actual = args.markdown_output.read_text(encoding="utf-8")
-        portable = args.skill_copy.read_text(encoding="utf-8")
+        portable = args.skill_copy.read_text(encoding="utf-8") if args.skill_copy else actual
         if expected != actual or portable != actual:
             print("AppleScript reference is not reproducible or portable copy is stale", file=sys.stderr)
             return 1
@@ -264,14 +263,16 @@ def main() -> int:
     raw = args.source_html.read_bytes() if args.source_html else fetch_source()
     args.html_output.parent.mkdir(parents=True, exist_ok=True)
     args.markdown_output.parent.mkdir(parents=True, exist_ok=True)
-    args.skill_copy.parent.mkdir(parents=True, exist_ok=True)
     args.html_output.write_bytes(raw)
     markdown = to_markdown(raw.decode("utf-8"))
     args.markdown_output.write_text(markdown, encoding="utf-8")
-    shutil.copyfile(args.markdown_output, args.skill_copy)
+    if args.skill_copy:
+        args.skill_copy.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(args.markdown_output, args.skill_copy)
     print(f"html: {args.html_output} ({sha256(args.html_output)})")
     print(f"markdown: {args.markdown_output} ({sha256(args.markdown_output)})")
-    print(f"portable: {args.skill_copy}")
+    if args.skill_copy:
+        print(f"portable: {args.skill_copy}")
     return 0
 
 

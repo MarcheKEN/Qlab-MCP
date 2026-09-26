@@ -15,7 +15,6 @@ from . import __version__
 from .errors import QLabMcpError
 from .models import (
     CreateCuesResult,
-    CreateCueResult,
     DeleteCuesResult,
     CueDetailsBatchResult,
     CueDetailsResult,
@@ -24,24 +23,45 @@ from .models import (
     MoveCueInput,
     MoveCuesResult,
     QlabConnectionCheckResult,
+    WorkspaceAudioSettingsResult,
+    WorkspaceDomainSettingsResult,
+    WorkspaceGeneralSettingsResult,
+    WorkspaceLightSettingsResult,
+    WorkspaceMidiSettingsResult,
+    WorkspaceNetworkSettingsResult,
     WorkspaceStatusResult,
-    WorkspaceSettingRequestInput,
     UpdateCuesResult,
     WriteReadinessResult,
-    WorkspaceSettingDetailsResult,
     WorkspaceOverviewResult,
-    WorkspaceSettingsResult,
     WorkspaceSettingsEditRequest,
     WorkspaceSettingsEditResult,
     WorkspaceSettingsOperation,
+    WorkspaceVideoSettingsResult,
+    VideoStageResult,
+    VideoOutputRouteResult,
     CanonicalWorkspaceUUID,
 )
 from .qlab import QLabReader
 from .cues.details import MAX_BATCH_CUE_DETAILS
+from .cues.list_models import CueListsResult, CueListDetailsResult, CueCartDetailsResult
+from .cues.audio import AudioCuesResult, AudioCueDetailsResult
+from .cues.mic import MicCuesResult, MicCueDetailsResult
+from .cues.light_group import LightCuesResult, LightCueDetailsResult, GroupCuesResult, GroupCueDetailsResult
+from .cues.control import ControlCueType, ControlCuesResult, ControlCueDetailsResult
+from .cues.remaining import (
+    FadeCuesResult, FadeCueDetailsResult,
+    NetworkCuesResult, NetworkCueDetailsResult,
+    MidiCuesResult, MidiCueDetailsResult,
+    TimecodeCuesResult, TimecodeCueDetailsResult,
+    ScriptCuesResult, ScriptCueDetailsResult,
+)
+from .cues.visual import (
+    VideoCuesResult, VideoCueDetailsResult, TextCuesResult, TextCueDetailsResult,
+    CameraCuesResult, CameraCueDetailsResult,
+)
 from .cues.limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES
 from .cues.query import MAX_SENSITIVE_QUERY_RESULTS
 from .sanitizer import sanitize_exception_message
-from .settings.workspace import MAX_WORKSPACE_DETAIL_REQUESTS, MAX_WORKSPACE_SETTINGS_SECTIONS
 from .server_responses import (
     cue_details_success_payload as _cue_details_success_payload,
     overview_success_payload as _overview_success_payload,
@@ -117,22 +137,36 @@ CueQueryFilter = Literal[
     "ambiguous_label",
     "flagged_or_broken",
 ]
-WorkspaceSettingsSection = Literal["audio", "video", "network", "midi", "light", "general"]
-WorkspaceSettingsMode = Literal["summary", "details"]
-WorkspaceSettingsProfile = Literal["safe", "technical", "exhaustive"]
-WorkspaceStatusProfile = Literal["summary", "technical"]
-WorkspaceSettingDetailKind = Literal[
-    "all",
-    "output_patch",
-    "input_patch",
-    "audio_map",
-    "route",
-    "stage",
-    "video_input_patch",
-    "network_patch",
-    "midi_patch",
-    "light_patch",
+WorkspaceSettingsProfile = Annotated[
+    Literal["safe", "technical", "exhaustive"],
+    Field(
+        description=(
+            "safe returns compact normalized data; technical and exhaustive return deeper redacted payloads. "
+            "Credentials remain redacted in every profile."
+        )
+    ),
 ]
+WorkspaceSettingsRef = Annotated[
+    str | None,
+    Field(description="Optional exact settings item name or UUID. Omit it to return the domain overview or choices."),
+]
+WorkspaceAudioSettingsView = Annotated[
+    Literal["overview", "output_patch", "input_patch"],
+    Field(description="Use overview, or select one output_patch or input_patch."),
+]
+AudioInputChannel = Annotated[
+    StrictInt | None,
+    Field(ge=1, le=128, description="Optional cue-output channel for one Audio Output Patch crosspoint read."),
+]
+AudioOutputChannel = Annotated[
+    StrictInt | None,
+    Field(ge=1, description="Optional device-output channel for one Audio Output Patch crosspoint read."),
+]
+VideoSettingsProfile = Annotated[
+    Literal["safe", "technical"],
+    Field(description="safe returns typed summaries; technical also returns the redacted OSC payload."),
+]
+WorkspaceStatusProfile = Literal["summary", "technical"]
 WritableCueType = Literal[
     "memo",
     "group",
@@ -207,17 +241,16 @@ CHECK_CONNECTION_TIMEOUT = 6.0
 WORKSPACE_OVERVIEW_TIMEOUT = 45.0
 WORKSPACE_STATUS_TIMEOUT = 60.0
 WORKSPACE_SETTINGS_TIMEOUT = 60.0
-WORKSPACE_SETTING_DETAILS_TIMEOUT = 60.0
 QUERY_CUES_TIMEOUT = 60.0
 CUE_DETAILS_TIMEOUT = 20.0
 WRITE_READINESS_TIMEOUT = 6.0
-CREATE_CUE_TIMEOUT = 30.0
 CREATE_CUES_TIMEOUT = 180.0
 UPDATE_CUES_TIMEOUT = 180.0
 DELETE_CUES_TIMEOUT = 180.0
 WORKSPACE_SETTINGS_WRITE_TIMEOUT = 60.0
 
 T = TypeVar("T")
+WorkspaceDomainResultT = TypeVar("WorkspaceDomainResultT", bound=WorkspaceDomainSettingsResult)
 
 
 mcp = FastMCP(
@@ -225,11 +258,11 @@ mcp = FastMCP(
     version=__version__,
     mask_error_details=True,
     instructions="""
-QLab MCP 0.3.0 exposes eight read-only tools plus six gated write tools over OSC.
+QLab MCP exposes forty-three read-only tools plus five gated write tools over OSC.
 Write mode requires QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; it remains dry-run first.
 This server does not expose GO, stop, panic, playback, audition, /live writes, AppleScript writes, or raw OSC passthrough.
 
-Orient first with qlab_check_connection, then use a bounded workspace overview/status or settings read, qlab_query_cues, and qlab_get_cue_details as needed. Resolve one exact workspace before any write. Use exact UUIDs for workspace and cue writes; never infer a workspace or target from selection, playhead, or active state.
+Orient first with qlab_check_connection, then use a bounded workspace overview/status or the relevant domain-specific settings read, qlab_query_cues, and qlab_get_cue_details as needed. Resolve one exact workspace before any write. Use exact UUIDs for workspace and cue writes; never infer a workspace or target from selection, playhead, or active state.
 
 For every real write, call qlab_check_write_readiness, inspect an explicit dry-run, review warnings/errors/planned operations, supply only the exact fresh confirmation token required by that operation, execute once, and require fresh readback. Do not retry a mutation after a timeout or identity ambiguity. Batches are not automatically transactional.
 
@@ -296,39 +329,153 @@ def _workspace_status_error(workspace_id: Any, profile: Any, **error: Any) -> Wo
     return WorkspaceStatusResult.model_validate(payload)
 
 
-def _settings_error(workspace_id: Any, mode: Any, profile: Any, **error: Any) -> WorkspaceSettingsResult:
-    payload = {
-        **_structured_error_result(**error),
-        "workspace_id": str(workspace_id or ""),
-        "mode": str(mode or "summary"),
-        "profile": str(profile or "safe"),
-        "requested_profile": str(profile or "safe"),
-        "sections": {},
-        "summary": {"error_count": 1},
-        "available_detail_requests": [],
-        "results": [],
-        "redactions": [],
-        "warnings": [error["message"]],
-        "errors": {"validation": error["message"], "error_code": error["error_code"]},
-    }
-    return WorkspaceSettingsResult.model_validate(payload)
+def _workspace_domain_data(domain: str, view: str, profile: str, value: Any) -> Any:
+    if value is None:
+        return None
+    if domain == "general":
+        return value
+    if domain == "video" and view in {"stage", "route"}:
+        return value
+    if domain in {"audio", "network", "midi"} and view != "overview" and isinstance(value, dict):
+        technical_payload = value.get("technical_payload")
+        detail = {key: item for key, item in value.items() if key != "technical_payload"}
+        return {"detail": detail, "technical_payload": technical_payload}
+    if domain == "light" and isinstance(value, dict):
+        if profile == "safe":
+            return {"detail": value}
+        return {
+            "detail": {"summary": value.get("summary") or {"patch_present": False}},
+            "technical_payload": value.get("patch"),
+        }
+    if profile in {"technical", "exhaustive"}:
+        return {"technical_payload": value}
+    if view == "overview":
+        return {"overview": value}
+    return {"detail": value}
 
 
-def _setting_details_error(workspace_id: Any, section: Any, kind: Any, profile: Any, **error: Any) -> WorkspaceSettingDetailsResult:
-    payload = {
-        **_structured_error_result(**error),
-        "workspace_id": str(workspace_id or ""),
-        "section": str(section or ""),
-        "kind": str(kind or ""),
-        "profile": str(profile or "safe"),
-        "details": None,
-        "choices": [],
-        "redactions": [],
-        "warnings": [error["message"]],
-        "errors": {"validation": error["message"], "error_code": error["error_code"]},
-        "message": error["message"],
+def _workspace_domain_payload(
+    payload: dict[str, Any],
+    *,
+    domain: str,
+    view: str,
+    ref: str | None,
+    profile: str,
+) -> dict[str, Any]:
+    is_overview = "sections" in payload
+    value = (payload.get("sections") or {}).get(domain) if is_overview else payload.get("details")
+    if domain == "video" and is_overview and isinstance(value, dict):
+        value = dict(value)
+        errors = payload.get("errors") or {}
+        for key, route in (("input_patches", "inputPatchList"), ("routes", "routes"), ("stages", "stages")):
+            if f"video.{route}" in errors:
+                value[key] = None
+    normalized = {
+        key: payload.get(key)
+        for key in (
+            "ok",
+            "status",
+            "partial",
+            "error_code",
+            "suggested_action",
+            "message",
+            "received",
+            "allowed",
+        )
+        if payload.get(key) is not None
     }
-    return WorkspaceSettingDetailsResult.model_validate(payload)
+    normalized.update(
+        {
+            "workspace_id": str(payload.get("workspace_id") or ""),
+            "domain": domain,
+            "coverage": "partial",
+            "profile": str(payload.get("profile") or profile),
+            "view": view,
+            "ref": ref,
+            "data": _workspace_domain_data(domain, view, profile, value),
+            "choices": payload.get("choices") or [],
+            "redactions": payload.get("redactions") or [],
+            "warnings": payload.get("warnings") or [],
+            "errors": payload.get("errors"),
+        }
+    )
+    return _settings_success_payload(normalized)
+
+
+def _run_workspace_settings_domain(
+    workspace_id: str,
+    *,
+    domain: str,
+    view: str,
+    ref: str | None,
+    profile: WorkspaceSettingsProfile,
+    detail_kind: str | None,
+    result_model: type[WorkspaceDomainResultT],
+    allowed: dict[str, Any],
+    exact_video: bool = False,
+    detail_options: dict[str, Any] | None = None,
+    validation_error: str | None = None,
+) -> WorkspaceDomainResultT:
+    try:
+        if validation_error is not None:
+            raise ValueError(validation_error)
+        if view == "overview" and ref is not None:
+            raise ValueError("ref is not allowed when view='overview'")
+
+        def read(reader: QLabReader) -> WorkspaceDomainResultT:
+            if exact_video:
+                payload = reader.get_video_setting(
+                    workspace_id=workspace_id, kind=detail_kind, ref=ref, profile=profile,
+                )
+            elif detail_kind is None:
+                payload = reader.get_workspace_settings(
+                    workspace_id=workspace_id,
+                    mode="summary",
+                    sections=[domain],
+                    profile=profile,
+                )
+            else:
+                payload = reader.get_workspace_setting_details(
+                    workspace_id=workspace_id,
+                    section=domain,
+                    kind=detail_kind,
+                    ref=ref,
+                    profile=profile,
+                    **(detail_options or {}),
+                )
+            return result_model.model_validate(
+                _workspace_domain_payload(
+                    payload,
+                    domain=domain,
+                    view=view,
+                    ref=ref,
+                    profile=profile,
+                )
+            )
+
+        return _run_tool(read, timeout=WORKSPACE_SETTINGS_TIMEOUT, translate_errors=False)
+    except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
+        message = sanitize_exception_message(exc)
+        payload = {
+            **_structured_error_result(
+                error_code="validation_failed",
+                message=message,
+                received={"view": view, "ref": ref, "profile": profile, **(detail_options or {})},
+                allowed=allowed,
+            ),
+            "workspace_id": str(workspace_id or ""),
+            "domain": domain,
+            "coverage": "partial",
+            "profile": profile,
+            "view": view,
+            "ref": ref,
+            "data": None,
+            "choices": [],
+            "redactions": [],
+            "warnings": [message],
+            "errors": {"validation": message, "error_code": "validation_failed"},
+        }
+        return result_model.model_validate(payload)
 
 
 def _query_error(workspace_id: Any, primary_filter: Any, profile: Any, max_results: Any, max_cues_scanned: Any, **error: Any) -> CueQueryResult:
@@ -440,8 +587,10 @@ def qlab_get_workspace_overview(
         ),
     ] = None,
     max_depth: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=0,
+            le=5,
             description=(
                 "How many child layers of cue lists/groups to inspect using shallow OSC reads. "
                 "Use 0 for cue-list names only; increase only when the show map is incomplete."
@@ -449,8 +598,10 @@ def qlab_get_workspace_overview(
         ),
     ] = 2,
     max_cues: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=1,
+            le=5000,
             description=(
                 "Maximum cue/list/group nodes to include in the bounded tree preview before marking it as truncated. "
                 "Raise up to 5000 for large workspace load checks."
@@ -476,8 +627,10 @@ def qlab_get_workspace_overview(
         ),
     ] = True,
     max_index_cues: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=1,
+            le=5000,
             description=(
                 "Maximum cue IDs to include in cue_index before marking the index as truncated. "
                 "This does not change the bounded tree preview limits."
@@ -564,14 +717,18 @@ def qlab_get_workspace_status(
         Field(description="When true, include timecode config and per-list/cart currentTimecode/text samples when exposed."),
     ] = True,
     max_cues_scanned: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=1,
+            le=5000,
             description="Maximum cues to scan for cue-derived status summaries before marking them partial.",
         ),
     ] = 1000,
     sample_limit: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=0,
+            le=50,
             description="Maximum sample cue/status rows returned inside compact sections.",
         ),
     ] = 10,
@@ -608,187 +765,745 @@ def qlab_get_workspace_status(
 
 
 @mcp.tool(
-    title="Get QLab Workspace Settings",
-    tags={"qlab", "settings", "patches", "routing", "inventory", "safe-read"},
+    title="Get QLab Workspace General Settings",
+    tags={"qlab", "settings", "general", "safe-read"},
     annotations=READ_ONLY_QLAB_TOOL,
     timeout=WORKSPACE_SETTINGS_TIMEOUT,
 )
-def qlab_get_workspace_settings(
-    workspace_id: WorkspaceId,
-    mode: Annotated[
-        str,
-        Field(
-            description=(
-                "summary returns compact inventory plus available_detail_requests. "
-                "details runs one or more focused detail requests and returns a batch result."
-            ),
-        ),
-    ] = "summary",
-    sections: Annotated[
-        list[str] | None,
-        Field(
-            json_schema_extra={"maxItems": MAX_WORKSPACE_SETTINGS_SECTIONS},
-            description=(
-                "Summary mode sections to inspect. Use audio, video, network, midi, light, and/or general. "
-                "When omitted in summary mode, all sections are read. Ignored in details mode."
-            ),
-        ),
-    ] = None,
-    requests: Annotated[
-        list[WorkspaceSettingRequestInput] | None,
-        Field(
-            json_schema_extra={"maxItems": MAX_WORKSPACE_DETAIL_REQUESTS},
-            description=(
-                "Details mode requests. Each item has section, kind, and optional ref. "
-                "Examples: {'section':'audio','kind':'output_patch','ref':'Main'}, "
-                "{'section':'video','kind':'stage','ref':'TELON'}, or "
-                "{'section':'light','kind':'light_patch'}."
-            ),
-        ),
-    ] = None,
-    profile: Annotated[
-        str,
-        Field(
-            description=(
-                "Read-only profile for details mode. safe returns compact redacted summaries; technical can include "
-                "routing, regions, interfaces, IPs/ports, device data, and raw payloads when needed; exhaustive returns "
-                "the deepest allowlisted read-only data and may be large. Summary mode stays compact."
-            ),
-        ),
-    ] = "safe",
-) -> WorkspaceSettingsResult:
-    """Return read-only QLab Workspace Settings summary or batched details.
+def qlab_get_workspace_general_settings(workspace_id: WorkspaceId) -> WorkspaceGeneralSettingsResult:
+    """Return the documented read-only General settings for one exact QLab workspace.
 
-    Summary mode is the first settings read after the overview: it returns compact sections, counts, redactions,
-    errors, and available_detail_requests. Use mode="details" for focused requests. Details mode accepts one or
-    more requests and returns independent per-request results; one failed request does not block other valid requests.
+    QLab OSC exposes only minimum GO time and selection/playhead locking from the larger General settings panel.
     """
-    if isinstance(requests, (list, tuple)) and len(requests) > MAX_WORKSPACE_DETAIL_REQUESTS:
-        return _settings_error(
-            workspace_id,
-            mode,
-            profile,
-            error_code="workspace_detail_batch_too_large",
-            message=(
-                f"workspace settings details can include at most {MAX_WORKSPACE_DETAIL_REQUESTS} requests"
-            ),
-            received={"request_count": len(requests)},
-            allowed={"max_requests": MAX_WORKSPACE_DETAIL_REQUESTS},
-        )
-    if isinstance(sections, (list, tuple)) and len(sections) > MAX_WORKSPACE_SETTINGS_SECTIONS:
-        return _settings_error(
-            workspace_id,
-            mode,
-            profile,
-            error_code="workspace_sections_too_many",
-            message=(
-                f"workspace settings sections can include at most {MAX_WORKSPACE_SETTINGS_SECTIONS} entries"
-            ),
-            received={"section_count": len(sections)},
-            allowed={"max_sections": MAX_WORKSPACE_SETTINGS_SECTIONS},
-        )
-    try:
-        return _run_tool(
-            lambda reader: WorkspaceSettingsResult.model_validate(
-                _settings_success_payload(reader.get_workspace_settings(
-                    workspace_id=workspace_id,
-                    mode=mode,
-                    sections=sections,
-                    requests=[request.model_dump() if hasattr(request, "model_dump") else request for request in requests]
-                    if requests is not None
-                    else None,
-                    profile=profile,
-                ))
-            ),
-            timeout=WORKSPACE_SETTINGS_TIMEOUT,
-            translate_errors=False,
-        )
-    except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
-        return _settings_error(
-            workspace_id,
-            mode,
-            profile,
-            error_code="validation_failed",
-            message=sanitize_exception_message(exc),
-            received={"mode": mode, "sections": sections, "requests": requests, "profile": profile},
-            allowed={"mode": ["summary", "details"], "sections": ["audio", "video", "network", "midi", "light", "general"], "profile": ["safe", "technical", "exhaustive"]},
-        )
+    return _run_workspace_settings_domain(
+        workspace_id,
+        domain="general",
+        view="overview",
+        ref=None,
+        profile="safe",
+        detail_kind=None,
+        result_model=WorkspaceGeneralSettingsResult,
+        allowed={"view": ["overview"]},
+    )
 
 
 @mcp.tool(
-    title="Get QLab Workspace Setting Details",
-    tags={"qlab", "settings", "patches", "routing", "details", "safe-read"},
+    title="Get QLab Workspace Audio Settings",
+    tags={"qlab", "settings", "audio", "patches", "routing", "safe-read"},
     annotations=READ_ONLY_QLAB_TOOL,
-    timeout=WORKSPACE_SETTING_DETAILS_TIMEOUT,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
 )
-def qlab_get_workspace_setting_details(
+def qlab_get_workspace_audio_settings(
     workspace_id: WorkspaceId,
-    section: Annotated[
-        str,
-        Field(description="Workspace settings section to inspect in detail."),
-    ],
-    kind: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Specific settings item kind. Use all, output_patch, input_patch, audio_map, route, stage, "
-                "video_input_patch, network_patch, midi_patch, or light_patch. Defaults to all except light, "
-                "where it defaults to light_patch."
-            ),
-        ),
-    ] = None,
-    ref: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Optional settings item name or uniqueID. If omitted for a kind with multiple candidates, "
-                "the tool returns choices instead of guessing."
-            ),
-        ),
-    ] = None,
-    profile: Annotated[
-        str,
-        Field(
-            description=(
-                "Read-only detail profile. safe returns compact normalized details suitable for normal agent use. "
-                "technical can include diagnostic IPs, ports, interfaces, device details, raw routes, regions, "
-                "geometry, mesh/warp, audio-map levels, and light-patch payloads. Passcodes are always redacted."
-            ),
-        ),
-    ] = "safe",
-) -> WorkspaceSettingDetailsResult:
-    """Return read-only details for one workspace setting item.
+    view: WorkspaceAudioSettingsView = "overview",
+    ref: WorkspaceSettingsRef = None,
+    profile: WorkspaceSettingsProfile = "safe",
+    input_channel: AudioInputChannel = None,
+    output_channel: AudioOutputChannel = None,
+) -> WorkspaceAudioSettingsResult:
+    """Return an Audio settings overview, one exact output patch, or one exact input patch.
 
-    Backwards-compatible wrapper for a single request around qlab_get_workspace_settings(mode="details"). The default
-    safe profile summarizes large structures: light patches become instrument indexes, video stages become
-    stage/region/route summaries, and audio maps omit long level arrays. Use technical or exhaustive only for
-    explicit low-level audits; use the settings tool for a batch.
+    The safe profile returns normalized summaries. Technical and exhaustive profiles add deeper redacted payloads.
+    Provide both channel selectors with output_patch to read one matrix crosspoint; the full matrix is never scanned.
     """
-    try:
-        return _run_tool(
-            lambda reader: WorkspaceSettingDetailsResult.model_validate(
-                _settings_success_payload(reader.get_workspace_setting_details(
-                    workspace_id=workspace_id,
-                    section=section,
-                    kind=kind,
-                    ref=ref,
-                    profile=profile,
-                ))
-            ),
-            timeout=WORKSPACE_SETTING_DETAILS_TIMEOUT,
-            translate_errors=False,
-        )
-    except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
-        return _setting_details_error(
-            workspace_id,
-            section,
-            kind,
-            profile,
-            error_code="validation_failed",
-            message=sanitize_exception_message(exc),
-            received={"section": section, "kind": kind, "ref": ref, "profile": profile},
-            allowed={"sections": ["audio", "video", "network", "midi", "light", "general"], "kinds": list(WorkspaceSettingDetailKind.__args__) if hasattr(WorkspaceSettingDetailKind, "__args__") else None, "profile": ["safe", "technical", "exhaustive"]},
-        )
+    detail_kind = None if view == "overview" and profile == "safe" else "all" if view == "overview" else view
+    validation_error = None
+    if (input_channel is None) != (output_channel is None):
+        validation_error = "input_channel and output_channel must be provided together"
+    elif input_channel is not None and view != "output_patch":
+        validation_error = "channel selectors are only valid when view='output_patch'"
+    detail_options = (
+        {"input_channel": input_channel, "output_channel": output_channel}
+        if input_channel is not None or output_channel is not None
+        else {}
+    )
+    return _run_workspace_settings_domain(
+        workspace_id,
+        domain="audio",
+        view=view,
+        ref=ref,
+        profile=profile,
+        detail_kind=detail_kind,
+        result_model=WorkspaceAudioSettingsResult,
+        detail_options=detail_options,
+        validation_error=validation_error,
+        allowed={
+            "view": ["overview", "output_patch", "input_patch"],
+            "profile": ["safe", "technical", "exhaustive"],
+            "input_channel": "1..128, with output_channel and output_patch",
+            "output_channel": ">=1, with input_channel and output_patch",
+        },
+    )
+
+
+@mcp.tool(
+    title="Get QLab Workspace Video Settings",
+    tags={"qlab", "settings", "video", "patches", "routing", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_workspace_video_settings(
+    workspace_id: WorkspaceId,
+) -> WorkspaceVideoSettingsResult:
+    """List Video input patches, output routes, and stages with their exact uniqueIDs.
+
+    Use qlab_get_video_stage or qlab_get_video_output_route for exact details.
+    OSC exposes only names and uniqueIDs for input patches and no independent device inventory.
+    """
+    return _run_workspace_settings_domain(
+        workspace_id,
+        domain="video",
+        view="overview",
+        ref=None,
+        profile="safe",
+        detail_kind=None,
+        result_model=WorkspaceVideoSettingsResult,
+        allowed={},
+    )
+
+
+@mcp.tool(
+    title="Get QLab Video Stage",
+    tags={"qlab", "settings", "video", "stages", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_video_stage(
+    workspace_id: WorkspaceId,
+    stage_id: Annotated[UUID, Field(description="Exact stage uniqueID from qlab_get_workspace_video_settings.")],
+    profile: VideoSettingsProfile = "safe",
+) -> VideoStageResult:
+    """Read one exact Video stage and its regions, geometry, and assigned output routes.
+
+    Technical adds the redacted OSC payload, including full control-point and mesh data.
+    """
+    return _run_workspace_settings_domain(
+        workspace_id, domain="video", view="stage", ref=str(stage_id), profile=profile,
+        detail_kind="stage", result_model=VideoStageResult,
+        allowed={"profile": ["safe", "technical"]}, exact_video=True,
+    )
+
+
+@mcp.tool(
+    title="Get QLab Video Output Route",
+    tags={"qlab", "settings", "video", "routing", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_video_output_route(
+    workspace_id: WorkspaceId,
+    route_id: Annotated[UUID, Field(description="Exact route uniqueID from qlab_get_workspace_video_settings.")],
+    profile: VideoSettingsProfile = "safe",
+) -> VideoOutputRouteResult:
+    """Read one exact Video output route, its destination, geometry, and guides state.
+
+    Technical adds the redacted OSC payload and available destination hardware metadata.
+    """
+    return _run_workspace_settings_domain(
+        workspace_id, domain="video", view="route", ref=str(route_id), profile=profile,
+        detail_kind="route", result_model=VideoOutputRouteResult,
+        allowed={"profile": ["safe", "technical"]}, exact_video=True,
+    )
+
+
+@mcp.tool(
+    title="Get QLab Workspace Light Settings",
+    tags={"qlab", "settings", "light", "patches", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_workspace_light_settings(
+    workspace_id: WorkspaceId,
+    profile: WorkspaceSettingsProfile = "safe",
+) -> WorkspaceLightSettingsResult:
+    """Return a safe summary or redacted technical payload for the workspace Light Patch.
+
+    The Light Patch is the only documented read surface for the larger Light settings panel.
+    """
+    return _run_workspace_settings_domain(
+        workspace_id,
+        domain="light",
+        view="light_patch",
+        ref=None,
+        profile=profile,
+        detail_kind="light_patch",
+        result_model=WorkspaceLightSettingsResult,
+        allowed={"profile": ["safe", "technical", "exhaustive"]},
+    )
+
+
+@mcp.tool(
+    title="Get QLab Workspace Network Settings",
+    tags={"qlab", "settings", "network", "patches", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_workspace_network_settings(
+    workspace_id: WorkspaceId,
+    ref: WorkspaceSettingsRef = None,
+    profile: WorkspaceSettingsProfile = "safe",
+) -> WorkspaceNetworkSettingsResult:
+    """Return the Network Patch inventory or one exact Network Patch by name or UUID.
+
+    QLab OSC exposes patch names and UUIDs, not the complete Network settings panel.
+    """
+    detail_kind = None if ref is None and profile == "safe" else "network_patch" if ref is not None else "all"
+    return _run_workspace_settings_domain(
+        workspace_id,
+        domain="network",
+        view="overview" if ref is None else "network_patch",
+        ref=ref,
+        profile=profile,
+        detail_kind=detail_kind,
+        result_model=WorkspaceNetworkSettingsResult,
+        allowed={"profile": ["safe", "technical", "exhaustive"]},
+    )
+
+
+@mcp.tool(
+    title="Get QLab Workspace MIDI Settings",
+    tags={"qlab", "settings", "midi", "patches", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_workspace_midi_settings(
+    workspace_id: WorkspaceId,
+    ref: WorkspaceSettingsRef = None,
+    profile: WorkspaceSettingsProfile = "safe",
+) -> WorkspaceMidiSettingsResult:
+    """Return the MIDI Patch inventory or one exact MIDI Patch by name or UUID.
+
+    QLab OSC exposes patch names and UUIDs, not the complete MIDI settings panel.
+    """
+    detail_kind = None if ref is None and profile == "safe" else "midi_patch" if ref is not None else "all"
+    return _run_workspace_settings_domain(
+        workspace_id,
+        domain="midi",
+        view="overview" if ref is None else "midi_patch",
+        ref=ref,
+        profile=profile,
+        detail_kind=detail_kind,
+        result_model=WorkspaceMidiSettingsResult,
+        allowed={"profile": ["safe", "technical", "exhaustive"]},
+    )
+
+
+@mcp.tool(
+    title="Get QLab Cue Lists",
+    tags={"qlab", "cue-lists", "inventory", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=CUE_DETAILS_TIMEOUT,
+)
+def qlab_get_cue_lists(workspace_id: WorkspaceId) -> CueListsResult:
+    """Return all Cue Lists and Cue Carts with exact UUIDs, types and current-container status.
+
+    cue_lists contains both types; counts distinguish lists, carts and total containers. No children are read.
+    Follow with qlab_get_cue_list_details or qlab_get_cue_cart_details according to type.
+    """
+    return _run_tool(lambda reader: reader.get_cue_list_inventory(workspace_id), timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(
+    title="Get QLab Cue List Details",
+    tags={"qlab", "cue-lists", "details", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_OVERVIEW_TIMEOUT,
+)
+def qlab_get_cue_list_details(
+    workspace_id: WorkspaceId,
+    cue_list_id: Annotated[UUID, Field(description="Exact Cue List UUID from qlab_get_cue_lists.")],
+    profile: Literal["safe", "technical"] = "safe",
+    max_depth: Annotated[StrictInt, Field(ge=0, le=5, description="Child layers; 0 reads no children.")] = 2,
+    max_cues: Annotated[StrictInt, Field(ge=1, le=5000, description="Maximum descendants, excluding the list root.")] = 1000,
+) -> CueListDetailsResult:
+    """Read one exact Cue List: identity, state, playhead, incoming timecode and a bounded tree.
+
+    safe returns typed sections; technical adds a redacted allowlisted payload.
+    Timecode settings do not prove synchronization is enabled. coverage reports OSC limitations.
+    Use qlab_get_cue_lists to resolve the UUID; Cue Carts and Groups are not Cue Lists.
+    """
+    return _run_tool(
+        lambda reader: reader.get_cue_list_details(workspace_id, str(cue_list_id), profile, max_depth, max_cues),
+        timeout=WORKSPACE_OVERVIEW_TIMEOUT,
+    )
+
+
+@mcp.tool(
+    title="Get QLab Cue Cart Details",
+    tags={"qlab", "cue-carts", "details", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_OVERVIEW_TIMEOUT,
+)
+def qlab_get_cue_cart_details(
+    workspace_id: WorkspaceId,
+    cue_cart_id: Annotated[UUID, Field(description="Exact Cue Cart UUID from qlab_get_cue_lists.")],
+    profile: Literal["safe", "technical"] = "safe",
+    max_cues: Annotated[StrictInt, Field(ge=1, le=5000, description="Maximum cart cells to inspect.")] = 1000,
+) -> CueCartDetailsResult:
+    """Read one exact Cue Cart: identity, state, timecode, grid dimensions and occupied cell positions.
+
+    Cue Carts have no playhead and no nested Groups. Inspect coverage, errors and grid.complete.
+    technical adds a redacted allowlisted payload. Use qlab_get_cue_details for a cell's cue Inspector.
+    """
+    return _run_tool(
+        lambda reader: reader.get_cue_cart_details(workspace_id, str(cue_cart_id), profile, max_cues),
+        timeout=WORKSPACE_OVERVIEW_TIMEOUT,
+    )
+
+
+@mcp.tool(title="Get QLab Audio Cues", tags={"qlab", "audio", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_audio_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+) -> AudioCuesResult:
+    """List Audio cues inside one exact Cue List, including nested groups, with compact identity/status.
+
+    Resolve cue_list_id through qlab_get_cue_lists. Carts are not accepted. offset counts matching Audio cues.
+    Inspect scan_complete and truncation_reasons; a bounded scan is not a whole-list total.
+    Follow with qlab_get_audio_cue_details for one exact cue UUID. No Audio Maps or Objects are read.
+    """
+    return _run_tool(lambda reader: reader.get_audio_cues(str(workspace_id), str(cue_list_id),
+                     limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Audio Cue Details", tags={"qlab", "audio", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_audio_cue_details(
+    workspace_id: CanonicalWorkspaceUUID,
+    cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+    input_channel: Annotated[StrictInt | None, Field(ge=0, le=24)] = None,
+    output_channel: Annotated[StrictInt | None, Field(ge=0, le=128)] = None,
+) -> AudioCueDetailsResult:
+    """Read one exact Audio cue: identity, state, timing, slices, output patch and levels.
+
+    Both channel selectors must be supplied together; zero addresses main controls. A requested crosspoint
+    is selected from the aggregate matrix. technical additionally exposes notes, file paths and payload.
+    Audio Maps, Audio Objects and live metrics are excluded. Inspect coverage and partial errors.
+    """
+    return _run_tool(lambda reader: reader.get_audio_cue_details(str(workspace_id), str(cue_id),
+                     profile, input_channel, output_channel), timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Mic Cues", tags={"qlab", "mic", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_mic_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+) -> MicCuesResult:
+    """List Mic cues inside one exact Cue List, including nested groups, with compact identity/status.
+
+    Resolve cue_list_id through qlab_get_cue_lists. Carts are not accepted. offset counts matching Mic cues.
+    Inspect scan_complete and truncation_reasons; a bounded scan is not a whole-list total.
+    Follow with qlab_get_mic_cue_details for one exact cue UUID. No Audio Maps or Objects are read.
+    """
+    return _run_tool(lambda reader: reader.get_mic_cues(str(workspace_id), str(cue_list_id),
+                     limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Mic Cue Details", tags={"qlab", "mic", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_mic_cue_details(
+    workspace_id: CanonicalWorkspaceUUID,
+    cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+    input_channel: Annotated[StrictInt | None, Field(ge=0, le=24)] = None,
+    output_channel: Annotated[StrictInt | None, Field(ge=0, le=128)] = None,
+) -> MicCueDetailsResult:
+    """Read one exact Mic cue: identity, state, timing, input/output patch references, channels and levels.
+
+    Both channel selectors must be supplied together; zero addresses main controls. A requested crosspoint
+    is selected from the aggregate matrix. technical additionally exposes notes and normalized payload.
+    Audio Maps, Audio Objects, live metrics and indexed effects are excluded. Patch configuration belongs
+    to qlab_get_workspace_audio_settings. Inspect coverage and partial errors.
+    """
+    return _run_tool(lambda reader: reader.get_mic_cue_details(str(workspace_id), str(cue_id),
+                     profile, input_channel, output_channel), timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Video Cues", tags={"qlab", "video", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_video_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+) -> VideoCuesResult:
+    """List Video cues inside one exact Cue List, including nested groups, with compact identity/status.
+
+    Resolve cue_list_id through qlab_get_cue_lists. Carts are not accepted. offset counts matching Video cues.
+    Inspect scan_complete and truncation_reasons; a bounded scan is not a whole-list total.
+    Follow with qlab_get_video_cue_details for one exact cue UUID.
+    """
+    return _run_tool(lambda reader: reader.get_video_cues(str(workspace_id), str(cue_list_id),
+                     limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Video Cue Details", tags={"qlab", "video", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_video_cue_details(
+    workspace_id: CanonicalWorkspaceUUID,
+    cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+    input_channel: Annotated[StrictInt | None, Field(ge=0, le=24)] = None,
+    output_channel: Annotated[StrictInt | None, Field(ge=0, le=128)] = None,
+) -> VideoCueDetailsResult:
+    """Read one exact Video cue: timing/loops, stage reference, geometry, effects inventory and audio levels.
+
+    Both channel selectors must be supplied together; zero addresses main controls. Crosspoints use the aggregate matrix.
+    technical additionally exposes notes, media paths and metadata.
+    Stage and patch configuration belong to the workspace tools. Audio Maps, Objects, live metrics and
+    indexed effect exploration are excluded. Inspect coverage and partial errors.
+    """
+    return _run_tool(lambda reader: reader.get_video_cue_details(str(workspace_id), str(cue_id),
+                     profile, input_channel, output_channel), timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Text Cues", tags={"qlab", "text", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_text_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+) -> TextCuesResult:
+    """List Text cues inside one exact Cue List, including nested groups, with compact identity/status.
+
+    Resolve cue_list_id through qlab_get_cue_lists. Carts are not accepted. offset counts matching Text cues.
+    Inspect scan_complete and truncation_reasons; a bounded scan is not a whole-list total.
+    Follow with qlab_get_text_cue_details for one exact cue UUID.
+    """
+    return _run_tool(lambda reader: reader.get_text_cues(str(workspace_id), str(cue_list_id),
+                     limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Text Cue Details", tags={"qlab", "text", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_text_cue_details(
+    workspace_id: CanonicalWorkspaceUUID,
+    cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+) -> TextCueDetailsResult:
+    """Read one exact Text cue: full text, formatted fragments, typography, stage reference, geometry and effects inventory.
+
+    safe includes the text content; technical adds notes and redacted variable payload.
+    Text never reads audio or file-playback properties.
+    Stage and patch configuration belong to the workspace tools. Audio Maps, Objects, live metrics and
+    indexed effect exploration are excluded. Inspect coverage and partial errors.
+    """
+    return _run_tool(lambda reader: reader.get_text_cue_details(str(workspace_id), str(cue_id),
+                     profile), timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Camera Cues", tags={"qlab", "camera", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_camera_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+) -> CameraCuesResult:
+    """List Camera cues inside one exact Cue List, including nested groups, with compact identity/status.
+
+    Resolve cue_list_id through qlab_get_cue_lists. Carts are not accepted. offset counts matching Camera cues.
+    Inspect scan_complete and truncation_reasons; a bounded scan is not a whole-list total.
+    Follow with qlab_get_camera_cue_details for one exact cue UUID.
+    """
+    return _run_tool(lambda reader: reader.get_camera_cues(str(workspace_id), str(cue_list_id),
+                     limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Camera Cue Details", tags={"qlab", "camera", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_camera_cue_details(
+    workspace_id: CanonicalWorkspaceUUID,
+    cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+    input_channel: Annotated[StrictInt | None, Field(ge=0, le=24)] = None,
+    output_channel: Annotated[StrictInt | None, Field(ge=0, le=128)] = None,
+) -> CameraCueDetailsResult:
+    """Read one exact Camera cue: input patches, stage reference, geometry, effects inventory and audio channels/levels.
+
+    Both channel selectors must be supplied together; zero addresses main controls. Crosspoints use the aggregate matrix.
+    technical additionally exposes notes and normalized payload.
+    Stage and patch configuration belong to the workspace tools. Audio Maps, Objects, live metrics and
+    indexed effect exploration are excluded. Inspect coverage and partial errors.
+    """
+    return _run_tool(lambda reader: reader.get_camera_cue_details(str(workspace_id), str(cue_id),
+                     profile, input_channel, output_channel), timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Control Cues", tags={"qlab", "control", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_control_cues(
+    workspace_id: CanonicalWorkspaceUUID, cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+    cue_type: ControlCueType | None = None,
+) -> ControlCuesResult:
+    """List control/organization cues in one exact Cue List, including nested groups.
+
+    Includes Start, Stop, Pause, Load, Reset, Devamp, GoTo, Target, Arm, Disarm, Wait and Memo.
+    Optional cue_type filters before pagination. Carts are rejected. Inspect scan_complete and truncation_reasons.
+    Use qlab_get_control_cue_details for the exact cue UUID.
+    """
+    return _run_tool(lambda reader: reader.get_control_cues(str(workspace_id), str(cue_list_id),
+                     limit, offset, max_cues_scanned, cue_type), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Control Cue Details", tags={"qlab", "control", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_control_cue_details(
+    workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+) -> ControlCueDetailsResult:
+    """Read one exact control/organization cue, detecting its type automatically.
+
+    Returns common settings, state, timing and applicable target, Reset or Devamp fields.
+    Memo notes are included in safe; technical adds other notes. Inspect coverage and partial errors.
+    Load load time and Target assigned number are not documented OSC reads. Audio Maps are excluded.
+    References do not expand targets or patches. Never starts, stops, loads or modifies cues.
+    """
+    return _run_tool(lambda reader: reader.get_control_cue_details(str(workspace_id), str(cue_id), profile),
+                     timeout=CUE_DETAILS_TIMEOUT)
+
+
+
+
+@mcp.tool(title="Get QLab Fade Cues", tags={"qlab", "fade", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_fade_cues(
+    workspace_id: CanonicalWorkspaceUUID, cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+) -> FadeCuesResult:
+    """List Fade cues in one exact Cue List, including nested groups.
+
+    Carts are rejected. Inspect scan_complete and truncation_reasons.
+    Use qlab_get_fade_cue_details for the exact cue UUID.
+    """
+    return _run_tool(lambda reader: reader.get_fade_cues(str(workspace_id), str(cue_list_id),
+        limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Fade Cue Details", tags={"qlab", "fade", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_fade_cue_details(
+    workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+) -> FadeCueDetailsResult:
+    """Read one exact Fade cue. Inspect coverage and partial errors.
+
+    Returns target references and documented fade settings. Audio target matrices and Video target opacity are supported; other inherited properties remain unverified.
+    References do not expand Workspace Settings. No live or indexed scans.
+    """
+    return _run_tool(lambda reader: reader.get_fade_cue_details(str(workspace_id), str(cue_id), profile),
+        timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Network Cues", tags={"qlab", "network", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_network_cues(
+    workspace_id: CanonicalWorkspaceUUID, cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+) -> NetworkCuesResult:
+    """List Network cues in one exact Cue List, including nested groups.
+
+    Carts are rejected. Inspect scan_complete and truncation_reasons.
+    Use qlab_get_network_cue_details for the exact cue UUID.
+    """
+    return _run_tool(lambda reader: reader.get_network_cues(str(workspace_id), str(cue_list_id),
+        limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Network Cue Details", tags={"qlab", "network", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_network_cue_details(
+    workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+) -> NetworkCueDetailsResult:
+    """Read one exact Network cue. Inspect coverage and partial errors.
+
+    Returns patch references and conditional fade settings. Free-form messages and parameter values require technical; embedded secrets may remain.
+    References do not expand Workspace Settings. No live or indexed scans.
+    """
+    return _run_tool(lambda reader: reader.get_network_cue_details(str(workspace_id), str(cue_id), profile),
+        timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab MIDI Cues", tags={"qlab", "midi", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_midi_cues(
+    workspace_id: CanonicalWorkspaceUUID, cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+    cue_type: Literal["all", "midi", "midi_file"] = "all",
+) -> MidiCuesResult:
+    """List MIDI and MIDI File cues in one exact Cue List, including nested groups.
+
+    Carts are rejected. Inspect scan_complete and truncation_reasons.
+    Use qlab_get_midi_cue_details for the exact cue UUID.
+    """
+    return _run_tool(lambda reader: reader.get_midi_cues(str(workspace_id), str(cue_list_id),
+        limit, offset, max_cues_scanned, cue_type), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab MIDI Cue Details", tags={"qlab", "midi", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_midi_cue_details(
+    workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+) -> MidiCueDetailsResult:
+    """Read one exact MIDI cue. Inspect coverage and partial errors.
+
+    Detects MIDI or MIDI File automatically. Reads only the selected message mode; file paths require technical. No message is sent.
+    References do not expand Workspace Settings. No live or indexed scans.
+    """
+    return _run_tool(lambda reader: reader.get_midi_cue_details(str(workspace_id), str(cue_id), profile),
+        timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Timecode Cues", tags={"qlab", "timecode", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_timecode_cues(
+    workspace_id: CanonicalWorkspaceUUID, cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+) -> TimecodeCuesResult:
+    """List Timecode cues in one exact Cue List, including nested groups.
+
+    Carts are rejected. Inspect scan_complete and truncation_reasons.
+    Use qlab_get_timecode_cue_details for the exact cue UUID.
+    """
+    return _run_tool(lambda reader: reader.get_timecode_cues(str(workspace_id), str(cue_list_id),
+        limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Timecode Cue Details", tags={"qlab", "timecode", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_timecode_cue_details(
+    workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+) -> TimecodeCueDetailsResult:
+    """Read one exact Timecode cue. Inspect coverage and partial errors.
+
+    Reads MTC or LTC configuration and the applicable patch reference. Does not generate timecode.
+    References do not expand Workspace Settings. No live or indexed scans.
+    """
+    return _run_tool(lambda reader: reader.get_timecode_cue_details(str(workspace_id), str(cue_id), profile),
+        timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Script Cues", tags={"qlab", "script", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_script_cues(
+    workspace_id: CanonicalWorkspaceUUID, cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+) -> ScriptCuesResult:
+    """List Script cues in one exact Cue List, including nested groups.
+
+    Carts are rejected. Inspect scan_complete and truncation_reasons.
+    Use qlab_get_script_cue_details for the exact cue UUID.
+    """
+    return _run_tool(lambda reader: reader.get_script_cues(str(workspace_id), str(cue_list_id),
+        limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Script Cue Details", tags={"qlab", "script", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_script_cue_details(
+    workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+) -> ScriptCueDetailsResult:
+    """Read one exact Script cue. Inspect coverage and partial errors.
+
+    Safe reads common settings only. Technical includes untrusted script source, potentially containing secrets. Never compiles or executes code.
+    References do not expand Workspace Settings. No live or indexed scans.
+    """
+    return _run_tool(lambda reader: reader.get_script_cue_details(str(workspace_id), str(cue_id), profile),
+        timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Light Cues", tags={"qlab", "light", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_light_cues(
+    workspace_id: CanonicalWorkspaceUUID, cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+) -> LightCuesResult:
+    """List Light cues in one exact Cue List, including nested groups. Inspect scan_complete and truncation_reasons.
+
+    Carts are rejected. offset counts matching cues. Use qlab_get_light_cue_details for an exact UUID.
+    """
+    return _run_tool(lambda reader: reader.get_light_cues(str(workspace_id), str(cue_list_id),
+                     limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Light Cue Details", tags={"qlab", "light", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_light_cue_details(
+    workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+) -> LightCueDetailsResult:
+    """Read one exact Light cue: full command text, collate, subcontroller, state and timing.
+
+    safe includes commands; technical adds notes. Commands are never executed or interpreted as live output.
+    Use qlab_get_workspace_light_settings for the patch. Inspect coverage and partial errors.
+    """
+    return _run_tool(lambda reader: reader.get_light_cue_details(str(workspace_id), str(cue_id), profile),
+                     timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Group Cues", tags={"qlab", "group", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=QUERY_CUES_TIMEOUT)
+def qlab_get_group_cues(
+    workspace_id: CanonicalWorkspaceUUID, cue_list_id: UUID,
+    limit: Annotated[StrictInt, Field(ge=1, le=500)] = 100,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    max_cues_scanned: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+) -> GroupCuesResult:
+    """List Group cues in one exact Cue List, including nested groups. Inspect scan_complete and truncation_reasons.
+
+    Lists and carts are not Groups. offset counts matching cues. Use qlab_get_group_cue_details for an exact UUID.
+    """
+    return _run_tool(lambda reader: reader.get_group_cues(str(workspace_id), str(cue_list_id),
+                     limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Group Cue Details", tags={"qlab", "group", "details", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_group_cue_details(
+    workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
+    profile: Literal["safe", "technical"] = "safe",
+    max_depth: Annotated[StrictInt, Field(ge=0, le=5)] = 2,
+    max_cues: Annotated[StrictInt, Field(ge=1, le=5000)] = 1000,
+) -> GroupCueDetailsResult:
+    """Read one exact Group cue: mode, state, timing and bounded ordered child summaries.
+
+    Playlist settings are read only in Playlist mode. Lists and carts are rejected. Depth zero reads no children;
+    max_cues counts descendants. technical adds notes. Inspect coverage, truncation and partial errors.
+    """
+    return _run_tool(lambda reader: reader.get_group_cue_details(str(workspace_id), str(cue_id),
+                     profile, max_depth, max_cues), timeout=CUE_DETAILS_TIMEOUT)
 
 
 @mcp.tool(
@@ -841,14 +1556,18 @@ def qlab_query_cues(
         ),
     ] = "basic_safe",
     max_results: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=1,
+            le=5000,
             description="Maximum matching cues to return. Scanning may continue past this to report matched_count.",
         ),
     ] = 500,
     max_cues_scanned: Annotated[
-        int,
+        StrictInt,
         Field(
+            ge=1,
+            le=5000,
             description="Maximum cue IDs to scan from cueLists/uniqueIDs before marking the result truncated.",
         ),
     ] = 500,
@@ -960,6 +1679,7 @@ def qlab_get_cue_details(
     inspector_safe for broader non-sensitive Inspector context, editable for update capability discovery, health for
     warnings, technical/full_sensitive only when justified, and exhaustive only for deep audits or load testing
     because it can expose large/sensitive payloads.
+    Cue List calls return a structured redirect; use qlab_get_cue_list_details with their exact UUID.
     """
     if isinstance(cue_ref, list) and len(cue_ref) > MAX_BATCH_CUE_DETAILS:
         return _cue_details_error(
@@ -1017,82 +1737,6 @@ def qlab_check_write_readiness(
 
 
 @mcp.tool(
-    title="Create QLab Cue",
-    tags={"qlab", "write-mode", "cue-create", "gated-write"},
-    annotations=GATED_CREATE_QLAB_TOOL,
-    timeout=CREATE_CUE_TIMEOUT,
-)
-def qlab_create_cue(
-    workspace_id: WorkspaceId,
-    cue_type: Annotated[
-        WritableCueType,
-        Field(
-            description=(
-                "Cue type to create from QLab's cue template/defaults. Create verifies identity and placement; it does not configure targets, files, patches, or setters."
-            ),
-        ),
-    ],
-    after_cue_id: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Exact UUID anchor for the existing-cue route. Use exactly one of after_cue_id or parent_container_id."
-            ),
-        ),
-    ] = None,
-    parent_container_id: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Exact UUID of an empty Cue List, Group, or Cue Cart for first-cue creation. Cue Lists select currentCueListID, Groups use one move to index 0, and Carts request row/column 0,0. Use exactly one of after_cue_id or parent_container_id."
-            ),
-        ),
-    ] = None,
-    dry_run: Annotated[
-        bool | None,
-        Field(
-            description=(
-                "When true, plan the OSC operations but send no mutating commands. "
-                "When omitted, QLAB_WRITE_DRY_RUN_DEFAULT is used and defaults to true."
-            ),
-        ),
-    ] = None,
-    confirm_token: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Exact confirm:createCue:v2 token returned by the reviewed dry-run. "
-                "Required for real creation."
-            ),
-        ),
-    ] = None,
-) -> CreateCueResult:
-    """Create one cue from QLab's template/defaults or return a dry-run plan.
-
-    Real creation requires QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
-    Supply exactly one of after_cue_id or parent_container_id. The latter
-    creates the first cue in an empty Cue List, Group, or Cue Cart using the
-    container-specific OSC route. Dry-run planning never sends mutating OSC.
-    Call qlab_check_write_readiness first, then review the dry-run and supply the
-    exact confirm:createCue:v2 token. After execution, require fresh identity/placement readback.
-    An unchanged structural snapshot is required; this is not a GO-ready claim.
-    Structural creation is separate from operational readiness: a created cue may be broken or warning because it still needs a target, file, patch, or edit. Script and container cue types are excluded.
-    """
-    return _run_tool(
-        lambda reader: CreateCueResult.model_validate(
-            reader.create_cue(
-                workspace_id=workspace_id,
-                cue_type=cue_type,
-                dry_run=dry_run,
-                after_cue_id=after_cue_id,
-                parent_container_id=parent_container_id,
-                confirm_token=confirm_token,
-            )
-        )
-    )
-
-
-@mcp.tool(
     title="Create QLab Cues",
     tags={"qlab", "write-mode", "cue-create", "batch-create", "gated-write"},
     annotations=GATED_CREATE_QLAB_TOOL,
@@ -1106,19 +1750,26 @@ def qlab_create_cues(
             min_length=1,
             max_length=50,
             description=(
-                "Ordered cue types. The first cue uses exactly one of after_cue_id or "
-                "parent_container_id; every later cue is created after the UUID returned "
-                "for the previous cue."
+                "One to fifty ordered cue types, including mixed types. Each cue uses its workspace Cue Template; "
+                "every later cue is created after the UUID verified for the previous cue."
             ),
         ),
     ],
-    after_cue_id: Annotated[
-        str | None,
-        Field(description="Exact UUID anchor for the first cue; use exactly one initial placement selector."),
+    cue_list_id: Annotated[
+        UUID | None,
+        Field(description="Exact Cue List UUID. Use exactly one of cue_list_id, group_id, or cue_cart_id."),
     ] = None,
-    parent_container_id: Annotated[
-        str | None,
-        Field(description="Exact UUID of an empty Cue List, Group, or Cue Cart for the first cue."),
+    group_id: Annotated[
+        UUID | None,
+        Field(description="Exact Group UUID. Use exactly one destination selector."),
+    ] = None,
+    cue_cart_id: Annotated[
+        UUID | None,
+        Field(description="Exact empty Cue Cart UUID; accepts one non-Group cue only."),
+    ] = None,
+    after_cue_id: Annotated[
+        UUID | None,
+        Field(description="Optional direct-child UUID within the selected Cue List or Group; omit to append at the end."),
     ] = None,
     dry_run: Annotated[
         bool | None,
@@ -1126,19 +1777,22 @@ def qlab_create_cues(
     ] = None,
     confirm_token: Annotated[
         str | None,
-        Field(description="Exact confirm:createCues:v1 token returned by the reviewed dry-run."),
+        Field(description="Exact confirm:createCues:v2 token returned by the reviewed dry-run."),
     ] = None,
 ) -> CreateCuesResult:
-    """Create an ordered cue sequence with one verified /new per item.
+    """Create 1–50 ordered cues from workspace Cue Templates, with one verified /new per item.
 
     Call qlab_check_write_readiness first, then review the dry-run and supply the
-    exact confirm:createCues:v1 token. The batch token is not interchangeable with
-    the single-create token. Each successful item requires fresh identity/placement
-    readback. Creation stops at the first timeout, ambiguous identity, placement
-    mismatch, or other failure. Do not retry after an ambiguous mutation. There is
-    no automatic rollback; earlier successful items remain. Create uses QLab
-    template defaults and does not apply initial setters, and the result is not a
-    GO-ready claim.
+    exact confirm:createCues:v2 token. Specify one exact Cue List, Group, or empty
+    Cue Cart UUID. Cue Lists and Groups append by default; after_cue_id inserts
+    after a direct child. QLab selects each new cue, and first-cue creation in
+    an empty Cue List can change the current list. QLab's General auto-numbering
+    setting does not officially apply to OSC-created cues, although tested
+    workspaces returned numbered cues. The MCP sends no cue number; use fresh
+    readback and do not predict it from the setting or template. No initial
+    setters, playback, or save are sent. Stop at the
+    first failure; earlier successful cues remain without automatic rollback.
+    Do not retry an ambiguous mutation. Structural success is not GO readiness.
     """
     return _run_tool(
         lambda reader: CreateCuesResult.model_validate(
@@ -1146,8 +1800,10 @@ def qlab_create_cues(
                 workspace_id=workspace_id,
                 cue_types=list(cue_types),
                 dry_run=dry_run,
-                after_cue_id=after_cue_id,
-                parent_container_id=parent_container_id,
+                cue_list_id=str(cue_list_id) if cue_list_id is not None else None,
+                group_id=str(group_id) if group_id is not None else None,
+                cue_cart_id=str(cue_cart_id) if cue_cart_id is not None else None,
+                after_cue_id=str(after_cue_id) if after_cue_id is not None else None,
                 confirm_token=confirm_token,
             )
         ),

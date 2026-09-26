@@ -80,6 +80,10 @@ def test_each_command_keeps_a_syntax_block() -> None:
         assert "```applescript" in entry, command
 
 
+@pytest.mark.skipif(
+    not SKILL_COPY.is_file() or not SKILL_MANIFEST.is_file(),
+    reason="skills are optional local files, not repository fixtures",
+)
 def test_portable_skill_copy_and_manifest_are_consistent() -> None:
     assert DOC.read_bytes() == SKILL_COPY.read_bytes()
     manifest = json.loads(SKILL_MANIFEST.read_text(encoding="utf-8"))
@@ -90,6 +94,10 @@ def test_portable_skill_copy_and_manifest_are_consistent() -> None:
 
 
 @LOCAL_AGENT_FIXTURES
+@pytest.mark.skipif(
+    not (ROOT / "skills/qlab-5-applescript/SKILL.md").is_file(),
+    reason="skills are optional local files, not repository fixtures",
+)
 def test_skill_and_agent_metadata_point_to_the_reference() -> None:
     skill = (ROOT / "skills/qlab-5-applescript/SKILL.md").read_text(encoding="utf-8")
     metadata = (ROOT / "skills/qlab-5-applescript/agents/openai.yaml").read_text(encoding="utf-8")

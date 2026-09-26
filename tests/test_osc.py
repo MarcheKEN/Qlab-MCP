@@ -52,6 +52,42 @@ class OscMessageTests(unittest.TestCase):
         self.assertEqual(reply.data, "Audio")
         self.assertEqual(reply.workspace_id, "ws-1")
 
+    def test_parse_reply_rejects_workspace_identity_mismatch(self) -> None:
+        packet = encode_message(
+            "/reply/workspace/ws-1/showMode",
+            json.dumps({"status": "ok", "data": "edit", "workspace_id": "ws-2"}),
+        )
+
+        with self.assertRaisesRegex(OscProtocolError, "workspace_id"):
+            QLabOscClient._parse_reply(packet, expected_address="/workspace/ws-1/showMode")
+
+    def test_parse_reply_rejects_unknown_status(self) -> None:
+        packet = encode_message("/reply/workspaces", json.dumps({"status": "maybe", "data": []}))
+
+        with self.assertRaisesRegex(OscProtocolError, "status"):
+            QLabOscClient._parse_reply(packet)
+
+    def test_parse_reply_rejects_missing_data_for_success(self) -> None:
+        packet = encode_message("/reply/workspaces", json.dumps({"status": "ok"}))
+
+        with self.assertRaisesRegex(OscProtocolError, "data"):
+            QLabOscClient._parse_reply(packet)
+
+    def test_parse_reply_rejects_empty_workspace_id(self) -> None:
+        packet = encode_message(
+            "/reply/workspace/ws-1/showMode",
+            json.dumps({"status": "ok", "data": "edit", "workspace_id": ""}),
+        )
+
+        with self.assertRaisesRegex(OscProtocolError, "workspace_id"):
+            QLabOscClient._parse_reply(packet)
+
+    def test_decode_rejects_trailing_bytes(self) -> None:
+        packet = encode_message("/reply/workspaces", json.dumps({"status": "ok", "data": []}))
+
+        with self.assertRaisesRegex(OscProtocolError, "trailing"):
+            decode_message(packet + b"\x00\x00\x00\x00")
+
     def test_invalid_reply_json_raises_protocol_error(self) -> None:
         packet = encode_message("/reply/workspaces", "{not json")
 

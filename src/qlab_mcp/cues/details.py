@@ -19,6 +19,7 @@ from .profiles import (
     _profile_needs_internal_file_target,
 )
 from .coverage import default_read_coverage_report
+from .lists import LIST_DETAILS_ACTION
 from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES, sensitive_payload_size
 
 
@@ -27,6 +28,9 @@ MAX_BATCH_CUE_DETAILS = 50
 UNRESOLVED_CUE_ERROR_CODE = "cue_ref_unresolved"
 UNRESOLVED_CUE_SUGGESTED_ACTION = (
     "Call qlab_query_cues to resolve an exact cue UUID, then retry qlab_get_cue_details."
+)
+WORKSPACE_RESOLUTION_SUGGESTED_ACTION = (
+    "Call qlab_check_connection and pass one of available_workspaces[].uniqueID."
 )
 SLICE_DETAIL_KEYS = ("sliceMarkers", "lastSlicePlayCount", "lastSliceInfiniteLoop")
 EXHAUSTIVE_WARNING = (
@@ -37,6 +41,27 @@ EXHAUSTIVE_BATCH_WARNING = (
     "Batch exhaustive cue details can be very large; prefer one cue or a small batch "
     "unless load testing."
 )
+
+
+def _reject_cue_list_detail(result: dict[str, Any]) -> dict[str, Any]:
+    if result.get("cue_type") != "Cue List":
+        return result
+    message = "Cue List details must be read with qlab_get_cue_list_details."
+    result.update(
+        {
+            "ok": False,
+            "status": "error",
+            "partial": False,
+            "error_code": "cue_list_specialized_tool_required",
+            "message": message,
+            "suggested_action": LIST_DETAILS_ACTION,
+            "properties": {},
+            "errors": {"error_code": message},
+        }
+    )
+    result.pop("sections", None)
+    result.pop("update_capabilities", None)
+    return result
 
 
 def _chunk_keys(keys: list[str] | tuple[str, ...], size: int = MAX_VALUES_FOR_KEYS) -> list[list[str]]:
@@ -161,6 +186,8 @@ def _failed_cue_detail_result(
         "suggested_action": (
             UNRESOLVED_CUE_SUGGESTED_ACTION
             if error_code == UNRESOLVED_CUE_ERROR_CODE
+            else WORKSPACE_RESOLUTION_SUGGESTED_ACTION
+            if error_code in {"workspace_not_found", "workspace_ambiguous", "workspace_unavailable"}
             else None
         ),
         "message": message,
@@ -472,18 +499,23 @@ class CueDetailsMixin:
                 "status": "error",
                 "partial": False,
                 "error_code": errors["error_code"],
-                "message": "Requested workspace could not be resolved.",
+                "suggested_action": WORKSPACE_RESOLUTION_SUGGESTED_ACTION,
+                "message": errors["message"],
                 "workspace_id": requested_workspace_id,
                 "requested_count": len(cue_ref) if isinstance(cue_ref, list) else 0,
                 "succeeded_count": 0,
                 "failed_count": len(cue_ref) if isinstance(cue_ref, list) else 0,
                 "profile": profile,
                 "results": [],
-                "errors": {"workspace_resolution": sanitize_exception_message(exc), "error_code": errors["error_code"]},
+                "errors": errors,
                 "warnings": ["Requested workspace could not be resolved."],
             }
         if isinstance(cue_ref, str):
-            result = _normalize_cue_detail_result(self._get_single_cue_details(resolved_workspace_id, cue_ref, profile))
+            result = _reject_cue_list_detail(
+                _normalize_cue_detail_result(self._get_single_cue_details(resolved_workspace_id, cue_ref, profile))
+            )
+            if result.get("error_code") == "cue_list_specialized_tool_required":
+                return result
             self._attach_video_summaries(resolved_workspace_id, [result], profile)
             payload_size = sensitive_payload_size(result, profile)
             if payload_size is not None and payload_size > MAX_SENSITIVE_CUE_RESPONSE_BYTES:
@@ -527,7 +559,7 @@ class CueDetailsMixin:
                     profile,
                     include_read_coverage=False,
                 )
-                result = _normalize_cue_detail_result(result)
+                result = _reject_cue_list_detail(_normalize_cue_detail_result(result))
                 results.append(result)
                 if result.get("errors"):
                     errors[ref] = _batch_error_summary(result)

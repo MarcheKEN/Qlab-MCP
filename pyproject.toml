@@ -1,6 +1,8 @@
 [project]
 name = "qlab-mcp"
 version = "0.3.0"
+license = "MIT"
+license-files = ["LICENSE", "NOTICE"]
 description = "FastMCP server for QLab 5 inspection and gated cue creation, editing, movement, and leaf deletion over OSC."
 requires-python = ">=3.11"
 dependencies = [

@@ -50,6 +50,9 @@ def test_build_artifacts_contain_only_release_files(tmp_path: Path) -> None:
         )
         metadata = archive.read("qlab_mcp-0.3.0.dist-info/METADATA").decode()
         assert "Version: 0.3.0\n" in metadata
+        assert "License-Expression: MIT\n" in metadata
+        for notice in ("LICENSE", "NOTICE"):
+            assert archive.read(f"qlab_mcp-0.3.0.dist-info/licenses/{notice}") == (ROOT / notice).read_bytes()
 
     sdist = next(output.glob("*.tar.gz"))
     with tarfile.open(sdist, "r:gz") as archive:
@@ -58,10 +61,11 @@ def test_build_artifacts_contain_only_release_files(tmp_path: Path) -> None:
         assert members
         assert all(
             name.startswith("src/qlab_mcp/")
-            or name in {".gitignore", "README.md", "pyproject.toml", "PKG-INFO"}
+            or name in {".gitignore", "README.md", "pyproject.toml", "PKG-INFO", "LICENSE", "NOTICE"}
             for name in members
         )
         assert not any(
             name.startswith((".codex/", "engineering-review/", "local/"))
             for name in members
         )
+        assert {"LICENSE", "NOTICE"} <= members

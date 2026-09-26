@@ -2,6 +2,104 @@
 
 ## Unreleased
 
+- Adds the MIT license for original project code and authored documentation,
+  with third-party material excluded in NOTICE and license metadata in packages.
+
+- Corrects contributor tool counts, Create security-token documentation, reference
+  provenance, and write-registry versus read coverage; surfaces pending Move/Delete
+  runtime findings in user workflows and distinguishes historical plans from current API.
+
+- Removes `.superpowers/` and `skills/` from Git tracking while retaining local
+  copies; ignores both directories. Reference extraction no longer requires a
+  portable skill copy, and local skill tests are optional on clean checkouts.
+
+- Aligns active read workflows and inventory links with 48 public tools; marks
+  prior status/roadmap entries as dated evidence and separates published PR CI
+  from uncommitted development and pending write-safety defects.
+
+- Replaces the public single-cue Create tool with `qlab_create_cues` for one to
+  50 ordered cues in an exact Cue List, Group, or empty Cue Cart. Adds explicit
+  destination/position, typed compact per-cue results, and a fresh
+  `confirm:createCues:v2` token. Public surface: 48 tools (43 reads, 5 gated writes).
+
+- Adds five scoped inventory/detail pairs for Fade, Network, MIDI and MIDI File,
+  Timecode, and Script. Conditional reads follow the cue mode. Script source
+  and Network free-form content require technical profile. Public surface:
+  49 tools (43 reads, 6 gated writes) before the Create consolidation.
+
+- Adds `qlab_get_control_cues` and `qlab_get_control_cue_details` for Start,
+  Stop, Pause, Load, Reset, Devamp, GoTo, Target, Arm, Disarm, Wait and Memo.
+  One bounded Cue List inventory with optional type filter; exact UUID detail
+  with typed common fields and conditional target/Reset/Devamp blocks.
+  Memo content is included in safe. Shared readers, no action calls or fallback.
+  Public surface: 39 tools (33 reads, 6 writes).
+
+- Adds Light/Group inventories and UUID-only details: Light commands, collate,
+  subcontroller; Group mode, conditional Playlist and bounded ordered children.
+  Reuses shared readers and traversal. Public surface: 37 tools (31 reads, 6 writes).
+
+- Adds scoped inventory and exact detail tools for Video, Text and Camera.
+  Typed geometry, stage/input references, aggregate effects, Video timing/audio,
+  Camera channel selection and Text content/format runs reuse the Audio/Mic
+  executor extracted into cues/family.py. Audio/Mic schemas remain unchanged.
+  Optional Text formatting OSC failures retain available data as partial results.
+
+- Adds `qlab_get_audio_cues`, scoped to a required Cue List UUID (nested groups
+  included), and `qlab_get_audio_cue_details` for an exact Audio cue UUID.
+  Shared bounded traversal, workspace resolution, transport and validation;
+  typed timing, patch reference, slices, mute/solo and aggregate levels, with
+  optional crosspoint selection. Technical metadata is credential-redacted.
+  Audio Maps, Audio Objects and live/indexed effect exploration remain excluded.
+  Generic cue tools remain available.
+- Adds `qlab_get_mic_cues` and `qlab_get_mic_cue_details`, sharing Audio's
+  scoped traversal, exact targeting, validation and bounded levels reader.
+  Mic details include input/output patch references, channels and channel offset;
+  Maps, Objects, live metrics and indexed effects remain excluded.
+
+- Adds `qlab_get_cue_lists` and UUID-only `qlab_get_cue_list_details`, with
+  typed identity/state, playhead, incoming timecode and bounded ordered contents.
+  Technical reads retain typed sections and add a redacted allowlisted payload.
+  The inventory includes both lists and carts, with separate type counts.
+  Adds UUID-only `qlab_get_cue_cart_details` for typed dimensions, occupied cell
+  positions, state and timecode, sharing the container reader and validation.
+  Both details include common basics; notes are read only in technical profile.
+- Removes Cue List detail reads from `qlab_get_cue_details`. Single and batch
+  calls return an actionable structured redirect to `qlab_get_cue_list_details`;
+  Cue Cart reads remain supported by the generic tool.
+
+- Extends exact Audio Output Patch reads with routing, cue-output count and
+  names, mute/solo state, and an optional single matrix crosspoint selected by
+  strict `input_channel` and `output_channel` arguments. The matrix is never
+  scanned automatically.
+- Replaces generic Workspace Settings detail payloads with typed Audio, Light,
+  Network, MIDI, choice, and empty-inventory models while retaining redacted
+  technical payloads where QLab's shape is variable.
+- Removes Audio Maps from the public Audio settings schema and overview reads.
+  Audio patch device presence is now explicit when known and remains unknown
+  when OSC omits device evidence.
+- Hardens OSC and settings reads against malformed status/data/workspace
+  identities, trailing bytes, invalid payload shapes, non-finite numbers, and
+  unsafe credential fields. Workspace UUID matching is case-insensitive while
+  preserving QLab's canonical UUID.
+- Adds strict public scan limits, actionable settings-selection and Cue Details
+  errors, and promotes detected Video routing problems into Workspace Status.
+- Types the Workspace Status response and enriches its partial Warnings section
+  with cue flags, explicit evidence provenance, and sampled known Video Settings
+  problems without adding OSC reads or a new public tool.
+- Splits Video reads into the compact `qlab_get_workspace_video_settings`
+  overview and UUID-only `qlab_get_video_stage` and
+  `qlab_get_video_output_route` tools. This intentionally removes the overview's
+  `view`, `ref`, and `profile` inputs; exact reads offer `safe` and `technical`.
+  This split brought the inventory to 20 tools before the Cue List additions.
+  Video overview uses three bulk reads without per-stage region queries.
+  Device metadata remains limited to assigned route destinations.
+- Replaces the broad `qlab_get_workspace_settings` and
+  `qlab_get_workspace_setting_details` public tools with six typed read tools
+  for General, Audio, Video, Light, Network, and MIDI. This is an intentional
+  breaking API change; the internal shared settings readers remain in use.
+- Adds the documented Audio volume-limit reads (`maxVolume` and `minVolume`).
+  Controls, Audition, Collaboration, and Templates remain unexposed because
+  QLab provides no complete documented settings-read API for those panels.
 - Adds the gated `qlab_edit_workspace_settings` tool for the single proven
   `general.minGoTime` saved-setting operation. The scope is intentionally
   complete for this PR; other Workspace Settings writes remain deferred until

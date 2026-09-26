@@ -14,7 +14,7 @@ import pytest
 
 from qlab_mcp.config import QLabConfig
 from qlab_mcp.errors import OscTimeoutError, QLabReplyError, UnsafeWriteOperationError
-from qlab_mcp.models import CreateCueResult, CueUpdateInput, UpdateCuesResult, WriteReadinessResult
+from qlab_mcp.models import CreateCueResult, CreateCuesResult, CueUpdateInput, UpdateCuesResult, WriteReadinessResult
 from qlab_mcp.qlab import QLabReader
 from qlab_mcp.runtime.read_cache import shared_read_cache
 import qlab_mcp.write.operations as write_operations
@@ -177,6 +177,168 @@ def test_create_preflight_rejects_active_anchor_even_when_broken(monkeypatch: py
     assert "inactive" in (error or "")
 
 
+def test_create_destination_appends_to_selected_cue_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    cue_list_id = "22222222-2222-4222-8222-222222222222"
+    last_cue_id = "11111111-1111-4111-8111-111111111111"
+    snapshot = {
+        "nodes": {
+            cue_list_id: {"uniqueID": cue_list_id, "type": "Cue List"},
+            last_cue_id: {"uniqueID": last_cue_id, "type": "Memo"},
+        },
+        "parent_by_child": {last_cue_id: cue_list_id},
+        "children_by_parent": {cue_list_id: [last_cue_id]},
+    }
+    monkeypatch.setattr(write_operations, "_read_structural_snapshot", lambda *_: snapshot)
+    monkeypatch.setattr(write_operations, "_structural_activity_snapshot", lambda *_: {"active_count": 0})
+
+    _, _, placement, error = write_operations._create_preflight(
+        object(), "ws-1", "destination",
+        {"kind": "cue_list", "id": cue_list_id, "after_cue_id": None},
+    )
+
+    assert error is None
+    assert placement is not None
+    assert placement["parent_id"] == cue_list_id
+    assert placement["after_cue_id"] == last_cue_id
+    assert placement["expected_index"] == 1
+
+
+def test_create_destination_accepts_qlab_cart_alias(monkeypatch: pytest.MonkeyPatch) -> None:
+    cart_id = "22222222-2222-4222-8222-222222222222"
+    snapshot = {
+        "nodes": {cart_id: {"uniqueID": cart_id, "type": "Cart"}},
+        "parent_by_child": {},
+        "children_by_parent": {cart_id: []},
+    }
+    monkeypatch.setattr(write_operations, "_read_structural_snapshot", lambda *_: snapshot)
+    monkeypatch.setattr(write_operations, "_structural_activity_snapshot", lambda *_: {"active_count": 0})
+
+    _, _, placement, error = write_operations._create_preflight(
+        object(), "ws-1", "destination",
+        {"kind": "cue_cart", "id": cart_id, "after_cue_id": None},
+    )
+
+    assert error is None
+    assert placement is not None
+    assert placement["mode"] == "empty_cart"
+
+
+@pytest.mark.parametrize("cue_types,ids,anchor", [
+    (["audio"], {}, None),
+    (["audio"], {"cue_list_id": "11111111-1111-4111-8111-111111111111", "group_id": "22222222-2222-4222-8222-222222222222"}, None),
+    (["audio", "video"], {"cue_cart_id": "11111111-1111-4111-8111-111111111111"}, None),
+    (["group"], {"cue_cart_id": "11111111-1111-4111-8111-111111111111"}, None),
+    (["audio"], {"cue_cart_id": "11111111-1111-4111-8111-111111111111"}, "22222222-2222-4222-8222-222222222222"),
+])
+def test_create_destination_rejects_invalid_selection_before_io(cue_types, ids, anchor) -> None:
+    with pytest.raises(UnsafeWriteOperationError):
+        write_operations._normalize_create_destination(
+            ids.get("cue_list_id"), ids.get("group_id"), ids.get("cue_cart_id"), anchor, cue_types
+        )
+
+
+@pytest.mark.parametrize("kind,container_type", [("cue_list", "Cue List"), ("group", "Group")])
+def test_create_destination_resolves_empty_and_direct_child(
+    monkeypatch: pytest.MonkeyPatch, kind: str, container_type: str
+) -> None:
+    container_id = "11111111-1111-4111-8111-111111111111"
+    first_id = "22222222-2222-4222-8222-222222222222"
+    other_id = "33333333-3333-4333-8333-333333333333"
+    snapshot = {
+        "nodes": {
+            container_id: {"uniqueID": container_id, "type": container_type},
+            first_id: {"uniqueID": first_id, "type": "Memo"},
+            other_id: {"uniqueID": other_id, "type": "Memo"},
+        },
+        "parent_by_child": {first_id: container_id},
+        "children_by_parent": {container_id: []},
+    }
+    monkeypatch.setattr(write_operations, "_read_structural_snapshot", lambda *_: snapshot)
+    monkeypatch.setattr(write_operations, "_structural_activity_snapshot", lambda *_: {"active_count": 0})
+    monkeypatch.setattr(write_operations, "_read_current_cue_list_id", lambda *_: container_id)
+
+    request = {"kind": kind, "id": container_id, "after_cue_id": None}
+    _, _, placement, error = write_operations._create_preflight(object(), "ws-1", "destination", request)
+    assert error is None
+    assert placement["mode"] == f"empty_{kind}"
+
+    snapshot["children_by_parent"][container_id] = [first_id]
+    request["after_cue_id"] = first_id
+    _, _, placement, error = write_operations._create_preflight(object(), "ws-1", "destination", request)
+    assert error is None
+    assert placement["after_cue_id"] == first_id
+    assert placement["expected_index"] == 1
+
+    request["after_cue_id"] = other_id
+    _, _, placement, error = write_operations._create_preflight(object(), "ws-1", "destination", request)
+    assert placement is None
+    assert "direct child" in error
+
+
+def test_create_cues_result_has_typed_items_and_destination() -> None:
+    result = CreateCuesResult.model_validate({
+        "ok": True, "status": "dry_run", "workspace_id": "ws-1", "dry_run": True,
+        "requested_count": 1,
+        "destination": {"kind": "cue_list", "id": "22222222-2222-4222-8222-222222222222"},
+        "results": [{"index": 0, "cue_type": "Audio", "status": "planned"}],
+        "message": "planned",
+    })
+
+    assert result.destination.kind == "cue_list"
+    assert result.results[0].index == 0
+    assert result.results[0].created_cue_id is None
+
+
+def test_create_cues_places_one_cue_in_empty_cart(monkeypatch: pytest.MonkeyPatch) -> None:
+    cart_id = "22222222-2222-4222-8222-222222222222"
+    created_id = "33333333-3333-4333-8333-333333333333"
+    snapshot = {
+        "nodes": {cart_id: {"uniqueID": cart_id, "type": "Cue Cart"}},
+        "parent_by_child": {}, "children_by_parent": {cart_id: []},
+    }
+    placement = {
+        "mode": "empty_cart", "parent_id": cart_id, "parent_type": "Cue Cart",
+        "parent_container_id": cart_id, "parent_osc_id": cart_id,
+        "new_args": [cart_id, 0, 0], "expected_index": 0,
+        "parent_children": [], "parent_fingerprint": write_operations._structural_fingerprint([]),
+        "tree_fingerprint": write_operations._create_tree_fingerprint(snapshot),
+    }
+    monkeypatch.setattr(write_operations, "_create_preflight", lambda *_: (
+        snapshot, {"active_count": 0}, placement, None
+    ))
+    monkeypatch.setattr(write_operations, "ensure_write_ready", lambda *_: "ws-1")
+
+    class Stub:
+        client = SimpleNamespace(config=SimpleNamespace(write_dry_run_default=True))
+
+        @staticmethod
+        def _resolve_workspace_id_strict(workspace_id: str) -> str:
+            return workspace_id
+
+    calls: list[tuple[str | None, str | None, bool]] = []
+
+    def fake_create_cue(_workspace, _cue_type, dry_run=None, after_cue_id=None, parent_container_id=None, confirm_token=None):
+        del confirm_token
+        calls.append((after_cue_id, parent_container_id, bool(dry_run)))
+        if dry_run:
+            return {"ok": True, "confirm_token": "item-token"}
+        return {"ok": True, "status": "created", "created_cue_id": created_id}
+
+    stub = Stub()
+    stub.create_cue = fake_create_cue
+    planned = write_operations.QLabWriteMixin.create_cues(
+        stub, "ws-1", ["audio"], dry_run=True, cue_cart_id=cart_id
+    )
+    result = write_operations.QLabWriteMixin.create_cues(
+        stub, "ws-1", ["audio"], dry_run=False,
+        cue_cart_id=cart_id, confirm_token=planned["confirm_token"],
+    )
+
+    assert result["status"] == "created"
+    assert result["results"][0]["created_cue_id"] == created_id
+    assert calls == [(None, cart_id, True), (None, cart_id, False)]
+
+
 def test_create_cues_chains_verified_ids(monkeypatch: pytest.MonkeyPatch) -> None:
     anchor = "11111111-1111-4111-8111-111111111111"
     parent = "22222222-2222-4222-8222-222222222222"
@@ -227,7 +389,7 @@ def test_create_cues_chains_verified_ids(monkeypatch: pytest.MonkeyPatch) -> Non
     stub = Stub()
     stub.create_cue = fake_create_cue
     planned = write_operations.QLabWriteMixin.create_cues(
-        stub, "ws-1", ["memo", "audio"], dry_run=True, after_cue_id=anchor
+        stub, "ws-1", ["memo", "audio"], dry_run=True, cue_list_id=parent
     )
     assert planned["status"] == "dry_run"
     assert "plan operations" in planned["message"]
@@ -236,11 +398,34 @@ def test_create_cues_chains_verified_ids(monkeypatch: pytest.MonkeyPatch) -> Non
         item.get("operation") == "new" and item.get("anchor_from_previous") is True
         for item in planned["planned_operations"]
     )
+    changed_order = write_operations.QLabWriteMixin.create_cues(
+        stub, "ws-1", ["audio", "memo"], dry_run=False,
+        cue_list_id=parent, confirm_token=planned["confirm_token"],
+    )
+    changed_destination = write_operations.QLabWriteMixin.create_cues(
+        stub, "ws-1", ["memo", "audio"], dry_run=False,
+        group_id=parent, confirm_token=planned["confirm_token"],
+    )
+    old_token = write_operations.QLabWriteMixin.create_cues(
+        stub, "ws-1", ["memo", "audio"], dry_run=False,
+        cue_list_id=parent,
+        confirm_token=planned["confirm_token"].replace("createCues:v2", "createCues:v1"),
+    )
+    assert changed_order["status"] == changed_destination["status"] == old_token["status"] == "preflight_failed"
+    assert calls == []
     result = write_operations.QLabWriteMixin.create_cues(
         stub, "ws-1", ["memo", "audio"], dry_run=False,
-        after_cue_id=anchor, confirm_token=planned["confirm_token"],
+        cue_list_id=parent, confirm_token=planned["confirm_token"],
     )
     assert result["status"] == "created"
+    assert result["destination"]["kind"] == "cue_list"
+    assert result["destination"]["id"] == parent
+    assert result["destination"]["resolved_after_cue_id"] == anchor
+    assert result["destination"]["insertion_index"] == 1
+    assert [(item["index"], item["cue_type"], item["created_cue_id"]) for item in result["results"]] == [
+        (0, "Memo", "33333333-3333-4333-8333-333333333333"),
+        (1, "Audio", "44444444-4444-4444-8444-444444444444"),
+    ]
     assert [call[:2] for call in calls] == [
         ("memo", anchor), ("memo", anchor),
         ("audio", "33333333-3333-4333-8333-333333333333"),
@@ -294,14 +479,18 @@ def test_create_cues_stops_before_the_next_item_after_failure(monkeypatch: pytes
     stub = Stub()
     stub.create_cue = fake_create_cue
     planned = write_operations.QLabWriteMixin.create_cues(
-        stub, "ws-1", ["memo", "audio", "wait"], dry_run=True, after_cue_id=anchor
+        stub, "ws-1", ["memo", "audio", "wait"], dry_run=True, cue_list_id=parent
     )
     result = write_operations.QLabWriteMixin.create_cues(
         stub, "ws-1", ["memo", "audio", "wait"], dry_run=False,
-        after_cue_id=anchor, confirm_token=planned["confirm_token"],
+        cue_list_id=parent, confirm_token=planned["confirm_token"],
     )
 
     assert result["status"] == "partial_failed"
+    assert result["created_count"] == 1
+    assert result["results"][0]["created_cue_id"] == created_id
+    assert result["error_code"] == "verification_failed"
+    assert "Inspect" in result["suggested_action"]
     assert [call[0] for call in calls] == ["memo", "memo", "audio", "audio"]
 
 

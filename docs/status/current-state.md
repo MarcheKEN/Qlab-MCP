@@ -8,8 +8,10 @@ A fresh in-process FastMCP instance using the corrected checkout deleted 55
 temporary cues in `mcp_prueba.qlab5` on QLab 5.5.10, including all 24 creatable
 types, batches of ten, and 29 nested descendants with the root preserved.
 Independent final readback confirmed the original workspace structure and
-removal of all temporary fixtures. List/Cart recursive plans were inspected;
-their existing contents were preserved. The installed MCP still needs reloading.
+removal of all temporary fixtures. After restarting the installed MCP, a second
+live matrix verified individual/batch/recursive deletion, token rejection and
+fresh readback; the original 17-cue list remained byte-for-byte identical in
+UUID and order. Existing List/Cart contents were preserved.
 See the [runtime report](../development/runtime-validation/2026-09-26-delete-cues.md).
 The Move shallow-health issue remains outside this fix. The audit below records
 the earlier Delete blocker as historical evidence.

@@ -8,8 +8,8 @@
 - User authorized testing in this workspace. Real cue mutations used public
   FastMCP Create/Delete tools with exact UUIDs, readiness, reviewed dry-runs,
   dedicated tokens, one execution and independent structural readback.
-- Corrected runtime tested through a newly instantiated in-process FastMCP
-  client. The already running installed MCP has not been restarted.
+- Initial corrected runtime tested through a newly instantiated in-process
+  FastMCP client; the post-restart MCP run is recorded below.
 
 ## Reproduced failures and fixes
 
@@ -52,6 +52,37 @@ The final matrix created and deleted **55 temporary cues**. An earlier run
 created and deleted 31 temporary cues while isolating the cache issue. Its cart
 fixture setup stopped at a guard: the cart named "Cue cart vacia" was nonempty.
 The corrected final run completed its final structural comparison successfully.
+
+## Installed MCP after restart
+
+After the user restarted the MCP, `qlab_check_connection` and
+`qlab_check_write_readiness` confirmed QLab 5.5.10, the same workspace, Edit
+Mode and edit permission. The exact `delete` Cue List began with 17 direct
+children. Through the restarted MCP:
+
+- Delete returned `reply_status="ok"`, confirmed fresh absence and completed
+  in 52 ms. A second single delete confirmed in 50 ms.
+- Invalid inputs again rejected empty or malformed IDs, missing UUIDs,
+  duplicates, Group-as-leaf, direct Cue List/Cart requests, invalid selector
+  combinations, and recursive-without-container. No target was deleted.
+- Missing and malformed confirmation tokens were rejected. A token for the
+  temporary Memo was rejected for the temporary Wait, which remained present.
+  Adding a sibling after planning invalidated the old token before deletion.
+- A mixed batch of ten Memo/Wait leaves deleted in order. Every readback
+  confirmed absence in 28–89 ms. A partially invalid batch was rejected while
+  all ten temporary cues remained readable. A new mixed batch of Memo/Wait
+  cues then deleted successfully.
+- Recursive deletion removed two nested leaves while preserving their Group.
+  Recursive deletion of the now-empty Group was a verified no-op; replaying
+  that token was rejected; direct deletion then removed the empty temporary
+  Group.
+- The list's final child UUIDs and order exactly matched its initial 17 cues.
+  All 19 cues created during this post-restart run were absent afterwards.
+
+An initial cross-target token check supplied a temporary Memo's token while
+naming a pre-existing Disarm cue. Automatic approval review rejected the call
+before execution. The same check was rerun against a temporary Wait created for
+the test; it was rejected by QLab preflight and the Wait remained present.
 
 ## Automated checks and limits
 

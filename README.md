@@ -4,7 +4,7 @@ QLab MCP `0.3.0` is a FastMCP server for inspecting QLab 5 workspaces over OSC
 and requesting narrowly gated structural writes. It is read-only by default;
 write mode is disabled unless explicitly configured and remains dry-run-first.
 
-The public surface is intentionally focused: 16 read-only tools and 6 gated write
+The public surface is intentionally focused: 43 read-only tools and 5 gated write
 tools. The server exposes no playback or raw-protocol escape hatch.
 
 ## Capability boundaries
@@ -47,7 +47,26 @@ workspace. The passcode is never a tool argument.
 
 ## Tool Groups
 
-The table below is the authoritative human inventory. Generated schemas and
+| Tool | Purpose |
+| --- | --- |
+| `qlab_get_control_cues` | Control/organization inventory within one Cue List, optionally filtered by type |
+| `qlab_get_control_cue_details` | Exact UUID detail: common fields, targets and Reset/Devamp settings |
+| `qlab_get_fade_cues` | Fade inventory within one Cue List |
+| `qlab_get_fade_cue_details` | Exact Fade target and documented fade settings |
+| `qlab_get_network_cues` | Network inventory within one Cue List |
+| `qlab_get_network_cue_details` | Exact Network patch and fade settings; free text requires technical |
+| `qlab_get_midi_cues` | MIDI and MIDI File inventory, optionally filtered by type |
+| `qlab_get_midi_cue_details` | Exact MIDI message or MIDI File detail, selected by concrete type |
+| `qlab_get_timecode_cues` | Timecode inventory within one Cue List |
+| `qlab_get_timecode_cue_details` | Exact MTC or LTC settings |
+| `qlab_get_script_cues` | Script inventory within one Cue List |
+| `qlab_get_script_cue_details` | Exact Script common settings; source requires technical |
+| `qlab_get_light_cues` | Light inventory within an exact Cue List UUID |
+| `qlab_get_light_cue_details` | Exact Light command text, collate, subcontroller, state and timing |
+| `qlab_get_group_cues` | Group inventory within an exact Cue List UUID |
+| `qlab_get_group_cue_details` | Exact Group mode, conditional Playlist settings and bounded children |
+
+The tables in this section together are the human inventory. Generated schemas and
 `tests/test_server_tools.py` define exact arguments, result models, and
 annotations.
 
@@ -66,12 +85,21 @@ annotations.
 | `qlab_get_workspace_midi_settings` | MIDI Patch inventory or exact patch | Partial OSC coverage; not the complete MIDI panel |
 | `qlab_query_cues` | Bounded filtered cue discovery | Read-only; not full payload inspection |
 | `qlab_get_cue_lists` | Compact combined Cue List / Cue Cart inventory and current container | Read-only; no child reads |
+| `qlab_get_audio_cues` | Compact Audio inventory inside one required Cue List UUID, including groups | Read-only; bounded and paged |
+| `qlab_get_video_cues` | Compact Video inventory inside one required Cue List UUID, including groups | Read-only; bounded and paged |
+| `qlab_get_video_cue_details` | Exact Video cue properties and typed geometry, timing and audio | Read-only; safe or technical |
+| `qlab_get_text_cues` | Compact Text inventory inside one required Cue List UUID, including groups | Read-only; bounded and paged |
+| `qlab_get_text_cue_details` | Exact Text cue properties and typed geometry, text and formatting | Read-only; safe or technical |
+| `qlab_get_camera_cues` | Compact Camera inventory inside one required Cue List UUID, including groups | Read-only; bounded and paged |
+| `qlab_get_camera_cue_details` | Exact Camera cue properties and typed geometry, input patch references and audio | Read-only; safe or technical |
+| `qlab_get_mic_cues` | Compact Mic inventory inside one required Cue List UUID, including groups | Read-only; bounded and paged |
+| `qlab_get_mic_cue_details` | Exact Mic cue input/output patch references, channels, timing and levels | Read-only; safe or technical; no Maps/Objects |
+| `qlab_get_audio_cue_details` | Exact Audio cue timing, slices, patch reference, mute/solo and levels | Read-only; safe or technical; no Maps/Objects |
 | `qlab_get_cue_list_details` | Exact Cue List state, playhead, timecode and bounded contents | Read-only; UUID-only; safe or technical |
 | `qlab_get_cue_cart_details` | Exact Cue Cart state, timecode, dimensions and occupied cell positions | Read-only; UUID-only; bounded cells; no playhead |
 | `qlab_get_cue_details` | Exact cue properties and health | Read-only; use exact refs for later writes |
 | `qlab_check_write_readiness` | Preflight before any real write | Read-only report; not a confirmation token |
-| `qlab_create_cue` | One template-backed structural creation | Gated, additive structural write; not initial setters or GO |
-| `qlab_create_cues` | Ordered sequential creation, 1–50 items | Gated, non-atomic batch; no automatic rollback |
+| `qlab_create_cues` | One to 50 ordered template-backed cues in an exact Cue List, Group, or empty Cue Cart | Gated, non-atomic creation; no initial setters, GO, or automatic rollback |
 | `qlab_edit_cues` | Allowlisted property/operation edits, 1–50 items | Gated, per-operation confirmation, non-atomic |
 | `qlab_edit_workspace_settings` | One exact `general.minGoTime` saved-setting write | Gated, one setter, fresh token, fresh readback |
 | `qlab_move_cues` | Sequential structural moves, 1–10 UUID targets | Gated, destructive metadata hint, non-atomic |
@@ -85,7 +113,9 @@ The normal read path is progressive rather than a full-show dump:
 2. `qlab_get_workspace_status` adds derived operational context.
 3. Use the relevant `qlab_get_workspace_*_settings` tool for infrastructure.
 4. `qlab_query_cues` finds a bounded target set.
-5. `qlab_get_cue_details` inspects exact properties.
+5. Prefer the cue-family inventory and UUID detail tools when the type and Cue List
+   are known. Keep `qlab_get_cue_details` for cross-type health, target, and editable
+   diagnostics; it is not the default family-detail reader.
 
 For lists and carts, use `qlab_get_cue_lists`, then select `qlab_get_cue_list_details`
 or `qlab_get_cue_cart_details` according to the returned type and UUID.
@@ -176,7 +206,7 @@ planned structure
 ## Deeper documentation
 
 - [User guide](docs/user/README.md)
-- [14-tool catalogue](docs/user/tools.md)
+- [Public tool catalogue](docs/user/tools.md)
 - [Agent workflows](docs/user/agent-workflows.md)
 - [Security policy](SECURITY.md)
 - [Development architecture](docs/development/architecture.md)

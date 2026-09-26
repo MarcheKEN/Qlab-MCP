@@ -1,6 +1,7 @@
 {
   "retrieval_date": "2026-08-01",
   "project_skill_root": "skills/",
+  "project_skill_scope": "optional ignored local files; not distributed in the repository",
   "reference": {
     "title": "The QLab 5 Manual",
     "qlab_version": "5.5.10",

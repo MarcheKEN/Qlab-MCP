@@ -117,7 +117,7 @@ CREATE_TOKEN_TTL_SECONDS = 300
 _CREATE_TOKEN_SECRET = secrets.token_bytes(32)
 _CONSUMED_CREATE_TOKENS: dict[str, int] = {}
 _CONSUMED_CREATE_TOKENS_LOCK = threading.Lock()
-CREATE_CUES_TOKEN_VERSION = 1
+CREATE_CUES_TOKEN_VERSION = 2
 CREATE_CUES_TOKEN_TTL_SECONDS = 300
 
 
@@ -946,8 +946,10 @@ class QLabWriteMixin:
         workspace_id: str,
         cue_types: list[str],
         dry_run: bool | None = None,
+        cue_list_id: str | None = None,
+        group_id: str | None = None,
+        cue_cart_id: str | None = None,
         after_cue_id: str | None = None,
-        parent_container_id: str | None = None,
         confirm_token: str | None = None,
     ) -> dict[str, Any]:
         """Create an ordered sequence, chaining each verified UUID to the next cue."""
@@ -960,7 +962,10 @@ class QLabWriteMixin:
             labels.append(writable_cue_type_label(cue_type))
         workspace = _clean_workspace_id(workspace_id)
         effective_dry_run = resolve_dry_run(self, dry_run)
-        placement_mode, placement_target = _normalize_create_placement(after_cue_id, parent_container_id)
+        destination = _normalize_create_destination(
+            cue_list_id, group_id, cue_cart_id, after_cue_id, labels
+        )
+        placement_mode, placement_target = "destination", destination
 
         try:
             if effective_dry_run:
@@ -979,6 +984,7 @@ class QLabWriteMixin:
             return _create_cues_failure(
                 workspace, labels, effective_dry_run, {},
                 {"preflight": str(exc)}, "preflight_failed",
+                destination=destination,
             )
         snapshot = prepared["snapshot"]
         activity = prepared["activity"]
@@ -988,6 +994,7 @@ class QLabWriteMixin:
             return _create_cues_failure(
                 workspace, labels, effective_dry_run, placement or {},
                 {"preflight": preflight_error or "Create batch preflight failed."}, "preflight_failed",
+                destination=destination,
             )
         if placement.get("mode") == "empty_cart" and len(labels) > 1:
             return _create_cues_failure(
@@ -997,9 +1004,10 @@ class QLabWriteMixin:
                 placement,
                 {"placement": "A Cue Cart has no linear order; create one cue per Cart cell."},
                 "preflight_failed",
+                destination=destination,
             )
 
-        binding = _create_cues_token_binding(workspace, wire_types, labels, placement, snapshot, activity)
+        binding = _create_cues_token_binding(workspace, wire_types, labels, destination, placement, snapshot, activity)
         planned_operations = _planned_create_cues_operations(workspace, wire_types, placement)
         if effective_dry_run:
             token = _encode_create_cues_token(binding)
@@ -1011,13 +1019,16 @@ class QLabWriteMixin:
                 "requested_count": len(labels),
                 "planned_count": len(planned_operations),
                 "created_count": 0,
+                "destination": _create_cues_destination_result(destination, placement),
                 "results": [
-                    {"cue_type": label, "status": "planned", "index": index}
+                    _create_cues_item_result(index, label, {"status": "planned"})
                     for index, label in enumerate(labels)
                 ],
                 "planned_operations": planned_operations,
                 "executed_operations": [],
                 "confirm_token": token,
+                "error_code": None,
+                "suggested_action": None,
                 "warnings": ["Dry run only: no mutating OSC commands were sent to QLab."],
                 "message": (
                     "Create sequence dry-run succeeded; planned_count counts generated plan operations "
@@ -1029,11 +1040,15 @@ class QLabWriteMixin:
         payload, token_error = _decode_create_cues_token(confirm_token)
         if token_error or payload is None:
             return _create_cues_failure(
-                workspace, labels, False, placement, {"confirm_token": token_error or "Invalid confirmation token."}, "preflight_failed", planned_operations
+                workspace, labels, False, placement,
+                {"confirm_token": token_error or "Invalid confirmation token."},
+                "preflight_failed", planned_operations, destination=destination,
             )
         if _create_token_is_consumed(confirm_token):
             return _create_cues_failure(
-                workspace, labels, False, placement, {"confirm_token": "confirmation_already_consumed: create sequence token has already been used."}, "preflight_failed", planned_operations
+                workspace, labels, False, placement,
+                {"confirm_token": "confirmation_already_consumed: create sequence token has already been used."},
+                "preflight_failed", planned_operations, destination=destination,
             )
         fresh_prepared = _prepare_create_request(
             self,
@@ -1049,43 +1064,49 @@ class QLabWriteMixin:
         fresh_error = fresh_prepared["preflight_error"]
         if fresh_error or fresh_snapshot is None or fresh_placement is None:
             return _create_cues_failure(
-                workspace, labels, False, placement, {"preflight": fresh_error or "Fresh create sequence preflight failed."}, "preflight_failed", planned_operations
+                workspace, labels, False, placement,
+                {"preflight": fresh_error or "Fresh create sequence preflight failed."},
+                "preflight_failed", planned_operations, destination=destination,
             )
         fresh_binding = _create_cues_token_binding(
-            workspace, wire_types, labels, fresh_placement, fresh_snapshot, fresh_activity
+            workspace, wire_types, labels, destination, fresh_placement, fresh_snapshot, fresh_activity
         )
         if payload.get("binding") != fresh_binding:
             return _create_cues_failure(
-                workspace, labels, False, fresh_placement, {"confirm_token": "Create sequence token does not match the fresh workspace structure."}, "preflight_failed", planned_operations
+                workspace, labels, False, fresh_placement,
+                {"confirm_token": "Create sequence token does not match the fresh workspace structure."},
+                "preflight_failed", planned_operations, destination=destination,
             )
         token_error = _consume_create_token(confirm_token, payload)
         if token_error:
             return _create_cues_failure(
-                workspace, labels, False, fresh_placement, {"confirm_token": token_error}, "preflight_failed", planned_operations
+                workspace, labels, False, fresh_placement,
+                {"confirm_token": token_error}, "preflight_failed", planned_operations,
+                destination=destination,
             )
 
         results: list[dict[str, Any]] = []
         executed_operations: list[dict[str, Any]] = []
         previous_id: str | None = None
         for index, (wire_type, label) in enumerate(zip(wire_types, labels)):
-            item_after = previous_id if previous_id is not None else (after_cue_id if placement_mode == "anchored" else None)
-            item_parent = parent_container_id if index == 0 and placement_mode == "empty_container" else None
+            item_after = previous_id if previous_id is not None else placement.get("after_cue_id")
+            item_parent = placement["parent_id"] if index == 0 and not item_after else None
             item_plan = self.create_cue(
                 workspace, wire_type, dry_run=True,
                 after_cue_id=item_after, parent_container_id=item_parent,
             )
             if not item_plan.get("ok"):
-                results.append({"cue_type": label, "status": "preflight_failed", "errors": item_plan.get("errors")})
-                return _create_cues_partial_result(workspace, labels, results, planned_operations, executed_operations, item_plan)
+                results.append(_create_cues_item_result(index, label, {**item_plan, "status": "preflight_failed"}))
+                return _create_cues_partial_result(workspace, labels, destination, placement, results, planned_operations, executed_operations, item_plan)
             item_result = self.create_cue(
                 workspace, wire_type, dry_run=False,
                 after_cue_id=item_after, parent_container_id=item_parent,
                 confirm_token=item_plan.get("confirm_token"),
             )
-            results.append(item_result)
+            results.append(_create_cues_item_result(index, label, item_result))
             executed_operations.extend(item_result.get("executed_operations") or [])
             if not item_result.get("ok") or not item_result.get("created_cue_id"):
-                return _create_cues_partial_result(workspace, labels, results, planned_operations, executed_operations, item_result)
+                return _create_cues_partial_result(workspace, labels, destination, placement, results, planned_operations, executed_operations, item_result)
             previous_id = item_result["created_cue_id"]
         return {
             "ok": True,
@@ -1095,10 +1116,13 @@ class QLabWriteMixin:
             "requested_count": len(labels),
             "planned_count": len(planned_operations),
             "created_count": len(results),
+            "destination": _create_cues_destination_result(destination, placement),
             "results": results,
             "planned_operations": planned_operations,
             "executed_operations": executed_operations,
             "confirm_token": None,
+            "error_code": None,
+            "suggested_action": None,
             "warnings": ["Sequence creation is sequential and has no automatic rollback."],
             "message": (
                 "Cue sequence created; planned_count counts generated plan operations, "
@@ -3302,6 +3326,29 @@ def _normalize_create_placement(
     return "empty_container", _normalize_create_uuid(parent_container_id, "parent_container_id")
 
 
+def _normalize_create_destination(
+    cue_list_id: str | None,
+    group_id: str | None,
+    cue_cart_id: str | None,
+    after_cue_id: str | None,
+    cue_types: list[str],
+) -> dict[str, Any]:
+    selectors = [(kind, field, value) for kind, field, value in (
+        ("cue_list", "cue_list_id", cue_list_id),
+        ("group", "group_id", group_id),
+        ("cue_cart", "cue_cart_id", cue_cart_id),
+    ) if value is not None]
+    if len(selectors) != 1:
+        raise UnsafeWriteOperationError("Create requires exactly one of cue_list_id, group_id, or cue_cart_id.")
+    kind, field, value = selectors[0]
+    destination_id = _normalize_create_uuid(value, field)
+    anchor_id = _normalize_create_uuid(after_cue_id, "after_cue_id") if after_cue_id is not None else None
+    if kind == "cue_cart":
+        if anchor_id is not None or len(cue_types) != 1 or cue_types[0].casefold() == "group":
+            raise UnsafeWriteOperationError("Cue Cart creation requires one non-Group cue and no after_cue_id.")
+    return {"kind": kind, "id": destination_id, "after_cue_id": anchor_id}
+
+
 def _create_tree_fingerprint(snapshot: dict[str, Any]) -> str:
     tree = snapshot.get("children_by_parent")
     if not isinstance(tree, dict):
@@ -3318,7 +3365,7 @@ def _prepare_create_request(
     osc_cue_type: str,
     qlab_cue_type: str,
     placement_mode: str,
-    placement_target: str,
+    placement_target: str | dict[str, Any],
 ) -> dict[str, Any]:
     snapshot, activity, placement, preflight_error = _create_preflight(
         reader,
@@ -3355,7 +3402,7 @@ def _create_preflight(
     reader: Any,
     workspace_id: str,
     placement_mode: str,
-    placement_target: str,
+    placement_target: str | dict[str, Any],
 ) -> tuple[dict[str, Any] | None, dict[str, Any], dict[str, Any] | None, str | None]:
     try:
         snapshot = _read_structural_snapshot(reader, workspace_id)
@@ -3365,6 +3412,27 @@ def _create_preflight(
     if activity.get("active_count"):
         return snapshot, activity, None, "Workspace activity is not safely idle; create requires 0 running/paused cues."
     nodes = snapshot.get("nodes") or {}
+    requested_destination: dict[str, Any] | None = None
+    if placement_mode == "destination":
+        requested_destination = placement_target
+        destination_id = placement_target["id"]
+        kind = placement_target["kind"]
+        destination = nodes.get(destination_id)
+        expected_types = {"cue_list": {"Cue List"}, "group": {"Group"}, "cue_cart": {"Cue Cart", "Cart"}}[kind]
+        if not isinstance(destination, dict) or destination.get("type") not in expected_types:
+            return snapshot, activity, None, f"{kind} does not identify the requested container type in this workspace."
+        children = list(snapshot.get("children_by_parent", {}).get(destination_id, []))
+        requested_anchor = placement_target.get("after_cue_id")
+        if requested_anchor and requested_anchor not in children:
+            return snapshot, activity, None, "after_cue_id must be a direct child of the selected destination."
+        if kind == "cue_cart" and requested_anchor:
+            return snapshot, activity, None, "after_cue_id is not supported for a Cue Cart."
+        if requested_anchor or (kind != "cue_cart" and children):
+            placement_mode = "anchored"
+            placement_target = requested_anchor or children[-1]
+        else:
+            placement_mode = "empty_container"
+            placement_target = destination_id
     if placement_mode == "anchored":
         anchor_id = placement_target
         anchor = nodes.get(anchor_id)
@@ -3399,6 +3467,8 @@ def _create_preflight(
             "tree_fingerprint": _create_tree_fingerprint(snapshot),
             "status": "anchored",
         }
+        if requested_destination is not None:
+            placement["destination"] = requested_destination
         return snapshot, activity, placement, None
 
     container_id = placement_target
@@ -3450,6 +3520,8 @@ def _create_preflight(
         "parent_fingerprint": _structural_fingerprint(children),
         "tree_fingerprint": _create_tree_fingerprint(snapshot),
     }
+    if requested_destination is not None:
+        placement["destination"] = requested_destination
     if mode == "empty_cart":
         # QLab 5.5.10 accepts the documented 0,0 request but reports the
         # first Cart cell as 1,1 on readback.
@@ -3564,6 +3636,7 @@ def _create_cues_token_binding(
     workspace_id: str,
     wire_types: list[str],
     labels: list[str],
+    destination: dict[str, Any],
     placement: dict[str, Any],
     snapshot: dict[str, Any],
     activity: dict[str, Any],
@@ -3573,6 +3646,7 @@ def _create_cues_token_binding(
         "workspace_id": workspace_id,
         "wire_types": wire_types,
         "cue_types": labels,
+        "destination": destination,
         "placement": placement,
         "tree_fingerprint": _create_tree_fingerprint(snapshot),
         "activity_snapshot": activity,
@@ -3660,6 +3734,8 @@ def _create_cues_failure(
     errors: dict[str, str],
     status: str,
     planned_operations: list[dict[str, Any]] | None = None,
+    *,
+    destination: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         "ok": False,
@@ -3669,10 +3745,13 @@ def _create_cues_failure(
         "requested_count": len(labels),
         "planned_count": len(planned_operations or []),
         "created_count": 0,
+        "destination": _create_cues_destination_result(destination, placement),
         "results": [],
         "planned_operations": list(planned_operations or []),
         "executed_operations": [],
         "confirm_token": None,
+        "error_code": status,
+        "suggested_action": "Inspect the destination and run a new dry-run before creating cues.",
         "errors": errors,
         "warnings": [],
         "message": "Create sequence stopped before mutating OSC commands.",
@@ -3682,26 +3761,78 @@ def _create_cues_failure(
 def _create_cues_partial_result(
     workspace_id: str,
     labels: list[str],
+    destination: dict[str, Any],
+    placement: dict[str, Any],
     results: list[dict[str, Any]],
     planned_operations: list[dict[str, Any]],
     executed_operations: list[dict[str, Any]],
     failed_result: dict[str, Any],
 ) -> dict[str, Any]:
+    created_count = sum(1 for result in results if result.get("status") == "created")
+    status = (
+        "partial_failed" if created_count
+        else "preflight_failed" if failed_result.get("status") == "preflight_failed"
+        else "verification_failed"
+    )
     return {
         "ok": False,
-        "status": "partial_failed" if len(results) > 1 else "verification_failed",
+        "status": status,
         "workspace_id": workspace_id,
         "dry_run": False,
         "requested_count": len(labels),
         "planned_count": len(planned_operations),
-        "created_count": sum(1 for result in results if result.get("status") == "created"),
+        "created_count": created_count,
+        "destination": _create_cues_destination_result(destination, placement),
         "results": results,
         "planned_operations": planned_operations,
         "executed_operations": executed_operations,
         "confirm_token": None,
+        "error_code": failed_result.get("error_code") or failed_result.get("status") or "create_failed",
+        "suggested_action": failed_result.get("suggested_action") or "Inspect the workspace and created UUIDs before a new dry-run; do not retry an ambiguous create.",
         "errors": failed_result.get("errors") or {"sequence": failed_result.get("message", "Create sequence stopped.")},
-        "warnings": ["No automatic rollback was sent; earlier successful cues remain."],
-        "message": "Create sequence stopped at the first failed or ambiguous cue; no retry was sent.",
+        "warnings": ["No automatic rollback was sent; earlier successful cues remain."] if created_count else [],
+        "message": (
+            "Create sequence stopped before mutating OSC commands."
+            if status == "preflight_failed" and not executed_operations
+            else "Create sequence stopped at the first failed or ambiguous cue; no retry was sent."
+        ),
+    }
+
+
+def _create_cues_destination_result(
+    destination: dict[str, Any] | None,
+    placement: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if destination is None:
+        return None
+    placement = placement or {}
+    return {
+        **destination,
+        "resolved_after_cue_id": placement.get("after_cue_id"),
+        "insertion_index": placement.get("expected_index"),
+        "placement_mode": placement.get("mode"),
+    }
+
+
+def _create_cues_item_result(index: int, cue_type: str, result: dict[str, Any]) -> dict[str, Any]:
+    verification = result.get("verification") or {}
+    structure = verification.get("structure") or {}
+    health = verification.get("health") or {}
+    return {
+        "index": index,
+        "cue_type": cue_type,
+        "status": result.get("status", "preflight_failed"),
+        "created_cue_id": result.get("created_cue_id"),
+        "verified": result.get("ok") if result.get("status") != "planned" else None,
+        "parent_id": structure.get("parent_id"),
+        "position_index": structure.get("index"),
+        "health_status": health.get("status"),
+        "cleanup_required": bool(result.get("cleanup_required")),
+        "cleanup": result.get("cleanup"),
+        "errors": result.get("errors"),
+        "warnings": list(result.get("warnings") or []),
+        "error_code": result.get("error_code"),
+        "suggested_action": result.get("suggested_action"),
     }
 
 

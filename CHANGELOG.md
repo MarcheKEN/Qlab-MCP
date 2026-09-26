@@ -2,6 +2,57 @@
 
 ## Unreleased
 
+- Corrects contributor tool counts, Create security-token documentation, reference
+  provenance, and write-registry versus read coverage; surfaces pending Move/Delete
+  runtime findings in user workflows and distinguishes historical plans from current API.
+
+- Removes `.superpowers/` and `skills/` from Git tracking while retaining local
+  copies; ignores both directories. Reference extraction no longer requires a
+  portable skill copy, and local skill tests are optional on clean checkouts.
+
+- Aligns active read workflows and inventory links with 48 public tools; marks
+  prior status/roadmap entries as dated evidence and separates published PR CI
+  from uncommitted development and pending write-safety defects.
+
+- Replaces the public single-cue Create tool with `qlab_create_cues` for one to
+  50 ordered cues in an exact Cue List, Group, or empty Cue Cart. Adds explicit
+  destination/position, typed compact per-cue results, and a fresh
+  `confirm:createCues:v2` token. Public surface: 48 tools (43 reads, 5 gated writes).
+
+- Adds five scoped inventory/detail pairs for Fade, Network, MIDI and MIDI File,
+  Timecode, and Script. Conditional reads follow the cue mode. Script source
+  and Network free-form content require technical profile. Public surface:
+  49 tools (43 reads, 6 gated writes) before the Create consolidation.
+
+- Adds `qlab_get_control_cues` and `qlab_get_control_cue_details` for Start,
+  Stop, Pause, Load, Reset, Devamp, GoTo, Target, Arm, Disarm, Wait and Memo.
+  One bounded Cue List inventory with optional type filter; exact UUID detail
+  with typed common fields and conditional target/Reset/Devamp blocks.
+  Memo content is included in safe. Shared readers, no action calls or fallback.
+  Public surface: 39 tools (33 reads, 6 writes).
+
+- Adds Light/Group inventories and UUID-only details: Light commands, collate,
+  subcontroller; Group mode, conditional Playlist and bounded ordered children.
+  Reuses shared readers and traversal. Public surface: 37 tools (31 reads, 6 writes).
+
+- Adds scoped inventory and exact detail tools for Video, Text and Camera.
+  Typed geometry, stage/input references, aggregate effects, Video timing/audio,
+  Camera channel selection and Text content/format runs reuse the Audio/Mic
+  executor extracted into cues/family.py. Audio/Mic schemas remain unchanged.
+  Optional Text formatting OSC failures retain available data as partial results.
+
+- Adds `qlab_get_audio_cues`, scoped to a required Cue List UUID (nested groups
+  included), and `qlab_get_audio_cue_details` for an exact Audio cue UUID.
+  Shared bounded traversal, workspace resolution, transport and validation;
+  typed timing, patch reference, slices, mute/solo and aggregate levels, with
+  optional crosspoint selection. Technical metadata is credential-redacted.
+  Audio Maps, Audio Objects and live/indexed effect exploration remain excluded.
+  Generic cue tools remain available.
+- Adds `qlab_get_mic_cues` and `qlab_get_mic_cue_details`, sharing Audio's
+  scoped traversal, exact targeting, validation and bounded levels reader.
+  Mic details include input/output patch references, channels and channel offset;
+  Maps, Objects, live metrics and indexed effects remain excluded.
+
 - Adds `qlab_get_cue_lists` and UUID-only `qlab_get_cue_list_details`, with
   typed identity/state, playhead, incoming timecode and bounded ordered contents.
   Technical reads retain typed sections and add a redacted allowlisted payload.
@@ -9,7 +60,6 @@
   Adds UUID-only `qlab_get_cue_cart_details` for typed dimensions, occupied cell
   positions, state and timecode, sharing the container reader and validation.
   Both details include common basics; notes are read only in technical profile.
-  Public inventory: 23 tools (17 read-only, 6 writes).
 - Removes Cue List detail reads from `qlab_get_cue_details`. Single and batch
   calls return an actionable structured redirect to `qlab_get_cue_list_details`;
   Cue Cart reads remain supported by the generic tool.

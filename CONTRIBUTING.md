@@ -26,7 +26,7 @@ git diff --check
 The project does not currently configure a separate linter or type checker.
 Do not add substitute checks as if they were official.
 
-The FastMCP inspection must expose exactly the 22 tools listed in
+The FastMCP inspection must expose exactly the 48 tools listed in
 [`docs/user/tools.md`](docs/user/tools.md). The schemas and contract tests in
 `tests/test_server_tools.py` remain authoritative.
 
@@ -53,6 +53,11 @@ or a protocol/API literal. Future contributions must follow this rule.
 
 Documentation-only checks must not connect to QLab. Use a temporary local link
 scan, focused tests, and a temporary package build.
+
+`skills/` and `.superpowers/` are optional ignored local directories, not
+distributed repository requirements. Canonical QLab references remain under
+`docs/references/` and `docs/sources/`. Reference extraction checks the canonical
+Markdown by default; `--skill-copy` explicitly opts into a local portable copy.
 
 ## QLab safety
 

@@ -2,6 +2,14 @@
 
 Start here, then follow the folder index nearest to the work you are doing.
 
+Current API and operating instructions are in `docs/user/`, the root README,
+CONTRIBUTING, SECURITY, and `docs/development/architecture.md`. Status and roadmap
+start with the current development snapshot. Dated research, reviews, runtime
+reports, archived workorders, and `docs/superpowers/` plans retain their original
+contracts as historical evidence; they do not override the current tool schemas.
+Imported reference/transcript content is preserved, not rewritten to describe MCP.
+Local `skills/` and `.superpowers/` directories are ignored and not distributed.
+
 ## Users
 
 - [User guide](user/README.md)
@@ -22,7 +30,7 @@ Start here, then follow the folder index nearest to the work you are doing.
 - [Development index](development/README.md)
 - [Architecture](development/architecture.md)
 - [MCP agent UX and Edit cleanup research](development/research/2026-08-13-mcp-agent-ux-and-edit-cleanup.md)
-- [Runtime checklist for `qlab_create_cue`](development/runtime-validation/create-cues.md)
+- [Historical single-cue Create runtime checklist](development/runtime-validation/create-cues.md)
 - [Runtime checklist for `qlab_edit_cues`](development/runtime-validation/edit-cues.md)
 
 ## References

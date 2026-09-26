@@ -19,7 +19,6 @@ import qlab_mcp.server as server_module
 from qlab_mcp.errors import OscTimeoutError, QLabReplyError
 from qlab_mcp.server import (
     CHECK_CONNECTION_TIMEOUT,
-    CREATE_CUE_TIMEOUT,
     CREATE_CUES_TIMEOUT,
     CUE_DETAILS_TIMEOUT,
     QUERY_CUES_TIMEOUT,
@@ -48,6 +47,382 @@ from qlab_mcp.server_responses import overview_success_payload
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_NOISE_KEYS: frozenset[str] = frozenset()
 EXPECTED_FASTMCP_TOOL_CONTRACTS = {
+    "qlab_get_fade_cue_details": {
+        "title": "Get QLab Fade Cue Details",
+        "timeout": 20,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "details",
+            "fade",
+            "qlab",
+            "safe-read"
+        ],
+        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
+        "output_schema_hash": "c6e114cc16172c2dd757b176114186a268603120ff15818d8c93610cd5da5c85"
+    },
+    "qlab_get_fade_cues": {
+        "title": "Get QLab Fade Cues",
+        "timeout": 60,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "fade",
+            "inventory",
+            "qlab",
+            "safe-read"
+        ],
+        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
+        "output_schema_hash": "85de5ae3dd4fcaf4b5df7badbd4550ebd953266e92ddc2c55167fb68ac0c9dd8"
+    },
+    "qlab_get_midi_cue_details": {
+        "title": "Get QLab MIDI Cue Details",
+        "timeout": 20,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "details",
+            "midi",
+            "qlab",
+            "safe-read"
+        ],
+        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
+        "output_schema_hash": "8b93af1bf558e53f14a326ce3c282682b696f27914dd87de8fd6e7bdc4205f9c"
+    },
+    "qlab_get_midi_cues": {
+        "title": "Get QLab MIDI Cues",
+        "timeout": 60,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "inventory",
+            "midi",
+            "qlab",
+            "safe-read"
+        ],
+        "input_schema_hash": "40e3b50a6091cb04e48143d9083895bd39bd19afea7d194384deab085f303795",
+        "output_schema_hash": "2602974bbf1673e3b1e035c57fbc130ffcb5244f19aa8f6bdc666e64726c36a0"
+    },
+    "qlab_get_network_cue_details": {
+        "title": "Get QLab Network Cue Details",
+        "timeout": 20,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "details",
+            "network",
+            "qlab",
+            "safe-read"
+        ],
+        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
+        "output_schema_hash": "846827822b8629f0a041f8a282b0b421ab5f1058f6632d9b27e6b602798eac37"
+    },
+    "qlab_get_network_cues": {
+        "title": "Get QLab Network Cues",
+        "timeout": 60,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "inventory",
+            "network",
+            "qlab",
+            "safe-read"
+        ],
+        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
+        "output_schema_hash": "dd04cd1245ff7e1764508f7af2086ee8130e8f769bff8fb39b75617cf4670ac2"
+    },
+    "qlab_get_script_cue_details": {
+        "title": "Get QLab Script Cue Details",
+        "timeout": 20,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "details",
+            "qlab",
+            "safe-read",
+            "script"
+        ],
+        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
+        "output_schema_hash": "0b767ee39f2a38350541b86439846f877c00cf50a6d3bddee1409b8d3da3c497"
+    },
+    "qlab_get_script_cues": {
+        "title": "Get QLab Script Cues",
+        "timeout": 60,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "inventory",
+            "qlab",
+            "safe-read",
+            "script"
+        ],
+        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
+        "output_schema_hash": "a322aa7517155fcad972562cce337bee3007d8b7954d817081c5093fcc8757b3"
+    },
+    "qlab_get_timecode_cue_details": {
+        "title": "Get QLab Timecode Cue Details",
+        "timeout": 20,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "details",
+            "qlab",
+            "safe-read",
+            "timecode"
+        ],
+        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
+        "output_schema_hash": "c9ccdf3af588031d80f199edbc511aa1b611f21428b3a5ff4f2f95c2af702605"
+    },
+    "qlab_get_timecode_cues": {
+        "title": "Get QLab Timecode Cues",
+        "timeout": 60,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "inventory",
+            "qlab",
+            "safe-read",
+            "timecode"
+        ],
+        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
+        "output_schema_hash": "a4581fb7f0253a07efef82cf1bf28f4ddc460c153a5f5aa4d8ab83a874595e97"
+    },
+    "qlab_get_control_cue_details": {
+        "title": "Get QLab Control Cue Details", "timeout": 20.0,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["control", "details", "qlab", "safe-read"],
+        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
+        "output_schema_hash": "dc59e5ae8b1df04003bf25576a04ceadeefdc00f604e010511c40fecfb93b787",
+    },
+    "qlab_get_control_cues": {
+        "title": "Get QLab Control Cues", "timeout": 60.0,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["control", "inventory", "qlab", "safe-read"],
+        "input_schema_hash": "75d6d6aad4041afdee76b5ef37fd2d28ce55b561381606fe85257cb68f8dfdc1",
+        "output_schema_hash": "65795d54165d04f47a3adc7929825671d17e1c1342be4cedbb479129e571e46b",
+    },
+'qlab_get_group_cue_details': {'title': 'Get QLab Group Cue Details',
+                                'timeout': 20.0,
+                                'annotations': {'readOnlyHint': True,
+                                                'destructiveHint': False,
+                                                'idempotentHint': True,
+                                                'openWorldHint': True},
+                                'tags': ['details',
+                                         'group',
+                                         'qlab',
+                                         'safe-read'],
+                                'input_schema_hash': '615c3da475f0580740ef4cc5767820e039c7ef2ebc0d28c34a4451bfc72cdf4d',
+                                'output_schema_hash': '962bf4e497238a234a7d2cb3cd2ceac22135a1ddf9f0eae3192b6885112bbc6b'},
+ 'qlab_get_group_cues': {'title': 'Get QLab Group Cues',
+                         'timeout': 60.0,
+                         'annotations': {'readOnlyHint': True,
+                                         'destructiveHint': False,
+                                         'idempotentHint': True,
+                                         'openWorldHint': True},
+                         'tags': ['group', 'inventory', 'qlab', 'safe-read'],
+                         'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
+                         'output_schema_hash': 'a9e4fd7553afc64a4a3be98ffcfad3ef1229ad01f24a5d24fba51e2d81be2639'},
+ 'qlab_get_light_cue_details': {'title': 'Get QLab Light Cue Details',
+                                'timeout': 20.0,
+                                'annotations': {'readOnlyHint': True,
+                                                'destructiveHint': False,
+                                                'idempotentHint': True,
+                                                'openWorldHint': True},
+                                'tags': ['details',
+                                         'light',
+                                         'qlab',
+                                         'safe-read'],
+                                'input_schema_hash': 'c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb',
+                                'output_schema_hash': '3a293706067f77afb4f4bc9e6b1519bab9711b3c21e34585c9a51f7791614b5f'},
+ 'qlab_get_light_cues': {'title': 'Get QLab Light Cues',
+                         'timeout': 60.0,
+                         'annotations': {'readOnlyHint': True,
+                                         'destructiveHint': False,
+                                         'idempotentHint': True,
+                                         'openWorldHint': True},
+                         'tags': ['inventory', 'light', 'qlab', 'safe-read'],
+                         'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
+                         'output_schema_hash': 'b81d56a7d869c323d4feec748abfcf115dece77d0150a9434be4e681f7caafb5'},
+    "qlab_get_camera_cue_details": {
+        "title": "Get QLab Camera Cue Details",
+        "timeout": 20,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "camera",
+            "details",
+            "qlab",
+            "safe-read"
+        ],
+        "input_schema_hash": "0af60c735e03d5135243f9b087e8c38c82ff0debb04ced39f4a5716bd27f2e06",
+        "output_schema_hash": "fc6afb41a86b3343dc410e75a85914497d11ed6190aaf163f432b2d1c3235418"
+    },
+    "qlab_get_camera_cues": {
+        "title": "Get QLab Camera Cues",
+        "timeout": 60,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "camera",
+            "inventory",
+            "qlab",
+            "safe-read"
+        ],
+        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
+        "output_schema_hash": "0c27a1cbdca0d9b51e4a2b0bf393009b194d8af28e00ef5e07c5441bad1df8d1"
+    },
+    "qlab_get_text_cue_details": {
+        "title": "Get QLab Text Cue Details",
+        "timeout": 20,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "details",
+            "qlab",
+            "safe-read",
+            "text"
+        ],
+        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
+        "output_schema_hash": "f727278211899669de5105a35e6de4562106b8fc86e555efc233eed4c14628df"
+    },
+    "qlab_get_text_cues": {
+        "title": "Get QLab Text Cues",
+        "timeout": 60,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "inventory",
+            "qlab",
+            "safe-read",
+            "text"
+        ],
+        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
+        "output_schema_hash": "151f435770ed59118ee17430a4879c272407ec50204fa2bebceb65a1008bb75e"
+    },
+    "qlab_get_video_cue_details": {
+        "title": "Get QLab Video Cue Details",
+        "timeout": 20,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "details",
+            "qlab",
+            "safe-read",
+            "video"
+        ],
+        "input_schema_hash": "0af60c735e03d5135243f9b087e8c38c82ff0debb04ced39f4a5716bd27f2e06",
+        "output_schema_hash": "03f85129047f197dde90196b686696074a8b6c7cc3aea6c6604a09b644ed63ac"
+    },
+    "qlab_get_video_cues": {
+        "title": "Get QLab Video Cues",
+        "timeout": 60,
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True
+        },
+        "tags": [
+            "inventory",
+            "qlab",
+            "safe-read",
+            "video"
+        ],
+        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
+        "output_schema_hash": "3ba3c1885314d31725092327b2a39fec5de9def57fef8ed32c22886405fa9905"
+    },
+    "qlab_get_mic_cues": {
+        "title": "Get QLab Mic Cues",
+        "timeout": QUERY_CUES_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["inventory", "mic", "qlab", "safe-read"],
+        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
+        "output_schema_hash": "4999a65f8e6421f85eed8d4ce5a75609a0c44a2e22775f814de74fb47413f469",
+    },
+    "qlab_get_mic_cue_details": {
+        "title": "Get QLab Mic Cue Details",
+        "timeout": CUE_DETAILS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["details", "mic", "qlab", "safe-read"],
+        "input_schema_hash": "0af60c735e03d5135243f9b087e8c38c82ff0debb04ced39f4a5716bd27f2e06",
+        "output_schema_hash": "bb8b82701b8812b16b430d7f1451f6f4ef3230ead95c0d3794bd7997d4b0cf77",
+    },
+    "qlab_get_audio_cues": {
+        "title": "Get QLab Audio Cues",
+        "timeout": QUERY_CUES_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["audio", "inventory", "qlab", "safe-read"],
+        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
+        "output_schema_hash": "7099b3a92ba4d13b656236111c2812f17f4a062bfff20f8c5e5f88a5f3e48caa",
+    },
+    "qlab_get_audio_cue_details": {
+        "title": "Get QLab Audio Cue Details",
+        "timeout": CUE_DETAILS_TIMEOUT,
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+        "tags": ["audio", "details", "qlab", "safe-read"],
+        "input_schema_hash": "0af60c735e03d5135243f9b087e8c38c82ff0debb04ced39f4a5716bd27f2e06",
+        "output_schema_hash": "6b3087a0dada6e39539f98c3deb54e9b5989be0693d644181ee91bd70f7b6820",
+    },
     "qlab_get_cue_lists": {
         "title": "Get QLab Cue Lists",
         "timeout": CUE_DETAILS_TIMEOUT,
@@ -88,19 +463,6 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
         "input_schema_hash": "a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578",
         "output_schema_hash": "0f27f2df78299a76f441eeb8d81064c38cda1bdf763bddb1f5ae79b67451de26",
     },
-    "qlab_create_cue": {
-        "title": "Create QLab Cue",
-        "timeout": CREATE_CUE_TIMEOUT,
-        "annotations": {
-            "readOnlyHint": False,
-            "destructiveHint": False,
-            "idempotentHint": False,
-            "openWorldHint": True,
-        },
-        "tags": ["cue-create", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "faa9110ad1e9ba3b77634190668c61f1f7f03addbb76aa85fcc88c4e8efded6d",
-        "output_schema_hash": "bb5ea5c46ac0b602557a64f66362903acafd2a02498cc1d39749dcf5eb06e4f5",
-    },
     "qlab_create_cues": {
         "title": "Create QLab Cues",
         "timeout": CREATE_CUES_TIMEOUT,
@@ -111,8 +473,8 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["batch-create", "cue-create", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "5797a769a3cd5c64c8e6635013ec0156e19914d864827922c181e935523b9b33",
-        "output_schema_hash": "f7ec4ee60c9daf4c40fae9107e3034aedc21c6342bffd2ac4f44e80111b0ab98",
+        "input_schema_hash": "71e0f0d8d009beac57efeae2ed6d15ab969688aca0d95973d23fcabf9a82d589",
+        "output_schema_hash": "a8c7028294707104a1afd9286b650e94b8e5f28f31deca017f01ea5f9939c183",
     },
     "qlab_get_cue_details": {
         "title": "Get QLab Cue Details",
@@ -264,6 +626,32 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
     },
 }
 EXPECTED_TOOL_CONCEPTS = {
+    "qlab_get_fade_cue_details": ("exact fade cue", "partial errors"),
+    "qlab_get_fade_cues": ("exact Cue List", "Carts are rejected"),
+    "qlab_get_midi_cue_details": ("exact midi cue", "partial errors"),
+    "qlab_get_midi_cues": ("exact Cue List", "Carts are rejected"),
+    "qlab_get_network_cue_details": ("exact network cue", "partial errors"),
+    "qlab_get_network_cues": ("exact Cue List", "Carts are rejected"),
+    "qlab_get_script_cue_details": ("exact script cue", "partial errors"),
+    "qlab_get_script_cues": ("exact Cue List", "Carts are rejected"),
+    "qlab_get_timecode_cue_details": ("exact timecode cue", "partial errors"),
+    "qlab_get_timecode_cues": ("exact Cue List", "Carts are rejected"),
+    "qlab_get_control_cues": ("exact Cue List", "nested groups", "scan_complete"),
+    "qlab_get_control_cue_details": ("type automatically", "partial errors", "Never starts"),
+    "qlab_get_light_cues": ("exact Cue List", "nested groups", "scan_complete"),
+    "qlab_get_light_cue_details": ("exact Light cue", "command text", "partial errors"),
+    "qlab_get_group_cues": ("exact Cue List", "nested groups", "scan_complete"),
+    "qlab_get_group_cue_details": ("exact Group cue", "Playlist", "partial errors"),
+    "qlab_get_video_cues": ("exact Cue List", "nested groups", "scan_complete"),
+    "qlab_get_video_cue_details": ("exact Video cue", "geometry", "partial errors"),
+    "qlab_get_text_cues": ("exact Cue List", "nested groups", "scan_complete"),
+    "qlab_get_text_cue_details": ("exact Text cue", "geometry", "partial errors"),
+    "qlab_get_camera_cues": ("exact Cue List", "nested groups", "scan_complete"),
+    "qlab_get_camera_cue_details": ("exact Camera cue", "geometry", "partial errors"),
+    "qlab_get_mic_cues": ("exact Cue List", "nested groups", "scan_complete"),
+    "qlab_get_mic_cue_details": ("exact Mic cue", "both channel selectors", "Audio Objects"),
+    "qlab_get_audio_cues": ("exact Cue List", "nested groups", "scan_complete"),
+    "qlab_get_audio_cue_details": ("exact Audio cue", "both channel selectors", "Audio Objects"),
     "qlab_get_cue_lists": ("Cue Lists and Cue Carts", "No children", "qlab_get_cue_list_details"),
     "qlab_get_cue_list_details": ("exact Cue List", "incoming timecode", "bounded tree"),
     "qlab_get_cue_cart_details": ("exact Cue Cart", "grid dimensions", "no playhead"),
@@ -281,8 +669,7 @@ EXPECTED_TOOL_CONCEPTS = {
     "qlab_query_cues": ("optional and filters", "truncation metadata", "qlab_get_cue_details"),
     "qlab_get_cue_details": ("editable for update capability discovery", "exhaustive only for deep audits", "qlab_query_cues"),
     "qlab_check_write_readiness": ("without sending any mutating osc commands", "edit mode", "read-only preflight"),
-    "qlab_create_cue": ("dry-run plan", "dry-run planning never sends mutating osc", "confirm:createcue:v2"),
-    "qlab_create_cues": ("one verified /new per item", "no automatic rollback", "confirm:createcues:v1", "do not retry"),
+    "qlab_create_cues": ("one verified /new per item", "without automatic rollback", "confirm:createcues:v2", "mcp sends no cue number", "do not predict it from the setting or template", "do not retry"),
     "qlab_edit_cues": ("dry-run planning never sends mutating osc", "high-risk profiles", "exact cue uuid", "per-operation confirm gates", "non-atomic", "fresh readback", "do not retry"),
     "qlab_edit_workspace_settings": ("general.minGoTime", "fresh", "single-use token", "one setter", "readback", "Audition"),
     "qlab_move_cues": ("sequential qlab cue moves", "never claims atomicity", "uuid-only", "confirm:movecues:v1", "fresh parent/order readback"),
@@ -451,6 +838,18 @@ def test_fastmcp_tool_context_size_report_is_deterministic() -> None:
 
 def test_read_tool_call_shapes_remain_explicit() -> None:
     expected = {
+        "qlab_get_control_cues": {"workspace_id", "cue_list_id", "limit", "offset", "max_cues_scanned", "cue_type"},
+        "qlab_get_control_cue_details": {"workspace_id", "cue_id", "profile"},
+        "qlab_get_audio_cues": {"workspace_id", "cue_list_id", "limit", "offset", "max_cues_scanned"},
+        "qlab_get_video_cues": {"workspace_id", "cue_list_id", "limit", "offset", "max_cues_scanned"},
+        "qlab_get_video_cue_details": {"workspace_id", "cue_id", "profile", "input_channel", "output_channel"},
+        "qlab_get_text_cues": {"workspace_id", "cue_list_id", "limit", "offset", "max_cues_scanned"},
+        "qlab_get_text_cue_details": {"workspace_id", "cue_id", "profile"},
+        "qlab_get_camera_cues": {"workspace_id", "cue_list_id", "limit", "offset", "max_cues_scanned"},
+        "qlab_get_camera_cue_details": {"workspace_id", "cue_id", "profile", "input_channel", "output_channel"},
+        "qlab_get_mic_cues": {"workspace_id", "cue_list_id", "limit", "offset", "max_cues_scanned"},
+        "qlab_get_mic_cue_details": {"workspace_id", "cue_id", "profile", "input_channel", "output_channel"},
+        "qlab_get_audio_cue_details": {"workspace_id", "cue_id", "profile", "input_channel", "output_channel"},
         "qlab_get_cue_lists": {"workspace_id"},
         "qlab_get_cue_list_details": {"workspace_id", "cue_list_id", "profile", "max_depth", "max_cues"},
         "qlab_get_cue_cart_details": {"workspace_id", "cue_cart_id", "profile", "max_cues"},
@@ -550,8 +949,9 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
     tools = asyncio.run(list_tools())
     tool_names = {tool.name for tool in tools}
 
-    assert len(tools) == 23
+    assert len(tools) == 48
     assert tool_names == set(EXPECTED_FASTMCP_TOOL_CONTRACTS)
+    assert "qlab_create_cue" not in tool_names
     forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
     assert all(
         token not in tool_name.casefold()
@@ -666,75 +1066,16 @@ def test_move_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
     assert result.structured_content["confirm_token"].startswith("confirm:moveCues:v1:")
 
 
-def test_create_cue_fastmcp_forwards_anchor_and_returns_structured_plan(monkeypatch) -> None:
+def test_create_cues_fastmcp_forwards_ordered_types_and_destination(monkeypatch) -> None:
     class FakeReader:
-        def create_cue(self, workspace_id, cue_type, dry_run, after_cue_id, parent_container_id, confirm_token):
-            assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-            assert cue_type == "wait"
-            assert dry_run is True
-            assert after_cue_id == "11111111-1111-4111-8111-111111111111"
-            assert parent_container_id is None
-            assert confirm_token is None
-            return {
-                "ok": True,
-                "status": "dry_run",
-                "workspace_id": workspace_id,
-                "cue_type": "Wait",
-                "dry_run": True,
-                "confirm_token": "confirm:createCue:v2:payload:signature",
-                "created_cue_id": None,
-                "placement": {
-                    "after_cue_id": after_cue_id,
-                    "expected_index": 1,
-                    "status": "anchored",
-                },
-                "planned_operations": [
-                    {"operation": "new", "args": ["Wait", after_cue_id]},
-                    {"operation": "verify"},
-                    {"operation": "verify_structure"},
-                ],
-                "executed_operations": [],
-                "verification": None,
-                "cleanup_required": False,
-                "cleanup": None,
-                "errors": None,
-                "warnings": ["Dry run only."],
-                "message": "Cue create batch planned.",
-            }
-
-    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
-
-    async def call_tool():
-        async with Client(mcp) as client:
-            return await client.call_tool(
-                "qlab_create_cue",
-                {
-                    "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-                    "cue_type": "wait",
-                    "after_cue_id": "11111111-1111-4111-8111-111111111111",
-                    "dry_run": True,
-                },
-            )
-
-    result = asyncio.run(call_tool())
-    assert result.is_error is False
-    assert result.structured_content["status"] == "dry_run"
-    assert result.structured_content["confirm_token"].startswith("confirm:createCue:v2:")
-    assert result.structured_content["planned_operations"][0]["args"] == [
-        "Wait",
-        "11111111-1111-4111-8111-111111111111",
-    ]
-    assert result.structured_content["executed_operations"] == []
-
-
-def test_create_cues_fastmcp_forwards_ordered_types_and_initial_anchor(monkeypatch) -> None:
-    class FakeReader:
-        def create_cues(self, workspace_id, cue_types, dry_run, after_cue_id, parent_container_id, confirm_token):
+        def create_cues(self, workspace_id, cue_types, dry_run, cue_list_id, group_id, cue_cart_id, after_cue_id, confirm_token):
             assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
             assert cue_types == ["memo", "audio", "video"]
             assert dry_run is True
-            assert after_cue_id == "11111111-1111-4111-8111-111111111111"
-            assert parent_container_id is None
+            assert cue_list_id == "22222222-2222-4222-8222-222222222222"
+            assert group_id is None
+            assert cue_cart_id is None
+            assert after_cue_id is None
             assert confirm_token is None
             return {
                 "ok": True,
@@ -751,7 +1092,7 @@ def test_create_cues_fastmcp_forwards_ordered_types_and_initial_anchor(monkeypat
                     {"operation": "new", "args": ["video", "<previous_created_cue_id>"]},
                 ],
                 "executed_operations": [],
-                "confirm_token": "confirm:createCues:v1:payload:signature",
+                "confirm_token": "confirm:createCues:v2:payload:signature",
                 "errors": None,
                 "warnings": [],
                 "message": "planned",
@@ -766,7 +1107,7 @@ def test_create_cues_fastmcp_forwards_ordered_types_and_initial_anchor(monkeypat
                 {
                     "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
                     "cue_types": ["memo", "audio", "video"],
-                    "after_cue_id": "11111111-1111-4111-8111-111111111111",
+                    "cue_list_id": "22222222-2222-4222-8222-222222222222",
                     "dry_run": True,
                 },
             )
@@ -775,7 +1116,39 @@ def test_create_cues_fastmcp_forwards_ordered_types_and_initial_anchor(monkeypat
     assert result.is_error is False
     assert result.structured_content["status"] == "dry_run"
     assert result.structured_content["requested_count"] == 3
-    assert result.structured_content["confirm_token"].startswith("confirm:createCues:v1:")
+    assert result.structured_content["confirm_token"].startswith("confirm:createCues:v2:")
+
+
+def test_create_cues_fastmcp_accepts_one_and_fifty_but_rejects_out_of_range(monkeypatch) -> None:
+    observed: list[list[str]] = []
+
+    class FakeReader:
+        def create_cues(self, workspace_id, cue_types, **kwargs):
+            observed.append(cue_types)
+            return {
+                "ok": True, "status": "dry_run", "workspace_id": workspace_id,
+                "dry_run": True, "requested_count": len(cue_types), "message": "planned",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+    base = {
+        "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "cue_list_id": "22222222-2222-4222-8222-222222222222",
+        "dry_run": True,
+    }
+
+    async def run() -> None:
+        async with Client(mcp) as client:
+            for types in (["audio"], ["video"] * 30 + ["audio"] * 20):
+                result = await client.call_tool("qlab_create_cues", {**base, "cue_types": types})
+                assert result.structured_content["requested_count"] == len(types)
+            for types in ([], ["audio"] * 51, ["script"]):
+                with pytest.raises(Exception):
+                    await client.call_tool("qlab_create_cues", {**base, "cue_types": types})
+
+    asyncio.run(run())
+    assert [len(types) for types in observed] == [1, 50]
+    assert observed[1] == ["video"] * 30 + ["audio"] * 20
 
 
 def test_delete_cues_fastmcp_schema_limits_and_nested_uuid_model() -> None:
@@ -905,7 +1278,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    write_tools = {"qlab_create_cue", "qlab_create_cues", "qlab_edit_cues", "qlab_edit_workspace_settings", "qlab_move_cues", "qlab_delete_cues"}
+    write_tools = {"qlab_create_cues", "qlab_edit_cues", "qlab_edit_workspace_settings", "qlab_move_cues", "qlab_delete_cues"}
     read_only_tools = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) - write_tools
 
     for tool_name in read_only_tools:
@@ -1117,6 +1490,32 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
     assert set(tools) == {
+        "qlab_get_fade_cue_details",
+        "qlab_get_fade_cues",
+        "qlab_get_midi_cue_details",
+        "qlab_get_midi_cues",
+        "qlab_get_network_cue_details",
+        "qlab_get_network_cues",
+        "qlab_get_script_cue_details",
+        "qlab_get_script_cues",
+        "qlab_get_timecode_cue_details",
+        "qlab_get_timecode_cues",
+        "qlab_get_control_cues",
+        "qlab_get_control_cue_details",
+        "qlab_get_light_cues",
+        "qlab_get_light_cue_details",
+        "qlab_get_group_cues",
+        "qlab_get_group_cue_details",
+        "qlab_get_video_cues",
+        "qlab_get_video_cue_details",
+        "qlab_get_text_cues",
+        "qlab_get_text_cue_details",
+        "qlab_get_camera_cues",
+        "qlab_get_camera_cue_details",
+        "qlab_get_mic_cues",
+        "qlab_get_mic_cue_details",
+        "qlab_get_audio_cues",
+        "qlab_get_audio_cue_details",
         "qlab_get_cue_lists",
         "qlab_get_cue_list_details",
         "qlab_get_cue_cart_details",
@@ -1134,7 +1533,6 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_query_cues",
         "qlab_get_cue_details",
         "qlab_check_write_readiness",
-        "qlab_create_cue",
         "qlab_create_cues",
         "qlab_edit_cues",
         "qlab_edit_workspace_settings",
@@ -1271,13 +1669,13 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "workspace_unavailable" in readiness.outputSchema["properties"]["status"]["enum"]
     assert "suggested_action" in readiness.outputSchema["properties"]
 
-    create = tools["qlab_create_cue"]
-    assert create.title == "Create QLab Cue"
-    assert "dry-run plan" in create.description
+    create = tools["qlab_create_cues"]
+    assert create.title == "Create QLab Cues"
+    assert "Cue Templates" in create.description
     assert create.annotations.readOnlyHint is False
     assert create.annotations.destructiveHint is False
     assert create.annotations.idempotentHint is False
-    assert create.inputSchema["properties"]["cue_type"]["enum"] == [
+    assert create.inputSchema["properties"]["cue_types"]["items"]["enum"] == [
         "memo",
         "group",
         "wait",
@@ -1305,19 +1703,22 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     ]
     assert "dry_run" in create.inputSchema["properties"]
     assert "workspace_id" in create.inputSchema["required"]
-    assert "cue_type" in create.inputSchema["required"]
+    assert "cue_types" in create.inputSchema["required"]
     assert "after_cue_id" not in create.inputSchema.get("required", [])
-    assert "parent_container_id" in create.inputSchema["properties"]
+    assert {"cue_list_id", "group_id", "cue_cart_id"} <= set(create.inputSchema["properties"])
+    assert "parent_container_id" not in create.inputSchema["properties"]
     assert create.outputSchema["properties"]["status"]["enum"] == [
         "dry_run",
-        "preflight_failed",
         "created",
+        "partial_failed",
+        "preflight_failed",
         "verification_failed",
         "workspace_not_found",
         "workspace_ambiguous",
         "workspace_unavailable",
     ]
-    assert "cleanup_required" in create.outputSchema["properties"]
+    assert "destination" in create.outputSchema["properties"]
+    assert "results" in create.outputSchema["properties"]
 
     edit = tools["qlab_edit_cues"]
     assert edit.title == "Edit QLab Cues"
@@ -1566,7 +1967,7 @@ def test_create_tool_uses_qlab_template_defaults_without_property_input() -> Non
     async def get_tool_schema() -> dict[str, Any]:
         async with Client(mcp) as client:
             tools = await client.list_tools()
-        return next(tool.inputSchema for tool in tools if tool.name == "qlab_create_cue")
+        return next(tool.inputSchema for tool in tools if tool.name == "qlab_create_cues")
 
     schema = asyncio.run(get_tool_schema())
 
@@ -1590,7 +1991,6 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
                 "qlab_query_cues",
                 "qlab_get_cue_details",
                 "qlab_check_write_readiness",
-                "qlab_create_cue",
                 "qlab_create_cues",
                 "qlab_edit_cues",
             )
@@ -1610,7 +2010,6 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
         "qlab_query_cues": QUERY_CUES_TIMEOUT,
         "qlab_get_cue_details": CUE_DETAILS_TIMEOUT,
         "qlab_check_write_readiness": WRITE_READINESS_TIMEOUT,
-        "qlab_create_cue": CREATE_CUE_TIMEOUT,
         "qlab_create_cues": CREATE_CUES_TIMEOUT,
         "qlab_edit_cues": UPDATE_CUES_TIMEOUT,
     }
@@ -1676,11 +2075,10 @@ def test_write_tool_wrappers_do_not_pass_outer_reader_deadlines(monkeypatch) -> 
 
     monkeypatch.setattr(server_module, "_run_tool", capture)
 
-    assert server_module.qlab_create_cue("ws-1", "memo", dry_run=True, after_cue_id="11111111-1111-4111-8111-111111111111") == "ok"
     assert server_module.qlab_edit_cues("ws-1", [], dry_run=True) == "ok"
     assert server_module.qlab_move_cues("ws-1", [], dry_run=True) == "ok"
     assert server_module.qlab_delete_cues("ws-1", [], dry_run=True) == "ok"
-    assert calls == [{}, {}, {}, {}]
+    assert calls == [{}, {}, {}]
 
 
 def test_run_tool_closes_reader_on_failure(monkeypatch) -> None:

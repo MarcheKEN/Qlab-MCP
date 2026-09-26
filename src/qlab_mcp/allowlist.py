@@ -50,6 +50,8 @@ TIMING_PROPERTIES = {
 }
 
 STATUS_PROPERTIES = {
+    "isCrossfadingOut",
+    "isNextInPlaylist",
     "allowsEditingDuration",
     "autoLoad",
     "isActionRunning",

@@ -268,7 +268,7 @@ def test_fastmcp_roundtrip_and_validation(monkeypatch, osc):
     async def run():
         async with Client(server.mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-            assert len(tools) == 23
+            assert len(tools) == 48
             detail_schema = tools["qlab_get_cue_list_details"].inputSchema
             assert detail_schema["properties"]["cue_list_id"]["format"] == "uuid"
             for key, minimum, maximum in [("max_depth", 0, 5), ("max_cues", 1, 5000)]:

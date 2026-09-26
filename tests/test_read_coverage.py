@@ -13,15 +13,15 @@ def test_read_allowlist_coverage_snapshot_matches_qlab_dictionary() -> None:
     report = read_coverage_report(DICTIONARY_PATH.read_text())
 
     assert report["readable_route_count"] == 509
-    assert report["allowlisted_property_count"] == 291
-    assert report["gap_count"] == 190
+    assert report["allowlisted_property_count"] == 293
+    assert report["gap_count"] == 188
     assert report["status_counts"] == {
         "covered_by_aggregate": 20,
         "covered_by_structural_reader": 4,
-        "direct": 295,
+        "direct": 297,
         "indexed_read_gap": 90,
         "live_omitted": 66,
-        "read_gap": 31,
+        "read_gap": 29,
         "runtime_read_gap": 3,
     }
     assert report["section_status_counts"]["Audio"] == {

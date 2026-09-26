@@ -1,10 +1,10 @@
 # Project Status
 
-This folder contains only current project status:
+This folder indexes current project status and explicitly dated evidence:
 
-- [Current state snapshot](current-state.md) — provisional 0.3.0 preparation state.
+- [Current state snapshot](current-state.md) — current development surface followed by dated history.
 - [Roadmap](roadmap.md) — supported, pending, and blocked work.
-- [Architecture audit](architecture-audit-0.3.0.md) — 0.3.0 extraction decision.
+- [Architecture audit](architecture-audit-0.3.0.md) — historical 2026-08-13 extraction decision.
 - [Coverage](coverage/README.md) — technical OSC and feature coverage.
 - [Workorders](workorders/README.md) — active and blocked tasks.
 

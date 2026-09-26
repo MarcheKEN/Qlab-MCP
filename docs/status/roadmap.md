@@ -1,5 +1,24 @@
 # Active Roadmap
 
+## Read-tools closeout — 2026-09-26
+
+- Align active documentation with 48 tools (43 reads, 5 gated writes) and prefer
+  family-specific UUID details for known cue types.
+- Publish and verify the local work before treating PR #17 CI as release evidence.
+  Explicitly decide whether the existing Create consolidation belongs in this
+  read-tools PR or a separate write-tools change; preserve it either way.
+- Keep Move shallow-health validation and Delete acknowledgement validation as
+  pending write-safety work. See [current state](current-state.md).
+- Do not remove historical validation/research assets without a separate review.
+
+## Historical roadmap snapshots
+
+Development update (2026-09-24): Create is consolidated into the public
+`qlab_create_cues` tool. One to 50 ordered cues require an exact destination,
+and the reviewed v2 token binds order, position, and fresh structure.
+The prior singular public tool is retired; its internal single-cue executor
+remains shared. Historical entries below retain their original scope.
+
 Development update (2026-09-21): combined List/Cart inventory and separate
 UUID-only List and Cart detail tools are implemented (23 public tools).
 

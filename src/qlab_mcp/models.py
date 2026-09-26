@@ -893,6 +893,32 @@ class CreateCueResult(BaseModel):
     message: str
 
 
+class CreateCuesDestination(BaseModel):
+    kind: Literal["cue_list", "group", "cue_cart"]
+    id: str
+    after_cue_id: str | None = None
+    resolved_after_cue_id: str | None = None
+    insertion_index: int | None = None
+    placement_mode: str | None = None
+
+
+class CreateCuesItemResult(BaseModel):
+    index: StrictInt = Field(description="Zero-based position in the requested cue_types list.")
+    cue_type: str
+    status: CreateCueStatus | Literal["planned"]
+    created_cue_id: str | None = None
+    verified: bool | None = None
+    parent_id: str | None = None
+    position_index: int | None = None
+    health_status: str | None = None
+    cleanup_required: bool = False
+    cleanup: dict[str, Any] | None = None
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    error_code: str | None = None
+    suggested_action: str | None = None
+
+
 class CreateCuesResult(BaseModel):
     """Result for an ordered, sequential multi-cue creation."""
 
@@ -909,13 +935,16 @@ class CreateCuesResult(BaseModel):
         ),
     )
     created_count: int = 0
-    results: list[dict[str, Any]] = Field(default_factory=list)
+    destination: CreateCuesDestination | None = None
+    results: list[CreateCuesItemResult] = Field(default_factory=list)
     planned_operations: list[dict[str, Any]] = Field(default_factory=list)
     executed_operations: list[dict[str, Any]] = Field(default_factory=list)
     confirm_token: str | None = Field(
         default=None,
-        description="Dedicated confirm:createCues:v1 token returned by dry-run.",
+        description="Dedicated confirm:createCues:v2 token returned by dry-run.",
     )
+    error_code: str | None = None
+    suggested_action: str | None = None
     errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
     message: str

@@ -1,6 +1,6 @@
 # Current Architecture
 
-This describes QLab MCP 0.3.0 at the security-hardened baseline. Historical graphs and refactor
+This describes the current QLab MCP development surface based on 0.3.0. Historical graphs and refactor
 analysis live under [`docs/archive/`](../archive/README.md).
 
 The 0.3.0 architecture audit concluded
@@ -10,13 +10,28 @@ contract and safety preservation.
 
 The supported threat model and accepted risks are defined in the repository
 root [`SECURITY.md`](../../SECURITY.md). The current hardening rejects
-over-limit settings batches, non-representable OSC numbers, massive or
+invalid domain settings inputs, non-representable OSC numbers, massive or
 sensitive cue payloads, and oversized `lightCommandText` input before OSC
 traffic.
 
 ## Public boundary
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 23 decorated tools,
+Light and Group reuse the family executor; Group also reuses bounded container
+traversal. Playlist reads are mode-dependent and followed by fresh identity/mode
+verification. The completed response is size-checked without patch expansion.
+
+Control/organization cues use the same family executor with an accepted-type
+set and type-selected models. Filtering precedes pagination; detail reads
+verify that the concrete type remains unchanged, including changes within the
+family. Devamp and Reset are typed blocks, not separate transports or tools.
+
+Fade, Network, MIDI/MIDI File, Timecode, and Script also use the family
+executor. A conditional extension reads only the fields of the selected
+message, output, fade, or target mode, then rechecks identity and selector.
+Failures in secondary reads preserve confirmed identity as partial data.
+Sensitive Network text and Script source require the technical profile.
+
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 48 decorated tools,
 their schemas, annotations, timeouts, and result models. Each call creates a
 fresh `QLabReader` and closes it after the operation. `qlab-mcp` maps to
 `qlab_mcp.server:main`.
@@ -31,6 +46,9 @@ another public start command.
 
 - `runtime/connection.py` — discovery, authentication, mode, and readiness;
 - `cues/` — overview, bounded indexes, queries, profiles, and cue details;
+- `cues/family.py` — shared scoped inventory and exact typed detail execution
+  for Audio, Mic, Video, Text, Camera, Light, Group, Control, Fade, Network,
+  MIDI/MIDI File, Timecode and Script; family models constrain requested keys;
 - `settings/` — settings inventory, detail normalization, and redaction;
 - `status.py` — derived workspace status;
 - `runtime/read_cache.py` — short-lived safe-read cache and single-flight;
@@ -39,7 +57,8 @@ another public start command.
   filtering remains intentionally unimplemented pending QLab 5.5.10 evidence.
 
 Reads use explicit workspace qualification once a workspace is selected.
-Sensitive profiles are opt-in. Cache entries are invalidated around writes;
+Technical profiles are opt-in; Text details include visible text in safe mode.
+Cache entries are invalidated around writes;
 verification reads are fresh.
 
 Workspace Settings reads use six domain tools and the shared domain executor.

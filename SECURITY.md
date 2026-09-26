@@ -40,7 +40,8 @@ file roots are operator configuration, not tool arguments.
 - Validation that can be completed locally happens before workspace resolution,
   token creation, or OSC traffic.
 - A failed validation sends zero OSC messages.
-- Workspace settings details accept at most 50 requests and six sections.
+- Workspace settings reads use six domain-specific tools; no public settings
+  batch or arbitrary section selector is exposed.
 - Sensitive cue detail/query responses are capped at 50 cues and 1 MiB.
 - `lightCommandText` is limited to 65,536 UTF-8 bytes, 2,000 lines, and 2,000
   analysis results.
@@ -48,7 +49,7 @@ file roots are operator configuration, not tool arguments.
   rejected rather than clamped or rounded.
 - `scriptSource` is the canonical script field. `scriptText` is not a public
   OSC/read-profile field. Script contents are exposed only through explicit
-  sensitive profiles.
+  technical family profiles or explicit sensitive generic profiles.
 - Writes are disabled by default. Their universal safety sequence is defined
   below; token cardinality, atomicity, and rollback vary by operation.
 - A timed-out setter is never retried automatically. Matching fresh readback
@@ -73,11 +74,14 @@ this universal sequence:
 
 ### Create
 
-`qlab_create_cue` uses one dedicated `confirm:createCue:v2` token and exactly
-one placement selector. `qlab_create_cues` uses the separate
-`confirm:createCues:v1` family, chains verified UUIDs, and stops without
-automatic rollback when a sequence item fails. Neither Create tool applies
-initial setters or claims GO readiness.
+`qlab_create_cues` is the sole public creation tool. It accepts one to 50 ordered
+types and exactly one destination UUID (Cue List, Group, or Cue Cart), with an
+optional direct-child insertion anchor for a List or Group. Cue Cart creation
+is restricted to one non-Group cue in an empty cart, without an anchor.
+The `confirm:createCues:v2` token binds order, destination, placement, and fresh
+structure. Execution chains verified UUIDs and stops without automatic rollback
+when a sequence item fails. It applies no initial setters or cue numbers and
+does not claim GO readiness. QLab may assign numbers through workspace defaults.
 
 ### Edit
 
@@ -127,8 +131,9 @@ port guarantee.
 This is a defense-in-depth limitation, not an authentication claim. A hostile
 same-network process is outside the initial scope. Separately, a delayed reply
 for an earlier request must not be accepted as the fresh reply for a later
-request with the same OSC address. That correlation property is still subject
-to a controlled fake-UDP investigation before any production change.
+request with the same OSC address. Request-scoped reply sessions and the fake-UDP
+regressions in `tests/test_osc_transport.py` exercise this correlation property;
+they do not establish source-port authentication or universal runtime proof.
 
 ## Reportable Findings
 
@@ -167,6 +172,10 @@ fail-closed.
 
 ## Known Limitations and Evidence
 
+- Delete acknowledgement validation and Move shallow-health validation have
+  outstanding runtime findings; see the current section of
+  [`docs/status/current-state.md`](docs/status/current-state.md). Successful
+  automated tests do not resolve those live-evidence gaps.
 - UDP source-port behavior has not been captured from QLab 5.5.10 because macOS
   capture permissions were unavailable. No source-port filter should be added
   until reproducible packet evidence exists.

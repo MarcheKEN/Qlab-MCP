@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Adds the MIT license for original project code and authored documentation,
+  with third-party material excluded in NOTICE and license metadata in packages.
+
 - Corrects contributor tool counts, Create security-token documentation, reference
   provenance, and write-registry versus read coverage; surfaces pending Move/Delete
   runtime findings in user workflows and distinguishes historical plans from current API.

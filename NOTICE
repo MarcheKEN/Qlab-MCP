@@ -1,0 +1,14 @@
+License scope
+
+The MIT license in LICENSE applies to the original QLab MCP code and
+repository-authored documentation, except where a file states otherwise.
+
+Imported QLab documentation, dictionaries, HTML/PDF snapshots, QClass
+transcripts, third-party images, and quoted external material remain subject
+to their respective owners' rights and terms. Their inclusion here does not
+relicense them under MIT. Source URLs and provenance are recorded in
+docs/references/manifest.json, docs/sources/, and the relevant document headers.
+
+Dependencies retain their own licenses. QLab MCP is an independent project;
+this license grants no rights to QLab software, trademarks, or other
+third-party assets.

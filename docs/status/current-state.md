@@ -11,7 +11,13 @@ Independent final readback confirmed the original workspace structure and
 removal of all temporary fixtures. After restarting the installed MCP, a second
 live matrix verified individual/batch/recursive deletion, token rejection and
 fresh readback; the original 17-cue list remained byte-for-byte identical in
-UUID and order. Existing List/Cart contents were preserved.
+UUID and order. A further live test deleted one temporary child recursively
+from a nonempty Cue List, restored its original Memo, and confirmed the safety
+Group empty and the Cue List playhead restored to baseline. Anchored Create in
+a nonempty Cue List passed. Empty Cue List Create still fails before `/new`:
+the `currentCueListID` setter acknowledgement lacks `data`. This separate issue
+is documented, not changed in the Delete fix. Existing Cart contents were
+preserved.
 See the [runtime report](../development/runtime-validation/2026-09-26-delete-cues.md).
 The Move shallow-health issue remains outside this fix. The audit below records
 the earlier Delete blocker as historical evidence.

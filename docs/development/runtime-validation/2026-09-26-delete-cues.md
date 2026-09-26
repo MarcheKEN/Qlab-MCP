@@ -77,7 +77,28 @@ children. Through the restarted MCP:
   that token was rejected; direct deletion then removed the empty temporary
   Group.
 - The list's final child UUIDs and order exactly matched its initial 17 cues.
-  All 19 cues created during this post-restart run were absent afterwards.
+  All 20 cues created during this post-restart run were absent afterwards.
+
+### Nonempty Cue List recursion and Create control
+
+To test recursive deletion on a nonempty Cue List without losing its original
+Memo, it was temporarily moved to an empty Group in `delete`, then moved back
+after the test. An anchored Memo Create in the nonempty list succeeded at index
+1. Recursive Delete planned and removed exactly that temporary Memo, confirmed
+its absence and preservation of the Cue List, then the original Memo was
+restored. Final reads showed the original Memo in its list, the Group empty, no
+playhead in that Cue List, and the `delete` list back at its original 17 UUIDs
+and order.
+
+A separate Create dry-run against an empty Cue List planned
+`set_current_cue_list` followed by `/new`, but execution returned
+`verification_failed`; `errors.current_cue_list` was exactly
+`QLab successful reply JSON missing data`. It returned `created_count=0` and
+`executed_operations=[]`. No `/new` was sent and the empty list remained
+unchanged. This is an observed Create issue, outside the
+Delete fix. One Move call was blocked before QLab because its confirmation
+token did not match the reviewed dry-run; a fresh plan's exact token was then
+used successfully.
 
 An initial cross-target token check supplied a temporary Memo's token while
 naming a pre-existing Disarm cue. Automatic approval review rejected the call
@@ -95,8 +116,10 @@ convergence, active cues, partial failure, stale parent order and nonconvergence
 
 No GO, playback, load, panic or save was sent. Transport faults and active-cue
 rejection were tested with automated fixtures rather than deliberately breaking
-the live connection or starting cues. Actual Cue List/Cart emptying was not
-performed: all available roots had existing contents, which were preserved.
-Script cues cannot be created by the public Create tool and were not live fixtures.
+the live connection or starting cues. Recursive deletion of a Cue List with one
+temporary child was performed after moving its original child aside, then
+restoring it. Cart emptying was not performed because the available Cart
+contained original content. Script cues cannot be created by the public Create
+tool and were not live fixtures.
 The 500-descendant limit and every possible QLab/environment failure are not
 claimed live-validated. Child reads now trade caching for current structural state.

@@ -115,6 +115,23 @@ class DeleteReader:
         self.nodes.pop(cue_id, None)
 
 
+def test_delete_cues_executes_fifty_explicit_cues(monkeypatch: pytest.MonkeyPatch) -> None:
+    from uuid import UUID
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    cue_ids = [str(UUID(int=index + 100)) for index in range(50)]
+    reader.children[LIST_ID] = cue_ids.copy()
+    reader.nodes.update({cue_id: {"uniqueID": cue_id, "type": "Memo"} for cue_id in cue_ids})
+    monkeypatch.setattr(deletes, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    planned = deletes.delete_cues(reader, WORKSPACE_ID, cue_ids, dry_run=True)
+    result = deletes.delete_cues(reader, WORKSPACE_ID, cue_ids, dry_run=False, confirm_token=planned["confirm_token"])
+
+    assert result["deleted_count"] == 50
+    assert reader.children[LIST_ID] == []
+    assert len([address for address, _ in reader.requests if "/delete_id/" in address]) == 50
+
+
 def test_delete_cues_dry_run_is_side_effect_free_and_issues_dedicated_token() -> None:
     from qlab_mcp.write.deletes import delete_cues
 

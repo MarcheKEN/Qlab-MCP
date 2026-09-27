@@ -572,6 +572,104 @@ class MovePlanReader:
     def get_running_cues(self, *_: Any, **__: Any) -> dict[str, Any]:
         return {"running_cues": []}
 
+    def read_cue_values(self, *_: Any, **__: Any) -> dict[str, Any]:
+        return {"values": {"isBroken": False, "isWarning": False}}
+
+
+@pytest.mark.parametrize("field", ["isBroken", "isWarning"])
+def test_move_cues_reads_fresh_health_when_shallow_structure_omits_it(field: str) -> None:
+    reader = MovePlanReader()
+    reads = []
+
+    def values(workspace_id: str, cue_id: str, keys: list[str], **kwargs: Any) -> dict[str, Any]:
+        reads.append(cue_id)
+        assert workspace_id == reader.workspace_id
+        assert kwargs["cacheable"] is False
+        health = {"isBroken": False, "isWarning": False}
+        health[field] = cue_id == reader.first_id
+        return {"values": health}
+
+    reader.read_cue_values = values
+    result = move_cues(reader, reader.workspace_id, [{"cue_id": reader.first_id, "position": "last"}], dry_run=True)
+
+    assert result["status"] == "planned"
+    assert reader.first_id in reads
+    assert result["results"][0]["source_health"]["is_broken" if field == "isBroken" else "is_warning"] is True
+    assert any("health" in warning.lower() for warning in result["warnings"])
+
+
+@pytest.mark.parametrize("values", [{}, {"isBroken": False}, {"isBroken": "false", "isWarning": False}])
+def test_move_cues_rejects_incomplete_or_invalid_health(values: dict[str, Any]) -> None:
+    reader = MovePlanReader()
+    reader.read_cue_values = lambda *_args, **_kwargs: {"values": values}
+    result = move_cues(reader, reader.workspace_id, [{"cue_id": reader.first_id, "position": "last"}], dry_run=True)
+    assert result["status"] == "preflight_failed"
+    assert result["confirm_token"] is None
+
+
+@pytest.mark.parametrize("field", ["before_cue_id", "after_cue_id"])
+def test_move_cues_accepts_uppercase_uuid_anchors(field: str) -> None:
+    reader = MovePlanReader()
+    reader.first_id = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"
+    reader.second_id = "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB"
+    source, anchor = (reader.second_id, reader.first_id) if field == "before_cue_id" else (reader.first_id, reader.second_id)
+    result = move_cues(reader, reader.workspace_id, [{"cue_id": source, field: anchor}], dry_run=True)
+    assert result["status"] == "planned"
+    assert result["results"][0][field] == anchor.lower()
+    assert result["results"][0]["destination_index"] == (0 if field == "before_cue_id" else 1)
+
+
+def test_move_cues_skips_verified_noop_before_executing_next_move(monkeypatch: pytest.MonkeyPatch) -> None:
+    reader = MovePlanReader()
+    children = reader.get_cue_children(reader.workspace_id, reader.list_id)["children"]
+    reader.get_cue_children = lambda *_args, **_kwargs: {"children": children}
+    sent = []
+
+    def request(address: str, index: int, **_: Any) -> Any:
+        cue_id = address.rsplit("/", 1)[-1]
+        sent.append(cue_id)
+        if cue_id == reader.first_id:
+            raise ValueError("QLab rejects a move to the existing index")
+        children.insert(index, children.pop(1))
+        return SimpleNamespace(data={"parent_cue_id": reader.list_id, "index": index}, status="ok")
+
+    reader.client.request = request
+    monkeypatch.setattr("qlab_mcp.write.moves.ensure_write_ready", lambda *_: reader.workspace_id)
+    moves = [{"cue_id": cid, "position": "first"} for cid in (reader.first_id, reader.second_id)]
+    plan = move_cues(reader, reader.workspace_id, moves, dry_run=True)
+    result = move_cues(reader, reader.workspace_id, moves, dry_run=False, confirm_token=plan["confirm_token"])
+    assert result["ok"] and result["moved_count"] == 2
+    assert sent == [reader.second_id]
+    assert result["results"][0]["reply_status"] == "skipped_no_op"
+
+
+def test_move_cues_executes_fifty_in_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    from uuid import UUID
+
+    reader = MovePlanReader()
+    cue_ids = [str(UUID(int=index + 100)) for index in range(50)]
+    children = [{"uniqueID": cue_id, "type": "Memo"} for cue_id in cue_ids]
+    reader.get_cue_children = lambda *_args, **_kwargs: {"children": children}
+    sent = []
+
+    def request(address: str, index: int, **_: Any) -> Any:
+        cue_id = address.rsplit("/", 1)[-1]
+        sent.append(cue_id)
+        moving = next(cue for cue in children if cue["uniqueID"] == cue_id)
+        children.remove(moving)
+        children.insert(index, moving)
+        return SimpleNamespace(data={"parent_cue_id": reader.list_id, "index": index}, status="ok")
+
+    reader.client.request = request
+    monkeypatch.setattr("qlab_mcp.write.moves.ensure_write_ready", lambda *_: reader.workspace_id)
+    moves = [{"cue_id": cue_id, "position": "first"} for cue_id in cue_ids]
+    planned = move_cues(reader, reader.workspace_id, moves, dry_run=True)
+    result = move_cues(reader, reader.workspace_id, moves, dry_run=False, confirm_token=planned["confirm_token"])
+
+    assert result["moved_count"] == 50
+    assert sent == cue_ids[1:]
+    assert [cue["uniqueID"] for cue in children] == list(reversed(cue_ids))
+
 
 def test_move_cues_dry_run_issues_reusable_dedicated_token() -> None:
     reader = MovePlanReader()

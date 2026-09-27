@@ -1,5 +1,18 @@
 # Current Project State
 
+## Move and Delete matrix — 2026-09-27
+
+Move and explicit leaf Delete accept 1–50 UUID targets. Move reads fresh health
+instead of inferring false values from shallow structure; broken/warning health
+is informational for structural editing. Verified unchanged placements skip OSC
+but retain fresh readback, and uppercase before/after anchors normalize correctly.
+The full suite passes **3067 tests and 47 subtests**. Three-workspace live tests
+and a fresh public FastMCP Client verified 50-cue moves/deletes, nested Groups,
+cross-list placements, stale/invalid requests, and fixture cleanup. The public
+surface remains 48 tools. See the [complete runtime report](../development/runtime-validation/2026-09-27-move-delete-cues.md)
+for the matrix, exact limitations, and root List experiment/recommendation.
+The installed MCP process must restart to load these source changes.
+
 ## Delete fix and runtime validation — 2026-09-26
 
 The cue-editing branch fixes status-only Delete acknowledgements and stale cached
@@ -19,7 +32,8 @@ the `currentCueListID` setter acknowledgement lacks `data`. This separate issue
 is documented, not changed in the Delete fix. Existing Cart contents were
 preserved.
 See the [runtime report](../development/runtime-validation/2026-09-26-delete-cues.md).
-The Move shallow-health issue remains outside this fix. The audit below records
+The Move shallow-health issue remained outside that Delete fix; it is addressed
+in the 2026-09-27 update above. The audit below records
 the earlier Delete blocker as historical evidence.
 
 ## Documentation closeout snapshot — 2026-09-26

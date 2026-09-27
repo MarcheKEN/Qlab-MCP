@@ -106,8 +106,8 @@ annotations.
 | `qlab_create_cues` | One to 50 ordered template-backed cues in an exact Cue List, Group, or empty Cue Cart | Gated, non-atomic creation; no initial setters, GO, or automatic rollback |
 | `qlab_edit_cues` | Allowlisted property/operation edits, 1–50 items | Gated, per-operation confirmation, non-atomic |
 | `qlab_edit_workspace_settings` | One exact `general.minGoTime` saved-setting write | Gated, one setter, fresh token, fresh readback |
-| `qlab_move_cues` | Sequential structural moves, 1–10 UUID targets | Gated, destructive metadata hint, non-atomic |
-| `qlab_delete_cues` | Explicit leaves, one empty Group, or root-preserving recursive emptying | Gated destructive, sequential, non-atomic |
+| `qlab_move_cues` | Sequential structural moves, 1–50 UUID targets | Gated, destructive metadata hint, non-atomic |
+| `qlab_delete_cues` | 1–50 explicit leaves, one empty Group, or root-preserving recursive emptying | Gated destructive, sequential, non-atomic |
 
 ## Read Model
 

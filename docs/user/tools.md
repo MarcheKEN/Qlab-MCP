@@ -53,8 +53,8 @@ annotations, and result models.
 | `qlab_create_cues` | One to 50 ordered template-backed cues in an exact Cue List, Group, or empty Cue Cart | Initial setters, GO, atomic transaction, or rollback | [Create](agent-workflows.md#create-cues) |
 | `qlab_edit_cues` | Allowlisted property/operation edits, 1–50 items | Create, Move, Delete, playback, or raw OSC | [Edit](agent-workflows.md#edit-existing-cues) |
 | `qlab_edit_workspace_settings` | One exact `general.minGoTime` write in seconds | Other settings writes, playback, GO, or raw OSC | [Workspace settings](agent-workflows.md#edit-workspace-settings) |
-| `qlab_move_cues` | Sequential structural moves, 1–10 UUID targets | Playback or unproven Cart writes | [Move](agent-workflows.md#move-existing-cues) |
-| `qlab_delete_cues` | Explicit leaves, one empty Group, or root-preserving recursive emptying | Root deletion or automatic rollback | [Delete](agent-workflows.md#delete-cues) |
+| `qlab_move_cues` | Sequential structural moves, 1–50 UUID targets | Playback or unproven Cart writes | [Move](agent-workflows.md#move-existing-cues) |
+| `qlab_delete_cues` | 1–50 explicit leaves, one empty Group, or root-preserving recursive emptying | Root deletion or automatic rollback | [Delete](agent-workflows.md#delete-cues) |
 
 ## Shared contract
 

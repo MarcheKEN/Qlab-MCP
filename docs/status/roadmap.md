@@ -1,5 +1,13 @@
 # Active Roadmap
 
+## Delete validation — 2026-09-26
+
+- Delete acknowledgement validation and cached child readback are corrected in
+  the cue-editing branch, with live Group/leaf validation and full-suite checks.
+  See the [runtime report](../development/runtime-validation/2026-09-26-delete-cues.md).
+- Reload the installed MCP to load the correction. Move shallow-health validation
+  remains pending. The closeout snapshot below predates these Delete fixes.
+
 ## Read-tools closeout — 2026-09-26
 
 - Align active documentation with 48 tools (43 reads, 5 gated writes) and prefer

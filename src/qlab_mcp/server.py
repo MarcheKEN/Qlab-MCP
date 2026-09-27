@@ -1918,9 +1918,9 @@ def qlab_move_cues(
         list[MoveCueInput],
         Field(
             min_length=1,
-            max_length=10,
+            max_length=50,
             description=(
-                "One to ten explicit UUID cue moves. List and Group placements use exactly one linear "
+                "One to fifty explicit UUID cue moves. List and Group placements use exactly one linear "
                 "placement field; Cue Cart placements use cart_row and cart_column only."
             ),
         ),
@@ -1939,13 +1939,14 @@ def qlab_move_cues(
         Field(description="Exact confirm:moveCues:v1: token returned by a reviewed dry-run plan."),
     ] = None,
 ) -> MoveCuesResult:
-    """Plan or execute one to ten sequential QLab cue moves.
+    """Plan or execute one to fifty sequential QLab cue moves.
 
     Targets are UUID-only. Real moves require write readiness, Edit Mode, inactive
-    healthy cues, the exact confirm:moveCues:v1 token, stable structural dependencies,
+    cues, the exact confirm:moveCues:v1 token, stable structural dependencies,
     and fresh parent/order readback. Execution is sequential and non-atomic; this
     tool never claims atomicity. Cart execution remains runtime-blocked pending the
     documented QLab 5.5.10 evidence boundary. Do not retry an ambiguous mutation.
+    Broken/warning health is reported as information; it does not block structural moves.
     """
     return _run_tool(
         lambda reader: MoveCuesResult.model_validate(
@@ -1971,7 +1972,7 @@ def qlab_delete_cues(
         list[UUID] | None,
         Field(
             min_length=0,
-            max_length=10,
+            max_length=50,
             description=(
                 "Optional explicit leaf cue UUIDs. For direct deletion of one exact empty Group, "
                 "omit cue_ids and provide container_id with recursive=false. For recursive emptying, "

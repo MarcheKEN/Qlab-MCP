@@ -27,6 +27,25 @@ def test_delete_mode_reuses_canonical_container_types() -> None:
     assert deletes.CONTAINER_CUE_TYPES is CONTAINER_CUE_TYPES
 
 
+def test_delete_structure_readback_does_not_reuse_cached_children(monkeypatch: pytest.MonkeyPatch) -> None:
+    from qlab_mcp.config import QLabConfig
+    from qlab_mcp.osc.client import QLabOscClient
+    from qlab_mcp.qlab import QLabReader
+    from qlab_mcp.write.moves import _read_snapshot
+
+    client = QLabOscClient(QLabConfig(cache_ttl=60))
+    children = [{"uniqueID": FIRST_ID, "type": "Memo"}]
+    monkeypatch.setattr(client, "request", lambda *a, **k: SimpleNamespace(data=list(children)))
+    reader = QLabReader(client)
+    monkeypatch.setattr(reader, "get_cue_lists", lambda *a, **k: {
+        "cue_lists": [{"uniqueID": LIST_ID, "type": "Cue List"}],
+    })
+
+    assert FIRST_ID in _read_snapshot(reader, WORKSPACE_ID)["nodes"]
+    children.clear()
+    assert FIRST_ID not in _read_snapshot(reader, WORKSPACE_ID)["nodes"]
+
+
 class DeleteReader:
     def __init__(self) -> None:
         self.workspace_id = WORKSPACE_ID
@@ -94,6 +113,23 @@ class DeleteReader:
             if cue_id in children:
                 children.remove(cue_id)
         self.nodes.pop(cue_id, None)
+
+
+def test_delete_cues_executes_fifty_explicit_cues(monkeypatch: pytest.MonkeyPatch) -> None:
+    from uuid import UUID
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    cue_ids = [str(UUID(int=index + 100)) for index in range(50)]
+    reader.children[LIST_ID] = cue_ids.copy()
+    reader.nodes.update({cue_id: {"uniqueID": cue_id, "type": "Memo"} for cue_id in cue_ids})
+    monkeypatch.setattr(deletes, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    planned = deletes.delete_cues(reader, WORKSPACE_ID, cue_ids, dry_run=True)
+    result = deletes.delete_cues(reader, WORKSPACE_ID, cue_ids, dry_run=False, confirm_token=planned["confirm_token"])
+
+    assert result["deleted_count"] == 50
+    assert reader.children[LIST_ID] == []
+    assert len([address for address, _ in reader.requests if "/delete_id/" in address]) == 50
 
 
 def test_delete_cues_dry_run_is_side_effect_free_and_issues_dedicated_token() -> None:

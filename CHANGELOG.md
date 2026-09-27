@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fixes Delete preflight rejecting documented status-only `/alwaysReply` and
+  `delete_id` acknowledgements on UDP/TCP. Read replies still require `data`.
+  Child-structure reads bypass the shared cache so deletion verification and
+  structural write preflight use current QLab state.
+
 - Adds the MIT license for original project code and authored documentation,
   with third-party material excluded in NOTICE and license metadata in packages.
 

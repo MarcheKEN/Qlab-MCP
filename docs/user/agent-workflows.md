@@ -434,18 +434,24 @@ not expose GO, playback, panic, `/live`, raw OSC, or AppleScript fallback.
 
 ## Move existing cues
 
-Current limitation: shallow structural reads can omit broken/warning state.
-Do not interpret absent health fields as proof that a cue is healthy; the
-[current-state findings](../status/current-state.md) remain pending correction.
+Shallow structural reads omit health fields; Move reads them separately with
+uncached `valuesForKeys` before issuing or accepting its confirmation token.
 
-`qlab_move_cues` accepts 1–10 UUID-only source cues. For List/Group placement,
+`qlab_move_cues` accepts 1–50 UUID-only source cues. For List/Group placement,
 provide exactly one of `destination_index`, `before_cue_id`, `after_cue_id`, or
 `position`; Cart coordinates require both `cart_row` and `cart_column` and no
 linear placement field. Use the exact `confirm:moveCues:v1` token from the
 reviewed dry-run.
 
+Source/destination health is read fresh and reported in the plan. Broken or
+warning cues can still be moved structurally; warnings do not establish
+playback readiness. Missing or invalid health data blocks preflight.
+
 Moves execute sequentially and are non-atomic. Fresh parent/order readback is
-required after each move. Cue Cart execution remains runtime-blocked by the
+required after each move. An already-satisfied placement skips its OSC setter
+but still requires fresh position readback; its result reports
+`reply_status=skipped_no_op`, and it counts toward `moved_count`.
+Cue Cart execution remains runtime-blocked by the
 current QLab 5.5.10 evidence boundary; this is a repository policy, not a
 claim that QLab itself has no Cart operation.
 
@@ -485,11 +491,12 @@ The invalid example supplies two linear placement forms and no reviewed token.
 
 ## Delete cues
 
-Current limitation: real execution was blocked before deletion by `/alwaysReply`
-acknowledgement validation. A successful dry-run is not evidence that execution
-works; see [current state](../status/current-state.md). Do not retry an error blindly.
+Delete acknowledgement handling and fresh child readback are corrected locally.
+QLab 5.5.10 validation covers individual leaves, mixed batches, empty Groups and
+nested recursive deletion; see the [runtime report](../development/runtime-validation/2026-09-26-delete-cues.md).
+Reload the installed MCP to load the fixes. Do not retry an error blindly.
 
-`qlab_delete_cues` accepts either 1–10 explicit leaf UUIDs, one exact empty
+`qlab_delete_cues` accepts either 1–50 explicit leaf UUIDs, one exact empty
 `Group` through `container_id` with `recursive=false`, or one container with
 `recursive=true`. Direct Group deletion removes the Group itself only when it
 is empty and inactive. Recursive mode deletes descendants deepest-first and

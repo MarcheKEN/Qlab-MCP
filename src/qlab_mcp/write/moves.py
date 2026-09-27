@@ -17,7 +17,7 @@ from .safety import ensure_write_ready, resolve_dry_run
 
 
 LINEAR_PLACEMENT_FIELDS = ("destination_index", "before_cue_id", "after_cue_id", "position")
-MAX_BATCH_MOVES = 10
+MAX_BATCH_MOVES = 50
 MOVE_TOKEN_TTL_SECONDS = 300
 MOVE_CONVERGENCE_DEADLINES_SECONDS = (0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0)
 _MOVE_TOKEN_SECRET = secrets.token_bytes(32)
@@ -126,6 +126,22 @@ def move_cues(
             message="Cue move preflight could not read a complete fresh workspace structure.",
         )
     normalized, errors = _normalize_moves(snapshot, moves)
+    if not errors:
+        targets = {move[field] for move in normalized for field in ("cue_id", "destination_parent_id")}
+        for cue_id in sorted(targets):
+            try:
+                cue = snapshot["nodes"][cue_id]
+                values = reader.read_cue_values(
+                    workspace, cue["uniqueID"], ["isBroken", "isWarning"], cacheable=False,
+                )["values"]
+                if not isinstance(values, dict) or any(
+                    type(values.get(key)) not in (bool, int) or values[key] not in (0, 1)
+                    for key in ("isBroken", "isWarning")
+                ):
+                    raise ValueError("QLab did not return complete boolean cue health.")
+                cue.update(values)
+            except Exception as exc:
+                errors[f"health.{cue_id}"] = str(exc)
     if errors:
         return _result(
             ok=False,
@@ -183,6 +199,7 @@ def move_cues(
             warnings=[
                 "Dry run only: no mutating OSC commands were sent to QLab.",
                 "Cue Cart execution remains runtime-blocked until disposable-workspace semantics are recorded.",
+                *_health_warnings(plan),
             ],
             message="Cue move batch planned; review the dedicated confirmation token before real execution.",
         )
@@ -250,13 +267,18 @@ def _execute_linear_batch(
                 "Workspace activity changed before the structural setter was sent.",
             )
         expected = simulate_move_batch(initial_snapshot["children_by_parent"], moves[: index + 1])["children_by_parent"]
+        before = simulate_move_batch(initial_snapshot["children_by_parent"], moves[:index])["children_by_parent"]
         try:
-            reply = reader.client.request(
-                item["address"].replace("{workspace_id}", workspace_id),
-                *item["args"],
-            )
-            reply_data = getattr(reply, "data", None)
-            reply_status = getattr(reply, "status", "ok")
+            if before == expected:
+                reply_data = None
+                reply_status = "skipped_no_op"
+            else:
+                reply = reader.client.request(
+                    item["address"].replace("{workspace_id}", workspace_id),
+                    *item["args"],
+                )
+                reply_data = getattr(reply, "data", None)
+                reply_status = getattr(reply, "status", "ok")
         except OscTimeoutError as exc:
             reply_data = None
             reply_status = "timeout_pending_readback"
@@ -342,7 +364,7 @@ def _execute_linear_batch(
         planned_count=len(plan),
         moved_count=moved_count,
         results=results,
-        warnings=["Moves were executed sequentially and are not atomic."],
+        warnings=["Moves were executed sequentially and are not atomic.", *_health_warnings(plan)],
         message="Cue move batch completed with fresh structural readback after every move.",
         timeout_confirmed_count=timeout_confirmed_count,
     )
@@ -543,8 +565,6 @@ def _normalize_moves(snapshot: dict[str, Any], moves: list[dict[str, Any]]) -> t
             destination = nodes.get(destination_parent)
             if destination is None:
                 raise ValueError("destination_parent_id does not resolve in this workspace.")
-            _validate_health(source, "source")
-            _validate_health(destination, "destination")
             if source.get("type") in CONTAINER_CUE_TYPES and _is_descendant(destination_parent, cue_id, parents):
                 raise ValueError("A Group, Cue List, or Cue Cart cannot move into itself or a descendant.")
 
@@ -596,7 +616,11 @@ def _normalize_moves(snapshot: dict[str, Any], moves: list[dict[str, Any]]) -> t
                     "cue_id": cue_id,
                     "source_parent_id": source_parent,
                     "destination_parent_id": destination_parent,
-                    **{field: raw_move.get(field) for field in LINEAR_PLACEMENT_FIELDS if raw_move.get(field) is not None},
+                    **{
+                        field: _uuid_key(raw_move[field], f"{key}.{field}")
+                        if field in ("before_cue_id", "after_cue_id") else raw_move[field]
+                        for field in LINEAR_PLACEMENT_FIELDS if raw_move.get(field) is not None
+                    },
                     "kind": "linear",
                 }
             )
@@ -672,9 +696,10 @@ def _activity_snapshot(reader: Any, workspace_id: str) -> dict[str, Any]:
     return {"active_count": len(cue_ids), "active_cue_ids": cue_ids}
 
 
-def _validate_health(cue: dict[str, Any], role: str) -> None:
-    if _qlab_bool(cue.get("isBroken")) or _qlab_bool(cue.get("isWarning")):
-        raise ValueError(f"{role} cue must be healthy and unflagged by QLab warnings.")
+def _health_warnings(plan: list[dict[str, Any]]) -> list[str]:
+    if any(any(item[field].values()) for item in plan for field in ("source_health", "destination_health")):
+        return ["Move target health reports broken or warning cues; structural success does not establish playback readiness."]
+    return []
 
 
 def _health_snapshot(cue: dict[str, Any]) -> dict[str, bool]:

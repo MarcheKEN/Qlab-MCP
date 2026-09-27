@@ -73,6 +73,39 @@ class OscMessageTests(unittest.TestCase):
         with self.assertRaisesRegex(OscProtocolError, "data"):
             QLabOscClient._parse_reply(packet)
 
+    def test_transport_accepts_status_only_write_acknowledgements(self) -> None:
+        client = QLabOscClient(QLabConfig())
+        for address, args in (("/alwaysReply", (1,)), ("/workspace/ws-1/delete_id/cue-1", ())):
+            packet = encode_message(
+                f"/reply{address}", json.dumps({"status": "ok", "address": address})
+            )
+            for transport in ("udp", "tcp"):
+                with self.subTest(address=address, transport=transport):
+                    sock = Mock()
+                    sock.recvfrom.return_value = (packet, ("127.0.0.1", 53000))
+                    sock.recv.return_value = _slip_encode(packet)
+                    if transport == "udp":
+                        reply = client._send_with_reply_on_socket(sock, address, *args)
+                    else:
+                        reply = client._send_with_reply_on_tcp_socket(sock, address, *args)
+                    self.assertEqual(reply.status, "ok")
+                    self.assertIsNone(reply.data)
+
+    def test_transport_still_rejects_status_only_read_replies(self) -> None:
+        client = QLabOscClient(QLabConfig())
+        for address in ("/alwaysReply", "/workspace/ws-1/cue/cue-1/name"):
+            packet = encode_message(f"/reply{address}", json.dumps({"status": "ok"}))
+            for transport in ("udp", "tcp"):
+                with self.subTest(address=address, transport=transport):
+                    sock = Mock()
+                    sock.recvfrom.return_value = (packet, ("127.0.0.1", 53000))
+                    sock.recv.return_value = _slip_encode(packet)
+                    with self.assertRaisesRegex(OscProtocolError, "missing data"):
+                        if transport == "udp":
+                            client._send_with_reply_on_socket(sock, address)
+                        else:
+                            client._send_with_reply_on_tcp_socket(sock, address)
+
     def test_parse_reply_rejects_empty_workspace_id(self) -> None:
         packet = encode_message(
             "/reply/workspace/ws-1/showMode",

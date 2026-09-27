@@ -24,7 +24,7 @@ from .moves import (
 from .safety import ensure_write_ready, resolve_dry_run
 
 
-MAX_BATCH_DELETES = 10
+MAX_BATCH_DELETES = 50
 MAX_RECURSIVE_DELETE_DESCENDANTS = 500
 DELETE_TOKEN_TTL_SECONDS = 300
 DELETE_OPERATION_VERSION = 1

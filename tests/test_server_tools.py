@@ -608,7 +608,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["cue-move", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "7d9c474bd71d9d98541ba143dc189a3c3ff6a8e3c6cb9d4a4346a250da33f80d",
+        "input_schema_hash": "00fe59bde570539237878a5ad71151a664fe84445384a3cdd84ea7c00e03499d",
         "output_schema_hash": "1338128f239451d8d5d14fe5847888f657b4f5864972c221b5466606fa90f33a",
     },
     "qlab_delete_cues": {
@@ -621,7 +621,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {
             "openWorldHint": True,
         },
         "tags": ["cue-delete", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "f3b0e3825a3db87c44c44243b5bd635e4588155e0e8ba8a703cc7ffb53cc990b",
+        "input_schema_hash": "cac408d2ffb5c81082c4144d16c8f25f72300f5cf25d7224ff077c6215ac44af",
         "output_schema_hash": "8b8a38d3937174d9e74a828201c56c5ebcc9c77482eb7f11be303423d8eb7132",
     },
 }
@@ -1019,7 +1019,7 @@ def test_move_cues_fastmcp_schema_limits_and_nested_model() -> None:
     moves = schema["properties"]["moves"]
 
     assert moves["minItems"] == 1
-    assert moves["maxItems"] == 10
+    assert moves["maxItems"] == 50
     assert moves["items"]["required"] == ["cue_id"]
     assert moves["items"]["properties"]["cue_id"]["format"] == "uuid"
 
@@ -1161,7 +1161,7 @@ def test_delete_cues_fastmcp_schema_limits_and_nested_uuid_model() -> None:
     cue_ids = schema["properties"]["cue_ids"]["anyOf"][0]
 
     assert cue_ids["minItems"] == 0
-    assert cue_ids["maxItems"] == 10
+    assert cue_ids["maxItems"] == 50
     assert cue_ids["items"]["format"] == "uuid"
     assert "confirm_token" in schema["properties"]
 
@@ -1766,7 +1766,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert delete.annotations.idempotentHint is False
     delete_cue_ids_schema = delete.inputSchema["properties"]["cue_ids"]["anyOf"][0]
     assert delete_cue_ids_schema["minItems"] == 0
-    assert delete_cue_ids_schema["maxItems"] == 10
+    assert delete_cue_ids_schema["maxItems"] == 50
     assert delete_cue_ids_schema["items"]["format"] == "uuid"
     assert "container_id" in delete.inputSchema["properties"]
     assert "recursive" in delete.inputSchema["properties"]

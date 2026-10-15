@@ -1,5 +1,13 @@
 # Workorder 017 - Geometry Completion: Smooth and Defaults
 
+Current note (2026-10-07): Video `smooth` was exercised and restored in QLab
+5.5.10 with UI contrast; see the [visual runtime report](../../../development/runtime-validation/2026-10-01-visual-cues.md).
+This workorder's earlier pending statement remains relevant to untested
+Camera/Text combinations and other blocked geometry actions. Use the
+family-specific editors; the phase notes below describe the older writer.
+
+## Historical phase specification
+
 Status: implemented locally; QLab runtime validation pending. This workorder
 records the local `smooth` implementation; no new runtime probe is part of the
 0.3.0 preparation.

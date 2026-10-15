@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, JsonValue, StrictBool, StrictInt, StrictS
 from .audio import AudioCueSummary, AudioCuesResult
 from .mic import MicBasics, MicTiming
 from .list_models import CueListReadResult, CueListState, CueListContents, FiniteNumber
-from .family import _fail, _section
+from .family import ControlTriggers, _fail, _section
 from .lists import _contents, _finish
 from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES, serialized_payload_bytes
 from ..sanitizer import sanitize_exception_message
@@ -54,6 +54,7 @@ class PlaylistSettings(BaseModel):
 
 
 class LightCueDetailsResult(CueListReadResult):
+    inspection_values: dict[str, JsonValue] = Field(default_factory=dict)
     cue_type: ClassVar[str] = "Light"
     cue_id: str
     profile: Literal["safe", "technical"] = "safe"
@@ -62,6 +63,8 @@ class LightCueDetailsResult(CueListReadResult):
     state: CueListState | None = None
     timing: MicTiming | None = None
     light: LightSettings | None = None
+    triggers: ControlTriggers | None = None
+    edit_capabilities: dict[str, JsonValue] = Field(default_factory=dict)
     technical_payload: JsonValue = None
     redactions: list[dict[str, str]] = Field(default_factory=list)
 
@@ -74,10 +77,12 @@ class GroupCueDetailsResult(CueListReadResult):
     basics: MicBasics | None = None
     state: CueListState | None = None
     timing: MicTiming | None = None
+    triggers: ControlTriggers | None = None
     group: GroupSettings | None = None
     mode_label: str | None = None
     playlist: PlaylistSettings | None = None
     contents: CueListContents | None = None
+    edit_capabilities: dict[str, JsonValue] = Field(default_factory=dict)
     technical_payload: JsonValue = None
     redactions: list[dict[str, str]] = Field(default_factory=list)
 
@@ -95,24 +100,26 @@ class LightGroupCuesMixin:
         return self._get_family_cues(workspace_id, cue_list_id, limit, offset, max_cues_scanned,
                                     GroupCuesResult, GroupCueSummary)
 
-    def get_light_cue_details(self, workspace_id, cue_id, profile="safe"):
+    def get_light_cue_details(self, workspace_id, cue_id, profile="safe", include_native_triggers=False):
         return self._get_family_details(workspace_id, cue_id, profile, None, None,
                                        LightCueDetailsResult, LightCueSummary,
-                                       {**COMMON_MODELS, "light": LightSettings})
+                                       {**COMMON_MODELS, "light": LightSettings}, include_native_triggers=include_native_triggers)
 
-    def get_group_cue_details(self, workspace_id, cue_id, profile="safe", max_depth=2, max_cues=1000):
+    def get_group_cue_details(self, workspace_id, cue_id, profile="safe", max_depth=2, max_cues=1000, include_native_triggers=False):
         if type(max_depth) is not int or not 0 <= max_depth <= 5 or type(max_cues) is not int or not 1 <= max_cues <= 5000:
             return _fail(GroupCueDetailsResult(workspace_id=str(workspace_id), cue_id=str(cue_id)),
                          "validation_failed", "Invalid container limits")
         result = self._get_family_details(workspace_id, cue_id, profile, None, None,
                                          GroupCueDetailsResult, GroupCueSummary,
-                                         {**COMMON_MODELS, "group": GroupSettings})
+                                         {**COMMON_MODELS, "group": GroupSettings}, include_native_triggers=include_native_triggers)
         if result.identity is None:
             return result
         mode = result.group.mode
         if mode not in MODES:
             return _fail(result, "group_cue_payload_invalid", "Invalid or unavailable Group mode")
         result.mode_label = MODES[mode]
+        from ..write.group import group_edit_capabilities
+        result.edit_capabilities = group_edit_capabilities(mode, result.triggers)
         if mode == 6:
             values = {}
             keys = [field.validation_alias for field in PlaylistSettings.model_fields.values()]
@@ -128,12 +135,12 @@ class LightGroupCuesMixin:
             if not isinstance(final, dict) or str(final.get("uniqueID", "")).casefold() != result.cue_id.casefold() or final.get("type") != "Group" or type(final.get("mode")) is not int or final["mode"] != mode:
                 raise ValueError("Group identity or mode changed during detail read")
         except Exception as exc:
-            result.identity = result.group = result.playlist = result.contents = None
+            result.identity = result.group = result.playlist = result.contents = result.triggers = None
             result.technical_payload = None
             return _fail(result, "group_cue_identity_mismatch", sanitize_exception_message(exc))
         result.coverage.notes.append("Children are bounded summaries; depth zero reads no children.")
         if serialized_payload_bytes(result.model_dump(mode="json")) > MAX_SENSITIVE_CUE_RESPONSE_BYTES:
-            result.identity = result.group = result.playlist = result.contents = None
+            result.identity = result.group = result.playlist = result.contents = result.triggers = None
             result.technical_payload = None
             return _fail(result, "cue_payload_too_large", "Group detail exceeds the response byte budget")
         return _finish(result)

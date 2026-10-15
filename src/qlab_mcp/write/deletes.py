@@ -1,10 +1,8 @@
-"""Gated deletion of explicit leaves, one empty Group, or one emptied container."""
+"""Gated sequential deletion, with explicit opt-in removal of a Group root."""
 
 from __future__ import annotations
 
-import base64
 import hashlib
-import hmac
 import json
 import secrets
 import threading
@@ -12,7 +10,7 @@ import time
 from typing import Any
 
 from ..cues.refs import CONTAINER_CUE_TYPES
-from ..errors import OscTimeoutError, UnsafeWriteOperationError
+from ..errors import OscTimeoutError, QLabReplyError, UnsafeWriteOperationError
 from .moves import (
     _activity_snapshot,
     _fingerprint,
@@ -22,6 +20,7 @@ from .moves import (
     _uuid_key,
 )
 from .safety import ensure_write_ready, resolve_dry_run
+from .tokens import decode_confirm_token, encode_confirm_token
 
 
 MAX_BATCH_DELETES = 50
@@ -43,14 +42,15 @@ def delete_cues(
     *,
     container_id: str | None = None,
     recursive: bool = False,
+    delete_container: bool = False,
 ) -> dict[str, Any]:
-    requested_count = _validate_delete_request(cue_ids, container_id, recursive)
+    requested_count = _validate_delete_request(cue_ids, container_id, recursive, delete_container)
 
     effective_dry_run = resolve_dry_run(reader, dry_run)
     workspace = _resolve_workspace(reader, workspace_id)
     try:
         snapshot, normalized, errors, activity, readiness = _read_delete_state(
-            reader, workspace, cue_ids, container_id, recursive
+            reader, workspace, cue_ids, container_id, recursive, delete_container
         )
     except Exception as exc:
         return _result(
@@ -60,6 +60,7 @@ def delete_cues(
             dry_run=effective_dry_run,
             container_id=container_id,
             recursive=recursive,
+            delete_container=delete_container,
             requested_count=requested_count,
             failed_count=requested_count,
             results=[],
@@ -75,6 +76,7 @@ def delete_cues(
             dry_run=effective_dry_run,
             container_id=container_id,
             recursive=recursive,
+            delete_container=delete_container,
             requested_count=requested_count,
             failed_count=len(errors),
             results=[],
@@ -89,6 +91,7 @@ def delete_cues(
             dry_run=effective_dry_run,
             container_id=container_id,
             recursive=recursive,
+            delete_container=delete_container,
             requested_count=requested_count,
             failed_count=requested_count,
             results=[],
@@ -105,6 +108,8 @@ def delete_cues(
             dry_run=True,
             container_id=container_id,
             recursive=recursive,
+            delete_container=delete_container,
+            preserved_container_id=_uuid_key(container_id, "container_id") if recursive and not delete_container else None,
             expanded_count=len(plan) if container_id is not None else 0,
             requested_count=requested_count,
             planned_count=len(plan),
@@ -114,6 +119,7 @@ def delete_cues(
                 plan,
                 container_id=container_id,
                 recursive=recursive,
+                delete_container=delete_container,
             ),
             warnings=["Dry run only: no mutating OSC commands were sent to QLab."],
             message="Cue delete batch planned; review the dedicated confirmation token before real execution.",
@@ -129,6 +135,7 @@ def delete_cues(
             dry_run=False,
             container_id=container_id,
             recursive=recursive,
+            delete_container=delete_container,
             requested_count=requested_count,
             planned_count=len(plan),
             failed_count=len(plan),
@@ -146,6 +153,7 @@ def delete_cues(
             dry_run=False,
             container_id=container_id,
             recursive=recursive,
+            delete_container=delete_container,
             requested_count=requested_count,
             planned_count=len(plan),
             failed_count=len(plan),
@@ -162,7 +170,7 @@ def delete_cues(
             fresh_activity,
             fresh_readiness,
         ) = _read_delete_state(
-            reader, workspace, cue_ids, container_id, recursive
+            reader, workspace, cue_ids, container_id, recursive, delete_container
         )
     except Exception as exc:
         fresh_errors = {"preflight": str(exc)}
@@ -178,6 +186,7 @@ def delete_cues(
             dry_run=False,
             container_id=container_id,
             recursive=recursive,
+            delete_container=delete_container,
             requested_count=requested_count,
             planned_count=len(plan),
             failed_count=len(plan),
@@ -193,6 +202,7 @@ def delete_cues(
             dry_run=False,
             container_id=container_id,
             recursive=recursive,
+            delete_container=delete_container,
             requested_count=requested_count,
             planned_count=len(plan),
             failed_count=len(plan),
@@ -206,6 +216,7 @@ def delete_cues(
         fresh_plan,
         container_id=container_id,
         recursive=recursive,
+        delete_container=delete_container,
     ):
         return _result(
             ok=False,
@@ -214,6 +225,7 @@ def delete_cues(
             dry_run=False,
             container_id=container_id,
             recursive=recursive,
+            delete_container=delete_container,
             requested_count=requested_count,
             planned_count=len(plan),
             failed_count=len(plan),
@@ -228,7 +240,7 @@ def delete_cues(
         )
     except (TypeError, ValueError):
         resolved_container_id = container_id
-    preserved_container_id = resolved_container_id if recursive else None
+    preserved_container_id = resolved_container_id if recursive and not delete_container else None
 
     if not fresh_plan and container_id is not None:
         # Empty-container deletion is a verified no-op; the root is preserved.
@@ -274,6 +286,8 @@ def delete_cues(
             planned_count=len(plan),
             failed_count=len(plan),
             results=plan,
+            container_id=container_id, recursive=recursive, delete_container=delete_container,
+            preserved_container_id=preserved_container_id,
             errors={"confirm_token": token_error},
             message="Cue delete real execution was rejected because its token was already used.",
         )
@@ -286,6 +300,7 @@ def delete_cues(
         preserved_container_id=preserved_container_id,
         container_id=resolved_container_id,
         recursive=recursive,
+        delete_container=delete_container,
     )
 
 
@@ -298,6 +313,7 @@ def _execute_delete_batch(
     preserved_container_id: str | None = None,
     container_id: str | None = None,
     recursive: bool = False,
+    delete_container: bool = False,
 ) -> dict[str, Any]:
     requested_count = len(plan) if requested_count is None else requested_count
     try:
@@ -312,6 +328,8 @@ def _execute_delete_batch(
             planned_count=len(plan),
             failed_count=len(plan),
             results=plan,
+            container_id=container_id, recursive=recursive, delete_container=delete_container,
+            preserved_container_id=preserved_container_id,
             errors={"always_reply": str(exc)},
             message="QLab alwaysReply could not be enabled; no delete was sent.",
         )
@@ -328,13 +346,23 @@ def _execute_delete_batch(
     }
 
     for index, item in enumerate(plan):
-        if _activity_snapshot(reader, workspace_id)["active_count"]:
+        try:
+            if _activity_snapshot(reader, workspace_id)["active_count"]:
+                raise UnsafeWriteOperationError("Workspace activity changed before the next delete.")
+            before = _read_snapshot(reader, workspace_id)
+            completed_ids = {completed["cue_id"] for completed in results}
+            expected_children = [cue_id for cue_id in item["parent_children"] if cue_id not in completed_ids]
+            if (item["cue_id"] not in before["nodes"]
+                    or before["children_by_parent"].get(item["parent_id"]) != expected_children
+                    or before["children_by_parent"].get(item["cue_id"], [])):
+                raise UnsafeWriteOperationError("Delete target or parent structure changed before the next delete.")
+        except Exception as exc:
             return _failure(
-                workspace_id, plan, results, deleted_count, index,
-                "Workspace activity changed before the next delete.",
-                requested_count=requested_count,
-                container_id=container_id,
+                workspace_id, plan, results, deleted_count, index, str(exc),
+                status="partial_failed" if deleted_count else "preflight_failed",
+                requested_count=requested_count, container_id=container_id,
                 recursive=recursive,
+                delete_container=delete_container,
                 preserved_container_id=preserved_container_id,
             )
         address = f"/workspace/{workspace_id}/delete_id/{item['cue_id_osc']}"
@@ -357,18 +385,21 @@ def _execute_delete_batch(
                     workspace_id, plan, results, deleted_count, index,
                     f"Delete failed and existence readback failed: {readback_exc}",
                     requested_count=requested_count,
-                    status="verification_failed",
+                    status="indeterminate", attempted=True, uncertain=True,
                     container_id=container_id,
                     recursive=recursive,
+                    delete_container=delete_container,
                     preserved_container_id=preserved_container_id,
                 )
             return _failure(
                 workspace_id, plan, results, deleted_count, index,
                 str(exc), readback={"exists": exists}, reply_status="error", reply_data=reply_data,
                 requested_count=requested_count,
-                status="failed" if deleted_count == 0 else "partial_failed",
+                status=("failed" if deleted_count == 0 else "partial_failed") if isinstance(exc, QLabReplyError) and exists else "indeterminate",
+                attempted=True, uncertain=not isinstance(exc, QLabReplyError) or not exists,
                 container_id=container_id,
                 recursive=recursive,
+                delete_container=delete_container,
                 preserved_container_id=preserved_container_id,
             )
 
@@ -378,9 +409,10 @@ def _execute_delete_batch(
                 f"QLab delete reply status was {reply_status!r}.",
                 requested_count=requested_count,
                 status="failed" if deleted_count == 0 else "partial_failed",
-                reply_status=reply_status, reply_data=reply_data,
+                reply_status=reply_status, reply_data=reply_data, attempted=True,
                 container_id=container_id,
                 recursive=recursive,
+                delete_container=delete_container,
                 preserved_container_id=preserved_container_id,
             )
         verification = _poll_delete_convergence(
@@ -389,7 +421,7 @@ def _execute_delete_batch(
             item,
             completed_ids={completed["cue_id"] for completed in results},
             unaffected_neighbors=unaffected_neighbors,
-            preserved_container_id=preserved_container_id,
+            preserved_container_id=(container_id if delete_container and item["cue_id"] != container_id else preserved_container_id),
         )
         if not verification["ok"]:
             return _failure(
@@ -398,9 +430,10 @@ def _execute_delete_batch(
                 requested_count=requested_count,
                 reply_status=reply_status, reply_data=reply_data,
                 verification_status=verification["verification_status"],
-                verification_elapsed_ms=verification["elapsed_ms"],
+                verification_elapsed_ms=verification["elapsed_ms"], attempted=True, uncertain=True,
                 container_id=container_id,
                 recursive=recursive,
+                delete_container=delete_container,
                 preserved_container_id=preserved_container_id,
             )
         status = (
@@ -422,14 +455,25 @@ def _execute_delete_batch(
         deleted_count += 1
         timeout_confirmed_count += int(reply_status == "timeout_pending_readback")
 
-    if _activity_snapshot(reader, workspace_id)["active_count"]:
+    try:
+        if _activity_snapshot(reader, workspace_id)["active_count"]:
+            raise UnsafeWriteOperationError("Workspace activity changed after deletion.")
+        final = _read_snapshot(reader, workspace_id)
+        if any(cue_id in final["nodes"] for cue_id in requested_ids):
+            raise UnsafeWriteOperationError("A deleted UUID is present during final verification.")
+        if preserved_container_id is not None and preserved_container_id not in final["nodes"]:
+            raise UnsafeWriteOperationError("Preserved container is missing during final verification.")
+        for item in plan:
+            if item["parent_id"] in requested_ids:
+                continue
+            expected_children = [cue_id for cue_id in item["parent_children"] if cue_id not in requested_ids]
+            if final["children_by_parent"].get(item["parent_id"]) != expected_children:
+                raise UnsafeWriteOperationError("Final affected parent structure differs from the deletion plan.")
+    except Exception as exc:
         return _failure(
-            workspace_id, plan, results, deleted_count, len(plan) - 1,
-            "Workspace activity changed after deletion.",
-            requested_count=requested_count,
-            status="verification_failed",
-            container_id=container_id,
-            recursive=recursive,
+            workspace_id, plan, results, deleted_count, len(plan), str(exc),
+            requested_count=requested_count, status="verification_failed", final_audit=True,
+            container_id=container_id, recursive=recursive, delete_container=delete_container,
             preserved_container_id=preserved_container_id,
         )
     return _result(
@@ -448,6 +492,7 @@ def _execute_delete_batch(
         results=results,
         container_id=container_id,
         recursive=recursive,
+        delete_container=delete_container,
         preserved_container_id=preserved_container_id,
         expanded_count=len(plan),
         warnings=["Deletes were executed sequentially and are not atomic."],
@@ -472,10 +517,14 @@ def _failure(
     verification_elapsed_ms: int | None = None,
     container_id: str | None = None,
     recursive: bool = False,
+    delete_container: bool = False,
     preserved_container_id: str | None = None,
+    attempted: bool = False,
+    uncertain: bool = False,
+    final_audit: bool = False,
 ) -> dict[str, Any]:
-    item = dict(plan[failed_index])
-    item.update({"status": status, "error": error})
+    item = dict(plan[failed_index]) if not final_audit else {}
+    item.update({"status": status, "error": error, "operation_attempted": attempted})
     if readback is not None:
         item["readback"] = readback
     if reply_status is not None:
@@ -486,7 +535,8 @@ def _failure(
         item["verification_status"] = verification_status
     if verification_elapsed_ms is not None:
         item["verification_elapsed_ms"] = verification_elapsed_ms
-    results.append(item)
+    if not final_audit:
+        results.append(item)
     return _result(
         ok=False,
         status=status,
@@ -499,9 +549,13 @@ def _failure(
         results=results,
         container_id=container_id,
         recursive=recursive,
+        delete_container=delete_container,
         preserved_container_id=preserved_container_id,
         expanded_count=len(plan) if recursive else 0,
-        errors={f"cue_ids[{failed_index}]": error},
+        pending_cue_ids=[entry["cue_id"] for entry in plan[failed_index + int(attempted):]] if not final_audit else [],
+        uncertain_cue_ids=[item["cue_id"]] if uncertain and not final_audit else [],
+        timeout_confirmed_count=sum(entry.get("reply_status") == "timeout_pending_readback" for entry in results[:deleted_count]),
+        errors={"final_audit" if final_audit else f"cue_ids[{failed_index}]": error},
         warnings=["No automatic rollback was sent; deletion is treated as irreversible."],
         message="Cue delete batch stopped after the first failed or unverifiable deletion.",
     )
@@ -511,7 +565,10 @@ def _validate_delete_request(
     cue_ids: list[str] | None,
     container_id: str | None,
     recursive: bool,
+    delete_container: bool = False,
 ) -> int:
+    if delete_container and (container_id is None or not recursive or cue_ids is not None):
+        raise UnsafeWriteOperationError("delete_container requires container_id, recursive=true, and omitted cue_ids.")
     if container_id is not None:
         if cue_ids not in (None, []):
             raise UnsafeWriteOperationError("container_id cannot be combined with cue_ids.")
@@ -530,6 +587,7 @@ def _normalize_delete_request(
     cue_ids: list[str] | None,
     container_id: str | None,
     recursive: bool,
+    delete_container: bool = False,
 ) -> tuple[list[str], dict[str, str]]:
     if container_id is None:
         # _validate_delete_request keeps this branch list-shaped for callers.
@@ -547,6 +605,8 @@ def _normalize_delete_request(
         return [], {"container_id": "container_id must identify a Cue List, Group, or Cue Cart."}
     if any(_qlab_bool(root.get(field)) for field in ("isRunning", "isPaused", "isAuditioning")):
         return [], {"container_id": "Active, paused, or auditioning containers cannot be emptied."}
+    if delete_container and (root_type != "Group" or snapshot["parent_by_child"].get(root_id) is None):
+        return [], {"container_id": "delete_container supports only a Group with an existing parent; Cue Lists and Cue Carts cannot be deleted."}
     if not recursive:
         if root_type != "Group":
             return [], {
@@ -569,12 +629,14 @@ def _normalize_delete_request(
         expanded = _postorder_descendants(snapshot, root_id)
     except ValueError as exc:
         return [], {"container_id": str(exc)}
+    if delete_container:
+        expanded.append(root_id)
     if not expanded:
         return [], {}
     if len(expanded) > MAX_RECURSIVE_DELETE_DESCENDANTS:
         return [], {
             "container_id": (
-                f"recursive deletion expands to {len(expanded)} descendants; "
+                f"recursive deletion expands to {len(expanded)} deletion operations; "
                 f"the maximum is {MAX_RECURSIVE_DELETE_DESCENDANTS}."
             )
         }
@@ -796,6 +858,7 @@ def _read_delete_state(
     cue_ids: list[str] | None,
     container_id: str | None,
     recursive: bool,
+    delete_container: bool = False,
 ) -> tuple[
     dict[str, Any],
     list[str],
@@ -809,6 +872,7 @@ def _read_delete_state(
         cue_ids,
         container_id,
         recursive,
+        delete_container,
     )
     return (
         snapshot,
@@ -825,6 +889,7 @@ def _token_binding(
     *,
     container_id: str | None = None,
     recursive: bool = False,
+    delete_container: bool = False,
 ) -> dict[str, Any]:
     return {
         "version": DELETE_OPERATION_VERSION,
@@ -832,6 +897,7 @@ def _token_binding(
         "workspace_id": workspace_id,
         "container_id": container_id,
         "recursive": recursive,
+        "delete_container": delete_container,
         "requested_cue_ids": [item["cue_id"] for item in plan],
         "requested_cue_ids_osc": [item["cue_id_osc"] for item in plan],
         "activity_snapshot": plan[0]["activity_snapshot"] if plan else {},
@@ -847,6 +913,7 @@ def _encode_token(
     *,
     container_id: str | None = None,
     recursive: bool = False,
+    delete_container: bool = False,
 ) -> str:
     payload = {
         "binding": _token_binding(
@@ -854,29 +921,24 @@ def _encode_token(
             plan,
             container_id=container_id,
             recursive=recursive,
+            delete_container=delete_container,
         ),
         "expires_at": int(time.time()) + DELETE_TOKEN_TTL_SECONDS,
         "nonce": secrets.token_urlsafe(12),
     }
-    encoded = _encode_payload(payload)
-    signature = hmac.new(_DELETE_TOKEN_SECRET, encoded.encode(), hashlib.sha256).hexdigest()
-    return f"confirm:deleteCues:v1:{encoded}:{signature}"
+    return encode_confirm_token("deleteCues", 1, payload, _DELETE_TOKEN_SECRET)
 
 
 def _decode_token(token: str | None) -> tuple[dict[str, Any] | None, str | None]:
     if not isinstance(token, str):
         return None, "delete confirmation token is required."
-    parts = token.split(":")
-    if len(parts) != 5 or parts[:3] != ["confirm", "deleteCues", "v1"]:
+    if token.count(":") != 4:
         return None, "delete confirmation token is malformed or has an unsupported family."
-    encoded, signature = parts[3:]
-    expected = hmac.new(_DELETE_TOKEN_SECRET, encoded.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(signature, expected):
+    payload, error = decode_confirm_token(token, "deleteCues", 1, _DELETE_TOKEN_SECRET)
+    if error == "malformed":
+        return None, "delete confirmation token is malformed or has an unsupported family."
+    if error == "signature":
         return None, "delete confirmation token signature is invalid."
-    try:
-        payload = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)).decode())
-    except Exception:
-        return None, "delete confirmation token payload is invalid."
     if not isinstance(payload, dict) or not isinstance(payload.get("expires_at"), int):
         return None, "delete confirmation token payload is invalid."
     binding = payload.get("binding")
@@ -903,11 +965,6 @@ def _consume_delete_token(token: str | None, payload: dict[str, Any]) -> str | N
     return None
 
 
-def _encode_payload(payload: dict[str, Any]) -> str:
-    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
-
-
 def _result(
     *,
     ok: bool,
@@ -923,8 +980,11 @@ def _result(
     confirm_token: str | None = None,
     container_id: str | None = None,
     recursive: bool = False,
+    delete_container: bool = False,
     preserved_container_id: str | None = None,
     expanded_count: int = 0,
+    pending_cue_ids: list[str] | None = None,
+    uncertain_cue_ids: list[str] | None = None,
     errors: dict[str, str] | None = None,
     warnings: list[str] | None = None,
     message: str,
@@ -943,8 +1003,11 @@ def _result(
         "confirm_token": confirm_token,
         "container_id": container_id,
         "recursive": recursive,
+        "delete_container": delete_container,
         "preserved_container_id": preserved_container_id,
         "expanded_count": expanded_count,
+        "pending_cue_ids": pending_cue_ids if pending_cue_ids is not None else [item["cue_id"] for item in results if not ok and "status" not in item],
+        "uncertain_cue_ids": uncertain_cue_ids or [],
         "errors": errors,
         "warnings": warnings or [],
         "message": message,

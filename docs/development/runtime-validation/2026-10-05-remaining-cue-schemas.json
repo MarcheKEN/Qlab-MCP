@@ -1,0 +1,77 @@
+{
+  "tool_count": 72,
+  "families": {
+    "audio": {
+      "update_bounds": [
+        1,
+        50
+      ],
+      "indexed_operations_max": 50,
+      "extra_fields": false
+    },
+    "mic": {
+      "update_bounds": [
+        1,
+        50
+      ],
+      "indexed_operations_max": 50,
+      "extra_fields": false
+    },
+    "light": {
+      "update_bounds": [
+        1,
+        50
+      ],
+      "indexed_operations_max": 0,
+      "extra_fields": false
+    },
+    "fade": {
+      "update_bounds": [
+        1,
+        50
+      ],
+      "indexed_operations_max": 50,
+      "extra_fields": false
+    },
+    "network": {
+      "update_bounds": [
+        1,
+        50
+      ],
+      "indexed_operations_max": 50,
+      "extra_fields": false
+    },
+    "midi": {
+      "update_bounds": [
+        1,
+        50
+      ],
+      "indexed_operations_max": 0,
+      "extra_fields": false
+    },
+    "midi_file": {
+      "update_bounds": [
+        1,
+        50
+      ],
+      "indexed_operations_max": 0,
+      "extra_fields": false
+    },
+    "timecode": {
+      "update_bounds": [
+        1,
+        50
+      ],
+      "indexed_operations_max": 0,
+      "extra_fields": false
+    },
+    "script": {
+      "update_bounds": [
+        1,
+        50
+      ],
+      "indexed_operations_max": 0,
+      "extra_fields": false
+    }
+  }
+}

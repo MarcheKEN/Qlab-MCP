@@ -1,6 +1,7 @@
 # Workorders
 
-Workorders describe unfinished work only.
+Workorders track unfinished validation and blocked operations. Their older phase
+text may describe retired tools; read each current note first.
 
 - [Active workorders](active/README.md)
 - [Blocked workorders](blocked/README.md)

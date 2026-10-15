@@ -676,3 +676,169 @@ def test_delete_cues_returns_indeterminate_when_readback_never_converges(monkeyp
 
     assert result["status"] == "indeterminate"
     assert result["results"][0]["readback"]["exists"] is True
+
+
+@pytest.mark.parametrize("empty", [True, False])
+def test_delete_container_removes_group_last(monkeypatch, empty):
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    if not empty:
+        reader.children[LIST_ID] = [GROUP_ID, THIRD_ID]
+        reader.children[GROUP_ID] = [NESTED_ID, SECOND_ID]
+        reader.children[NESTED_ID] = [FIRST_ID]
+        reader.nodes[NESTED_ID] = {"uniqueID": NESTED_ID, "type": "Group"}
+    monkeypatch.setattr(deletes, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    kwargs = dict(container_id=GROUP_ID, recursive=True, delete_container=True)
+    plan = deletes.delete_cues(reader, WORKSPACE_ID, dry_run=True, **kwargs)
+    ids = [GROUP_ID] if empty else [FIRST_ID, NESTED_ID, SECOND_ID, GROUP_ID]
+    assert [item["cue_id"] for item in plan["results"]] == ids
+    assert plan["delete_container"] is True
+    assert plan["preserved_container_id"] is None
+    payload, error = deletes._decode_token(plan["confirm_token"])
+    assert error is None and payload["binding"]["delete_container"] is True
+    result = deletes.delete_cues(reader, WORKSPACE_ID, dry_run=False, confirm_token=plan["confirm_token"], **kwargs)
+    assert result["ok"] and result["deleted_count"] == len(ids)
+    assert [addr.rsplit("/", 1)[-1] for addr, _ in reader.requests if "/delete_id/" in addr] == ids
+    assert GROUP_ID not in reader.nodes
+    assert THIRD_ID in reader.nodes
+
+
+@pytest.mark.parametrize("delete_root", [False, True])
+def test_delete_container_tokens_cannot_change_mode(monkeypatch, delete_root):
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    monkeypatch.setattr(deletes, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    plan = deletes.delete_cues(reader, WORKSPACE_ID, container_id=GROUP_ID, recursive=True,
+                              delete_container=delete_root, dry_run=True)
+    result = deletes.delete_cues(reader, WORKSPACE_ID, container_id=GROUP_ID, recursive=True,
+                                delete_container=not delete_root, dry_run=False, confirm_token=plan["confirm_token"])
+    assert result["status"] == "preflight_failed"
+    assert reader.requests == []
+    assert GROUP_ID in reader.nodes
+
+
+@pytest.mark.parametrize("kwargs", [dict(), dict(container_id=GROUP_ID),
+    dict(container_id=GROUP_ID, recursive=True, cue_ids=[]),
+    dict(container_id=GROUP_ID, recursive=True, cue_ids=[FIRST_ID])])
+def test_delete_container_requires_explicit_recursive_group_request(kwargs):
+    from qlab_mcp.write import deletes
+    from qlab_mcp.errors import UnsafeWriteOperationError
+
+    reader = DeleteReader()
+    with pytest.raises(UnsafeWriteOperationError):
+        deletes.delete_cues(reader, WORKSPACE_ID, delete_container=True, dry_run=True, **kwargs)
+    assert reader.requests == []
+
+
+@pytest.mark.parametrize("root", [LIST_ID, CART_ID])
+def test_delete_container_does_not_allow_list_or_cart_roots(root):
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    reader.children[LIST_ID].append(CART_ID)
+    result = deletes.delete_cues(reader, WORKSPACE_ID, container_id=root, recursive=True,
+                                delete_container=True, dry_run=True)
+    assert result["status"] == "preflight_failed"
+    assert reader.requests == []
+
+
+@pytest.mark.parametrize("descendants,delete_root,allowed", [(499, True, True), (500, True, False), (500, False, True), (501, False, False)])
+def test_recursive_delete_operation_limit(descendants, delete_root, allowed):
+    from uuid import UUID
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    ids = [str(UUID(int=index + 100)) for index in range(descendants)]
+    reader.children[GROUP_ID] = ids
+    reader.nodes.update({cid: {"uniqueID": cid, "type": "Memo"} for cid in ids})
+    result = deletes.delete_cues(reader, WORKSPACE_ID, container_id=GROUP_ID, recursive=True,
+                                delete_container=delete_root, dry_run=True)
+    assert result["ok"] is allowed
+    if allowed:
+        assert result["planned_count"] == descendants + int(delete_root)
+    assert reader.requests == []
+
+
+def test_delete_container_stops_before_root_after_descendant_failure(monkeypatch):
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    reader.children[LIST_ID] = [GROUP_ID, THIRD_ID]
+    reader.children[GROUP_ID] = [FIRST_ID, SECOND_ID]
+    reader.fail_on = SECOND_ID
+    monkeypatch.setattr(deletes, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    kwargs = dict(container_id=GROUP_ID, recursive=True, delete_container=True)
+    plan = deletes.delete_cues(reader, WORKSPACE_ID, dry_run=True, **kwargs)
+    result = deletes.delete_cues(reader, WORKSPACE_ID, dry_run=False, confirm_token=plan["confirm_token"], **kwargs)
+    assert result["deleted_count"] == 1
+    assert result["pending_cue_ids"] == [GROUP_ID]
+    assert result["uncertain_cue_ids"] == []
+    assert reader.children[GROUP_ID] == [SECOND_ID]
+    assert GROUP_ID in reader.nodes
+
+
+@pytest.mark.parametrize("phase", ["before", "between", "before_structure", "between_structure", "final_activity", "final_structure", "verification"])
+def test_delete_read_failures_preserve_confirmed_progress(monkeypatch, phase):
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    monkeypatch.setattr(deletes, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    monkeypatch.setattr(deletes, "DELETE_CONVERGENCE_DEADLINES_SECONDS", (0,))
+    plan = deletes.delete_cues(reader, WORKSPACE_ID, [FIRST_ID, SECOND_ID], dry_run=True)
+    reads = 0
+
+    def activity(*a, **kw):
+        nonlocal reads
+        reads += 1
+        # initial read, fresh token read, before first, before second, final
+        if reads == {"before": 3, "between": 4, "final_activity": 5}.get(phase):
+            raise OscTimeoutError("synthetic activity timeout")
+        return {"running_cues": []}
+
+    reader.get_running_cues = activity
+    if phase in ("before_structure", "between_structure", "final_structure", "verification"):
+        original = deletes._read_snapshot
+        structure_reads = 0
+
+        def snapshot(*a, **kw):
+            nonlocal structure_reads
+            structure_reads += 1
+            if structure_reads == {"before_structure": 3, "between_structure": 5, "final_structure": 7, "verification": 6}[phase]:
+                raise OscTimeoutError("synthetic structure timeout")
+            return original(*a, **kw)
+
+        monkeypatch.setattr(deletes, "_read_snapshot", snapshot)
+    result = deletes.delete_cues(reader, WORKSPACE_ID, [FIRST_ID, SECOND_ID], dry_run=False, confirm_token=plan["confirm_token"])
+    count = {"before": 0, "between": 1, "before_structure": 0, "between_structure": 1, "verification": 1}.get(phase, 2)
+    assert not result["ok"] and result["deleted_count"] == count
+    assert result["pending_cue_ids"] == ([FIRST_ID, SECOND_ID][count:] if phase != "verification" else [])
+    assert result["uncertain_cue_ids"] == ([SECOND_ID] if phase == "verification" else [])
+    assert len(result["results"]) == count + (count < 2)
+
+
+def test_delete_container_rejects_child_added_before_root_setter(monkeypatch):
+    from qlab_mcp.write import deletes
+
+    reader = DeleteReader()
+    monkeypatch.setattr(deletes, "ensure_write_ready", lambda *_: WORKSPACE_ID)
+    plan = deletes.delete_cues(reader, WORKSPACE_ID, container_id=GROUP_ID, recursive=True, delete_container=True, dry_run=True)
+    original = deletes._read_snapshot
+    reads = 0
+
+    def snapshot(*a, **kw):
+        nonlocal reads
+        reads += 1
+        if reads == 3:
+            reader.children[LIST_ID].remove(FIRST_ID)
+            reader.children[GROUP_ID].append(FIRST_ID)
+        return original(*a, **kw)
+
+    monkeypatch.setattr(deletes, "_read_snapshot", snapshot)
+    result = deletes.delete_cues(reader, WORKSPACE_ID, container_id=GROUP_ID, recursive=True,
+                                delete_container=True, dry_run=False, confirm_token=plan["confirm_token"])
+    assert result["status"] == "preflight_failed"
+    assert result["pending_cue_ids"] == [GROUP_ID]
+    assert GROUP_ID in reader.nodes
+    assert not any("/delete_id/" in addr for addr, _ in reader.requests)

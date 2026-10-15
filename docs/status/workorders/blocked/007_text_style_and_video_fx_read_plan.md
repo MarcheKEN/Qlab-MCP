@@ -1,5 +1,16 @@
 # Video Phase 3F + 4A/4B — Text Style and Video FX Planning
 
+Current note (2026-10-09): Text ranges/percentages/simple ASCII words and Latin
+selections are verified. Partial fonts require a complete mapping already
+observed in the cue; font inventories are available through `qlab_get_fonts`.
+FX native named getters can prove unique indexed identity; native defaults for
+58 effects and 55 delete/insert restorations are verified in 5.5.10.
+LinearKey/DropShadow creation, ambiguous/repeated FX and unrecorded defaults,
+non-Latin fallback, complex words and partial shadows remain blocked. Native
+key differences can still block parameters and deletion; see the
+[creation report](../../../development/runtime-validation/2026-10-09-fx-empty-stack-creation.md). The phase
+matrices below are historical; use the [current workflow](../../../user/agent-workflows.md#fx-and-text-fragment-operations).
+
 Status: local implementation revised after runtime validation gaps.
 
 Source: `docs/references/qlab_osc_dictionary.md` for QLab 5.

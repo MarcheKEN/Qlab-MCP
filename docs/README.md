@@ -15,6 +15,7 @@ Local `skills/` and `.superpowers/` directories are ignored and not distributed.
 - [User guide](user/README.md)
 - [Public tools](user/tools.md)
 - [Agent workflows](user/agent-workflows.md)
+- [Workspace review and authoring](user/workspace-authoring.md)
 
 ## Status
 
@@ -31,7 +32,7 @@ Local `skills/` and `.superpowers/` directories are ignored and not distributed.
 - [Architecture](development/architecture.md)
 - [MCP agent UX and Edit cleanup research](development/research/2026-08-13-mcp-agent-ux-and-edit-cleanup.md)
 - [Historical single-cue Create runtime checklist](development/runtime-validation/create-cues.md)
-- [Runtime checklist for `qlab_edit_cues`](development/runtime-validation/edit-cues.md)
+- [Cue editor runtime checklist (includes historical phases)](development/runtime-validation/edit-cues.md)
 
 ## References
 

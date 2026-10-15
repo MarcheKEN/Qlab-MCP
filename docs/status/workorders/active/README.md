@@ -8,5 +8,6 @@ Active, bounded work:
 - [022 — Audio/Video slice markers](022_slice_markers_audio_video.md)
 - [029 — Video audio runtime validation](029_video_audio_runtime_validation.md)
 
-Each workorder must state its remaining gate. Completed work moves to the
-archive rather than being rewritten as current.
+Each workorder opens with its current remaining gate. Older phase text beneath
+that note is historical; the [roadmap](../../roadmap.md) and public tool
+catalogue define the present contract.

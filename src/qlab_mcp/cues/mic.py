@@ -18,6 +18,9 @@ class MicCuesResult(AudioCuesResult):
 
 
 class MicBasics(BaseModel):
+    secondColorName: StrictStr | None = None
+    useSecondColor: StrictBool | None = None
+    allowsEditingDuration: StrictBool | None = None
     colorName: StrictStr | None = None
     autoLoad: StrictBool | None = None
     skipIfDisarmed: StrictBool | None = None
@@ -63,6 +66,6 @@ class MicCuesMixin:
         return self._get_family_cues(workspace_id, cue_list_id, limit, offset, max_cues_scanned,
                                           MicCuesResult, MicCueSummary)
 
-    def get_mic_cue_details(self, workspace_id, cue_id, profile="safe", input_channel=None, output_channel=None):
+    def get_mic_cue_details(self, workspace_id, cue_id, profile="safe", input_channel=None, output_channel=None, include_native_triggers=False):
         return self._get_family_details(workspace_id, cue_id, profile, input_channel, output_channel,
-                                             MicCueDetailsResult, MicCueSummary, DETAIL_MODELS)
+                                             MicCueDetailsResult, MicCueSummary, DETAIL_MODELS, include_native_triggers=include_native_triggers)

@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, JsonValue, StrictBool, StrictInt, StrictS
 
 from .list_models import CueListReadResult, CueListState, CueTimecodeComponents, FiniteNumber
 from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES
-from .family import AudioCrosspoint, Level
+from .family import AudioCrosspoint, ControlTriggers, Level
 
 
 Channel = Annotated[StrictInt, Field(ge=0, le=128)]
@@ -44,6 +44,8 @@ class AudioCuesResult(CueListReadResult):
 
 
 class AudioTiming(BaseModel):
+    doFade: StrictBool | None = None
+    lockFadeToCue: StrictBool | None = None
     preWait: FiniteNumber | None = None
     duration: FiniteNumber | None = None
     postWait: FiniteNumber | None = None
@@ -77,6 +79,9 @@ class AudioSettings(BaseModel):
 
 
 class AudioBasics(BaseModel):
+    secondColorName: StrictStr | None = None
+    useSecondColor: StrictBool | None = None
+    allowsEditingDuration: StrictBool | None = None
     colorName: StrictStr | None = None
     autoLoad: StrictBool | None = None
     skipIfDisarmed: StrictBool | None = None
@@ -86,6 +91,7 @@ class AudioBasics(BaseModel):
 
 
 class AudioCueDetailsResult(CueListReadResult):
+    inspection_values: dict[str, JsonValue] = Field(default_factory=dict)
     cue_type: ClassVar[str] = "Audio"
     cue_id: str
     profile: Literal["safe", "technical"] = "safe"
@@ -95,6 +101,8 @@ class AudioCueDetailsResult(CueListReadResult):
     timing: AudioTiming | None = None
     audio: AudioSettings | None = None
     level: AudioCrosspoint | None = None
+    triggers: ControlTriggers | None = None
+    edit_capabilities: dict[str, JsonValue] = Field(default_factory=dict)
     technical_payload: JsonValue = None
     redactions: list[dict[str, str]] = Field(default_factory=list)
 
@@ -107,7 +115,7 @@ class AudioCuesMixin:
         return self._get_family_cues(workspace_id, cue_list_id, limit, offset, max_cues_scanned,
                                      AudioCuesResult, AudioCueSummary)
 
-    def get_audio_cue_details(self, workspace_id, cue_id, profile="safe", input_channel=None, output_channel=None):
+    def get_audio_cue_details(self, workspace_id, cue_id, profile="safe", input_channel=None, output_channel=None, include_native_triggers=False):
         return self._get_family_details(workspace_id, cue_id, profile, input_channel, output_channel,
                                         AudioCueDetailsResult, AudioCueSummary, DETAIL_MODELS,
-                                        max_bytes=MAX_SENSITIVE_CUE_RESPONSE_BYTES)
+                                        max_bytes=MAX_SENSITIVE_CUE_RESPONSE_BYTES, include_native_triggers=include_native_triggers)

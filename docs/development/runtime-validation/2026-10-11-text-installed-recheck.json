@@ -1,0 +1,3850 @@
+{
+  "date": "2026-10-11",
+  "transport": "installed MCP connector after restart",
+  "qlab": "5.5.10",
+  "write_calls": 4,
+  "setters": 6,
+  "full_text_and_state_restored": true,
+  "ui_contrast": [
+    "red Árbol",
+    "green azul",
+    "two smaller than one",
+    "blue range »—luz NBSP",
+    "original restored"
+  ],
+  "records": {
+    "contentExec": {
+      "ok": true,
+      "status": "updated",
+      "workspace_id": "11111111-1111-4111-8111-111111111111",
+      "dry_run": false,
+      "requested_count": 1,
+      "planned_count": 1,
+      "updated_count": 1,
+      "failed_count": 0,
+      "timeout_confirmed_count": 0,
+      "results": [
+        {
+          "cue_ref": "22222222-2222-4222-8222-222222222222",
+          "cue_id": "22222222-2222-4222-8222-222222222222",
+          "profile": "text_basic",
+          "status": "updated",
+          "properties": {
+            "text": "«Árbol»—luz “azul”\none\ttwo"
+          },
+          "operations": [
+            {
+              "operation": "set_property",
+              "property": "text",
+              "path": "text",
+              "mode": "saved",
+              "args": [
+                "«Árbol»—luz “azul”\none\ttwo"
+              ],
+              "arg_values": {
+                "value": "«Árbol»—luz “azul”\none\ttwo"
+              },
+              "read_key": "text",
+              "risk_tier": "high",
+              "real_write_enabled": true,
+              "capability_gate": "video_visual",
+              "readback": "value",
+              "contextual_requirements": [],
+              "real_write_possible": true,
+              "requires_confirm_token": true
+            }
+          ],
+          "confirm_gates": [],
+          "before": {
+            "isRunning": false,
+            "isPaused": false,
+            "cueTargetID": "",
+            "parent": "33333333-3333-4333-8333-333333333333",
+            "type": "Text",
+            "isAuditioning": false,
+            "hasCueTargets": false,
+            "canHavePatchTargets": false,
+            "uniqueID": "22222222-2222-4222-8222-222222222222",
+            "isWarning": false,
+            "allowsEditingDuration": true,
+            "isBroken": false,
+            "text": "Codex MCP text test — placeholder only"
+          },
+          "after": {
+            "type": "Text",
+            "uniqueID": "22222222-2222-4222-8222-222222222222",
+            "text": "«Árbol»—luz “azul”\none\ttwo"
+          },
+          "diff": {
+            "text": {
+              "before": "Codex MCP text test — placeholder only",
+              "requested": "«Árbol»—luz “azul”\none\ttwo"
+            }
+          },
+          "planned_operations": [
+            {
+              "operation": "set_property",
+              "property": "text",
+              "key": "text",
+              "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text",
+              "args": [
+                "«Árbol»—luz “azul”\none\ttwo"
+              ],
+              "status": "verified"
+            }
+          ],
+          "executed_operations": [
+            {
+              "operation": "set_property",
+              "property": "text",
+              "key": "text",
+              "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text",
+              "args": [
+                "«Árbol»—luz “azul”\none\ttwo"
+              ],
+              "status": "sent",
+              "reply_error": null
+            }
+          ],
+          "errors": null,
+          "warnings": [],
+          "notices": [],
+          "updateq_plan": null,
+          "group_child_readback": null,
+          "side_effects": [],
+          "debug": null
+        }
+      ],
+      "errors": null,
+      "warnings": [
+        "Sequential, non-atomic edits; no automatic rollback or setter retry."
+      ],
+      "error_code": null,
+      "suggested_action": null,
+      "message": "updated"
+    },
+    "formatExec": {
+      "ok": true,
+      "status": "updated",
+      "workspace_id": "11111111-1111-4111-8111-111111111111",
+      "dry_run": false,
+      "requested_count": 1,
+      "planned_count": 1,
+      "updated_count": 1,
+      "failed_count": 0,
+      "timeout_confirmed_count": 0,
+      "results": [
+        {
+          "cue_ref": "22222222-2222-4222-8222-222222222222",
+          "cue_id": "22222222-2222-4222-8222-222222222222",
+          "profile": "text_basic",
+          "status": "updated",
+          "properties": {
+            "text/format@0": {
+              "selector": {
+                "kind": "word",
+                "index": 0
+              },
+              "attributes": {
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ]
+              }
+            },
+            "text/format@1": {
+              "selector": {
+                "kind": "word",
+                "index": 2
+              },
+              "attributes": {
+                "color": [
+                  0,
+                  1,
+                  0,
+                  1
+                ]
+              }
+            },
+            "text/format@2": {
+              "selector": {
+                "kind": "word",
+                "index": 4
+              },
+              "attributes": {
+                "fontSize": 48
+              }
+            }
+          },
+          "operations": [
+            {
+              "property": "text/format@0",
+              "path": "text/format",
+              "args": [
+                "{\"color\":[1,0,0,1],\"range\":[1,5]}"
+              ],
+              "arg_values": {
+                "selector": {
+                  "kind": "word",
+                  "index": 0
+                },
+                "attributes": {
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ]
+                }
+              },
+              "real_write_enabled": true,
+              "real_write_possible": true,
+              "requires_confirm_token": true
+            },
+            {
+              "property": "text/format@1",
+              "path": "text/format",
+              "args": [
+                "{\"color\":[0,1,0,1],\"range\":[13,4]}"
+              ],
+              "arg_values": {
+                "selector": {
+                  "kind": "word",
+                  "index": 2
+                },
+                "attributes": {
+                  "color": [
+                    0,
+                    1,
+                    0,
+                    1
+                  ]
+                }
+              },
+              "real_write_enabled": true,
+              "real_write_possible": true,
+              "requires_confirm_token": true
+            },
+            {
+              "property": "text/format@2",
+              "path": "text/format",
+              "args": [
+                "{\"fontSize\":48,\"range\":[23,3]}"
+              ],
+              "arg_values": {
+                "selector": {
+                  "kind": "word",
+                  "index": 4
+                },
+                "attributes": {
+                  "fontSize": 48
+                }
+              },
+              "real_write_enabled": true,
+              "real_write_possible": true,
+              "requires_confirm_token": true
+            }
+          ],
+          "confirm_gates": [],
+          "before": {
+            "isRunning": false,
+            "isPaused": false,
+            "cueTargetID": "",
+            "parent": "33333333-3333-4333-8333-333333333333",
+            "type": "Text",
+            "isAuditioning": false,
+            "hasCueTargets": false,
+            "canHavePatchTargets": false,
+            "uniqueID": "22222222-2222-4222-8222-222222222222",
+            "isWarning": false,
+            "allowsEditingDuration": true,
+            "isBroken": false,
+            "text/format@0": {
+              "text": "«Árbol»—luz “azul”\none\ttwo",
+              "runs": [
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    26
+                  ],
+                  "lineSpacing": 1
+                }
+              ]
+            },
+            "text/format@1": {
+              "text": "«Árbol»—luz “azul”\none\ttwo",
+              "runs": [
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    26
+                  ],
+                  "lineSpacing": 1
+                }
+              ]
+            },
+            "text/format@2": {
+              "text": "«Árbol»—luz “azul”\none\ttwo",
+              "runs": [
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    26
+                  ],
+                  "lineSpacing": 1
+                }
+              ]
+            }
+          },
+          "after": {
+            "type": "Text",
+            "uniqueID": "22222222-2222-4222-8222-222222222222",
+            "text/format@0": {
+              "text": "«Árbol»—luz “azul”\none\ttwo",
+              "runs": [
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    1
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    1,
+                    5
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    6,
+                    20
+                  ],
+                  "lineSpacing": 1
+                }
+              ]
+            },
+            "text/format@1": {
+              "text": "«Árbol»—luz “azul”\none\ttwo",
+              "runs": [
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    1
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    1,
+                    5
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    6,
+                    7
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    0,
+                    1,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    13,
+                    4
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    17,
+                    9
+                  ],
+                  "lineSpacing": 1
+                }
+              ]
+            },
+            "text/format@2": {
+              "text": "«Árbol»—luz “azul”\none\ttwo",
+              "runs": [
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    1
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    1,
+                    5
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    6,
+                    7
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    0,
+                    1,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    13,
+                    4
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    17,
+                    6
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 48,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    23,
+                    3
+                  ],
+                  "lineSpacing": 1
+                }
+              ]
+            }
+          },
+          "diff": {
+            "text/format@0": {
+              "before": {
+                "text": "«Árbol»—luz “azul”\none\ttwo",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      26
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "requested": {
+                "selector": {
+                  "kind": "word",
+                  "index": 0
+                },
+                "attributes": {
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ]
+                }
+              }
+            },
+            "text/format@1": {
+              "before": {
+                "text": "«Árbol»—luz “azul”\none\ttwo",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      26
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "requested": {
+                "selector": {
+                  "kind": "word",
+                  "index": 2
+                },
+                "attributes": {
+                  "color": [
+                    0,
+                    1,
+                    0,
+                    1
+                  ]
+                }
+              }
+            },
+            "text/format@2": {
+              "before": {
+                "text": "«Árbol»—luz “azul”\none\ttwo",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      26
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "requested": {
+                "selector": {
+                  "kind": "word",
+                  "index": 4
+                },
+                "attributes": {
+                  "fontSize": 48
+                }
+              }
+            }
+          },
+          "planned_operations": [
+            {
+              "operation": "set_property",
+              "property": "text/format@0",
+              "key": "text/format@0",
+              "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+              "args": [
+                "{\"color\":[1,0,0,1],\"range\":[1,5]}"
+              ],
+              "status": "verified"
+            },
+            {
+              "operation": "set_property",
+              "property": "text/format@1",
+              "key": "text/format@1",
+              "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+              "args": [
+                "{\"color\":[0,1,0,1],\"range\":[13,4]}"
+              ],
+              "status": "verified"
+            },
+            {
+              "operation": "set_property",
+              "property": "text/format@2",
+              "key": "text/format@2",
+              "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+              "args": [
+                "{\"fontSize\":48,\"range\":[23,3]}"
+              ],
+              "status": "verified"
+            }
+          ],
+          "executed_operations": [
+            {
+              "operation": "set_property",
+              "property": "text/format@0",
+              "key": "text/format@0",
+              "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+              "args": [
+                "{\"color\":[1,0,0,1],\"range\":[1,5]}"
+              ],
+              "status": "sent",
+              "reply_error": null
+            },
+            {
+              "operation": "set_property",
+              "property": "text/format@1",
+              "key": "text/format@1",
+              "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+              "args": [
+                "{\"color\":[0,1,0,1],\"range\":[13,4]}"
+              ],
+              "status": "sent",
+              "reply_error": null
+            },
+            {
+              "operation": "set_property",
+              "property": "text/format@2",
+              "key": "text/format@2",
+              "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+              "args": [
+                "{\"fontSize\":48,\"range\":[23,3]}"
+              ],
+              "status": "sent",
+              "reply_error": null
+            }
+          ],
+          "errors": null,
+          "warnings": [],
+          "notices": [],
+          "updateq_plan": null,
+          "group_child_readback": null,
+          "side_effects": [],
+          "debug": null
+        }
+      ],
+      "errors": null,
+      "warnings": [
+        "Sequential, non-atomic edits; no automatic rollback or setter retry."
+      ],
+      "error_code": null,
+      "suggested_action": null,
+      "message": "updated"
+    },
+    "formatRead": {
+      "ok": true,
+      "status": "ok",
+      "partial": false,
+      "workspace_id": "11111111-1111-4111-8111-111111111111",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [],
+        "unavailable_fields": [
+          "isChildAuditioning",
+          "isChildFlagged",
+          "text/format/backgroundColor",
+          "text/format/shadowColor",
+          "text/format/shadowBlurRadius",
+          "text/format/shadowOffset",
+          "text/format/strikethroughColor",
+          "text/format/underlineColor",
+          "text/format/strikethroughStyle",
+          "text/format/underlineStyle",
+          "hotkeyTriggerEnabled",
+          "midiTriggerByte1",
+          "midiTriggerByte1String",
+          "midiTriggerByte2",
+          "midiTriggerByte2String",
+          "midiTriggerChannel",
+          "midiTriggerCommand",
+          "midiTriggerEnabled",
+          "timecodeShowAsTimecode",
+          "timecodeTriggerEnabled",
+          "wallClockHours",
+          "wallClockMinutes",
+          "wallClockSeconds",
+          "wallClockTriggerEnabled"
+        ],
+        "failed_routes": [],
+        "notes": [
+          "Audio Maps, Audio Objects and live metrics are excluded.",
+          "Containing Cue List context comes from qlab_get_text_cues; detail reads only the immediate parent.",
+          "Video FX parameters require explicit indexed selectors; no automatic stack scan is performed.",
+          "Stage/input references do not expand patches, stages, regions or routes."
+        ]
+      },
+      "warnings": [],
+      "errors": {},
+      "cue_id": "22222222-2222-4222-8222-222222222222",
+      "profile": "safe",
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": true,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "notes": null
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isChildAuditioning": null,
+        "isChildFlagged": null,
+        "isPanicking": false,
+        "isTailingOut": false
+      },
+      "timing": {
+        "preWait": 0,
+        "duration": 0,
+        "postWait": 0,
+        "continueMode": 0,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        }
+      },
+      "video": {
+        "stageID": "A0CA9B3F-A783-54BF-9B36-25572F3C93EF",
+        "stageName": "Stage 9",
+        "stageNumber": 9,
+        "cueSize": {
+          "width": 646,
+          "height": 175
+        },
+        "anchor": {
+          "x": 0,
+          "y": 0
+        },
+        "translation": {
+          "x": 0,
+          "y": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1
+        },
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "cropTop": 0,
+        "cropBottom": 0,
+        "cropLeft": 0,
+        "cropRight": 0,
+        "opacity": 1,
+        "layer": 1000,
+        "blendMode": "Normal",
+        "fillStage": false,
+        "fillStyle": 0,
+        "preserveAspectRatio": true,
+        "smooth": true,
+        "videoEffects": []
+      },
+      "triggers": {
+        "hotkeyTriggerEnabled": null,
+        "midiTriggerEnabled": null,
+        "midiTriggerCommand": null,
+        "midiTriggerChannel": null,
+        "midiTriggerByte1": null,
+        "midiTriggerByte2": null,
+        "midiTriggerByte1String": null,
+        "midiTriggerByte2String": null,
+        "wallClockTriggerEnabled": null,
+        "wallClockHours": null,
+        "wallClockMinutes": null,
+        "wallClockSeconds": null,
+        "timecodeTriggerEnabled": null,
+        "timecodeShowAsTimecode": null,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_text_cues",
+        "allowed_properties": [
+          "anchor",
+          "anchor/x",
+          "anchor/y",
+          "armed",
+          "autoLoad",
+          "blendMode",
+          "colorName",
+          "continueMode",
+          "crop",
+          "cropBottom",
+          "cropLeft",
+          "cropRight",
+          "cropTop",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "duration",
+          "fadeAndStopOthersTime",
+          "fillStage",
+          "fillStyle",
+          "fixedWidth",
+          "flagged",
+          "layer",
+          "name",
+          "notes",
+          "number",
+          "opacity",
+          "origin",
+          "origin/x",
+          "origin/y",
+          "postWait",
+          "preWait",
+          "preserveAspectRatio",
+          "quaternion",
+          "resetRotation",
+          "scale",
+          "scale/x",
+          "scale/y",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "skipIfDisarmed",
+          "smooth",
+          "stageID",
+          "text",
+          "text/format/alignment",
+          "text/format/fontFamilyAndStyle",
+          "text/format/fontName",
+          "text/format/lineSpacing",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "translation",
+          "translation/x",
+          "translation/y",
+          "useSecondColor"
+        ],
+        "video_fx": {
+          "allowed_operations": [],
+          "schema_operations": [
+            "videoEffectIndex/enabled",
+            "videoEffectIndex/parameter",
+            "videoEffectIndex/parameters",
+            "videoEffectIndex/delete",
+            "videoEffectIndex/move",
+            "videoEffects/add",
+            "videoEffects/insert"
+          ],
+          "blocked_operations": {
+            "videoEffectIndex/enabled": "No existing effect with verifiable native type identity.",
+            "videoEffectIndex/parameter": "No existing effect with verifiable native type identity.",
+            "videoEffectIndex/parameters": "No existing effect with verifiable native type identity."
+          },
+          "catalogue_effect_count": 60,
+          "catalogue_parameter_count": 262,
+          "range_policy": "Conservative published bands; QLab can allow values outside them.",
+          "pending_validation": [],
+          "conditional_structural_operations": [
+            "videoEffectIndex/delete",
+            "videoEffectIndex/move",
+            "videoEffects/add",
+            "videoEffects/insert"
+          ],
+          "validated_new_effects": [
+            "BloomGloom",
+            "BokehBlur",
+            "BoxDiscGaussianBlur",
+            "CMYKHalftone",
+            "CircleSplashHoleDistortion",
+            "ColorClamp",
+            "ColorControls",
+            "ColorMatrix",
+            "ColorPosterize",
+            "ColorThreshold",
+            "CrystallizePointillize",
+            "DepthOfField",
+            "Dither",
+            "Droste",
+            "EdgeWork",
+            "Exposure",
+            "FalseColor",
+            "GaborGradients",
+            "Gamma",
+            "GlassLozenge",
+            "HighlightShadow",
+            "Kaleidoscope",
+            "KeystoneCorrection",
+            "LightTunnel",
+            "LineOverlay",
+            "MedianComicEffect",
+            "MinMaxInvert",
+            "MorphologyGradient",
+            "MorphologyMinMax",
+            "MotionBlur",
+            "NinePartStretched",
+            "NinePartTiled",
+            "NoiseReduction",
+            "OpTile",
+            "PerspectiveTile",
+            "PhotoEffects",
+            "PinchBumpDistortion",
+            "Pixellation",
+            "QuadTiles",
+            "ReflectedTiles",
+            "RotatedTiles",
+            "Screen",
+            "SepiaMonochrome",
+            "SharpenLuminance",
+            "Shutter",
+            "SpotColor",
+            "Spotlight",
+            "TemperatureTint",
+            "ThermalXRay",
+            "ToneCurve",
+            "TorusLensDistortion",
+            "TriangleKaleidoscope",
+            "TwirlVortexDistortion",
+            "UnsharpMask",
+            "Vibrance",
+            "WhitePoint",
+            "Window",
+            "ZoomBlur"
+          ],
+          "unvalidated_new_effect_defaults_blocked": true,
+          "blocked_creation_effects": {
+            "LinearKey": "QLab 5.5.10 returned OSC status=error for documented add and insert; its unified log says 'unrecognized video effect name: LinearKey' although the UI tooltip and OSC dictionary give that exact name. Existing instances can be read and edited; creation stays blocked pending QLab-side resolution.",
+            "DropShadow": "QLab 5.5.10 returned OSC status=error for documented add and insert; its unified log says 'unrecognized video effect name: DropShadow' although the UI tooltip and OSC dictionary give that exact name. Existing instances can be read and edited; creation stays blocked pending QLab-side resolution."
+          },
+          "native_parameter_aliases": {
+            "DropShadow": {
+              "Color": "inputColor"
+            }
+          },
+          "structural_qlab_version": "5.5.10",
+          "conditional_operations": [
+            "videoEffectIndex/enabled",
+            "videoEffectIndex/parameter",
+            "videoEffectIndex/parameters"
+          ],
+          "identity_proof": "Native type metadata, or a named native getter matching one unique indexed payload",
+          "requires_explicit_effect_type": true,
+          "requires_full_stack_preflight": true,
+          "excluded": [
+            "Fade FX flags",
+            "/live",
+            "effect-name write addressing"
+          ]
+        },
+        "text_format": {
+          "property": "text/format",
+          "selectors": [
+            "full",
+            "range",
+            "word"
+          ],
+          "requires_complete_text_and_runs": true,
+          "pending_validation": [
+            "other word delimiters, contractions and combining marks",
+            "unobserved font companion metadata",
+            "non-Latin font fallback",
+            "partial shadow line scope"
+          ],
+          "native_index_unit": "utf16",
+          "ranges_verified": true,
+          "unicode_scope": "ASCII/Latin selections; color-only edits also allow verified NBSP/guillemet/curly-quote/em-dash characters; other scripts and emoji remain blocked",
+          "color_only_extra_characters": [
+            " ",
+            "«",
+            "»",
+            "“",
+            "”",
+            "—"
+          ],
+          "unicode_formatting_pending": true,
+          "percentage_rounding": "nearest",
+          "word_tokenization": "latin_delimiters",
+          "word_delimiters": [
+            "space",
+            "tab",
+            "LF",
+            "CR",
+            "NBSP",
+            "«",
+            "»",
+            "“",
+            "”",
+            "—"
+          ],
+          "font_scope": "Complete fontName/family/style mapping already observed in the same cue",
+          "validated_json_attributes": [
+            "color",
+            "fontFamily",
+            "fontName",
+            "fontSize",
+            "fontStyle",
+            "lineSpacing"
+          ]
+        },
+        "blocked_properties": {
+          "videoEffectIndex/enabled": "Use a typed FX operation with fresh native index/type proof; parameter keys alone cannot prove identity.",
+          "fadeAndStopOthers": "Scope readback must be an integer, not boolean.",
+          "text/format/underlineColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowBlurRadius": "Format fragments omit this attribute or have mixed values.",
+          "text/format/fontSize": "Format fragments omit this attribute or have mixed values.",
+          "text/format/color": "Format fragments omit this attribute or have mixed values.",
+          "text/format/strikethroughColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/underlineStyle": "Format fragments omit this attribute or have mixed values.",
+          "text/format/backgroundColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowOffset/height": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/strikethroughStyle": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowOffset/width": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowOffset": "Format fragments omit this attribute or have mixed values.",
+          "midiTriggerByte1String": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "timecodeTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerByte2String": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockMinutes": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockHours": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "hotkeyTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "timecodeShowAsTimecode": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerChannel": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockSeconds": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerByte2": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerCommand": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerByte1": "Request include_native_triggers=true; requires fresh local AppleScript evidence."
+        },
+        "requires_fresh_preflight": true,
+        "unavailable_via_osc": [
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display"
+        ],
+        "excluded": [
+          "Audio Maps",
+          "/live",
+          "cue execution",
+          "workspace stage/region edits"
+        ],
+        "pending_validation": [
+          "FX LinearKey/DropShadow creation, ambiguous native identities and unavailable native parameter baselines",
+          "Audio FX",
+          "Non-Latin Text fallback, complex words, unobserved fonts and partial shadows",
+          "Camera input channel bounds"
+        ],
+        "blocked_operations": [
+          "setDefaultLevels",
+          "setSilentLevels"
+        ],
+        "property_transports": {
+          "midiTriggerByte1String": "applescript",
+          "timecodeTriggerEnabled": "applescript",
+          "midiTriggerByte2String": "applescript",
+          "wallClockMinutes": "applescript",
+          "wallClockHours": "applescript",
+          "hotkeyTriggerEnabled": "applescript",
+          "timecodeShowAsTimecode": "applescript",
+          "midiTriggerEnabled": "applescript",
+          "midiTriggerChannel": "applescript",
+          "wallClockSeconds": "applescript",
+          "midiTriggerByte2": "applescript",
+          "wallClockTriggerEnabled": "applescript",
+          "midiTriggerCommand": "applescript",
+          "midiTriggerByte1": "applescript"
+        },
+        "native_trigger_preconditions": [
+          "Configure a disabled trigger; change activation and MIDI command separately.",
+          "Activation requires disarmed, Do not continue and Skip if disarmed off.",
+          "Hotkey activation is blocked without documented key/modifier readback; disabling is supported.",
+          "Hotkey assignment and Wall Clock weekdays are not available through the dictionary."
+        ]
+      },
+      "selected_video_effects": [],
+      "technical_payload": null,
+      "redactions": [],
+      "identity": {
+        "uniqueID": "22222222-2222-4222-8222-222222222222",
+        "type": "Text",
+        "number": "147",
+        "name": "TEST · Text · PLACEHOLDER",
+        "displayName": "TEST · Text · PLACEHOLDER",
+        "parent_id": "33333333-3333-4333-8333-333333333333",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "text": {
+        "text": "«Árbol»—luz “azul”\none\ttwo",
+        "fixedWidth": 0,
+        "outputSize": {
+          "width": 646,
+          "height": 175
+        },
+        "fragments": [
+          {
+            "range": [
+              0,
+              1
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          },
+          {
+            "range": [
+              1,
+              5
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              1,
+              0,
+              0,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          },
+          {
+            "range": [
+              6,
+              7
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          },
+          {
+            "range": [
+              13,
+              4
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              0,
+              1,
+              0,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          },
+          {
+            "range": [
+              17,
+              6
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          },
+          {
+            "range": [
+              23,
+              3
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 48,
+            "lineSpacing": 1,
+            "color": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          }
+        ],
+        "alignment": "center",
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontFamilyAndStyle": {
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold"
+        },
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 72,
+        "lineSpacing": 1,
+        "color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      }
+    },
+    "punctExec": {
+      "ok": true,
+      "status": "updated",
+      "workspace_id": "11111111-1111-4111-8111-111111111111",
+      "dry_run": false,
+      "requested_count": 1,
+      "planned_count": 1,
+      "updated_count": 1,
+      "failed_count": 0,
+      "timeout_confirmed_count": 0,
+      "results": [
+        {
+          "cue_ref": "22222222-2222-4222-8222-222222222222",
+          "cue_id": "22222222-2222-4222-8222-222222222222",
+          "profile": "text_basic",
+          "status": "updated",
+          "properties": {
+            "text/format@0": {
+              "selector": {
+                "kind": "range",
+                "index": 6,
+                "length": 6
+              },
+              "attributes": {
+                "color": [
+                  0,
+                  0,
+                  1,
+                  1
+                ]
+              }
+            }
+          },
+          "operations": [
+            {
+              "property": "text/format@0",
+              "path": "text/format",
+              "args": [
+                "{\"color\":[0,0,1,1],\"range\":[6,6]}"
+              ],
+              "arg_values": {
+                "selector": {
+                  "kind": "range",
+                  "index": 6,
+                  "length": 6
+                },
+                "attributes": {
+                  "color": [
+                    0,
+                    0,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "real_write_enabled": true,
+              "real_write_possible": true,
+              "requires_confirm_token": true
+            }
+          ],
+          "confirm_gates": [],
+          "before": {
+            "isRunning": false,
+            "isPaused": false,
+            "cueTargetID": "",
+            "parent": "33333333-3333-4333-8333-333333333333",
+            "type": "Text",
+            "isAuditioning": false,
+            "hasCueTargets": false,
+            "canHavePatchTargets": false,
+            "uniqueID": "22222222-2222-4222-8222-222222222222",
+            "isWarning": false,
+            "allowsEditingDuration": true,
+            "isBroken": false,
+            "text/format@0": {
+              "text": "«Árbol»—luz “azul”\none\ttwo",
+              "runs": [
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    1
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    1,
+                    5
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    6,
+                    7
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    0,
+                    1,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    13,
+                    4
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    17,
+                    6
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 48,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    23,
+                    3
+                  ],
+                  "lineSpacing": 1
+                }
+              ]
+            }
+          },
+          "after": {
+            "type": "Text",
+            "uniqueID": "22222222-2222-4222-8222-222222222222",
+            "text/format@0": {
+              "text": "«Árbol»—luz “azul”\none\ttwo",
+              "runs": [
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    1
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    1,
+                    5
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    0,
+                    0,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    6,
+                    6
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    12,
+                    1
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    0,
+                    1,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    13,
+                    4
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    17,
+                    6
+                  ],
+                  "lineSpacing": 1
+                },
+                {
+                  "fontSize": 48,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    23,
+                    3
+                  ],
+                  "lineSpacing": 1
+                }
+              ]
+            }
+          },
+          "diff": {
+            "text/format@0": {
+              "before": {
+                "text": "«Árbol»—luz “azul”\none\ttwo",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      1
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      1,
+                      5
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      6,
+                      7
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      0,
+                      1,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      13,
+                      4
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      17,
+                      6
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 48,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      23,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "requested": {
+                "selector": {
+                  "kind": "range",
+                  "index": 6,
+                  "length": 6
+                },
+                "attributes": {
+                  "color": [
+                    0,
+                    0,
+                    1,
+                    1
+                  ]
+                }
+              }
+            }
+          },
+          "planned_operations": [
+            {
+              "operation": "set_property",
+              "property": "text/format@0",
+              "key": "text/format@0",
+              "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+              "args": [
+                "{\"color\":[0,0,1,1],\"range\":[6,6]}"
+              ],
+              "status": "verified"
+            }
+          ],
+          "executed_operations": [
+            {
+              "operation": "set_property",
+              "property": "text/format@0",
+              "key": "text/format@0",
+              "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+              "args": [
+                "{\"color\":[0,0,1,1],\"range\":[6,6]}"
+              ],
+              "status": "sent",
+              "reply_error": null
+            }
+          ],
+          "errors": null,
+          "warnings": [],
+          "notices": [],
+          "updateq_plan": null,
+          "group_child_readback": null,
+          "side_effects": [],
+          "debug": null
+        }
+      ],
+      "errors": null,
+      "warnings": [
+        "Sequential, non-atomic edits; no automatic rollback or setter retry."
+      ],
+      "error_code": null,
+      "suggested_action": null,
+      "message": "updated"
+    },
+    "punctRead": {
+      "ok": true,
+      "status": "ok",
+      "partial": false,
+      "workspace_id": "11111111-1111-4111-8111-111111111111",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [],
+        "unavailable_fields": [
+          "isChildAuditioning",
+          "isChildFlagged",
+          "text/format/backgroundColor",
+          "text/format/shadowColor",
+          "text/format/shadowBlurRadius",
+          "text/format/shadowOffset",
+          "text/format/strikethroughColor",
+          "text/format/underlineColor",
+          "text/format/strikethroughStyle",
+          "text/format/underlineStyle",
+          "hotkeyTriggerEnabled",
+          "midiTriggerByte1",
+          "midiTriggerByte1String",
+          "midiTriggerByte2",
+          "midiTriggerByte2String",
+          "midiTriggerChannel",
+          "midiTriggerCommand",
+          "midiTriggerEnabled",
+          "timecodeShowAsTimecode",
+          "timecodeTriggerEnabled",
+          "wallClockHours",
+          "wallClockMinutes",
+          "wallClockSeconds",
+          "wallClockTriggerEnabled"
+        ],
+        "failed_routes": [],
+        "notes": [
+          "Audio Maps, Audio Objects and live metrics are excluded.",
+          "Containing Cue List context comes from qlab_get_text_cues; detail reads only the immediate parent.",
+          "Video FX parameters require explicit indexed selectors; no automatic stack scan is performed.",
+          "Stage/input references do not expand patches, stages, regions or routes."
+        ]
+      },
+      "warnings": [],
+      "errors": {},
+      "cue_id": "22222222-2222-4222-8222-222222222222",
+      "profile": "safe",
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": true,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "notes": null
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isChildAuditioning": null,
+        "isChildFlagged": null,
+        "isPanicking": false,
+        "isTailingOut": false
+      },
+      "timing": {
+        "preWait": 0,
+        "duration": 0,
+        "postWait": 0,
+        "continueMode": 0,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        }
+      },
+      "video": {
+        "stageID": "A0CA9B3F-A783-54BF-9B36-25572F3C93EF",
+        "stageName": "Stage 9",
+        "stageNumber": 9,
+        "cueSize": {
+          "width": 646,
+          "height": 175
+        },
+        "anchor": {
+          "x": 0,
+          "y": 0
+        },
+        "translation": {
+          "x": 0,
+          "y": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1
+        },
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "cropTop": 0,
+        "cropBottom": 0,
+        "cropLeft": 0,
+        "cropRight": 0,
+        "opacity": 1,
+        "layer": 1000,
+        "blendMode": "Normal",
+        "fillStage": false,
+        "fillStyle": 0,
+        "preserveAspectRatio": true,
+        "smooth": true,
+        "videoEffects": []
+      },
+      "triggers": {
+        "hotkeyTriggerEnabled": null,
+        "midiTriggerEnabled": null,
+        "midiTriggerCommand": null,
+        "midiTriggerChannel": null,
+        "midiTriggerByte1": null,
+        "midiTriggerByte2": null,
+        "midiTriggerByte1String": null,
+        "midiTriggerByte2String": null,
+        "wallClockTriggerEnabled": null,
+        "wallClockHours": null,
+        "wallClockMinutes": null,
+        "wallClockSeconds": null,
+        "timecodeTriggerEnabled": null,
+        "timecodeShowAsTimecode": null,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_text_cues",
+        "allowed_properties": [
+          "anchor",
+          "anchor/x",
+          "anchor/y",
+          "armed",
+          "autoLoad",
+          "blendMode",
+          "colorName",
+          "continueMode",
+          "crop",
+          "cropBottom",
+          "cropLeft",
+          "cropRight",
+          "cropTop",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "duration",
+          "fadeAndStopOthersTime",
+          "fillStage",
+          "fillStyle",
+          "fixedWidth",
+          "flagged",
+          "layer",
+          "name",
+          "notes",
+          "number",
+          "opacity",
+          "origin",
+          "origin/x",
+          "origin/y",
+          "postWait",
+          "preWait",
+          "preserveAspectRatio",
+          "quaternion",
+          "resetRotation",
+          "scale",
+          "scale/x",
+          "scale/y",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "skipIfDisarmed",
+          "smooth",
+          "stageID",
+          "text",
+          "text/format/alignment",
+          "text/format/fontFamilyAndStyle",
+          "text/format/fontName",
+          "text/format/lineSpacing",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "translation",
+          "translation/x",
+          "translation/y",
+          "useSecondColor"
+        ],
+        "video_fx": {
+          "allowed_operations": [],
+          "schema_operations": [
+            "videoEffectIndex/enabled",
+            "videoEffectIndex/parameter",
+            "videoEffectIndex/parameters",
+            "videoEffectIndex/delete",
+            "videoEffectIndex/move",
+            "videoEffects/add",
+            "videoEffects/insert"
+          ],
+          "blocked_operations": {
+            "videoEffectIndex/enabled": "No existing effect with verifiable native type identity.",
+            "videoEffectIndex/parameter": "No existing effect with verifiable native type identity.",
+            "videoEffectIndex/parameters": "No existing effect with verifiable native type identity."
+          },
+          "catalogue_effect_count": 60,
+          "catalogue_parameter_count": 262,
+          "range_policy": "Conservative published bands; QLab can allow values outside them.",
+          "pending_validation": [],
+          "conditional_structural_operations": [
+            "videoEffectIndex/delete",
+            "videoEffectIndex/move",
+            "videoEffects/add",
+            "videoEffects/insert"
+          ],
+          "validated_new_effects": [
+            "BloomGloom",
+            "BokehBlur",
+            "BoxDiscGaussianBlur",
+            "CMYKHalftone",
+            "CircleSplashHoleDistortion",
+            "ColorClamp",
+            "ColorControls",
+            "ColorMatrix",
+            "ColorPosterize",
+            "ColorThreshold",
+            "CrystallizePointillize",
+            "DepthOfField",
+            "Dither",
+            "Droste",
+            "EdgeWork",
+            "Exposure",
+            "FalseColor",
+            "GaborGradients",
+            "Gamma",
+            "GlassLozenge",
+            "HighlightShadow",
+            "Kaleidoscope",
+            "KeystoneCorrection",
+            "LightTunnel",
+            "LineOverlay",
+            "MedianComicEffect",
+            "MinMaxInvert",
+            "MorphologyGradient",
+            "MorphologyMinMax",
+            "MotionBlur",
+            "NinePartStretched",
+            "NinePartTiled",
+            "NoiseReduction",
+            "OpTile",
+            "PerspectiveTile",
+            "PhotoEffects",
+            "PinchBumpDistortion",
+            "Pixellation",
+            "QuadTiles",
+            "ReflectedTiles",
+            "RotatedTiles",
+            "Screen",
+            "SepiaMonochrome",
+            "SharpenLuminance",
+            "Shutter",
+            "SpotColor",
+            "Spotlight",
+            "TemperatureTint",
+            "ThermalXRay",
+            "ToneCurve",
+            "TorusLensDistortion",
+            "TriangleKaleidoscope",
+            "TwirlVortexDistortion",
+            "UnsharpMask",
+            "Vibrance",
+            "WhitePoint",
+            "Window",
+            "ZoomBlur"
+          ],
+          "unvalidated_new_effect_defaults_blocked": true,
+          "blocked_creation_effects": {
+            "LinearKey": "QLab 5.5.10 returned OSC status=error for documented add and insert; its unified log says 'unrecognized video effect name: LinearKey' although the UI tooltip and OSC dictionary give that exact name. Existing instances can be read and edited; creation stays blocked pending QLab-side resolution.",
+            "DropShadow": "QLab 5.5.10 returned OSC status=error for documented add and insert; its unified log says 'unrecognized video effect name: DropShadow' although the UI tooltip and OSC dictionary give that exact name. Existing instances can be read and edited; creation stays blocked pending QLab-side resolution."
+          },
+          "native_parameter_aliases": {
+            "DropShadow": {
+              "Color": "inputColor"
+            }
+          },
+          "structural_qlab_version": "5.5.10",
+          "conditional_operations": [
+            "videoEffectIndex/enabled",
+            "videoEffectIndex/parameter",
+            "videoEffectIndex/parameters"
+          ],
+          "identity_proof": "Native type metadata, or a named native getter matching one unique indexed payload",
+          "requires_explicit_effect_type": true,
+          "requires_full_stack_preflight": true,
+          "excluded": [
+            "Fade FX flags",
+            "/live",
+            "effect-name write addressing"
+          ]
+        },
+        "text_format": {
+          "property": "text/format",
+          "selectors": [
+            "full",
+            "range",
+            "word"
+          ],
+          "requires_complete_text_and_runs": true,
+          "pending_validation": [
+            "other word delimiters, contractions and combining marks",
+            "unobserved font companion metadata",
+            "non-Latin font fallback",
+            "partial shadow line scope"
+          ],
+          "native_index_unit": "utf16",
+          "ranges_verified": true,
+          "unicode_scope": "ASCII/Latin selections; color-only edits also allow verified NBSP/guillemet/curly-quote/em-dash characters; other scripts and emoji remain blocked",
+          "color_only_extra_characters": [
+            " ",
+            "«",
+            "»",
+            "“",
+            "”",
+            "—"
+          ],
+          "unicode_formatting_pending": true,
+          "percentage_rounding": "nearest",
+          "word_tokenization": "latin_delimiters",
+          "word_delimiters": [
+            "space",
+            "tab",
+            "LF",
+            "CR",
+            "NBSP",
+            "«",
+            "»",
+            "“",
+            "”",
+            "—"
+          ],
+          "font_scope": "Complete fontName/family/style mapping already observed in the same cue",
+          "validated_json_attributes": [
+            "color",
+            "fontFamily",
+            "fontName",
+            "fontSize",
+            "fontStyle",
+            "lineSpacing"
+          ]
+        },
+        "blocked_properties": {
+          "videoEffectIndex/enabled": "Use a typed FX operation with fresh native index/type proof; parameter keys alone cannot prove identity.",
+          "fadeAndStopOthers": "Scope readback must be an integer, not boolean.",
+          "text/format/underlineColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowBlurRadius": "Format fragments omit this attribute or have mixed values.",
+          "text/format/fontSize": "Format fragments omit this attribute or have mixed values.",
+          "text/format/color": "Format fragments omit this attribute or have mixed values.",
+          "text/format/strikethroughColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/underlineStyle": "Format fragments omit this attribute or have mixed values.",
+          "text/format/backgroundColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowOffset/height": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/strikethroughStyle": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowOffset/width": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowOffset": "Format fragments omit this attribute or have mixed values.",
+          "midiTriggerByte1String": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "timecodeTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerByte2String": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockMinutes": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockHours": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "hotkeyTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "timecodeShowAsTimecode": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerChannel": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockSeconds": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerByte2": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerCommand": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerByte1": "Request include_native_triggers=true; requires fresh local AppleScript evidence."
+        },
+        "requires_fresh_preflight": true,
+        "unavailable_via_osc": [
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display"
+        ],
+        "excluded": [
+          "Audio Maps",
+          "/live",
+          "cue execution",
+          "workspace stage/region edits"
+        ],
+        "pending_validation": [
+          "FX LinearKey/DropShadow creation, ambiguous native identities and unavailable native parameter baselines",
+          "Audio FX",
+          "Non-Latin Text fallback, complex words, unobserved fonts and partial shadows",
+          "Camera input channel bounds"
+        ],
+        "blocked_operations": [
+          "setDefaultLevels",
+          "setSilentLevels"
+        ],
+        "property_transports": {
+          "midiTriggerByte1String": "applescript",
+          "timecodeTriggerEnabled": "applescript",
+          "midiTriggerByte2String": "applescript",
+          "wallClockMinutes": "applescript",
+          "wallClockHours": "applescript",
+          "hotkeyTriggerEnabled": "applescript",
+          "timecodeShowAsTimecode": "applescript",
+          "midiTriggerEnabled": "applescript",
+          "midiTriggerChannel": "applescript",
+          "wallClockSeconds": "applescript",
+          "midiTriggerByte2": "applescript",
+          "wallClockTriggerEnabled": "applescript",
+          "midiTriggerCommand": "applescript",
+          "midiTriggerByte1": "applescript"
+        },
+        "native_trigger_preconditions": [
+          "Configure a disabled trigger; change activation and MIDI command separately.",
+          "Activation requires disarmed, Do not continue and Skip if disarmed off.",
+          "Hotkey activation is blocked without documented key/modifier readback; disabling is supported.",
+          "Hotkey assignment and Wall Clock weekdays are not available through the dictionary."
+        ]
+      },
+      "selected_video_effects": [],
+      "technical_payload": null,
+      "redactions": [],
+      "identity": {
+        "uniqueID": "22222222-2222-4222-8222-222222222222",
+        "type": "Text",
+        "number": "147",
+        "name": "TEST · Text · PLACEHOLDER",
+        "displayName": "TEST · Text · PLACEHOLDER",
+        "parent_id": "33333333-3333-4333-8333-333333333333",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "text": {
+        "text": "«Árbol»—luz “azul”\none\ttwo",
+        "fixedWidth": 0,
+        "outputSize": {
+          "width": 646,
+          "height": 175
+        },
+        "fragments": [
+          {
+            "range": [
+              0,
+              1
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          },
+          {
+            "range": [
+              1,
+              5
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              1,
+              0,
+              0,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          },
+          {
+            "range": [
+              6,
+              6
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              0,
+              0,
+              1,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          },
+          {
+            "range": [
+              12,
+              1
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          },
+          {
+            "range": [
+              13,
+              4
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              0,
+              1,
+              0,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          },
+          {
+            "range": [
+              17,
+              6
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          },
+          {
+            "range": [
+              23,
+              3
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 48,
+            "lineSpacing": 1,
+            "color": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          }
+        ],
+        "alignment": "center",
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontFamilyAndStyle": {
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold"
+        },
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 72,
+        "lineSpacing": 1,
+        "color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      }
+    },
+    "wordOutOfBounds": {
+      "ok": false,
+      "status": "preflight_failed",
+      "workspace_id": "11111111-1111-4111-8111-111111111111",
+      "dry_run": true,
+      "requested_count": 1,
+      "planned_count": 0,
+      "updated_count": 0,
+      "failed_count": 1,
+      "timeout_confirmed_count": 0,
+      "results": [
+        {
+          "cue_ref": "22222222-2222-4222-8222-222222222222",
+          "cue_id": "22222222-2222-4222-8222-222222222222",
+          "profile": "text_basic",
+          "status": "dry_run_preflight_failed",
+          "properties": {},
+          "operations": [],
+          "confirm_gates": [],
+          "before": null,
+          "after": null,
+          "diff": {},
+          "planned_operations": [],
+          "executed_operations": [],
+          "errors": {
+            "preflight": "Text word index is outside saved text."
+          },
+          "warnings": [],
+          "notices": [],
+          "updateq_plan": null,
+          "group_child_readback": null,
+          "side_effects": [],
+          "debug": null
+        }
+      ],
+      "errors": {
+        "batch": "Inspect per-cue errors; pending operations were not sent."
+      },
+      "warnings": [
+        "Sequential, non-atomic edits; no automatic rollback or setter retry."
+      ],
+      "error_code": null,
+      "suggested_action": null,
+      "message": "preflight_failed"
+    },
+    "punctTypography": {
+      "ok": false,
+      "status": "preflight_failed",
+      "workspace_id": "11111111-1111-4111-8111-111111111111",
+      "dry_run": true,
+      "requested_count": 1,
+      "planned_count": 0,
+      "updated_count": 0,
+      "failed_count": 1,
+      "timeout_confirmed_count": 0,
+      "results": [
+        {
+          "cue_ref": "22222222-2222-4222-8222-222222222222",
+          "cue_id": "22222222-2222-4222-8222-222222222222",
+          "profile": "text_basic",
+          "status": "dry_run_preflight_failed",
+          "properties": {},
+          "operations": [],
+          "confirm_gates": [],
+          "before": null,
+          "after": null,
+          "diff": {},
+          "planned_operations": [],
+          "executed_operations": [],
+          "errors": {
+            "preflight": "Unicode font fallback is not predictable for this selection; only ASCII/Latin formatting is validated."
+          },
+          "warnings": [],
+          "notices": [],
+          "updateq_plan": null,
+          "group_child_readback": null,
+          "side_effects": [],
+          "debug": null
+        }
+      ],
+      "errors": {
+        "batch": "Inspect per-cue errors; pending operations were not sent."
+      },
+      "warnings": [
+        "Sequential, non-atomic edits; no automatic rollback or setter retry."
+      ],
+      "error_code": null,
+      "suggested_action": null,
+      "message": "preflight_failed"
+    },
+    "shadowBaseline": {
+      "ok": false,
+      "status": "preflight_failed",
+      "workspace_id": "11111111-1111-4111-8111-111111111111",
+      "dry_run": true,
+      "requested_count": 1,
+      "planned_count": 0,
+      "updated_count": 0,
+      "failed_count": 1,
+      "timeout_confirmed_count": 0,
+      "results": [
+        {
+          "cue_ref": "22222222-2222-4222-8222-222222222222",
+          "cue_id": "22222222-2222-4222-8222-222222222222",
+          "profile": "text_basic",
+          "status": "dry_run_preflight_failed",
+          "properties": {},
+          "operations": [],
+          "confirm_gates": [],
+          "before": null,
+          "after": null,
+          "diff": {},
+          "planned_operations": [],
+          "executed_operations": [],
+          "errors": {
+            "preflight": "Partial shadows affect a line; native line scope is pending runtime validation."
+          },
+          "warnings": [],
+          "notices": [],
+          "updateq_plan": null,
+          "group_child_readback": null,
+          "side_effects": [],
+          "debug": null
+        }
+      ],
+      "errors": {
+        "batch": "Inspect per-cue errors; pending operations were not sent."
+      },
+      "warnings": [
+        "Sequential, non-atomic edits; no automatic rollback or setter retry."
+      ],
+      "error_code": null,
+      "suggested_action": null,
+      "message": "preflight_failed"
+    },
+    "baseline": {
+      "ok": true,
+      "status": "ok",
+      "partial": false,
+      "workspace_id": "11111111-1111-4111-8111-111111111111",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [],
+        "unavailable_fields": [
+          "isChildAuditioning",
+          "isChildFlagged",
+          "text/format/backgroundColor",
+          "text/format/shadowColor",
+          "text/format/shadowBlurRadius",
+          "text/format/shadowOffset",
+          "text/format/strikethroughColor",
+          "text/format/underlineColor",
+          "text/format/strikethroughStyle",
+          "text/format/underlineStyle",
+          "hotkeyTriggerEnabled",
+          "midiTriggerByte1",
+          "midiTriggerByte1String",
+          "midiTriggerByte2",
+          "midiTriggerByte2String",
+          "midiTriggerChannel",
+          "midiTriggerCommand",
+          "midiTriggerEnabled",
+          "timecodeShowAsTimecode",
+          "timecodeTriggerEnabled",
+          "wallClockHours",
+          "wallClockMinutes",
+          "wallClockSeconds",
+          "wallClockTriggerEnabled"
+        ],
+        "failed_routes": [],
+        "notes": [
+          "Audio Maps, Audio Objects and live metrics are excluded.",
+          "Containing Cue List context comes from qlab_get_text_cues; detail reads only the immediate parent.",
+          "Video FX parameters require explicit indexed selectors; no automatic stack scan is performed.",
+          "Stage/input references do not expand patches, stages, regions or routes."
+        ]
+      },
+      "warnings": [],
+      "errors": {},
+      "cue_id": "22222222-2222-4222-8222-222222222222",
+      "profile": "safe",
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": true,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "notes": null
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isChildAuditioning": null,
+        "isChildFlagged": null,
+        "isPanicking": false,
+        "isTailingOut": false
+      },
+      "timing": {
+        "preWait": 0,
+        "duration": 0,
+        "postWait": 0,
+        "continueMode": 0,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        }
+      },
+      "video": {
+        "stageID": "A0CA9B3F-A783-54BF-9B36-25572F3C93EF",
+        "stageName": "Stage 9",
+        "stageNumber": 9,
+        "cueSize": {
+          "width": 1390,
+          "height": 100
+        },
+        "anchor": {
+          "x": 0,
+          "y": 0
+        },
+        "translation": {
+          "x": 0,
+          "y": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1
+        },
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "cropTop": 0,
+        "cropBottom": 0,
+        "cropLeft": 0,
+        "cropRight": 0,
+        "opacity": 1,
+        "layer": 1000,
+        "blendMode": "Normal",
+        "fillStage": false,
+        "fillStyle": 0,
+        "preserveAspectRatio": true,
+        "smooth": true,
+        "videoEffects": []
+      },
+      "triggers": {
+        "hotkeyTriggerEnabled": null,
+        "midiTriggerEnabled": null,
+        "midiTriggerCommand": null,
+        "midiTriggerChannel": null,
+        "midiTriggerByte1": null,
+        "midiTriggerByte2": null,
+        "midiTriggerByte1String": null,
+        "midiTriggerByte2String": null,
+        "wallClockTriggerEnabled": null,
+        "wallClockHours": null,
+        "wallClockMinutes": null,
+        "wallClockSeconds": null,
+        "timecodeTriggerEnabled": null,
+        "timecodeShowAsTimecode": null,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_text_cues",
+        "allowed_properties": [
+          "anchor",
+          "anchor/x",
+          "anchor/y",
+          "armed",
+          "autoLoad",
+          "blendMode",
+          "colorName",
+          "continueMode",
+          "crop",
+          "cropBottom",
+          "cropLeft",
+          "cropRight",
+          "cropTop",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "duration",
+          "fadeAndStopOthersTime",
+          "fillStage",
+          "fillStyle",
+          "fixedWidth",
+          "flagged",
+          "layer",
+          "name",
+          "notes",
+          "number",
+          "opacity",
+          "origin",
+          "origin/x",
+          "origin/y",
+          "postWait",
+          "preWait",
+          "preserveAspectRatio",
+          "quaternion",
+          "resetRotation",
+          "scale",
+          "scale/x",
+          "scale/y",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "skipIfDisarmed",
+          "smooth",
+          "stageID",
+          "text",
+          "text/format/alignment",
+          "text/format/color",
+          "text/format/fontFamilyAndStyle",
+          "text/format/fontName",
+          "text/format/fontSize",
+          "text/format/lineSpacing",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "translation",
+          "translation/x",
+          "translation/y",
+          "useSecondColor"
+        ],
+        "video_fx": {
+          "allowed_operations": [],
+          "schema_operations": [
+            "videoEffectIndex/enabled",
+            "videoEffectIndex/parameter",
+            "videoEffectIndex/parameters",
+            "videoEffectIndex/delete",
+            "videoEffectIndex/move",
+            "videoEffects/add",
+            "videoEffects/insert"
+          ],
+          "blocked_operations": {
+            "videoEffectIndex/enabled": "No existing effect with verifiable native type identity.",
+            "videoEffectIndex/parameter": "No existing effect with verifiable native type identity.",
+            "videoEffectIndex/parameters": "No existing effect with verifiable native type identity."
+          },
+          "catalogue_effect_count": 60,
+          "catalogue_parameter_count": 262,
+          "range_policy": "Conservative published bands; QLab can allow values outside them.",
+          "pending_validation": [],
+          "conditional_structural_operations": [
+            "videoEffectIndex/delete",
+            "videoEffectIndex/move",
+            "videoEffects/add",
+            "videoEffects/insert"
+          ],
+          "validated_new_effects": [
+            "BloomGloom",
+            "BokehBlur",
+            "BoxDiscGaussianBlur",
+            "CMYKHalftone",
+            "CircleSplashHoleDistortion",
+            "ColorClamp",
+            "ColorControls",
+            "ColorMatrix",
+            "ColorPosterize",
+            "ColorThreshold",
+            "CrystallizePointillize",
+            "DepthOfField",
+            "Dither",
+            "Droste",
+            "EdgeWork",
+            "Exposure",
+            "FalseColor",
+            "GaborGradients",
+            "Gamma",
+            "GlassLozenge",
+            "HighlightShadow",
+            "Kaleidoscope",
+            "KeystoneCorrection",
+            "LightTunnel",
+            "LineOverlay",
+            "MedianComicEffect",
+            "MinMaxInvert",
+            "MorphologyGradient",
+            "MorphologyMinMax",
+            "MotionBlur",
+            "NinePartStretched",
+            "NinePartTiled",
+            "NoiseReduction",
+            "OpTile",
+            "PerspectiveTile",
+            "PhotoEffects",
+            "PinchBumpDistortion",
+            "Pixellation",
+            "QuadTiles",
+            "ReflectedTiles",
+            "RotatedTiles",
+            "Screen",
+            "SepiaMonochrome",
+            "SharpenLuminance",
+            "Shutter",
+            "SpotColor",
+            "Spotlight",
+            "TemperatureTint",
+            "ThermalXRay",
+            "ToneCurve",
+            "TorusLensDistortion",
+            "TriangleKaleidoscope",
+            "TwirlVortexDistortion",
+            "UnsharpMask",
+            "Vibrance",
+            "WhitePoint",
+            "Window",
+            "ZoomBlur"
+          ],
+          "unvalidated_new_effect_defaults_blocked": true,
+          "blocked_creation_effects": {
+            "LinearKey": "QLab 5.5.10 returned OSC status=error for documented add and insert; its unified log says 'unrecognized video effect name: LinearKey' although the UI tooltip and OSC dictionary give that exact name. Existing instances can be read and edited; creation stays blocked pending QLab-side resolution.",
+            "DropShadow": "QLab 5.5.10 returned OSC status=error for documented add and insert; its unified log says 'unrecognized video effect name: DropShadow' although the UI tooltip and OSC dictionary give that exact name. Existing instances can be read and edited; creation stays blocked pending QLab-side resolution."
+          },
+          "native_parameter_aliases": {
+            "DropShadow": {
+              "Color": "inputColor"
+            }
+          },
+          "structural_qlab_version": "5.5.10",
+          "conditional_operations": [
+            "videoEffectIndex/enabled",
+            "videoEffectIndex/parameter",
+            "videoEffectIndex/parameters"
+          ],
+          "identity_proof": "Native type metadata, or a named native getter matching one unique indexed payload",
+          "requires_explicit_effect_type": true,
+          "requires_full_stack_preflight": true,
+          "excluded": [
+            "Fade FX flags",
+            "/live",
+            "effect-name write addressing"
+          ]
+        },
+        "text_format": {
+          "property": "text/format",
+          "selectors": [
+            "full",
+            "range",
+            "word"
+          ],
+          "requires_complete_text_and_runs": true,
+          "pending_validation": [
+            "other word delimiters, contractions and combining marks",
+            "unobserved font companion metadata",
+            "non-Latin font fallback",
+            "partial shadow line scope"
+          ],
+          "native_index_unit": "utf16",
+          "ranges_verified": true,
+          "unicode_scope": "ASCII/Latin selections; color-only edits also allow verified NBSP/guillemet/curly-quote/em-dash characters; other scripts and emoji remain blocked",
+          "color_only_extra_characters": [
+            " ",
+            "«",
+            "»",
+            "“",
+            "”",
+            "—"
+          ],
+          "unicode_formatting_pending": true,
+          "percentage_rounding": "nearest",
+          "word_tokenization": "latin_delimiters",
+          "word_delimiters": [
+            "space",
+            "tab",
+            "LF",
+            "CR",
+            "NBSP",
+            "«",
+            "»",
+            "“",
+            "”",
+            "—"
+          ],
+          "font_scope": "Complete fontName/family/style mapping already observed in the same cue",
+          "validated_json_attributes": [
+            "color",
+            "fontFamily",
+            "fontName",
+            "fontSize",
+            "fontStyle",
+            "lineSpacing"
+          ]
+        },
+        "blocked_properties": {
+          "videoEffectIndex/enabled": "Use a typed FX operation with fresh native index/type proof; parameter keys alone cannot prove identity.",
+          "fadeAndStopOthers": "Scope readback must be an integer, not boolean.",
+          "text/format/underlineColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowBlurRadius": "Format fragments omit this attribute or have mixed values.",
+          "text/format/strikethroughColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/underlineStyle": "Format fragments omit this attribute or have mixed values.",
+          "text/format/backgroundColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowOffset/height": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/strikethroughStyle": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowOffset/width": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowOffset": "Format fragments omit this attribute or have mixed values.",
+          "midiTriggerByte1String": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "timecodeTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerByte2String": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockMinutes": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockHours": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "hotkeyTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "timecodeShowAsTimecode": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerChannel": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockSeconds": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerByte2": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerCommand": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerByte1": "Request include_native_triggers=true; requires fresh local AppleScript evidence."
+        },
+        "requires_fresh_preflight": true,
+        "unavailable_via_osc": [
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display"
+        ],
+        "excluded": [
+          "Audio Maps",
+          "/live",
+          "cue execution",
+          "workspace stage/region edits"
+        ],
+        "pending_validation": [
+          "FX LinearKey/DropShadow creation, ambiguous native identities and unavailable native parameter baselines",
+          "Audio FX",
+          "Non-Latin Text fallback, complex words, unobserved fonts and partial shadows",
+          "Camera input channel bounds"
+        ],
+        "blocked_operations": [
+          "setDefaultLevels",
+          "setSilentLevels"
+        ],
+        "property_transports": {
+          "midiTriggerByte1String": "applescript",
+          "timecodeTriggerEnabled": "applescript",
+          "midiTriggerByte2String": "applescript",
+          "wallClockMinutes": "applescript",
+          "wallClockHours": "applescript",
+          "hotkeyTriggerEnabled": "applescript",
+          "timecodeShowAsTimecode": "applescript",
+          "midiTriggerEnabled": "applescript",
+          "midiTriggerChannel": "applescript",
+          "wallClockSeconds": "applescript",
+          "midiTriggerByte2": "applescript",
+          "wallClockTriggerEnabled": "applescript",
+          "midiTriggerCommand": "applescript",
+          "midiTriggerByte1": "applescript"
+        },
+        "native_trigger_preconditions": [
+          "Configure a disabled trigger; change activation and MIDI command separately.",
+          "Activation requires disarmed, Do not continue and Skip if disarmed off.",
+          "Hotkey activation is blocked without documented key/modifier readback; disabling is supported.",
+          "Hotkey assignment and Wall Clock weekdays are not available through the dictionary."
+        ]
+      },
+      "selected_video_effects": [],
+      "technical_payload": null,
+      "redactions": [],
+      "identity": {
+        "uniqueID": "22222222-2222-4222-8222-222222222222",
+        "type": "Text",
+        "number": "147",
+        "name": "TEST · Text · PLACEHOLDER",
+        "displayName": "TEST · Text · PLACEHOLDER",
+        "parent_id": "33333333-3333-4333-8333-333333333333",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "text": {
+        "text": "Codex MCP text test — placeholder only",
+        "fixedWidth": 0,
+        "outputSize": {
+          "width": 1390,
+          "height": 100
+        },
+        "fragments": [
+          {
+            "range": [
+              0,
+              38
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          }
+        ],
+        "alignment": "center",
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontFamilyAndStyle": {
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold"
+        },
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 72,
+        "lineSpacing": 1,
+        "color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      }
+    },
+    "final": {
+      "ok": true,
+      "status": "ok",
+      "partial": false,
+      "workspace_id": "11111111-1111-4111-8111-111111111111",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [],
+        "unavailable_fields": [
+          "isChildAuditioning",
+          "isChildFlagged",
+          "text/format/backgroundColor",
+          "text/format/shadowColor",
+          "text/format/shadowBlurRadius",
+          "text/format/shadowOffset",
+          "text/format/strikethroughColor",
+          "text/format/underlineColor",
+          "text/format/strikethroughStyle",
+          "text/format/underlineStyle",
+          "hotkeyTriggerEnabled",
+          "midiTriggerByte1",
+          "midiTriggerByte1String",
+          "midiTriggerByte2",
+          "midiTriggerByte2String",
+          "midiTriggerChannel",
+          "midiTriggerCommand",
+          "midiTriggerEnabled",
+          "timecodeShowAsTimecode",
+          "timecodeTriggerEnabled",
+          "wallClockHours",
+          "wallClockMinutes",
+          "wallClockSeconds",
+          "wallClockTriggerEnabled"
+        ],
+        "failed_routes": [],
+        "notes": [
+          "Audio Maps, Audio Objects and live metrics are excluded.",
+          "Containing Cue List context comes from qlab_get_text_cues; detail reads only the immediate parent.",
+          "Video FX parameters require explicit indexed selectors; no automatic stack scan is performed.",
+          "Stage/input references do not expand patches, stages, regions or routes."
+        ]
+      },
+      "warnings": [],
+      "errors": {},
+      "cue_id": "22222222-2222-4222-8222-222222222222",
+      "profile": "safe",
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": true,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "notes": null
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isChildAuditioning": null,
+        "isChildFlagged": null,
+        "isPanicking": false,
+        "isTailingOut": false
+      },
+      "timing": {
+        "preWait": 0,
+        "duration": 0,
+        "postWait": 0,
+        "continueMode": 0,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        }
+      },
+      "video": {
+        "stageID": "A0CA9B3F-A783-54BF-9B36-25572F3C93EF",
+        "stageName": "Stage 9",
+        "stageNumber": 9,
+        "cueSize": {
+          "width": 1390,
+          "height": 100
+        },
+        "anchor": {
+          "x": 0,
+          "y": 0
+        },
+        "translation": {
+          "x": 0,
+          "y": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1
+        },
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "cropTop": 0,
+        "cropBottom": 0,
+        "cropLeft": 0,
+        "cropRight": 0,
+        "opacity": 1,
+        "layer": 1000,
+        "blendMode": "Normal",
+        "fillStage": false,
+        "fillStyle": 0,
+        "preserveAspectRatio": true,
+        "smooth": true,
+        "videoEffects": []
+      },
+      "triggers": {
+        "hotkeyTriggerEnabled": null,
+        "midiTriggerEnabled": null,
+        "midiTriggerCommand": null,
+        "midiTriggerChannel": null,
+        "midiTriggerByte1": null,
+        "midiTriggerByte2": null,
+        "midiTriggerByte1String": null,
+        "midiTriggerByte2String": null,
+        "wallClockTriggerEnabled": null,
+        "wallClockHours": null,
+        "wallClockMinutes": null,
+        "wallClockSeconds": null,
+        "timecodeTriggerEnabled": null,
+        "timecodeShowAsTimecode": null,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_text_cues",
+        "allowed_properties": [
+          "anchor",
+          "anchor/x",
+          "anchor/y",
+          "armed",
+          "autoLoad",
+          "blendMode",
+          "colorName",
+          "continueMode",
+          "crop",
+          "cropBottom",
+          "cropLeft",
+          "cropRight",
+          "cropTop",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "duration",
+          "fadeAndStopOthersTime",
+          "fillStage",
+          "fillStyle",
+          "fixedWidth",
+          "flagged",
+          "layer",
+          "name",
+          "notes",
+          "number",
+          "opacity",
+          "origin",
+          "origin/x",
+          "origin/y",
+          "postWait",
+          "preWait",
+          "preserveAspectRatio",
+          "quaternion",
+          "resetRotation",
+          "scale",
+          "scale/x",
+          "scale/y",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "skipIfDisarmed",
+          "smooth",
+          "stageID",
+          "text",
+          "text/format/alignment",
+          "text/format/color",
+          "text/format/fontFamilyAndStyle",
+          "text/format/fontName",
+          "text/format/fontSize",
+          "text/format/lineSpacing",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "translation",
+          "translation/x",
+          "translation/y",
+          "useSecondColor"
+        ],
+        "video_fx": {
+          "allowed_operations": [],
+          "schema_operations": [
+            "videoEffectIndex/enabled",
+            "videoEffectIndex/parameter",
+            "videoEffectIndex/parameters",
+            "videoEffectIndex/delete",
+            "videoEffectIndex/move",
+            "videoEffects/add",
+            "videoEffects/insert"
+          ],
+          "blocked_operations": {
+            "videoEffectIndex/enabled": "No existing effect with verifiable native type identity.",
+            "videoEffectIndex/parameter": "No existing effect with verifiable native type identity.",
+            "videoEffectIndex/parameters": "No existing effect with verifiable native type identity."
+          },
+          "catalogue_effect_count": 60,
+          "catalogue_parameter_count": 262,
+          "range_policy": "Conservative published bands; QLab can allow values outside them.",
+          "pending_validation": [],
+          "conditional_structural_operations": [
+            "videoEffectIndex/delete",
+            "videoEffectIndex/move",
+            "videoEffects/add",
+            "videoEffects/insert"
+          ],
+          "validated_new_effects": [
+            "BloomGloom",
+            "BokehBlur",
+            "BoxDiscGaussianBlur",
+            "CMYKHalftone",
+            "CircleSplashHoleDistortion",
+            "ColorClamp",
+            "ColorControls",
+            "ColorMatrix",
+            "ColorPosterize",
+            "ColorThreshold",
+            "CrystallizePointillize",
+            "DepthOfField",
+            "Dither",
+            "Droste",
+            "EdgeWork",
+            "Exposure",
+            "FalseColor",
+            "GaborGradients",
+            "Gamma",
+            "GlassLozenge",
+            "HighlightShadow",
+            "Kaleidoscope",
+            "KeystoneCorrection",
+            "LightTunnel",
+            "LineOverlay",
+            "MedianComicEffect",
+            "MinMaxInvert",
+            "MorphologyGradient",
+            "MorphologyMinMax",
+            "MotionBlur",
+            "NinePartStretched",
+            "NinePartTiled",
+            "NoiseReduction",
+            "OpTile",
+            "PerspectiveTile",
+            "PhotoEffects",
+            "PinchBumpDistortion",
+            "Pixellation",
+            "QuadTiles",
+            "ReflectedTiles",
+            "RotatedTiles",
+            "Screen",
+            "SepiaMonochrome",
+            "SharpenLuminance",
+            "Shutter",
+            "SpotColor",
+            "Spotlight",
+            "TemperatureTint",
+            "ThermalXRay",
+            "ToneCurve",
+            "TorusLensDistortion",
+            "TriangleKaleidoscope",
+            "TwirlVortexDistortion",
+            "UnsharpMask",
+            "Vibrance",
+            "WhitePoint",
+            "Window",
+            "ZoomBlur"
+          ],
+          "unvalidated_new_effect_defaults_blocked": true,
+          "blocked_creation_effects": {
+            "LinearKey": "QLab 5.5.10 returned OSC status=error for documented add and insert; its unified log says 'unrecognized video effect name: LinearKey' although the UI tooltip and OSC dictionary give that exact name. Existing instances can be read and edited; creation stays blocked pending QLab-side resolution.",
+            "DropShadow": "QLab 5.5.10 returned OSC status=error for documented add and insert; its unified log says 'unrecognized video effect name: DropShadow' although the UI tooltip and OSC dictionary give that exact name. Existing instances can be read and edited; creation stays blocked pending QLab-side resolution."
+          },
+          "native_parameter_aliases": {
+            "DropShadow": {
+              "Color": "inputColor"
+            }
+          },
+          "structural_qlab_version": "5.5.10",
+          "conditional_operations": [
+            "videoEffectIndex/enabled",
+            "videoEffectIndex/parameter",
+            "videoEffectIndex/parameters"
+          ],
+          "identity_proof": "Native type metadata, or a named native getter matching one unique indexed payload",
+          "requires_explicit_effect_type": true,
+          "requires_full_stack_preflight": true,
+          "excluded": [
+            "Fade FX flags",
+            "/live",
+            "effect-name write addressing"
+          ]
+        },
+        "text_format": {
+          "property": "text/format",
+          "selectors": [
+            "full",
+            "range",
+            "word"
+          ],
+          "requires_complete_text_and_runs": true,
+          "pending_validation": [
+            "other word delimiters, contractions and combining marks",
+            "unobserved font companion metadata",
+            "non-Latin font fallback",
+            "partial shadow line scope"
+          ],
+          "native_index_unit": "utf16",
+          "ranges_verified": true,
+          "unicode_scope": "ASCII/Latin selections; color-only edits also allow verified NBSP/guillemet/curly-quote/em-dash characters; other scripts and emoji remain blocked",
+          "color_only_extra_characters": [
+            " ",
+            "«",
+            "»",
+            "“",
+            "”",
+            "—"
+          ],
+          "unicode_formatting_pending": true,
+          "percentage_rounding": "nearest",
+          "word_tokenization": "latin_delimiters",
+          "word_delimiters": [
+            "space",
+            "tab",
+            "LF",
+            "CR",
+            "NBSP",
+            "«",
+            "»",
+            "“",
+            "”",
+            "—"
+          ],
+          "font_scope": "Complete fontName/family/style mapping already observed in the same cue",
+          "validated_json_attributes": [
+            "color",
+            "fontFamily",
+            "fontName",
+            "fontSize",
+            "fontStyle",
+            "lineSpacing"
+          ]
+        },
+        "blocked_properties": {
+          "videoEffectIndex/enabled": "Use a typed FX operation with fresh native index/type proof; parameter keys alone cannot prove identity.",
+          "fadeAndStopOthers": "Scope readback must be an integer, not boolean.",
+          "text/format/underlineColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowBlurRadius": "Format fragments omit this attribute or have mixed values.",
+          "text/format/strikethroughColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/underlineStyle": "Format fragments omit this attribute or have mixed values.",
+          "text/format/backgroundColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowOffset/height": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowColor": "Format fragments omit this attribute or have mixed values.",
+          "text/format/strikethroughStyle": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowOffset/width": "Format fragments omit this attribute or have mixed values.",
+          "text/format/shadowOffset": "Format fragments omit this attribute or have mixed values.",
+          "midiTriggerByte1String": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "timecodeTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerByte2String": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockMinutes": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockHours": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "hotkeyTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "timecodeShowAsTimecode": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerChannel": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockSeconds": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerByte2": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "wallClockTriggerEnabled": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerCommand": "Request include_native_triggers=true; requires fresh local AppleScript evidence.",
+          "midiTriggerByte1": "Request include_native_triggers=true; requires fresh local AppleScript evidence."
+        },
+        "requires_fresh_preflight": true,
+        "unavailable_via_osc": [
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display"
+        ],
+        "excluded": [
+          "Audio Maps",
+          "/live",
+          "cue execution",
+          "workspace stage/region edits"
+        ],
+        "pending_validation": [
+          "FX LinearKey/DropShadow creation, ambiguous native identities and unavailable native parameter baselines",
+          "Audio FX",
+          "Non-Latin Text fallback, complex words, unobserved fonts and partial shadows",
+          "Camera input channel bounds"
+        ],
+        "blocked_operations": [
+          "setDefaultLevels",
+          "setSilentLevels"
+        ],
+        "property_transports": {
+          "midiTriggerByte1String": "applescript",
+          "timecodeTriggerEnabled": "applescript",
+          "midiTriggerByte2String": "applescript",
+          "wallClockMinutes": "applescript",
+          "wallClockHours": "applescript",
+          "hotkeyTriggerEnabled": "applescript",
+          "timecodeShowAsTimecode": "applescript",
+          "midiTriggerEnabled": "applescript",
+          "midiTriggerChannel": "applescript",
+          "wallClockSeconds": "applescript",
+          "midiTriggerByte2": "applescript",
+          "wallClockTriggerEnabled": "applescript",
+          "midiTriggerCommand": "applescript",
+          "midiTriggerByte1": "applescript"
+        },
+        "native_trigger_preconditions": [
+          "Configure a disabled trigger; change activation and MIDI command separately.",
+          "Activation requires disarmed, Do not continue and Skip if disarmed off.",
+          "Hotkey activation is blocked without documented key/modifier readback; disabling is supported.",
+          "Hotkey assignment and Wall Clock weekdays are not available through the dictionary."
+        ]
+      },
+      "selected_video_effects": [],
+      "technical_payload": null,
+      "redactions": [],
+      "identity": {
+        "uniqueID": "22222222-2222-4222-8222-222222222222",
+        "type": "Text",
+        "number": "147",
+        "name": "TEST · Text · PLACEHOLDER",
+        "displayName": "TEST · Text · PLACEHOLDER",
+        "parent_id": "33333333-3333-4333-8333-333333333333",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "text": {
+        "text": "Codex MCP text test — placeholder only",
+        "fixedWidth": 0,
+        "outputSize": {
+          "width": 1390,
+          "height": 100
+        },
+        "fragments": [
+          {
+            "range": [
+              0,
+              38
+            ],
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold",
+            "fontName": "HelveticaNeue-Bold",
+            "fontSize": 72,
+            "lineSpacing": 1,
+            "color": [
+              1,
+              1,
+              1,
+              1
+            ],
+            "alignment": "center",
+            "backgroundColor": null,
+            "shadowColor": null,
+            "shadowBlurRadius": null,
+            "shadowOffset": null,
+            "strikethroughColor": null,
+            "underlineColor": null,
+            "strikethroughStyle": null,
+            "underlineStyle": null
+          }
+        ],
+        "alignment": "center",
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontFamilyAndStyle": {
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold"
+        },
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 72,
+        "lineSpacing": 1,
+        "color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      }
+    }
+  }
+}

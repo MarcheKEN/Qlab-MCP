@@ -1,5 +1,13 @@
 # Video Phase 8C - Slice Markers for Audio and Video
 
+Current note (2026-10-07): Two Audio slice play-count edits in one call were
+verified and restored in [QLab 5.5.10](../../../development/runtime-validation/2026-10-05-remaining-cue-completion.md).
+On the tested Video cue, the OSC slice inventory was unavailable, so Video
+slice writes stayed blocked; see the [visual follow-up](../../../development/runtime-validation/2026-10-02-visual-cue-fixes.md).
+The remaining marker operations below still need their own evidence.
+
+## Historical phase specification
+
 Status: implemented locally; runtime validation pending. This workorder records
 Phase 8C/8C.2 local hardening; no new runtime probe is part of the 0.3.0
 preparation.

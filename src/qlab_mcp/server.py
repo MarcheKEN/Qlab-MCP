@@ -1,6 +1,9 @@
-﻿"""FastMCP server exposing safe QLab inspection and gated write tools."""
+"""FastMCP server exposing safe QLab inspection and gated write tools."""
 
 from __future__ import annotations
+
+import asyncio
+import threading
 
 from collections.abc import Callable
 from typing import Annotated, Any, Literal, TypeVar
@@ -8,19 +11,25 @@ from uuid import UUID
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware.caching import ResponseCachingMiddleware
 from mcp.types import ToolAnnotations
-from pydantic import Field, StrictFloat, StrictInt
+from pathlib import Path
+from pydantic import Field, StrictBool, StrictInt, StrictStr, TypeAdapter
 
 from . import __version__
+from .media import search_media_files
+from .audio_analysis_models import AudioAnalysisRequest, AudioAnalysisResult, Resolution
 from .errors import QLabMcpError
 from .models import (
+    CreateCueListsResult,
     CreateCuesResult,
     DeleteCuesResult,
     CueDetailsBatchResult,
     CueDetailsResult,
-    CueUpdateInput,
+    CueListEditInput,
     CueQueryResult,
     MoveCueInput,
+    MoveCueListInput,
     MoveCuesResult,
     QlabConnectionCheckResult,
     WorkspaceAudioSettingsResult,
@@ -35,13 +44,42 @@ from .models import (
     WorkspaceOverviewResult,
     WorkspaceSettingsEditRequest,
     WorkspaceSettingsEditResult,
-    WorkspaceSettingsOperation,
+    GeneralSettingsOperation,
+    AudioOutputPatchOperation,
+    VideoRouteOperation,
+    VideoStageOperation,
+    VideoRegionOperation,
     WorkspaceVideoSettingsResult,
     VideoStageResult,
     VideoOutputRouteResult,
+    VideoRegionResult,
     CanonicalWorkspaceUUID,
 )
 from .qlab import QLabReader
+from .workspace_documents import (
+    get_workspace_document, open_workspace, save_workspace, close_workspace,
+)
+from .write.control import (ControlCueEditInput, DevampCueEditInput, TargetCueEditInput,
+                            edit_control_cues, edit_devamp_cues, edit_target_cues)
+from .write.group import GroupCueEditInput, edit_group_cues
+from .write.video_fx import FxReadSelector, EffectType, catalogue as video_effect_catalogue
+from .write.remaining import (
+    AudioCueEditInput, MicCueEditInput, LightCueEditInput, FadeCueEditInput,
+    NetworkCueEditInput, MidiCueEditInput, MidiFileCueEditInput,
+    TimecodeCueEditInput, ScriptCueEditInput, edit_remaining_cues,
+)
+from .write.remaining import INSPECTIONS, inspect as inspect_remaining
+AudioInspection = INSPECTIONS["audio"]
+MicInspection = INSPECTIONS["mic"]
+LightInspection = INSPECTIONS["light"]
+FadeInspection = INSPECTIONS["fade"]
+NetworkInspection = INSPECTIONS["network"]
+MidiInspection = INSPECTIONS["midi"]
+MidiFileInspection = INSPECTIONS["midi_file"]
+TimecodeInspection = INSPECTIONS["timecode"]
+ScriptInspection = INSPECTIONS["script"]
+from .write.visual import (VideoCueEditInput, CameraCueEditInput, TextCueEditInput,
+                           edit_video_cues, edit_camera_cues, edit_text_cues)
 from .cues.details import MAX_BATCH_CUE_DETAILS
 from .cues.list_models import CueListsResult, CueListDetailsResult, CueCartDetailsResult
 from .cues.audio import AudioCuesResult, AudioCueDetailsResult
@@ -57,7 +95,7 @@ from .cues.remaining import (
 )
 from .cues.visual import (
     VideoCuesResult, VideoCueDetailsResult, TextCuesResult, TextCueDetailsResult,
-    CameraCuesResult, CameraCueDetailsResult,
+    CameraCuesResult, CameraCueDetailsResult, FontsResult,
 )
 from .cues.limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES
 from .cues.query import MAX_SENSITIVE_QUERY_RESULTS
@@ -156,11 +194,11 @@ WorkspaceAudioSettingsView = Annotated[
 ]
 AudioInputChannel = Annotated[
     StrictInt | None,
-    Field(ge=1, le=128, description="Optional cue-output channel for one Audio Output Patch crosspoint read."),
+    Field(ge=0, le=128, description="Cue-output row; 0 selects Main/output gains in the patch matrix."),
 ]
 AudioOutputChannel = Annotated[
     StrictInt | None,
-    Field(ge=1, description="Optional device-output channel for one Audio Output Patch crosspoint read."),
+    Field(ge=0, description="Device-output column; 0 selects Main/input gains in the patch matrix."),
 ]
 VideoSettingsProfile = Annotated[
     Literal["safe", "technical"],
@@ -244,7 +282,7 @@ WORKSPACE_SETTINGS_TIMEOUT = 60.0
 QUERY_CUES_TIMEOUT = 60.0
 CUE_DETAILS_TIMEOUT = 20.0
 WRITE_READINESS_TIMEOUT = 6.0
-CREATE_CUES_TIMEOUT = 180.0
+CREATE_CUES_TIMEOUT = 300.0
 UPDATE_CUES_TIMEOUT = 180.0
 DELETE_CUES_TIMEOUT = 180.0
 WORKSPACE_SETTINGS_WRITE_TIMEOUT = 60.0
@@ -257,12 +295,23 @@ mcp = FastMCP(
     "QLab Workspace Inspector",
     version=__version__,
     mask_error_details=True,
+    # Cache the static catalogue only; tool execution and QLab state stay fresh.
+    middleware=[ResponseCachingMiddleware(
+        list_tools_settings={"ttl": 300},
+        call_tool_settings={"enabled": False},
+        list_resources_settings={"enabled": False},
+        list_prompts_settings={"enabled": False},
+        read_resource_settings={"enabled": False},
+        get_prompt_settings={"enabled": False},
+    )],
     instructions="""
-QLab MCP exposes forty-three read-only tools plus five gated write tools over OSC.
+QLab MCP exposes forty-nine read-only tools plus thirty gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
 Write mode requires QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; it remains dry-run first.
-This server does not expose GO, stop, panic, playback, audition, /live writes, AppleScript writes, or raw OSC passthrough.
+This server does not expose GO, stop, panic, playback, audition, /live writes, arbitrary AppleScript, or raw OSC passthrough. Load loadTime, Target assignedNumber and documented cue Triggers use fixed local AppleScript reads/writes. Native Trigger reads require include_native_triggers=true; configuration requires disabled triggers, activation requires disarmed/no continuation/no skip, and Hotkey enabling is blocked without key/modifier readback.
 
 Orient first with qlab_check_connection, then use a bounded workspace overview/status or the relevant domain-specific settings read, qlab_query_cues, and qlab_get_cue_details as needed. Resolve one exact workspace before any write. Use exact UUIDs for workspace and cue writes; never infer a workspace or target from selection, playhead, or active state.
+
+Before searching for, inspecting, or assigning a local media file, ask the person directly: "¿Me das permiso para buscar y acceder a los archivos que necesito?" Once granted, use qlab_search_media_files; it searches the MCP user's home folder. The operating system still controls which files the MCP process can read. Use the family editor's dry run and fresh readback before changing a cue.
 
 For every real write, call qlab_check_write_readiness, inspect an explicit dry-run, review warnings/errors/planned operations, supply only the exact fresh confirmation token required by that operation, execute once, and require fresh readback. Do not retry a mutation after a timeout or identity ambiguity. Batches are not automatically transactional.
 
@@ -273,6 +322,131 @@ Create, Edit, Move, Delete, and Workspace Settings writes have different token, 
 
 def _reader() -> QLabReader:
     return QLabReader()
+
+
+@mcp.tool(title="Get QLab Workspace Document", tags={"qlab", "workspace", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=30.0)
+def qlab_get_workspace_document(workspace_id: CanonicalWorkspaceUUID) -> dict[str, Any]:
+    """Read exact local workspace UUID, document path, dirty flag and native mode/activity.
+
+    Requires the running /Applications/QLab.app. No save or close; unknown state blocks writes.
+    """
+    return _run_tool(lambda reader: get_workspace_document(reader, str(workspace_id)))
+
+
+@mcp.tool(title="Open QLab Workspace", tags={"qlab", "workspace", "gated-write"},
+          annotations=GATED_CREATE_QLAB_TOOL, timeout=30.0)
+def qlab_open_workspace(path: StrictStr, dry_run: StrictBool = True,
+                        confirm_token: StrictStr | None = None) -> dict[str, Any]:
+    """Plan or open one existing local .qlab5 document by absolute path.
+
+    Requires an empty inventory (no workspaces open), a bounded file fingerprint
+    and a five-minute single-use token.
+    One native event followed by fresh inventory. Do not retry an uncertain result automatically.
+    Does not create a workspace, run cues or change file contents.
+    """
+    return _run_tool(lambda reader: open_workspace(reader, path, dry_run, confirm_token))
+
+
+@mcp.tool(title="Save QLab Workspace", tags={"qlab", "workspace", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=30.0)
+def qlab_save_workspace(workspace_id: CanonicalWorkspaceUUID, dry_run: StrictBool = True,
+                        confirm_token: StrictStr | None = None) -> dict[str, Any]:
+    """Plan or save an exact inactive local workspace at its existing path.
+
+    Saves all current unsaved edits. Requires Edit Mode and a five-minute single-use token.
+    The dirty flag is not an edit revision. One native event and fresh inventory; no Save As,
+    automatic retry, or cue execution.
+    """
+    return _run_tool(lambda reader: save_workspace(reader, str(workspace_id), dry_run, confirm_token))
+
+
+@mcp.tool(title="Close QLab Workspace", tags={"qlab", "workspace", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=30.0)
+def qlab_close_workspace(workspace_id: CanonicalWorkspaceUUID, dry_run: StrictBool = True,
+                         confirm_token: StrictStr | None = None) -> dict[str, Any]:
+    """Plan or close an exact inactive local workspace only when it has no unsaved changes.
+
+    Requires Edit Mode and a five-minute single-use token. Uses close saving no after a fresh
+    dirty check, then verifies disappearance. No discard, implicit save or automatic retry.
+    """
+    return _run_tool(lambda reader: close_workspace(reader, str(workspace_id), dry_run, confirm_token))
+
+
+@mcp.tool(title="Get QLab Video Effect Catalogue", tags={"qlab", "video", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=6.0)
+def qlab_get_video_effect_catalogue(
+    effect_types: Annotated[list[EffectType], Field(min_length=1, max_length=10)] | None = None,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    limit: Annotated[StrictInt, Field(ge=1, le=10)] = 10,
+) -> dict[str, Any]:
+    """Discover documented FX names, keys, types, enums and conservative write bands.
+
+    Paged static catalogue; no workspace, OSC or AppleScript access. Defaults are
+    recorded QLab 5.5.10 evidence. Metadata never grants permission to write a
+    live effect: use its exact cue Get and a fresh family-editor dry run.
+    """
+    return video_effect_catalogue(effect_types, offset=offset, limit=limit)
+
+
+@mcp.tool(title="Search QLab Media Files", tags={"qlab", "media", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=6.0)
+def qlab_search_media_files(
+    query: Annotated[StrictStr, Field(min_length=1, max_length=255)],
+    max_results: Annotated[StrictInt, Field(ge=1, le=100)] = 20,
+) -> dict[str, Any]:
+    """After the user agrees, find local files by name in the MCP user's home folder.
+
+    Returns absolute paths for fileTarget in qlab_edit_audio_cues,
+    qlab_edit_video_cues or qlab_edit_midi_file_cues. Search is limited to
+    20,000 entries and five seconds; truncated means results may be incomplete.
+    Symlinks are skipped. Does not inspect contents or validate media formats.
+    No OSC requests, downloads, copies or cue changes; use a dry-run before assignment.
+    """
+    try:
+        return search_media_files((str(Path.home()),), query, max_results)
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
+
+
+@mcp.tool(title="Analyze QLab Audio File", tags={"qlab", "media", "audio", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=300.0)
+async def qlab_analyze_audio_file(
+    path: Annotated[StrictStr, Field(min_length=1, description="Absolute path to one local audio file; access requires user consent.")],
+    start_ms: Annotated[StrictInt, Field(ge=0, description="Source-file start in milliseconds, a multiple of 10.")] = 0,
+    end_ms: Annotated[StrictInt, Field(gt=0, description="Exclusive source-file end in milliseconds, a multiple of 10; null uses file end.")] | None = None,
+    resolution_ms: Resolution = 100,
+    offset: Annotated[StrictInt, Field(ge=0, description="Row offset within the requested interval; use next_offset to continue.")] = 0,
+    max_frames: Annotated[StrictInt, Field(ge=1, le=5000)] = 5000,
+    expected_analysis_id: Annotated[StrictStr, Field(min_length=1, description="Use the previous page identity to detect changes to the source.")] | None = None,
+) -> AudioAnalysisResult:
+    """Read audio levels, frequency bands and estimated attacks/beats without OSC or playback.
+
+    Default 100 ms tuples include columns and units. Pages contain at most 5000
+    rows and 512 KiB; continue with next_offset and expected_analysis_id.
+    Summaries cover this page; loudness and rhythm have explicit block/context
+    scopes. Times refer to the source file, excluding QLab trims, rate and loops.
+    Requires the optional audio extra and FFmpeg/ffprobe in the MCP process PATH.
+    No file changes, cue changes, downloads or dependency installation.
+    """
+    from .audio_analysis import analyze_audio_file
+
+    request = AudioAnalysisRequest(path=path, start_ms=start_ms, end_ms=end_ms,
+                                   resolution_ms=resolution_ms, offset=offset,
+                                   max_frames=max_frames, expected_analysis_id=expected_analysis_id)
+    cancelled = threading.Event()
+    worker = asyncio.create_task(asyncio.to_thread(analyze_audio_file, request, cancelled))
+    try:
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        cancelled.set()
+        # Wait for cleanup even if the caller cancels more than once.
+        while not worker.done():
+            try:
+                await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                continue
+        raise
 
 
 def _run_tool(
@@ -804,7 +978,8 @@ def qlab_get_workspace_audio_settings(
     """Return an Audio settings overview, one exact output patch, or one exact input patch.
 
     The safe profile returns normalized summaries. Technical and exhaustive profiles add deeper redacted payloads.
-    Provide both channel selectors with output_patch to read one matrix crosspoint; the full matrix is never scanned.
+    Provide both selectors with output_patch: (0,0) Main, (input,0) input gain, (0,output) output gain,
+    or positive indices for a crosspoint. The full matrix is never scanned.
     """
     detail_kind = None if view == "overview" and profile == "safe" else "all" if view == "overview" else view
     validation_error = None
@@ -830,8 +1005,8 @@ def qlab_get_workspace_audio_settings(
         allowed={
             "view": ["overview", "output_patch", "input_patch"],
             "profile": ["safe", "technical", "exhaustive"],
-            "input_channel": "1..128, with output_channel and output_patch",
-            "output_channel": ">=1, with input_channel and output_patch",
+            "input_channel": "0..128, with output_channel and output_patch",
+            "output_channel": ">=0, with input_channel and output_patch",
         },
     )
 
@@ -903,6 +1078,30 @@ def qlab_get_video_output_route(
         workspace_id, domain="video", view="route", ref=str(route_id), profile=profile,
         detail_kind="route", result_model=VideoOutputRouteResult,
         allowed={"profile": ["safe", "technical"]}, exact_video=True,
+    )
+
+
+@mcp.tool(
+    title="Get QLab Video Region",
+    tags={"qlab", "settings", "video", "regions", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_video_region(
+    workspace_id: WorkspaceId,
+    stage_id: Annotated[UUID, Field(description="Exact parent stage UUID.")],
+    region_id: Annotated[UUID, Field(description="Exact region UUID.")],
+    subregion_index: Annotated[StrictInt | None, Field(ge=0, description="Optional one control-point subregion index.")] = None,
+    control_point_index: Annotated[StrictInt | None, Field(ge=0, description="Optional one control-point index.")] = None,
+) -> VideoRegionResult:
+    """Read one region's OSC bounds and visibility, optionally one indexed control point."""
+    if (subregion_index is None) != (control_point_index is None):
+        raise ToolError("Both control-point indices are required together.")
+    return _run_tool(
+        lambda reader: VideoRegionResult.model_validate(reader.get_video_region(
+            str(workspace_id), str(stage_id), str(region_id), subregion_index, control_point_index,
+        )),
+        timeout=WORKSPACE_SETTINGS_TIMEOUT,
     )
 
 
@@ -1064,7 +1263,7 @@ def qlab_get_audio_cues(
 
     Resolve cue_list_id through qlab_get_cue_lists. Carts are not accepted. offset counts matching Audio cues.
     Inspect scan_complete and truncation_reasons; a bounded scan is not a whole-list total.
-    Follow with qlab_get_audio_cue_details for one exact cue UUID. No Audio Maps or Objects are read.
+    Follow with qlab_get_audio_cue_details for one exact cue UUID. Audio Maps are excluded; use optional inspections for exact cue-owned object/indexed reads.
     """
     return _run_tool(lambda reader: reader.get_audio_cues(str(workspace_id), str(cue_list_id),
                      limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
@@ -1078,15 +1277,18 @@ def qlab_get_audio_cue_details(
     profile: Literal["safe", "technical"] = "safe",
     input_channel: Annotated[StrictInt | None, Field(ge=0, le=24)] = None,
     output_channel: Annotated[StrictInt | None, Field(ge=0, le=128)] = None,
+    inspections: Annotated[list[AudioInspection], Field(max_length=50)] = [],
+    include_native_triggers: StrictBool = False,
 ) -> AudioCueDetailsResult:
     """Read one exact Audio cue: identity, state, timing, slices, output patch and levels.
 
     Both channel selectors must be supplied together; zero addresses main controls. A requested crosspoint
     is selected from the aggregate matrix. technical additionally exposes notes, file paths and payload.
-    Audio Maps, Audio Objects and live metrics are excluded. Inspect coverage and partial errors.
+    Optional inspections read only requested scalar/indexed endpoints, including Audio Objects; Audio Maps and live metrics are excluded. Inspect coverage and partial errors.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
-    return _run_tool(lambda reader: reader.get_audio_cue_details(str(workspace_id), str(cue_id),
-                     profile, input_channel, output_channel), timeout=CUE_DETAILS_TIMEOUT)
+    return _run_tool(lambda reader: inspect_remaining(reader, reader.get_audio_cue_details(str(workspace_id), str(cue_id),
+                     profile, input_channel, output_channel, include_native_triggers=include_native_triggers), inspections), timeout=CUE_DETAILS_TIMEOUT)
 
 
 @mcp.tool(title="Get QLab Mic Cues", tags={"qlab", "mic", "inventory", "safe-read"},
@@ -1102,7 +1304,7 @@ def qlab_get_mic_cues(
 
     Resolve cue_list_id through qlab_get_cue_lists. Carts are not accepted. offset counts matching Mic cues.
     Inspect scan_complete and truncation_reasons; a bounded scan is not a whole-list total.
-    Follow with qlab_get_mic_cue_details for one exact cue UUID. No Audio Maps or Objects are read.
+    Follow with qlab_get_mic_cue_details for one exact cue UUID. Audio Maps are excluded; use optional inspections for exact cue-owned object/indexed reads.
     """
     return _run_tool(lambda reader: reader.get_mic_cues(str(workspace_id), str(cue_list_id),
                      limit, offset, max_cues_scanned), timeout=QUERY_CUES_TIMEOUT)
@@ -1116,16 +1318,19 @@ def qlab_get_mic_cue_details(
     profile: Literal["safe", "technical"] = "safe",
     input_channel: Annotated[StrictInt | None, Field(ge=0, le=24)] = None,
     output_channel: Annotated[StrictInt | None, Field(ge=0, le=128)] = None,
+    inspections: Annotated[list[MicInspection], Field(max_length=50)] = [],
+    include_native_triggers: StrictBool = False,
 ) -> MicCueDetailsResult:
     """Read one exact Mic cue: identity, state, timing, input/output patch references, channels and levels.
 
     Both channel selectors must be supplied together; zero addresses main controls. A requested crosspoint
     is selected from the aggregate matrix. technical additionally exposes notes and normalized payload.
-    Audio Maps, Audio Objects, live metrics and indexed effects are excluded. Patch configuration belongs
+    Optional inspections read only requested scalar/indexed endpoints, including Audio Objects; Audio Maps, live metrics and indexed effects are excluded. Patch configuration belongs
     to qlab_get_workspace_audio_settings. Inspect coverage and partial errors.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
-    return _run_tool(lambda reader: reader.get_mic_cue_details(str(workspace_id), str(cue_id),
-                     profile, input_channel, output_channel), timeout=CUE_DETAILS_TIMEOUT)
+    return _run_tool(lambda reader: inspect_remaining(reader, reader.get_mic_cue_details(str(workspace_id), str(cue_id),
+                     profile, input_channel, output_channel, include_native_triggers=include_native_triggers), inspections), timeout=CUE_DETAILS_TIMEOUT)
 
 
 @mcp.tool(title="Get QLab Video Cues", tags={"qlab", "video", "inventory", "safe-read"},
@@ -1155,16 +1360,32 @@ def qlab_get_video_cue_details(
     profile: Literal["safe", "technical"] = "safe",
     input_channel: Annotated[StrictInt | None, Field(ge=0, le=24)] = None,
     output_channel: Annotated[StrictInt | None, Field(ge=0, le=128)] = None,
+    video_effects: Annotated[list[FxReadSelector] | None, Field(max_length=50)] = None,
+    include_native_triggers: StrictBool = False,
 ) -> VideoCueDetailsResult:
     """Read one exact Video cue: timing/loops, stage reference, geometry, effects inventory and audio levels.
 
     Both channel selectors must be supplied together; zero addresses main controls. Crosspoints use the aggregate matrix.
     technical additionally exposes notes, media paths and metadata.
     Stage and patch configuration belong to the workspace tools. Audio Maps, Objects, live metrics and
-    indexed effect exploration are excluded. Inspect coverage and partial errors.
+    playback are excluded. Optional video_effects selectors require an index; effect_type may be omitted to discover
+    native identity. Only requested parameters are read, and ambiguous identity returns a partial result.
+    Inspect coverage and partial errors.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
     return _run_tool(lambda reader: reader.get_video_cue_details(str(workspace_id), str(cue_id),
-                     profile, input_channel, output_channel), timeout=CUE_DETAILS_TIMEOUT)
+                     profile, input_channel, output_channel, video_effects, include_native_triggers=include_native_triggers), timeout=CUE_DETAILS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Fonts", tags={"qlab", "text", "inventory", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=CUE_DETAILS_TIMEOUT)
+def qlab_get_fonts(workspace_id: CanonicalWorkspaceUUID) -> FontsResult:
+    """Read QLab's application-wide PostScript font names and font families/styles over TCP.
+
+    Use the exact names when choosing Text typography. The two inventories do not
+    provide a mapping from each PostScript name to its family/style or glyph coverage.
+    """
+    return _run_tool(lambda reader: reader.get_fonts(str(workspace_id)), timeout=CUE_DETAILS_TIMEOUT)
 
 
 @mcp.tool(title="Get QLab Text Cues", tags={"qlab", "text", "inventory", "safe-read"},
@@ -1192,16 +1413,21 @@ def qlab_get_text_cue_details(
     workspace_id: CanonicalWorkspaceUUID,
     cue_id: UUID,
     profile: Literal["safe", "technical"] = "safe",
+    video_effects: Annotated[list[FxReadSelector] | None, Field(max_length=50)] = None,
+    include_native_triggers: StrictBool = False,
 ) -> TextCueDetailsResult:
     """Read one exact Text cue: full text, formatted fragments, typography, stage reference, geometry and effects inventory.
 
     safe includes the text content; technical adds notes and redacted variable payload.
     Text never reads audio or file-playback properties.
     Stage and patch configuration belong to the workspace tools. Audio Maps, Objects, live metrics and
-    indexed effect exploration are excluded. Inspect coverage and partial errors.
+    playback are excluded. Optional video_effects selectors require an index; effect_type may be omitted to discover
+    native identity. Only requested parameters are read, and ambiguous identity returns a partial result.
+    Inspect coverage and partial errors.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
     return _run_tool(lambda reader: reader.get_text_cue_details(str(workspace_id), str(cue_id),
-                     profile), timeout=CUE_DETAILS_TIMEOUT)
+                     profile, video_effects, include_native_triggers=include_native_triggers), timeout=CUE_DETAILS_TIMEOUT)
 
 
 @mcp.tool(title="Get QLab Camera Cues", tags={"qlab", "camera", "inventory", "safe-read"},
@@ -1231,16 +1457,21 @@ def qlab_get_camera_cue_details(
     profile: Literal["safe", "technical"] = "safe",
     input_channel: Annotated[StrictInt | None, Field(ge=0, le=24)] = None,
     output_channel: Annotated[StrictInt | None, Field(ge=0, le=128)] = None,
+    video_effects: Annotated[list[FxReadSelector] | None, Field(max_length=50)] = None,
+    include_native_triggers: StrictBool = False,
 ) -> CameraCueDetailsResult:
     """Read one exact Camera cue: input patches, stage reference, geometry, effects inventory and audio channels/levels.
 
     Both channel selectors must be supplied together; zero addresses main controls. Crosspoints use the aggregate matrix.
     technical additionally exposes notes and normalized payload.
     Stage and patch configuration belong to the workspace tools. Audio Maps, Objects, live metrics and
-    indexed effect exploration are excluded. Inspect coverage and partial errors.
+    playback are excluded. Optional video_effects selectors require an index; effect_type may be omitted to discover
+    native identity. Only requested parameters are read, and ambiguous identity returns a partial result.
+    Inspect coverage and partial errors.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
     return _run_tool(lambda reader: reader.get_camera_cue_details(str(workspace_id), str(cue_id),
-                     profile, input_channel, output_channel), timeout=CUE_DETAILS_TIMEOUT)
+                     profile, input_channel, output_channel, video_effects, include_native_triggers=include_native_triggers), timeout=CUE_DETAILS_TIMEOUT)
 
 
 @mcp.tool(title="Get QLab Control Cues", tags={"qlab", "control", "inventory", "safe-read"},
@@ -1267,15 +1498,18 @@ def qlab_get_control_cues(
 def qlab_get_control_cue_details(
     workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
     profile: Literal["safe", "technical"] = "safe",
+    include_native_triggers: StrictBool = False,
 ) -> ControlCueDetailsResult:
     """Read one exact control/organization cue, detecting its type automatically.
 
     Returns common settings, state, timing and applicable target, Reset or Devamp fields.
     Memo notes are included in safe; technical adds other notes. Inspect coverage and partial errors.
-    Load load time and Target assigned number are not documented OSC reads. Audio Maps are excluded.
+    Load loadTime and Target assignedNumber use fixed local AppleScript reads; inspect partial errors
+    and property_transports. Requires macOS Automation access and /Applications/QLab.app. Audio Maps are excluded.
     References do not expand targets or patches. Never starts, stops, loads or modifies cues.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
-    return _run_tool(lambda reader: reader.get_control_cue_details(str(workspace_id), str(cue_id), profile),
+    return _run_tool(lambda reader: reader.get_control_cue_details(str(workspace_id), str(cue_id), profile, include_native_triggers=include_native_triggers),
                      timeout=CUE_DETAILS_TIMEOUT)
 
 
@@ -1303,13 +1537,16 @@ def qlab_get_fade_cues(
 def qlab_get_fade_cue_details(
     workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
     profile: Literal["safe", "technical"] = "safe",
+    inspections: Annotated[list[FadeInspection], Field(max_length=50)] = [],
+    include_native_triggers: StrictBool = False,
 ) -> FadeCueDetailsResult:
     """Read one exact Fade cue. Inspect coverage and partial errors.
 
     Returns target references and documented fade settings. Audio target matrices and Video target opacity are supported; other inherited properties remain unverified.
-    References do not expand Workspace Settings. No live or indexed scans.
+    References do not expand Workspace Settings. Optional inspections read requested scalar/indexed endpoints; no live or automatic indexed scans.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
-    return _run_tool(lambda reader: reader.get_fade_cue_details(str(workspace_id), str(cue_id), profile),
+    return _run_tool(lambda reader: inspect_remaining(reader, reader.get_fade_cue_details(str(workspace_id), str(cue_id), profile, include_native_triggers=include_native_triggers), inspections),
         timeout=CUE_DETAILS_TIMEOUT)
 
 
@@ -1335,13 +1572,16 @@ def qlab_get_network_cues(
 def qlab_get_network_cue_details(
     workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
     profile: Literal["safe", "technical"] = "safe",
+    inspections: Annotated[list[NetworkInspection], Field(max_length=50)] = [],
+    include_native_triggers: StrictBool = False,
 ) -> NetworkCueDetailsResult:
     """Read one exact Network cue. Inspect coverage and partial errors.
 
     Returns patch references and conditional fade settings. Free-form messages and parameter values require technical; embedded secrets may remain.
-    References do not expand Workspace Settings. No live or indexed scans.
+    References do not expand Workspace Settings. Optional inspections read requested scalar/indexed endpoints; no live or automatic indexed scans.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
-    return _run_tool(lambda reader: reader.get_network_cue_details(str(workspace_id), str(cue_id), profile),
+    return _run_tool(lambda reader: inspect_remaining(reader, reader.get_network_cue_details(str(workspace_id), str(cue_id), profile, include_native_triggers=include_native_triggers), inspections),
         timeout=CUE_DETAILS_TIMEOUT)
 
 
@@ -1368,13 +1608,16 @@ def qlab_get_midi_cues(
 def qlab_get_midi_cue_details(
     workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
     profile: Literal["safe", "technical"] = "safe",
+    inspections: Annotated[list[MidiInspection | MidiFileInspection], Field(max_length=50)] = [],
+    include_native_triggers: StrictBool = False,
 ) -> MidiCueDetailsResult:
     """Read one exact MIDI cue. Inspect coverage and partial errors.
 
     Detects MIDI or MIDI File automatically. Reads only the selected message mode; file paths require technical. No message is sent.
-    References do not expand Workspace Settings. No live or indexed scans.
+    References do not expand Workspace Settings. Optional inspections read requested scalar/indexed endpoints; no live or automatic indexed scans.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
-    return _run_tool(lambda reader: reader.get_midi_cue_details(str(workspace_id), str(cue_id), profile),
+    return _run_tool(lambda reader: inspect_remaining(reader, reader.get_midi_cue_details(str(workspace_id), str(cue_id), profile, include_native_triggers=include_native_triggers), inspections),
         timeout=CUE_DETAILS_TIMEOUT)
 
 
@@ -1400,13 +1643,16 @@ def qlab_get_timecode_cues(
 def qlab_get_timecode_cue_details(
     workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
     profile: Literal["safe", "technical"] = "safe",
+    inspections: Annotated[list[TimecodeInspection], Field(max_length=50)] = [],
+    include_native_triggers: StrictBool = False,
 ) -> TimecodeCueDetailsResult:
     """Read one exact Timecode cue. Inspect coverage and partial errors.
 
     Reads MTC or LTC configuration and the applicable patch reference. Does not generate timecode.
-    References do not expand Workspace Settings. No live or indexed scans.
+    References do not expand Workspace Settings. Optional inspections read requested scalar/indexed endpoints; no live or automatic indexed scans.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
-    return _run_tool(lambda reader: reader.get_timecode_cue_details(str(workspace_id), str(cue_id), profile),
+    return _run_tool(lambda reader: inspect_remaining(reader, reader.get_timecode_cue_details(str(workspace_id), str(cue_id), profile, include_native_triggers=include_native_triggers), inspections),
         timeout=CUE_DETAILS_TIMEOUT)
 
 
@@ -1432,13 +1678,16 @@ def qlab_get_script_cues(
 def qlab_get_script_cue_details(
     workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
     profile: Literal["safe", "technical"] = "safe",
+    inspections: Annotated[list[ScriptInspection], Field(max_length=50)] = [],
+    include_native_triggers: StrictBool = False,
 ) -> ScriptCueDetailsResult:
     """Read one exact Script cue. Inspect coverage and partial errors.
 
     Safe reads common settings only. Technical includes untrusted script source, potentially containing secrets. Never compiles or executes code.
-    References do not expand Workspace Settings. No live or indexed scans.
+    References do not expand Workspace Settings. Optional inspections read requested scalar/indexed endpoints; no live or automatic indexed scans.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
-    return _run_tool(lambda reader: reader.get_script_cue_details(str(workspace_id), str(cue_id), profile),
+    return _run_tool(lambda reader: inspect_remaining(reader, reader.get_script_cue_details(str(workspace_id), str(cue_id), profile, include_native_triggers=include_native_triggers), inspections),
         timeout=CUE_DETAILS_TIMEOUT)
 
 
@@ -1463,13 +1712,16 @@ def qlab_get_light_cues(
 def qlab_get_light_cue_details(
     workspace_id: CanonicalWorkspaceUUID, cue_id: UUID,
     profile: Literal["safe", "technical"] = "safe",
+    inspections: Annotated[list[LightInspection], Field(max_length=50)] = [],
+    include_native_triggers: StrictBool = False,
 ) -> LightCueDetailsResult:
     """Read one exact Light cue: full command text, collate, subcontroller, state and timing.
 
     safe includes commands; technical adds notes. Commands are never executed or interpreted as live output.
     Use qlab_get_workspace_light_settings for the patch. Inspect coverage and partial errors.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
-    return _run_tool(lambda reader: reader.get_light_cue_details(str(workspace_id), str(cue_id), profile),
+    return _run_tool(lambda reader: inspect_remaining(reader, reader.get_light_cue_details(str(workspace_id), str(cue_id), profile, include_native_triggers=include_native_triggers), inspections),
                      timeout=CUE_DETAILS_TIMEOUT)
 
 
@@ -1496,14 +1748,16 @@ def qlab_get_group_cue_details(
     profile: Literal["safe", "technical"] = "safe",
     max_depth: Annotated[StrictInt, Field(ge=0, le=5)] = 2,
     max_cues: Annotated[StrictInt, Field(ge=1, le=5000)] = 1000,
+    include_native_triggers: StrictBool = False,
 ) -> GroupCueDetailsResult:
     """Read one exact Group cue: mode, state, timing and bounded ordered child summaries.
 
     Playlist settings are read only in Playlist mode. Lists and carts are rejected. Depth zero reads no children;
     max_cues counts descendants. technical adds notes. Inspect coverage, truncation and partial errors.
+    Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
     return _run_tool(lambda reader: reader.get_group_cue_details(str(workspace_id), str(cue_id),
-                     profile, max_depth, max_cues), timeout=CUE_DETAILS_TIMEOUT)
+                     profile, max_depth, max_cues, include_native_triggers=include_native_triggers), timeout=CUE_DETAILS_TIMEOUT)
 
 
 @mcp.tool(
@@ -1666,7 +1920,7 @@ def qlab_get_cue_details(
                 "Read-only detail profile. Use auto for safe type-aware sections, health for warnings/broken cues, "
                 "inspector_safe for broader QLab Inspector-style details without file paths or scripts, "
                 "targets for target IDs without file paths, technical for notes/targets/routing/paths, "
-                "editable for safe details plus qlab_edit_cues profile/property capabilities, "
+                "editable for safe details plus typed family editor capabilities, "
                 "full_sensitive for deep audits, and exhaustive for the deepest allowlisted read-only read "
                 "including heavy/sensitive payloads; exhaustive may be large."
             )
@@ -1737,6 +1991,67 @@ def qlab_check_write_readiness(
 
 
 @mcp.tool(
+    title="Create QLab Cue Lists",
+    tags={"qlab", "write-mode", "cue-list-create", "batch-create", "gated-write"},
+    annotations=GATED_CREATE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_create_cue_lists(
+    workspace_id: WorkspaceId,
+    container_types: Annotated[
+        list[Literal["cue_list", "cue_cart"]],
+        Field(min_length=1, max_length=50, description="Ordered root containers to create with QLab defaults."),
+    ],
+    dry_run: Annotated[bool | None, Field(description="Plan only by default; execution requires the reviewed token.")] = None,
+    confirm_token: Annotated[str | None, Field(description="Exact confirm:createCueLists:v1 token from dry-run.")] = None,
+) -> CreateCueListsResult:
+    """Create one to fifty empty root Cue Lists and Cue Carts using QLab defaults.
+
+    The requested order is preserved. Each /new response must contain a UUID and
+    each root is read back with its type, position, and empty contents before the
+    next creation. Creation is sequential and has no rollback. QLab may change
+    the current container and selection. Use qlab_move_cue_lists afterwards when
+    a different sidebar position is required.
+    """
+    return _run_tool(
+        lambda reader: CreateCueListsResult.model_validate(reader.create_cue_lists(
+            workspace_id=workspace_id,
+            container_types=list(container_types),
+            dry_run=dry_run,
+            confirm_token=confirm_token,
+        )),
+        timeout=UPDATE_CUES_TIMEOUT,
+    )
+
+
+@mcp.tool(
+    title="Edit QLab Cue Lists",
+    tags={"qlab", "write-mode", "cue-list-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_cue_lists(
+    workspace_id: WorkspaceId,
+    updates: Annotated[list[CueListEditInput], Field(min_length=1, max_length=50)],
+    dry_run: Annotated[bool | None, Field(description="Plan or execute through the existing verified Edit executor.")] = None,
+) -> UpdateCuesResult:
+    """Edit typed OSC properties on root Cue Lists or Cue Carts.
+
+    Targets must be exact root UUIDs. The tool supports common metadata and the
+    documented incoming-timecode settings. It excludes playhead, playback,
+    mode conversion, Cart grid resizing, and fields unavailable through OSC.
+    """
+    return _run_tool(
+        lambda reader: UpdateCuesResult.model_validate(reader.edit_cue_lists(
+            workspace_id=workspace_id,
+            updates=[update.model_dump(mode="json", exclude_none=True) for update in updates],
+            dry_run=dry_run,
+        )),
+        timeout=UPDATE_CUES_TIMEOUT,
+    )
+
+
+@mcp.tool(
     title="Create QLab Cues",
     tags={"qlab", "write-mode", "cue-create", "batch-create", "gated-write"},
     annotations=GATED_CREATE_QLAB_TOOL,
@@ -1748,9 +2063,9 @@ def qlab_create_cues(
         list[WritableCueType],
         Field(
             min_length=1,
-            max_length=50,
+            max_length=100,
             description=(
-                "One to fifty ordered cue types, including mixed types. Each cue uses its workspace Cue Template; "
+                "One to one hundred ordered cue types, including mixed types. Each cue uses its workspace Cue Template; "
                 "every later cue is created after the UUID verified for the previous cue."
             ),
         ),
@@ -1780,7 +2095,7 @@ def qlab_create_cues(
         Field(description="Exact confirm:createCues:v2 token returned by the reviewed dry-run."),
     ] = None,
 ) -> CreateCuesResult:
-    """Create 1–50 ordered cues from workspace Cue Templates, with one verified /new per item.
+    """Create 1–100 ordered cues from workspace Cue Templates, with one verified /new per item.
 
     Call qlab_check_write_readiness first, then review the dry-run and supply the
     exact confirm:createCues:v2 token. Specify one exact Cue List, Group, or empty
@@ -1793,6 +2108,9 @@ def qlab_create_cues(
     setters, playback, or save are sent. Stop at the
     first failure; earlier successful cues remain without automatic rollback.
     Do not retry an ambiguous mutation. Structural success is not GO readiness.
+    Execution has a 270-second budget within the 300-second public timeout.
+    pending_indices are unattempted items; uncertain_indices may have been
+    created without verification. batch_verified requires final full readback.
     """
     return _run_tool(
         lambda reader: CreateCuesResult.model_validate(
@@ -1812,67 +2130,433 @@ def qlab_create_cues(
 
 
 @mcp.tool(
-    title="Edit QLab Cues",
-    tags={"qlab", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    title="Edit QLab Control Cues",
+    tags={"qlab", "control", "write-mode", "cue-edit", "batch-edit", "gated-write"},
     annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
     timeout=UPDATE_CUES_TIMEOUT,
 )
-def qlab_edit_cues(
-    workspace_id: WorkspaceId,
-    updates: Annotated[
-        list[CueUpdateInput],
-        Field(
-            min_length=1,
-            max_length=50,
-            description=(
-                "Cue updates to plan or apply. Each item has cue_ref, profile, properties, operations, and optional confirm_gates "
-                "containing exact confirm_token values from reviewed dry-run planned_operations. "
-                "cue_ref must be a concrete cue number or unique ID; selected, active, playhead, and playbackPosition "
-                "are not accepted."
-            ),
-        ),
-    ],
-    dry_run: Annotated[
-        bool | None,
-        Field(
-            description=(
-                "When true, plan and diff the update but send no mutating commands. "
-                "When omitted, QLAB_WRITE_DRY_RUN_DEFAULT is used and defaults to true."
-            ),
-        ),
-    ] = None,
+def qlab_edit_control_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[ControlCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
 ) -> UpdateCuesResult:
-    """Edit one or more existing cues through the cue editing registry, or return a dry-run plan.
+    """Edit 1–50 mixed Start/Stop/Pause/Load/Reset/GoTo/Arm/Disarm/Wait/Memo cues by UUID.
 
-    Real updates require QLAB_ENABLE_WRITE, server-side QLAB_PASSCODE, edit confirmed by /connect, and Edit Mode from /showMode.
-    Dry-run planning never sends mutating OSC.
-    High-risk profiles and unvalidated properties are cataloged for planning and require exact dry-run confirm_tokens for real writes.
-    Resolve every target to an exact cue UUID through the read tools; this is not a
-    Create, Move, Delete, or playback tool. Dry-run returns per-operation confirm gates,
-    not one global Edit token. Batch real writes run all preflight checks before
-    sending any setter, are non-atomic, use cue unique IDs for setters, and require
-    fresh readback after each item. Do not retry after a timeout or identity ambiguity.
+    Plan Basics, supported OSC Triggers and targets without executing cues. Review
+    every planned setter and supply its exact confirm_token in confirm_gates.
+    Tokens expire after five minutes and are reserved once for the whole batch.
+    All items preflight before any setter; execution is sequential and non-atomic.
+    Load loadTime uses local AppleScript and finite seconds (negative counts back from end).
+    Change its cueTargetID separately, then request a new dry run. Target, Devamp, Hotkey/MIDI/Wall Clock setup, Audio Maps and /live
+    are excluded. Fade & Stop scope is blocked when readback is only boolean.
+    A setter timeout is never retried. Inspect fresh readback and pending operations.
     """
-    return _run_tool(
-        lambda reader: UpdateCuesResult.model_validate(
-            reader.edit_cues(
-                workspace_id=workspace_id,
-                updates=[update.model_dump() if hasattr(update, "model_dump") else update for update in updates],
-                dry_run=dry_run,
-            )
-        )
-    )
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_control_cues(reader, str(workspace_id), updates, dry_run)))
 
 
 @mcp.tool(
-    title="Edit QLab Workspace Settings",
+    title="Edit QLab Group Cues",
+    tags={"qlab", "group", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_group_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[GroupCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 Group, Cue List, Cue Cart or Cart containers by exact UUID.
+
+    Typed Basics are batchable. Group mode and canonical Playlist settings are
+    one cue and one property per call; Playlist setters require mode 6. Read the
+    Group and children first, review the dry-run, and copy its exact confirm_token.
+    Existing Group gates expire after five minutes, bind the ordered child
+    snapshot, and are consumed once. Writes are sequential and non-atomic, with fresh readback,
+    no rollback and no cue execution. Playhead navigation, current-cue selection,
+    deprecated Playlist aliases and Cart cell movement remain excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_group_cues(reader, str(workspace_id), updates, dry_run)))
+
+
+@mcp.tool(
+    title="Edit QLab Devamp Cues",
+    tags={"qlab", "devamp", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_devamp_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[DevampCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 Devamp cue UUIDs: Basics, OSC Triggers, Audio/Video target and Settings.
+
+    devampType 1 selects looping slice; 2 selects looping cue. Configure startNextCueWhenSliceEnds
+    and stopTargetWhenSliceEnds without executing cues. Stop target requires Start next enabled.
+    Assign cueTargetID by exact UUID or clear with empty string. Review dry_run and copy each
+    confirm_token into confirm_gates. Signed single-use tokens expire after five minutes.
+    All items preflight before setters. Sequential, non-atomic; no rollback.
+    Each setter is sent once and checked by fresh readback. Timeout is never retried.
+    Audio Maps, /live, capture and trigger activation are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_devamp_cues(reader, str(workspace_id), updates, dry_run)))
+
+
+@mcp.tool(
+    title="Edit QLab Target Cues",
+    tags={"qlab", "target", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_target_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[TargetCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 Target cue UUIDs: Basics, OSC Triggers and cueTargetID.
+
+    The target must accept cue targets; Fade is excluded. Assign an exact workspace UUID
+    or clear with empty string. The Cue Number tab's assignedNumber uses fixed local AppleScript:
+    an existing unique workspace cue number, or empty string to clear. It configures a future
+    temporary target; no action runs. number edits this Target cue's own number. Change cueTargetID
+    or renumber the assigned cue separately, then request a new dry run.
+    Review dry_run and copy each confirm_token into confirm_gates. Signed single-use
+    tokens expire after five minutes. All items preflight before setters.
+    Sequential, non-atomic; no rollback. Fresh readback verifies each setter.
+    Timeout is never retried. No cues, temporary targets, /live or capture are executed.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_target_cues(reader, str(workspace_id), updates, dry_run)))
+
+
+@mcp.tool(
+    title="Edit QLab Video Cues",
+    tags={"qlab", "video", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_video_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[VideoCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 Video cues by exact UUID: Basics, OSC Triggers and saved family properties.
+
+    Read details first. Dry run returns previous values and one signed confirm_token per setter.
+    Copy every token into confirm_gates; tokens expire after five minutes and are single-use.
+    Validate the entire batch before writing. Sequential, non-atomic, no rollback.
+    Every setter uses alwaysReply and fresh readback; timeouts never trigger a retry.
+    Routing uses exact UUIDs in this workspace; empty stage/input UUID clears routing.
+    Fade & Stop requires integer scope readback. Text styles require readable uniform fragments.
+    Ask the user before accessing files. File targets need an existing readable
+    absolute path; macOS permissions apply to the MCP process. No folder allowlist
+    is required. Audio Maps, /live, cue execution and external triggers are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_video_cues(reader, str(workspace_id), updates, dry_run)))
+
+
+@mcp.tool(
+    title="Edit QLab Camera Cues",
+    tags={"qlab", "camera", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_camera_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[CameraCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 Camera cues by exact UUID: Basics, OSC Triggers and saved family properties.
+
+    Read details first. Dry run returns previous values and one signed confirm_token per setter.
+    Copy every token into confirm_gates; tokens expire after five minutes and are single-use.
+    Validate the entire batch before writing. Sequential, non-atomic, no rollback.
+    Every setter uses alwaysReply and fresh readback; timeouts never trigger a retry.
+    Routing uses exact UUIDs in this workspace; empty stage/input UUID clears routing.
+    Fade & Stop requires integer scope readback. Text styles require readable uniform fragments.
+    Audio Maps, /live, cue execution and external trigger configuration are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_camera_cues(reader, str(workspace_id), updates, dry_run)))
+
+
+@mcp.tool(
+    title="Edit QLab Text Cues",
+    tags={"qlab", "text", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_text_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[TextCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 Text cues by exact UUID: Basics, OSC Triggers and saved family properties.
+
+    Read details first. Dry run returns previous values and one signed confirm_token per setter.
+    Copy every token into confirm_gates; tokens expire after five minutes and are single-use.
+    Validate the entire batch before writing. Sequential, non-atomic, no rollback.
+    Every setter uses alwaysReply and fresh readback; timeouts never trigger a retry.
+    Routing uses exact UUIDs in this workspace; empty stage/input UUID clears routing.
+    Fade & Stop requires integer scope readback. Text styles require readable uniform fragments.
+    Audio Maps, /live, cue execution and external trigger configuration are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_text_cues(reader, str(workspace_id), updates, dry_run)))
+
+
+@mcp.tool(
+    title="Edit QLab Audio Cues",
+    tags={"qlab", "audio", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_audio_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[AudioCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 exact Audio cue UUIDs: Basics, Triggers and file target, patch UUID, timing/loops, Levels and slices.
+
+    Combine supported Basics, Triggers and saved settings. Optional typed operations
+    select up to 50 indexed destinations per cue. Review the dry run and supply
+    every signed confirm_token in confirm_gates after dry_run; five-minute expiry, single-use.
+    Selectors which reset dependent state require a separate dry run. The complete
+    batch is validated and confirmations reserved before the first setter.
+    Sequential, non-atomic; each setter is sent once with immediate fresh readback.
+    Failure or uncertain readback stops remaining setters. Never retry; no rollback.
+    Ask the user before accessing files. File targets need an existing readable
+    absolute path; macOS permissions apply to the MCP process. No folder allowlist
+    is required. Audio Maps, /live, cue execution and Script source/compilation are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_remaining_cues(reader, str(workspace_id), updates, dry_run, family="audio")))
+
+
+@mcp.tool(
+    title="Edit QLab Mic Cues",
+    tags={"qlab", "mic", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_mic_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[MicCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 exact Mic cue UUIDs: Basics, Triggers and input/output patch UUIDs, Levels and input format.
+
+    Combine supported Basics, Triggers and saved settings. Optional typed operations
+    select up to 50 indexed destinations per cue. Review the dry run and supply
+    every signed confirm_token in confirm_gates after dry_run; five-minute expiry, single-use.
+    Selectors which reset dependent state require a separate dry run. The complete
+    batch is validated and confirmations reserved before the first setter.
+    Sequential, non-atomic; each setter is sent once with immediate fresh readback.
+    Failure or uncertain readback stops remaining setters. Never retry; no rollback.
+    Ask the user before accessing files. File targets need an existing readable
+    absolute path and a supported MIDI format; macOS permissions apply to the MCP
+    process. No folder allowlist is required. Audio Maps, /live, execution, and
+    Script source/compilation are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_remaining_cues(reader, str(workspace_id), updates, dry_run, family="mic")))
+
+
+@mcp.tool(
+    title="Edit QLab Light Cues",
+    tags={"qlab", "light", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_light_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[LightCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 exact Light cue UUIDs: Basics, Triggers and command text, alwaysCollate and subcontroller.
+
+    Combine supported Basics, Triggers and saved settings. Optional typed operations
+    select up to 50 indexed destinations per cue. Review the dry run and supply
+    every signed confirm_token in confirm_gates after dry_run; five-minute expiry, single-use.
+    Selectors which reset dependent state require a separate dry run. The complete
+    batch is validated and confirmations reserved before the first setter.
+    Sequential, non-atomic; each setter is sent once with immediate fresh readback.
+    Failure or uncertain readback stops remaining setters. Never retry; no rollback.
+    Audio Maps, /live, cue execution and Script source/compilation are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_remaining_cues(reader, str(workspace_id), updates, dry_run, family="light")))
+
+
+@mcp.tool(
+    title="Edit QLab Fade Cues",
+    tags={"qlab", "fade", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_fade_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[FadeCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 exact Fade cue UUIDs: Basics, Triggers and exact cue target, completion behavior, geometry and Levels.
+
+    Combine supported Basics, Triggers and saved settings. Optional typed operations
+    select up to 50 indexed destinations per cue. Review the dry run and supply
+    every signed confirm_token in confirm_gates after dry_run; five-minute expiry, single-use.
+    Selectors which reset dependent state require a separate dry run. The complete
+    batch is validated and confirmations reserved before the first setter.
+    Sequential, non-atomic; each setter is sent once with immediate fresh readback.
+    Failure or uncertain readback stops remaining setters. Never retry; no rollback.
+    Audio Maps, /live, cue execution and Script source/compilation are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_remaining_cues(reader, str(workspace_id), updates, dry_run, family="fade")))
+
+
+@mcp.tool(
+    title="Edit QLab Network Cues",
+    tags={"qlab", "network", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_network_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[NetworkCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 exact Network cue UUIDs: Basics, Triggers and patch UUID, message and fade configuration.
+
+    Combine supported Basics, Triggers and saved settings. Optional typed operations
+    select up to 50 indexed destinations per cue. Review the dry run and supply
+    every signed confirm_token in confirm_gates after dry_run; five-minute expiry, single-use.
+    Selectors which reset dependent state require a separate dry run. The complete
+    batch is validated and confirmations reserved before the first setter.
+    Sequential, non-atomic; each setter is sent once with immediate fresh readback.
+    Failure or uncertain readback stops remaining setters. Never retry; no rollback.
+    Audio Maps, /live, cue execution and Script source/compilation are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_remaining_cues(reader, str(workspace_id), updates, dry_run, family="network")))
+
+
+@mcp.tool(
+    title="Edit QLab MIDI Cues",
+    tags={"qlab", "midi", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_midi_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[MidiCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 exact MIDI cue UUIDs: Basics, Triggers and patch UUID and Voice/MSC/SysEx message configuration.
+
+    Combine supported Basics, Triggers and saved settings. Optional typed operations
+    select up to 50 indexed destinations per cue. Review the dry run and supply
+    every signed confirm_token in confirm_gates after dry_run; five-minute expiry, single-use.
+    Selectors which reset dependent state require a separate dry run. The complete
+    batch is validated and confirmations reserved before the first setter.
+    Sequential, non-atomic; each setter is sent once with immediate fresh readback.
+    Failure or uncertain readback stops remaining setters. Never retry; no rollback.
+    Audio Maps, /live, cue execution and Script source/compilation are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_remaining_cues(reader, str(workspace_id), updates, dry_run, family="midi")))
+
+
+@mcp.tool(
+    title="Edit QLab MIDI File Cues",
+    tags={"qlab", "midi_file", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_midi_file_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[MidiFileCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 exact MIDI File cue UUIDs: Basics, Triggers and file/patch targets, timing, rate and play count.
+
+    Combine supported Basics, Triggers and saved settings. Optional typed operations
+    select up to 50 indexed destinations per cue. Review the dry run and supply
+    every signed confirm_token in confirm_gates after dry_run; five-minute expiry, single-use.
+    Selectors which reset dependent state require a separate dry run. The complete
+    batch is validated and confirmations reserved before the first setter.
+    Sequential, non-atomic; each setter is sent once with immediate fresh readback.
+    Failure or uncertain readback stops remaining setters. Never retry; no rollback.
+    Audio Maps, /live, cue execution and Script source/compilation are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_remaining_cues(reader, str(workspace_id), updates, dry_run, family="midi_file")))
+
+
+@mcp.tool(
+    title="Edit QLab Timecode Cues",
+    tags={"qlab", "timecode", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_timecode_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[TimecodeCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 exact Timecode cue UUIDs: Basics, Triggers and MTC/LTC mode, frame rate, time bounds and patches.
+
+    Combine supported Basics, Triggers and saved settings. Optional typed operations
+    select up to 50 indexed destinations per cue. Review the dry run and supply
+    every signed confirm_token in confirm_gates after dry_run; five-minute expiry, single-use.
+    Selectors which reset dependent state require a separate dry run. The complete
+    batch is validated and confirmations reserved before the first setter.
+    Sequential, non-atomic; each setter is sent once with immediate fresh readback.
+    Failure or uncertain readback stops remaining setters. Never retry; no rollback.
+    Audio Maps, /live, cue execution and Script source/compilation are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_remaining_cues(reader, str(workspace_id), updates, dry_run, family="timecode")))
+
+
+@mcp.tool(
+    title="Edit QLab Script Cues",
+    tags={"qlab", "script", "write-mode", "cue-edit", "batch-edit", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_edit_script_cues(
+    workspace_id: CanonicalWorkspaceUUID,
+    updates: Annotated[list[ScriptCueEditInput], Field(min_length=1, max_length=50)],
+    dry_run: bool | None = None,
+) -> UpdateCuesResult:
+    """Edit 1–50 exact Script cue UUIDs: Basics, Triggers and saved Basics and supported OSC Triggers.
+
+    Combine supported Basics, Triggers and saved settings. Optional typed operations
+    select up to 50 indexed destinations per cue. Review the dry run and supply
+    every signed confirm_token in confirm_gates after dry_run; five-minute expiry, single-use.
+    Selectors which reset dependent state require a separate dry run. The complete
+    batch is validated and confirmations reserved before the first setter.
+    Sequential, non-atomic; each setter is sent once with immediate fresh readback.
+    Failure or uncertain readback stops remaining setters. Never retry; no rollback.
+    Audio Maps, /live, cue execution and Script source/compilation are excluded.
+    """
+    return _run_tool(lambda reader: UpdateCuesResult.model_validate(
+        edit_remaining_cues(reader, str(workspace_id), updates, dry_run, family="script")))
+
+
+@mcp.tool(
+    title="Edit QLab Workspace General Settings",
     tags={"qlab", "settings", "general-settings", "write-mode", "gated-write"},
     annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
     timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT,
 )
-def qlab_edit_workspace_settings(
+def qlab_edit_workspace_general_settings(
     workspace_id: CanonicalWorkspaceUUID,
-    operation: WorkspaceSettingsOperation,
+    operation: GeneralSettingsOperation,
     dry_run: Annotated[
         bool | None,
         Field(description="Plan without mutating OSC; omitted uses QLAB_WRITE_DRY_RUN_DEFAULT."),
@@ -1882,9 +2566,10 @@ def qlab_edit_workspace_settings(
         Field(description="Exact fresh confirm:workspaceSettings:v1 token returned by the reviewed dry-run."),
     ] = None,
 ) -> WorkspaceSettingsEditResult:
-    """Plan or execute the gated general.minGoTime Workspace Settings write.
+    """Plan or execute one General setting: minGoTime or selectionIsPlayhead.
 
-    Target an exact workspace UUID and use seconds as the value. Dry-run performs
+    Target an exact workspace UUID. Use seconds for minGoTime and a boolean for
+    selectionIsPlayhead. Dry-run performs
     readiness, inactive-cue, baseline, and activity checks before issuing a fresh
     single-use token. Real execution rechecks readiness and activity, sends exactly one
     setter. One setter is attempted per real call. It requires fresh no-argument readback. A timeout-confirmed result is
@@ -1892,17 +2577,111 @@ def qlab_edit_workspace_settings(
     activity reader cannot prove workspace-wide Audition state, so keep Audition
     disabled. This tool has no GO, playback, panic, /live, or raw OSC behavior.
     """
-    request = WorkspaceSettingsEditRequest(
-        workspace_id=workspace_id,
-        operation=operation,
-        dry_run=dry_run,
-        confirm_token=confirm_token,
-    )
+    operation = TypeAdapter(GeneralSettingsOperation).validate_python(operation)
+    if operation.kind == "general.minGoTime":
+        request = WorkspaceSettingsEditRequest(
+            workspace_id=workspace_id, operation=operation, dry_run=dry_run, confirm_token=confirm_token,
+        )
+        return _run_tool(
+            lambda reader: WorkspaceSettingsEditResult.model_validate(reader.edit_workspace_settings(request)),
+            timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT,
+        )
+    return _edit_object_setting(workspace_id, "general", {}, operation, dry_run, confirm_token)
+
+
+def _edit_object_setting(
+    workspace_id: UUID, family: str, ids: dict[str, str], operation: Any,
+    dry_run: bool | None, confirm_token: str | None,
+) -> WorkspaceSettingsEditResult:
     return _run_tool(
-        lambda reader: WorkspaceSettingsEditResult.model_validate(
-            reader.edit_workspace_settings(request)
-        ),
+        lambda reader: WorkspaceSettingsEditResult.model_validate(reader.edit_object_setting(
+            str(workspace_id), family, ids, operation, dry_run, confirm_token,
+        )),
         timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT,
+    )
+
+
+@mcp.tool(title="Edit QLab Audio Output Patch", tags={"qlab", "settings", "audio", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT)
+def qlab_edit_audio_output_patch(
+    workspace_id: CanonicalWorkspaceUUID,
+    patch_id: CanonicalWorkspaceUUID,
+    operation: AudioOutputPatchOperation,
+    dry_run: bool | None = None,
+    confirm_token: str | None = None,
+) -> WorkspaceSettingsEditResult:
+    """Edit one patch property, including name, or clear mutes/solos with a single-use token."""
+    return _edit_object_setting(workspace_id, "audio", {"patch_id": str(patch_id)}, operation, dry_run, confirm_token)
+
+
+@mcp.tool(title="Edit QLab Video Output Route", tags={"qlab", "settings", "video", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT)
+def qlab_edit_video_output_route(
+    workspace_id: CanonicalWorkspaceUUID,
+    route_id: CanonicalWorkspaceUUID,
+    operation: VideoRouteOperation,
+    dry_run: bool | None = None,
+    confirm_token: str | None = None,
+) -> WorkspaceSettingsEditResult:
+    """Edit enableGuides on one exact Video output route."""
+    return _edit_object_setting(workspace_id, "route", {"route_id": str(route_id)}, operation, dry_run, confirm_token)
+
+
+@mcp.tool(title="Edit QLab Video Stage", tags={"qlab", "settings", "video", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT)
+def qlab_edit_video_stage(
+    workspace_id: CanonicalWorkspaceUUID,
+    stage_id: CanonicalWorkspaceUUID,
+    operation: VideoStageOperation,
+    dry_run: bool | None = None,
+    confirm_token: str | None = None,
+) -> WorkspaceSettingsEditResult:
+    """Rename one exact Video stage."""
+    return _edit_object_setting(workspace_id, "stage", {"stage_id": str(stage_id)}, operation, dry_run, confirm_token)
+
+
+@mcp.tool(title="Edit QLab Video Region", tags={"qlab", "settings", "video", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT)
+def qlab_edit_video_region(
+    workspace_id: CanonicalWorkspaceUUID,
+    stage_id: CanonicalWorkspaceUUID,
+    region_id: CanonicalWorkspaceUUID,
+    operation: VideoRegionOperation,
+    dry_run: bool | None = None,
+    confirm_token: str | None = None,
+) -> WorkspaceSettingsEditResult:
+    """Edit one OSC-coordinate region property; points require exact indices."""
+    return _edit_object_setting(workspace_id, "region", {"stage_id": str(stage_id), "region_id": str(region_id)}, operation, dry_run, confirm_token)
+
+
+@mcp.tool(
+    title="Move QLab Cue Lists",
+    tags={"qlab", "write-mode", "cue-list-move", "gated-write"},
+    annotations=GATED_DESTRUCTIVE_QLAB_TOOL,
+    timeout=UPDATE_CUES_TIMEOUT,
+)
+def qlab_move_cue_lists(
+    workspace_id: WorkspaceId,
+    moves: Annotated[list[MoveCueListInput], Field(min_length=1, max_length=50)],
+    dry_run: Annotated[bool | None, Field(description="Plan only by default; real execution requires the reviewed token.")] = None,
+    confirm_token: Annotated[str | None, Field(description="Exact confirm:moveCueLists:v1 token from the dry run; expires after five minutes.")] = None,
+) -> MoveCuesResult:
+    """Reorder one to fifty root Cue Lists and Cue Carts in one workspace.
+
+    UUID-only placements use exactly one index, before/after anchor, or first/last.
+    Indices are zero-based insertion positions after removing the source and
+    resolve sequentially against the simulated mixed sidebar order. Real writes
+    require Edit Mode, idle workspace, a matching confirm:moveCueLists:v1 token,
+    and fresh root order and content verification. No-op placements skip OSC.
+    Moves are sequential and non-atomic; do not retry an ambiguous mutation.
+    Moving a Cart here does not reposition its cells. Root deletion is deferred.
+    """
+    return _run_tool(
+        lambda reader: MoveCuesResult.model_validate(reader.move_cue_lists(
+            workspace_id=workspace_id,
+            moves=[move.model_dump(mode="json", exclude_none=True) for move in moves],
+            dry_run=dry_run, confirm_token=confirm_token,
+        ))
     )
 
 
@@ -1946,6 +2725,8 @@ def qlab_move_cues(
     and fresh parent/order readback. Execution is sequential and non-atomic; this
     tool never claims atomicity. Cart execution remains runtime-blocked pending the
     documented QLab 5.5.10 evidence boundary. Do not retry an ambiguous mutation.
+    Each source UUID must be unique. Anchors and destination parents cannot refer
+    to another cue moved in the same batch; dependent moves need separate calls.
     Broken/warning health is reported as information; it does not block structural moves.
     """
     return _run_tool(
@@ -1986,7 +2767,7 @@ def qlab_delete_cues(
             description=(
                 "Exact empty Group UUID to delete only when recursive=false; or exact "
                 "Cue List, Cue Cart, Cart, or Group UUID to empty recursively with recursive=true. "
-                "Recursive mode preserves the container itself."
+                "Recursive mode preserves the container unless delete_container=true for a Group."
             ),
         ),
     ] = None,
@@ -1994,7 +2775,7 @@ def qlab_delete_cues(
         bool,
         Field(
             description=(
-                "When true with container_id, delete descendants deepest-first and preserve the root. "
+                "When true with container_id, delete descendants deepest-first; preserve the root unless delete_container=true. "
                 "When false, container_id must identify one empty Group that will itself be deleted."
             ),
         ),
@@ -2012,24 +2793,30 @@ def qlab_delete_cues(
         str | None,
         Field(description="Exact confirm:deleteCues:v1: token returned by a reviewed dry-run plan."),
     ] = None,
+    delete_container: Annotated[
+        bool,
+        Field(description="With container_id and recursive=true, delete a Group's descendants then the Group itself. Omit cue_ids. Default false preserves the root; Cue List and Cue Cart deletion stays blocked."),
+    ] = False,
 ) -> DeleteCuesResult:
     """Plan or execute sequential deletions of explicit leaves or one exact empty Group.
 
     Real deletion requires write readiness, Edit Mode, zero activity, the exact
     confirm:deleteCues:v1 token, and independent existence readback after every delete.
     A non-recursive container request deletes only an empty Group. Recursive mode
-    deletes descendants deepest-first and preserves the requested root container.
+    deletes descendants deepest-first and preserves the requested root container by default.
+    Set delete_container=true only to delete a Group last after its descendants.
     Deletion is sequential and not atomic, with no automatic rollback.
     Do not retry after a timeout or identity ambiguity; verify disappearance of every
-    requested leaf and preservation of the root.
+    requested UUID and the planned preservation or deletion of the root.
     """
     return _run_tool(
         lambda reader: DeleteCuesResult.model_validate(
             reader.delete_cues(
                 workspace_id=workspace_id,
-                cue_ids=[str(cue_id) for cue_id in cue_ids] if cue_ids is not None else [],
+                cue_ids=[str(cue_id) for cue_id in cue_ids] if cue_ids is not None else None,
                 container_id=str(container_id) if container_id is not None else None,
                 recursive=recursive,
+                delete_container=delete_container,
                 dry_run=dry_run,
                 confirm_token=confirm_token,
             )

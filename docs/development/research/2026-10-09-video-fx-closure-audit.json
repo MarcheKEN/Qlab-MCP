@@ -1,0 +1,104 @@
+{
+  "date": "2026-10-09",
+  "scope": "Read-only audit and production dry runs; no cue setters or playback.",
+  "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+  "workspace_path": "<redacted-local-path-851cab375f>.qlab5",
+  "qlab_version": "5.5.10",
+  "official_catalogue_comparison": {
+    "source": "https://qlab.app/docs/v5/scripting/parameter-reference/#video-effects",
+    "effects": 60,
+    "parameters": 262,
+    "type_counts": {
+      "number": 229,
+      "enum": 21,
+      "vector": 11,
+      "boolean": 1
+    },
+    "differences": []
+  },
+  "ui_effect_count": 60,
+  "ui_effect_labels_match_reference": true,
+  "blend_mode_count": 24,
+  "ui_blend_modes_match_registry_and_reference": true,
+  "observed_fixture": {
+    "cue_id": "CC889BBC-471F-5039-854E-5F61184B73D6",
+    "number": "v11",
+    "blendMode": "Color Burn",
+    "type": "EdgeWork",
+    "parameters": {
+      "inputIntensity": 2.6191787719726562,
+      "inputRadius": 10,
+      "Choose_Effect": 0
+    },
+    "enabled_ui": true,
+    "enabled_get_summary": null
+  },
+  "production_dry_runs": [
+    {
+      "case": "existing_parameter",
+      "ok": true,
+      "status": "dry_run",
+      "results": [
+        {
+          "status": "dry_run",
+          "errors": null,
+          "executed_operations": [],
+          "planned_properties": [
+            "videoEffectIndex/0/parameter/inputRadius"
+          ]
+        }
+      ]
+    },
+    {
+      "case": "unvalidated_new_effect",
+      "ok": false,
+      "status": "preflight_failed",
+      "results": [
+        {
+          "status": "dry_run_preflight_failed",
+          "errors": {
+            "preflight": "New effect defaults/result identity have not been validated."
+          },
+          "executed_operations": [],
+          "planned_properties": []
+        }
+      ]
+    },
+    {
+      "case": "unvalidated_delete_restoration",
+      "ok": false,
+      "status": "preflight_failed",
+      "results": [
+        {
+          "status": "dry_run_preflight_failed",
+          "errors": {
+            "preflight": "Deletion requires validated insert/default restoration evidence."
+          },
+          "executed_operations": [],
+          "planned_properties": []
+        }
+      ]
+    }
+  ],
+  "blend_dry_run": {
+    "ok": true,
+    "status": "dry_run",
+    "requested": "Screen",
+    "executed_operations": []
+  },
+  "verified_new_effect_defaults": [
+    "Gamma",
+    "Exposure"
+  ],
+  "new_effect_defaults_not_validated": 58,
+  "focused_tests": {
+    "command": ".venv/bin/pytest -q tests/test_visual_cue_writes.py tests/test_video_fx_operations.py",
+    "passed": 105
+  },
+  "caveats": [
+    "Catalogue comparison does not validate all setters in QLab.",
+    "No fresh full-stack or per-parameter live mutation sweep.",
+    "No automatic type inference from UI or keys.",
+    "PDF local snapshot predates QLab 5.5.10 per MANIFEST."
+  ]
+}

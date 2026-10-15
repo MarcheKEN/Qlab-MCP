@@ -1,0 +1,1992 @@
+{
+  "baseline": {
+    "ok": true,
+    "status": "ok",
+    "partial": false,
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "error_code": null,
+    "message": null,
+    "suggested_action": null,
+    "coverage": {
+      "source": "documented_osc",
+      "unavailable_via_osc": [
+        "sync_enabled",
+        "mtc_source_name",
+        "ltc_input_patch",
+        "ltc_sync_channel"
+      ],
+      "unavailable_fields": [
+        "currentTimecode",
+        "currentTimecode/text"
+      ],
+      "failed_routes": [],
+      "notes": [
+        "Timecode mode/configuration does not prove synchronization is enabled or a signal is present.",
+        "Current timecode may be unavailable when the list is not receiving timecode.",
+        "Depth 0 reads no children; max_cues counts descendants, excluding the list root.",
+        "Reads are sequential observations, not an atomic snapshot."
+      ]
+    },
+    "warnings": [],
+    "errors": {},
+    "cue_list_id": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+    "profile": "technical",
+    "identity": {
+      "uniqueID": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+      "type": "Cue List",
+      "name": "MCP_GROUP_WRITE_FIXTURE",
+      "displayName": "MCP_GROUP_WRITE_FIXTURE",
+      "listName": "MCP_GROUP_WRITE_FIXTURE",
+      "number": "",
+      "colorName": "none",
+      "secondColorName": "none",
+      "useSecondColor": false
+    },
+    "basics": {
+      "defaultName": "",
+      "notes": "",
+      "mode": 0,
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false
+    },
+    "state": {
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false
+    },
+    "playhead": {
+      "number": "",
+      "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "present": true
+    },
+    "playback_position": {
+      "number": "",
+      "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "present": true
+    },
+    "incoming_timecode": {
+      "current": null,
+      "text": null,
+      "sync_mode": {
+        "value": 0,
+        "label": "MTC"
+      },
+      "smpte_format": {
+        "value": 3,
+        "label": "30 fps"
+      },
+      "start_behavior": {
+        "value": 4,
+        "label": "Start all earlier triggers"
+      },
+      "stop_behavior": {
+        "value": 1,
+        "label": "Pause timecode-triggered cues"
+      },
+      "freewheel_seconds": 0.25,
+      "lookback_seconds": 0.0,
+      "trigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "trigger_text": "1:00:00:00"
+    },
+    "contents": {
+      "children": [
+        {
+          "uniqueID": "88735E9C-39F7-523A-9801-D7AFD2DBD752",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 1,
+          "children": [
+            {
+              "uniqueID": "4B3A37C5-3DBD-5E7A-B6BD-7746B2871804",
+              "type": "Group",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": null,
+              "children": [],
+              "children_complete": null
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+          "type": "Group",
+          "number": "125",
+          "name": "",
+          "displayName": null,
+          "listName": "",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "3D1A56D3-6E61-5F24-8C45-96BD132CBD06",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 3,
+          "children": [
+            {
+              "uniqueID": "DB9A18B5-619F-5917-9187-708DFF3FCB38",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "<redacted-local-path-a56ca6550c>.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "ACA941CE-4CEA-5D7E-B4A5-0FF0401CD902",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Rihanna - Don-'t Stop The Music.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "8DFFAD2E-77AB-56EA-9049-30F5C2BD6915",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Shape of You - Ed Sheeran.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "CE83987E-A15F-58CE-83D1-0480127BDBA5",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 3,
+          "children": [
+            {
+              "uniqueID": "18175C62-6358-5143-9D1C-7945B1546E76",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "<redacted-local-path-a56ca6550c>.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "EA33C496-F6B1-5F0B-8013-8A91EBF2F0D8",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Rihanna - Don-'t Stop The Music.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "01D114C3-6A29-512A-B3F9-8DB4E397B484",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Shape of You - Ed Sheeran.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "Playlist - Shuffle, Loop, Crossfade",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 3,
+          "children": [
+            {
+              "uniqueID": "69FAE776-BD85-5490-B4B1-25D716F55E34",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Rihanna - Don-'t Stop The Music.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "4B564579-4FC3-50A6-85DB-05A22B75005F",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "<redacted-local-path-a56ca6550c>.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "8DD1F3DC-66BD-58CB-9B59-333EE9918601",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Shape of You - Ed Sheeran.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "B8C68B70-0F40-5C26-8E37-49A75E5762ED",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "Playlist",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 3,
+          "children": [
+            {
+              "uniqueID": "62E23EF0-3CBD-5713-9A12-14783995637A",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "<redacted-local-path-a56ca6550c>.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "3FD98079-3EF7-52C9-BFB5-EF44D5DD69EB",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Rihanna - Don-'t Stop The Music.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "B8D9D408-6C83-5589-AE17-FCE4E3CA2630",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Shape of You - Ed Sheeran.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "1A2C6F8E-C52D-57DB-A13D-69E908C80BDD",
+          "type": "Group",
+          "number": "",
+          "name": "grupo cuidado",
+          "displayName": null,
+          "listName": "grupo cuidado",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 1,
+          "children": [
+            {
+              "uniqueID": "EADC45F7-D2FD-578B-8329-E65046FE4565",
+              "type": "Group",
+              "number": "",
+              "name": "subgrupo",
+              "displayName": null,
+              "listName": "subgrupo",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": null,
+              "children": [],
+              "children_complete": null
+            }
+          ],
+          "children_complete": true
+        }
+      ],
+      "direct_child_count": 7,
+      "returned_count": 21,
+      "max_depth": 2,
+      "max_cues": 1000,
+      "truncated": true,
+      "truncation_reasons": [
+        "max_depth"
+      ]
+    },
+    "technical_payload": {
+      "uniqueID": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+      "type": "Cue List",
+      "name": "MCP_GROUP_WRITE_FIXTURE",
+      "displayName": "MCP_GROUP_WRITE_FIXTURE",
+      "listName": "MCP_GROUP_WRITE_FIXTURE",
+      "number": "",
+      "colorName": "none",
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false,
+      "defaultName": "",
+      "notes": "",
+      "mode": 0,
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "playhead": "",
+      "playheadID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "playbackPosition": "",
+      "playbackPositionID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "timecodeSyncMode": 0,
+      "timecodeSMPTEFormat": 3,
+      "timecodeStartBehavior": 4,
+      "timecodeStopBehavior": 1,
+      "timecodeFreewheelTime": 0.25,
+      "timecodeLookbackTime": 0,
+      "timecodeTrigger": {
+        "frames": 0,
+        "videoSpeed": false,
+        "hours": 1,
+        "bits": 0,
+        "seconds": 0,
+        "fps": 30,
+        "minutes": 0,
+        "dropFrame": false
+      },
+      "timecodeTrigger/text": "1:00:00:00"
+    }
+  },
+  "changed_dry": {
+    "ok": true,
+    "status": "dry_run",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": true,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 0,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+        "cue_id": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+        "profile": "group_basic",
+        "status": "dry_run",
+        "properties": {
+          "flagged": true,
+          "timecodeFreewheelTime": 0.75
+        },
+        "operations": [
+          {
+            "operation": "set_property",
+            "property": "flagged",
+            "path": "flagged",
+            "mode": "saved",
+            "args": [
+              true
+            ],
+            "arg_values": {
+              "value": true
+            },
+            "read_key": "flagged",
+            "risk_tier": "safe",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          },
+          {
+            "operation": "set_property",
+            "property": "timecodeFreewheelTime",
+            "path": "timecodeFreewheelTime",
+            "mode": "saved",
+            "args": [
+              0.75
+            ],
+            "arg_values": {
+              "value": 0.75
+            },
+            "read_key": "timecodeFreewheelTime",
+            "risk_tier": "safe",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "timecodeFreewheelTime": 0.25,
+          "parent": "__root__",
+          "flagged": false,
+          "type": "Cue List",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+          "isWarning": false,
+          "allowsEditingDuration": false,
+          "isBroken": false
+        },
+        "after": null,
+        "diff": {
+          "flagged": {
+            "before": false,
+            "requested": true
+          },
+          "timecodeFreewheelTime": {
+            "before": 0.25,
+            "requested": 0.75
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "flagged",
+            "key": "flagged",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87/flagged",
+            "args": [
+              true
+            ],
+            "status": "planned"
+          },
+          {
+            "operation": "set_property",
+            "property": "timecodeFreewheelTime",
+            "key": "timecodeFreewheelTime",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87/timecodeFreewheelTime",
+            "args": [
+              0.75
+            ],
+            "status": "planned"
+          }
+        ],
+        "executed_operations": [],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "dry_run"
+  },
+  "changed": {
+    "ok": true,
+    "status": "updated",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": false,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 1,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+        "cue_id": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+        "profile": "group_basic",
+        "status": "updated",
+        "properties": {
+          "flagged": true,
+          "timecodeFreewheelTime": 0.75
+        },
+        "operations": [
+          {
+            "operation": "set_property",
+            "property": "flagged",
+            "path": "flagged",
+            "mode": "saved",
+            "args": [
+              true
+            ],
+            "arg_values": {
+              "value": true
+            },
+            "read_key": "flagged",
+            "risk_tier": "safe",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          },
+          {
+            "operation": "set_property",
+            "property": "timecodeFreewheelTime",
+            "path": "timecodeFreewheelTime",
+            "mode": "saved",
+            "args": [
+              0.75
+            ],
+            "arg_values": {
+              "value": 0.75
+            },
+            "read_key": "timecodeFreewheelTime",
+            "risk_tier": "safe",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "timecodeFreewheelTime": 0.25,
+          "parent": "__root__",
+          "flagged": false,
+          "type": "Cue List",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+          "isWarning": false,
+          "allowsEditingDuration": false,
+          "isBroken": false
+        },
+        "after": {
+          "flagged": true,
+          "type": "Cue List",
+          "uniqueID": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+          "timecodeFreewheelTime": 0.75
+        },
+        "diff": {
+          "flagged": {
+            "before": false,
+            "requested": true
+          },
+          "timecodeFreewheelTime": {
+            "before": 0.25,
+            "requested": 0.75
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "flagged",
+            "key": "flagged",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87/flagged",
+            "args": [
+              true
+            ],
+            "status": "verified"
+          },
+          {
+            "operation": "set_property",
+            "property": "timecodeFreewheelTime",
+            "key": "timecodeFreewheelTime",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87/timecodeFreewheelTime",
+            "args": [
+              0.75
+            ],
+            "status": "verified"
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "set_property",
+            "property": "flagged",
+            "key": "flagged",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87/flagged",
+            "args": [
+              true
+            ],
+            "status": "sent",
+            "reply_error": null
+          },
+          {
+            "operation": "set_property",
+            "property": "timecodeFreewheelTime",
+            "key": "timecodeFreewheelTime",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87/timecodeFreewheelTime",
+            "args": [
+              0.75
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "updated"
+  },
+  "readback": {
+    "ok": true,
+    "status": "ok",
+    "partial": false,
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "error_code": null,
+    "message": null,
+    "suggested_action": null,
+    "coverage": {
+      "source": "documented_osc",
+      "unavailable_via_osc": [
+        "sync_enabled",
+        "mtc_source_name",
+        "ltc_input_patch",
+        "ltc_sync_channel"
+      ],
+      "unavailable_fields": [
+        "currentTimecode",
+        "currentTimecode/text"
+      ],
+      "failed_routes": [],
+      "notes": [
+        "Timecode mode/configuration does not prove synchronization is enabled or a signal is present.",
+        "Current timecode may be unavailable when the list is not receiving timecode.",
+        "Depth 0 reads no children; max_cues counts descendants, excluding the list root.",
+        "Reads are sequential observations, not an atomic snapshot."
+      ]
+    },
+    "warnings": [],
+    "errors": {},
+    "cue_list_id": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+    "profile": "technical",
+    "identity": {
+      "uniqueID": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+      "type": "Cue List",
+      "name": "MCP_GROUP_WRITE_FIXTURE",
+      "displayName": "MCP_GROUP_WRITE_FIXTURE",
+      "listName": "MCP_GROUP_WRITE_FIXTURE",
+      "number": "",
+      "colorName": "none",
+      "secondColorName": "none",
+      "useSecondColor": false
+    },
+    "basics": {
+      "defaultName": "",
+      "notes": "",
+      "mode": 0,
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false
+    },
+    "state": {
+      "armed": true,
+      "flagged": true,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false
+    },
+    "playhead": {
+      "number": "",
+      "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "present": true
+    },
+    "playback_position": {
+      "number": "",
+      "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "present": true
+    },
+    "incoming_timecode": {
+      "current": null,
+      "text": null,
+      "sync_mode": {
+        "value": 0,
+        "label": "MTC"
+      },
+      "smpte_format": {
+        "value": 3,
+        "label": "30 fps"
+      },
+      "start_behavior": {
+        "value": 4,
+        "label": "Start all earlier triggers"
+      },
+      "stop_behavior": {
+        "value": 1,
+        "label": "Pause timecode-triggered cues"
+      },
+      "freewheel_seconds": 0.75,
+      "lookback_seconds": 0.0,
+      "trigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "trigger_text": "1:00:00:00"
+    },
+    "contents": {
+      "children": [
+        {
+          "uniqueID": "88735E9C-39F7-523A-9801-D7AFD2DBD752",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 1,
+          "children": [
+            {
+              "uniqueID": "4B3A37C5-3DBD-5E7A-B6BD-7746B2871804",
+              "type": "Group",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": null,
+              "children": [],
+              "children_complete": null
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+          "type": "Group",
+          "number": "125",
+          "name": "",
+          "displayName": null,
+          "listName": "",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "3D1A56D3-6E61-5F24-8C45-96BD132CBD06",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 3,
+          "children": [
+            {
+              "uniqueID": "DB9A18B5-619F-5917-9187-708DFF3FCB38",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "<redacted-local-path-a56ca6550c>.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "ACA941CE-4CEA-5D7E-B4A5-0FF0401CD902",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Rihanna - Don-'t Stop The Music.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "8DFFAD2E-77AB-56EA-9049-30F5C2BD6915",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Shape of You - Ed Sheeran.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "CE83987E-A15F-58CE-83D1-0480127BDBA5",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 3,
+          "children": [
+            {
+              "uniqueID": "18175C62-6358-5143-9D1C-7945B1546E76",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "<redacted-local-path-a56ca6550c>.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "EA33C496-F6B1-5F0B-8013-8A91EBF2F0D8",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Rihanna - Don-'t Stop The Music.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "01D114C3-6A29-512A-B3F9-8DB4E397B484",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Shape of You - Ed Sheeran.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "Playlist - Shuffle, Loop, Crossfade",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 3,
+          "children": [
+            {
+              "uniqueID": "69FAE776-BD85-5490-B4B1-25D716F55E34",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Rihanna - Don-'t Stop The Music.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "4B564579-4FC3-50A6-85DB-05A22B75005F",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "<redacted-local-path-a56ca6550c>.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "8DD1F3DC-66BD-58CB-9B59-333EE9918601",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Shape of You - Ed Sheeran.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "B8C68B70-0F40-5C26-8E37-49A75E5762ED",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "Playlist",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 3,
+          "children": [
+            {
+              "uniqueID": "62E23EF0-3CBD-5713-9A12-14783995637A",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "<redacted-local-path-a56ca6550c>.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "3FD98079-3EF7-52C9-BFB5-EF44D5DD69EB",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Rihanna - Don-'t Stop The Music.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "B8D9D408-6C83-5589-AE17-FCE4E3CA2630",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Shape of You - Ed Sheeran.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "1A2C6F8E-C52D-57DB-A13D-69E908C80BDD",
+          "type": "Group",
+          "number": "",
+          "name": "grupo cuidado",
+          "displayName": null,
+          "listName": "grupo cuidado",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 1,
+          "children": [
+            {
+              "uniqueID": "EADC45F7-D2FD-578B-8329-E65046FE4565",
+              "type": "Group",
+              "number": "",
+              "name": "subgrupo",
+              "displayName": null,
+              "listName": "subgrupo",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": null,
+              "children": [],
+              "children_complete": null
+            }
+          ],
+          "children_complete": true
+        }
+      ],
+      "direct_child_count": 7,
+      "returned_count": 21,
+      "max_depth": 2,
+      "max_cues": 1000,
+      "truncated": true,
+      "truncation_reasons": [
+        "max_depth"
+      ]
+    },
+    "technical_payload": {
+      "uniqueID": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+      "type": "Cue List",
+      "name": "MCP_GROUP_WRITE_FIXTURE",
+      "displayName": "MCP_GROUP_WRITE_FIXTURE",
+      "listName": "MCP_GROUP_WRITE_FIXTURE",
+      "number": "",
+      "colorName": "none",
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "armed": true,
+      "flagged": true,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false,
+      "defaultName": "",
+      "notes": "",
+      "mode": 0,
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "playhead": "",
+      "playheadID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "playbackPosition": "",
+      "playbackPositionID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "timecodeSyncMode": 0,
+      "timecodeSMPTEFormat": 3,
+      "timecodeStartBehavior": 4,
+      "timecodeStopBehavior": 1,
+      "timecodeFreewheelTime": 0.75,
+      "timecodeLookbackTime": 0,
+      "timecodeTrigger": {
+        "frames": 0,
+        "videoSpeed": false,
+        "hours": 1,
+        "bits": 0,
+        "seconds": 0,
+        "fps": 30,
+        "minutes": 0,
+        "dropFrame": false
+      },
+      "timecodeTrigger/text": "1:00:00:00"
+    }
+  },
+  "restored_dry": {
+    "ok": true,
+    "status": "dry_run",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": true,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 0,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+        "cue_id": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+        "profile": "group_basic",
+        "status": "dry_run",
+        "properties": {
+          "flagged": false,
+          "timecodeFreewheelTime": 0.25
+        },
+        "operations": [
+          {
+            "operation": "set_property",
+            "property": "flagged",
+            "path": "flagged",
+            "mode": "saved",
+            "args": [
+              false
+            ],
+            "arg_values": {
+              "value": false
+            },
+            "read_key": "flagged",
+            "risk_tier": "safe",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          },
+          {
+            "operation": "set_property",
+            "property": "timecodeFreewheelTime",
+            "path": "timecodeFreewheelTime",
+            "mode": "saved",
+            "args": [
+              0.25
+            ],
+            "arg_values": {
+              "value": 0.25
+            },
+            "read_key": "timecodeFreewheelTime",
+            "risk_tier": "safe",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "timecodeFreewheelTime": 0.75,
+          "parent": "__root__",
+          "flagged": true,
+          "type": "Cue List",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+          "isWarning": false,
+          "allowsEditingDuration": false,
+          "isBroken": false
+        },
+        "after": null,
+        "diff": {
+          "flagged": {
+            "before": true,
+            "requested": false
+          },
+          "timecodeFreewheelTime": {
+            "before": 0.75,
+            "requested": 0.25
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "flagged",
+            "key": "flagged",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87/flagged",
+            "args": [
+              false
+            ],
+            "status": "planned"
+          },
+          {
+            "operation": "set_property",
+            "property": "timecodeFreewheelTime",
+            "key": "timecodeFreewheelTime",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87/timecodeFreewheelTime",
+            "args": [
+              0.25
+            ],
+            "status": "planned"
+          }
+        ],
+        "executed_operations": [],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "dry_run"
+  },
+  "restored": {
+    "ok": true,
+    "status": "updated",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": false,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 1,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+        "cue_id": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+        "profile": "group_basic",
+        "status": "updated",
+        "properties": {
+          "flagged": false,
+          "timecodeFreewheelTime": 0.25
+        },
+        "operations": [
+          {
+            "operation": "set_property",
+            "property": "flagged",
+            "path": "flagged",
+            "mode": "saved",
+            "args": [
+              false
+            ],
+            "arg_values": {
+              "value": false
+            },
+            "read_key": "flagged",
+            "risk_tier": "safe",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          },
+          {
+            "operation": "set_property",
+            "property": "timecodeFreewheelTime",
+            "path": "timecodeFreewheelTime",
+            "mode": "saved",
+            "args": [
+              0.25
+            ],
+            "arg_values": {
+              "value": 0.25
+            },
+            "read_key": "timecodeFreewheelTime",
+            "risk_tier": "safe",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "timecodeFreewheelTime": 0.75,
+          "parent": "__root__",
+          "flagged": true,
+          "type": "Cue List",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+          "isWarning": false,
+          "allowsEditingDuration": false,
+          "isBroken": false
+        },
+        "after": {
+          "flagged": false,
+          "type": "Cue List",
+          "uniqueID": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+          "timecodeFreewheelTime": 0.25
+        },
+        "diff": {
+          "flagged": {
+            "before": true,
+            "requested": false
+          },
+          "timecodeFreewheelTime": {
+            "before": 0.75,
+            "requested": 0.25
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "flagged",
+            "key": "flagged",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87/flagged",
+            "args": [
+              false
+            ],
+            "status": "verified"
+          },
+          {
+            "operation": "set_property",
+            "property": "timecodeFreewheelTime",
+            "key": "timecodeFreewheelTime",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87/timecodeFreewheelTime",
+            "args": [
+              0.25
+            ],
+            "status": "verified"
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "set_property",
+            "property": "flagged",
+            "key": "flagged",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87/flagged",
+            "args": [
+              false
+            ],
+            "status": "sent",
+            "reply_error": null
+          },
+          {
+            "operation": "set_property",
+            "property": "timecodeFreewheelTime",
+            "key": "timecodeFreewheelTime",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87/timecodeFreewheelTime",
+            "args": [
+              0.25
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "updated"
+  },
+  "restored_readback": {
+    "ok": true,
+    "status": "ok",
+    "partial": false,
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "error_code": null,
+    "message": null,
+    "suggested_action": null,
+    "coverage": {
+      "source": "documented_osc",
+      "unavailable_via_osc": [
+        "sync_enabled",
+        "mtc_source_name",
+        "ltc_input_patch",
+        "ltc_sync_channel"
+      ],
+      "unavailable_fields": [
+        "currentTimecode",
+        "currentTimecode/text"
+      ],
+      "failed_routes": [],
+      "notes": [
+        "Timecode mode/configuration does not prove synchronization is enabled or a signal is present.",
+        "Current timecode may be unavailable when the list is not receiving timecode.",
+        "Depth 0 reads no children; max_cues counts descendants, excluding the list root.",
+        "Reads are sequential observations, not an atomic snapshot."
+      ]
+    },
+    "warnings": [],
+    "errors": {},
+    "cue_list_id": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+    "profile": "technical",
+    "identity": {
+      "uniqueID": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+      "type": "Cue List",
+      "name": "MCP_GROUP_WRITE_FIXTURE",
+      "displayName": "MCP_GROUP_WRITE_FIXTURE",
+      "listName": "MCP_GROUP_WRITE_FIXTURE",
+      "number": "",
+      "colorName": "none",
+      "secondColorName": "none",
+      "useSecondColor": false
+    },
+    "basics": {
+      "defaultName": "",
+      "notes": "",
+      "mode": 0,
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false
+    },
+    "state": {
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false
+    },
+    "playhead": {
+      "number": "",
+      "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "present": true
+    },
+    "playback_position": {
+      "number": "",
+      "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "present": true
+    },
+    "incoming_timecode": {
+      "current": null,
+      "text": null,
+      "sync_mode": {
+        "value": 0,
+        "label": "MTC"
+      },
+      "smpte_format": {
+        "value": 3,
+        "label": "30 fps"
+      },
+      "start_behavior": {
+        "value": 4,
+        "label": "Start all earlier triggers"
+      },
+      "stop_behavior": {
+        "value": 1,
+        "label": "Pause timecode-triggered cues"
+      },
+      "freewheel_seconds": 0.25,
+      "lookback_seconds": 0.0,
+      "trigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "trigger_text": "1:00:00:00"
+    },
+    "contents": {
+      "children": [
+        {
+          "uniqueID": "88735E9C-39F7-523A-9801-D7AFD2DBD752",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 1,
+          "children": [
+            {
+              "uniqueID": "4B3A37C5-3DBD-5E7A-B6BD-7746B2871804",
+              "type": "Group",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": null,
+              "children": [],
+              "children_complete": null
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+          "type": "Group",
+          "number": "125",
+          "name": "",
+          "displayName": null,
+          "listName": "",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "3D1A56D3-6E61-5F24-8C45-96BD132CBD06",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 3,
+          "children": [
+            {
+              "uniqueID": "DB9A18B5-619F-5917-9187-708DFF3FCB38",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "<redacted-local-path-a56ca6550c>.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "ACA941CE-4CEA-5D7E-B4A5-0FF0401CD902",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Rihanna - Don-'t Stop The Music.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "8DFFAD2E-77AB-56EA-9049-30F5C2BD6915",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Shape of You - Ed Sheeran.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "CE83987E-A15F-58CE-83D1-0480127BDBA5",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 3,
+          "children": [
+            {
+              "uniqueID": "18175C62-6358-5143-9D1C-7945B1546E76",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "<redacted-local-path-a56ca6550c>.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "EA33C496-F6B1-5F0B-8013-8A91EBF2F0D8",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Rihanna - Don-'t Stop The Music.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "01D114C3-6A29-512A-B3F9-8DB4E397B484",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Shape of You - Ed Sheeran.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "Playlist - Shuffle, Loop, Crossfade",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 3,
+          "children": [
+            {
+              "uniqueID": "69FAE776-BD85-5490-B4B1-25D716F55E34",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Rihanna - Don-'t Stop The Music.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "4B564579-4FC3-50A6-85DB-05A22B75005F",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "<redacted-local-path-a56ca6550c>.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "8DD1F3DC-66BD-58CB-9B59-333EE9918601",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Shape of You - Ed Sheeran.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "B8C68B70-0F40-5C26-8E37-49A75E5762ED",
+          "type": "Group",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "Playlist",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 3,
+          "children": [
+            {
+              "uniqueID": "62E23EF0-3CBD-5713-9A12-14783995637A",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "<redacted-local-path-a56ca6550c>.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "3FD98079-3EF7-52C9-BFB5-EF44D5DD69EB",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Rihanna - Don-'t Stop The Music.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            },
+            {
+              "uniqueID": "B8D9D408-6C83-5589-AE17-FCE4E3CA2630",
+              "type": "Audio",
+              "number": "",
+              "name": "",
+              "displayName": null,
+              "listName": "Shape of You - Ed Sheeran.mp3",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": 0,
+              "children": [],
+              "children_complete": true
+            }
+          ],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "1A2C6F8E-C52D-57DB-A13D-69E908C80BDD",
+          "type": "Group",
+          "number": "",
+          "name": "grupo cuidado",
+          "displayName": null,
+          "listName": "grupo cuidado",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 1,
+          "children": [
+            {
+              "uniqueID": "EADC45F7-D2FD-578B-8329-E65046FE4565",
+              "type": "Group",
+              "number": "",
+              "name": "subgrupo",
+              "displayName": null,
+              "listName": "subgrupo",
+              "colorName": "none",
+              "armed": true,
+              "flagged": false,
+              "child_count": null,
+              "children": [],
+              "children_complete": null
+            }
+          ],
+          "children_complete": true
+        }
+      ],
+      "direct_child_count": 7,
+      "returned_count": 21,
+      "max_depth": 2,
+      "max_cues": 1000,
+      "truncated": true,
+      "truncation_reasons": [
+        "max_depth"
+      ]
+    },
+    "technical_payload": {
+      "uniqueID": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+      "type": "Cue List",
+      "name": "MCP_GROUP_WRITE_FIXTURE",
+      "displayName": "MCP_GROUP_WRITE_FIXTURE",
+      "listName": "MCP_GROUP_WRITE_FIXTURE",
+      "number": "",
+      "colorName": "none",
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false,
+      "defaultName": "",
+      "notes": "",
+      "mode": 0,
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "playhead": "",
+      "playheadID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "playbackPosition": "",
+      "playbackPositionID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "timecodeSyncMode": 0,
+      "timecodeSMPTEFormat": 3,
+      "timecodeStartBehavior": 4,
+      "timecodeStopBehavior": 1,
+      "timecodeFreewheelTime": 0.25,
+      "timecodeLookbackTime": 0,
+      "timecodeTrigger": {
+        "frames": 0,
+        "videoSpeed": false,
+        "hours": 1,
+        "bits": 0,
+        "seconds": 0,
+        "fps": 30,
+        "minutes": 0,
+        "dropFrame": false
+      },
+      "timecodeTrigger/text": "1:00:00:00"
+    }
+  }
+}

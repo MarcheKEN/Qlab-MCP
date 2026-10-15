@@ -1,0 +1,174 @@
+{
+  "date": "2026-10-10",
+  "scope": "Workflow validation through installed public MCP tools and inspection-only Computer Use; no QLab setters.",
+  "qlab_version": "5.5.10",
+  "workspace_identity": "Exact workspace UUID and saved path privately checked; identifiers, names and paths omitted.",
+  "workspace_count": 1,
+  "mode": "edit",
+  "structure": {
+    "items_including_roots": 493,
+    "list_roots": 25,
+    "cart_roots": 1,
+    "ui_cues_excluding_roots": 467,
+    "index_unchanged": true
+  },
+  "health": {
+    "status_partial": false,
+    "warnings_coverage": "partial",
+    "broken_category_count": 114,
+    "warning_category_count": 4,
+    "known_disconnected_routes": 4,
+    "running": 0,
+    "paused": 0
+  },
+  "reviewed_cases": [
+    {
+      "case": "unassigned_audio_file",
+      "mcp": {
+        "isBroken": true,
+        "hasFileTargets": true,
+        "fileTarget_safe": null
+      },
+      "ui": "Empty File Target prompt; broken row. Confirms no assigned file, not an inaccessible existing file."
+    },
+    {
+      "case": "disconnected_route",
+      "mcp": {
+        "connected": false,
+        "destination_present": true,
+        "width": 1920,
+        "height": 1080
+      },
+      "ui": "Configured display marked missing; 1920 x 1080."
+    },
+    {
+      "case": "wait_timing",
+      "mcp": {
+        "duration": 10,
+        "postWait": 10,
+        "preWait": 0,
+        "continueMode": 2,
+        "armed": true
+      },
+      "ui": "10-second duration/post-wait, Auto-follow and Armed on."
+    },
+    {
+      "case": "fade_disabled_output",
+      "mcp": {
+        "main_enabled": true,
+        "output_1_enabled": false,
+        "main_level": -60,
+        "output_1_level": -60
+      },
+      "ui": "Main highlighted, output 1 inactive; Main label -INF. Raw OSC value retained; UI label is not treated as a numeric baseline."
+    },
+    {
+      "case": "historical_note_conflict",
+      "mcp": "All nine scene cues currently armed.",
+      "ui": "Armed on; Memo still says all disarmed. Notes treated as stale, no edit."
+    },
+    {
+      "case": "bounded_query",
+      "mcp": {
+        "partial": true,
+        "truncated": true,
+        "scanned": 1,
+        "reasons": [
+          "max_cues_scanned"
+        ]
+      },
+      "decision": "Do not claim the scene was audited from this intentionally truncated query."
+    }
+  ],
+  "dry_runs": [
+    {
+      "case": "renumber",
+      "status": "dry_run",
+      "ok": true,
+      "planned_operation_count": 2,
+      "executed_operations": [],
+      "errors": []
+    },
+    {
+      "case": "copy",
+      "status": "dry_run",
+      "ok": true,
+      "planned_operation_count": 1,
+      "executed_operations": [],
+      "errors": []
+    },
+    {
+      "case": "relative",
+      "status": "dry_run",
+      "ok": true,
+      "planned_operation_count": 1,
+      "executed_operations": [],
+      "errors": []
+    },
+    {
+      "case": "occupied_number",
+      "status": "preflight_failed",
+      "ok": false,
+      "planned_operation_count": 0,
+      "executed_operations": [],
+      "errors": [
+        "Cue number is unavailable or already assigned."
+      ]
+    },
+    {
+      "case": "missing_target",
+      "status": "preflight_failed",
+      "ok": false,
+      "planned_operation_count": 0,
+      "executed_operations": [],
+      "errors": [
+        "Fresh cue identity could not be verified."
+      ]
+    },
+    {
+      "case": "unenabled_fade",
+      "status": "preflight_failed",
+      "ok": false,
+      "planned_operation_count": 0,
+      "executed_operations": [],
+      "errors": [
+        "Fade target health/inactivity is unavailable."
+      ]
+    },
+    {
+      "case": "disabled_crosspoint",
+      "status": "preflight_failed",
+      "ok": false,
+      "planned_operation_count": 0,
+      "executed_operations": [],
+      "errors": [
+        "Fade level requires its crosspoint to be enabled."
+      ]
+    }
+  ],
+  "negative_relative": {
+    "isError": true,
+    "error": "Input should be greater than or equal to 0",
+    "executed_operations": []
+  },
+  "preservation": {
+    "full_index_identical": true,
+    "wait_and_memo_identity_basics_timing_state_identical": true,
+    "scene_query_identical": true,
+    "original_selection_restored": true
+  },
+  "checks": {
+    "focused_tests_passed": 107,
+    "skill_frontmatter": "valid",
+    "local_public_tools": 74,
+    "local_links_checked": 14,
+    "git_diff_check": "passed",
+    "new_tool_count": 0,
+    "generic_editor_present": false
+  },
+  "limits": [
+    "Only dry runs were tested live; confirmation execution was not exercised in this documentation phase.",
+    "Physical output, playback, a complete inspector audit and an independent model skill evaluation were not tested.",
+    "The full test suite was not rerun; no runtime source was modified."
+  ]
+}

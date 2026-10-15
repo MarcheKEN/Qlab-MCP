@@ -29,6 +29,15 @@ uv run fastmcp inspect fastmcp.json
 Use compact profiles for normal work. Technical, sensitive, and exhaustive
 profiles can expose larger or more sensitive show data.
 
+For reviewing dependencies, planning a scene, renumbering, copying selected
+properties or calculating relative changes, follow
+[Workspace review and authoring](workspace-authoring.md). Reviews stay read-only
+unless the user authorizes the changes. A project skill links to the same guide;
+it is not installed by the Python package.
+
+For document lifecycle, use the local inventory and gated open/save/clean-close
+tools only after reviewing the [workspace document workflow](agent-workflows.md#workspace-documents).
+
 ## Writes
 
 Writes default to dry-run. The complete multi-tool sequences and good/invalid
@@ -42,14 +51,15 @@ It is a read-only preflight, not a confirmation token.
 
 ### Create
 
-Use [`qlab_create_cues`](agent-workflows.md#create-cues) for one to 50 ordered
+Use [`qlab_create_cues`](agent-workflows.md#create-cues) for one to 100 ordered
 template-backed cues in an exact Cue List, Group, or empty Cue Cart. Creation verifies structure and placement;
 it does not configure initial setters or claim GO readiness.
 
 ### Edit
 
-[`qlab_edit_cues`](agent-workflows.md#edit-existing-cues) resolves exact cues
-and uses per-operation confirmation gates. Batches are non-atomic.
+Family-specific cue editors resolve exact UUIDs and apply typed saved properties
+with signed per-operation confirmation. See [cue editing](agent-workflows.md#edit-existing-cues).
+The public generic editor has been removed.
 
 ### Move
 
@@ -75,4 +85,4 @@ planned structure
 See the [public tool catalogue](tools.md),
 [security policy](../../SECURITY.md), and
 [Create checklist](../development/runtime-validation/create-cues.md) and
-[Edit checklist](../development/runtime-validation/edit-cues.md).
+[Cue editor runtime checklist](../development/runtime-validation/edit-cues.md).

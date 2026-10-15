@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-import base64
 import hashlib
-import hmac
 import json
 import math
-import secrets
-import threading
-import time
 from typing import Any
 from uuid import UUID
 
@@ -24,7 +19,6 @@ GROUP_PLAYLIST_PROPERTIES = frozenset(
     }
 )
 GROUP_PROPERTIES = frozenset({GROUP_MODE_PROPERTY, *GROUP_PLAYLIST_PROPERTIES})
-GROUP_TOKEN_TTL_SECONDS = 300
 GROUP_SOURCE_READ_KEYS = (
     "uniqueID",
     "type",
@@ -61,9 +55,6 @@ GROUP_CHILD_READ_KEYS = (
     "isOverridden",
     "isActionRunning",
 )
-_GROUP_TOKEN_SECRET = secrets.token_bytes(32)
-_CONSUMED_GROUP_TOKENS: dict[str, int] = {}
-_CONSUMED_GROUP_TOKENS_LOCK = threading.Lock()
 
 
 def group_operation(item: dict[str, Any]) -> dict[str, Any] | None:
@@ -71,31 +62,6 @@ def group_operation(item: dict[str, Any]) -> dict[str, Any] | None:
         return None
     operations = item.get("operations") or []
     return next((operation for operation in operations if operation.get("property") in GROUP_PROPERTIES), None)
-
-
-def group_family(operation: dict[str, Any]) -> str:
-    return "groupMode" if operation.get("property") == GROUP_MODE_PROPERTY else "groupPlaylist"
-
-
-def group_structure_error(items: list[dict[str, Any]], workspace_id: str | None = None) -> str | None:
-    if len(items) != 1:
-        return "Group real writes require exactly one cue update."
-    item = items[0]
-    operations = item.get("operations") or []
-    if item.get("profile") != "group_basic":
-        return "Group real writes require group_basic profile."
-    if len(operations) != 1:
-        return "Group real writes require exactly one property."
-    operation = operations[0]
-    if operation.get("property") not in GROUP_PROPERTIES or operation.get("path") != operation.get("property"):
-        return "Group real writes allow only one canonical mode or Playlist property."
-    if operation.get("mode") != "saved":
-        return "Group real writes require saved mode."
-    if not _is_uuid(item.get("cue_ref")):
-        return "Group real writes require exact cue UUID as cue_ref; cue numbers are rejected."
-    if workspace_id is not None and not _is_uuid(workspace_id):
-        return "Group real writes require an exact workspace UUID."
-    return None
 
 
 def read_group_snapshot(
@@ -149,8 +115,6 @@ def group_preflight(
     workspace_id: str,
     item: dict[str, Any],
     before: dict[str, Any] | None,
-    *,
-    emit_token: bool,
 ) -> tuple[dict[str, str], list[str]]:
     operation = group_operation(item)
     property_name = operation.get("property") if operation else "group"
@@ -171,105 +135,7 @@ def group_preflight(
     if value_error:
         return ({property_name: value_error}, [])
     operation["group_before_snapshot"] = snapshot
-    if emit_token:
-        operation.update(
-            {
-                "risk_tier": "high",
-                "real_write_enabled": False,
-                "real_write_possible": True,
-                "requires_confirm_token": True,
-                "group_edit_candidate": True,
-                "planned_only_reason": (
-                    "group_mode_requires_confirm_token"
-                    if property_name == GROUP_MODE_PROPERTY
-                    else "group_playlist_requires_confirm_token"
-                ),
-                "future_gate_requirements": [
-                    "single_group_single_property",
-                    "exact_workspace_and_cue_uuid",
-                    "fresh_group_mode_health_and_activity",
-                    "fresh_ordered_child_fingerprint",
-                    "expiring_process_bound_confirm_token",
-                    "fresh_scalar_and_child_readback",
-                    "new_dry_run_for_rollback",
-                ],
-                "rollback_plan": {
-                    "status": "new_dry_run_and_fresh_token_required",
-                    "property": property_name,
-                    "value": baseline,
-                    "automatic_restoration": False,
-                },
-            }
-        )
-        operation["confirm_token"] = _encode_token(
-            group_family(operation),
-            _binding(workspace_id, item, operation, before, snapshot),
-        )
     return ({}, [])
-
-
-def validate_group_token(
-    reader: Any,
-    workspace_id: str,
-    item: dict[str, Any],
-    before: dict[str, Any] | None,
-) -> dict[str, str]:
-    operation = group_operation(item)
-    property_name = operation.get("property") if operation else "group"
-    if operation is None:
-        return {property_name: "Group preflight is incomplete."}
-    payload, token_error = _decode_token(item.get("confirm_gates", [None])[0], group_family(operation))
-    if token_error or payload is None:
-        return {property_name: token_error or "Group confirm_token is invalid."}
-    token_digest = hashlib.sha256(item["confirm_gates"][0].encode()).hexdigest()
-    now = int(time.time())
-    with _CONSUMED_GROUP_TOKENS_LOCK:
-        for digest, expires_at in list(_CONSUMED_GROUP_TOKENS.items()):
-            if expires_at < now:
-                del _CONSUMED_GROUP_TOKENS[digest]
-        if token_digest in _CONSUMED_GROUP_TOKENS:
-            return {property_name: "confirmation_already_consumed: confirm_token has already been used."}
-    errors, _ = group_preflight(reader, workspace_id, item, before, emit_token=False)
-    if errors or not isinstance(before, dict):
-        return errors
-    snapshot = operation["group_before_snapshot"]
-    expected = _binding(workspace_id, item, operation, before, snapshot)
-    if payload.get("binding") != expected:
-        return {property_name: "stale_group_baseline: confirm_token no longer matches the Group or ordered children."}
-    operation.update(
-        real_write_enabled=True,
-        real_write_possible=True,
-        requires_confirm_token=True,
-        rollback_plan={
-            "status": "new_dry_run_and_fresh_token_required",
-            "property": property_name,
-            "value": before.get(property_name),
-            "automatic_restoration": False,
-        },
-    )
-    operation.pop("planned_only_reason", None)
-    return {}
-
-
-def consume_group_token(item: dict[str, Any]) -> dict[str, str]:
-    """Atomically consume a validated Group token immediately before its setter."""
-    operation = group_operation(item)
-    property_name = operation.get("property") if operation else "group"
-    if operation is None:
-        return {}
-    payload, token_error = _decode_token(item.get("confirm_gates", [None])[0], group_family(operation))
-    if token_error or payload is None:
-        return {property_name: token_error or "Group confirm_token is invalid."}
-    token_digest = hashlib.sha256(item["confirm_gates"][0].encode()).hexdigest()
-    now = int(time.time())
-    with _CONSUMED_GROUP_TOKENS_LOCK:
-        for digest, expires_at in list(_CONSUMED_GROUP_TOKENS.items()):
-            if expires_at < now:
-                del _CONSUMED_GROUP_TOKENS[digest]
-        if token_digest in _CONSUMED_GROUP_TOKENS:
-            return {property_name: "confirmation_already_consumed: confirm_token has already been used."}
-        _CONSUMED_GROUP_TOKENS[token_digest] = payload["expires_at"]
-    return {}
 
 
 def group_side_effects(operation: dict[str, Any], after_snapshot: dict[str, Any]) -> list[dict[str, Any]]:
@@ -385,66 +251,6 @@ def _value_error(
         if any(duration < effective_crossfade for duration in durations):
             return "Playlist crossfade duration exceeds one or more child durations."
     return None
-
-
-def _binding(
-    workspace_id: str,
-    item: dict[str, Any],
-    operation: dict[str, Any],
-    before: dict[str, Any],
-    snapshot: dict[str, Any],
-) -> dict[str, Any]:
-    property_name = operation["property"]
-    return {
-        "workspace_id": workspace_id,
-        "cue_ref": item["cue_ref"],
-        "cue_id": before["uniqueID"],
-        "cue_type": before["type"],
-        "profile": item["profile"],
-        "property": property_name,
-        "path": operation["path"],
-        "mode": operation["mode"],
-        "baseline": before.get(property_name),
-        "requested": operation["args"][0],
-        "current_group_mode": before["mode"],
-        "source_health": {key: before.get(key) for key in GROUP_SOURCE_READ_KEYS if key.startswith("is") or key == "armed"},
-        "playlist_state": {key: before.get(key) for key in sorted(GROUP_PLAYLIST_PROPERTIES)},
-        "children_fingerprint": snapshot["fingerprint"],
-    }
-
-
-def _encode_token(family: str, binding: dict[str, Any]) -> str:
-    payload = {
-        "binding": binding,
-        "expires_at": int(time.time()) + GROUP_TOKEN_TTL_SECONDS,
-        "nonce": secrets.token_urlsafe(12),
-    }
-    encoded = base64.urlsafe_b64encode(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    ).decode().rstrip("=")
-    signature = hmac.new(_GROUP_TOKEN_SECRET, encoded.encode(), hashlib.sha256).hexdigest()
-    return f"confirm:{family}:v1:{encoded}:{signature}"
-
-
-def _decode_token(token: Any, family: str) -> tuple[dict[str, Any] | None, str | None]:
-    if not isinstance(token, str):
-        return None, f"{family} confirm_token is required."
-    parts = token.split(":")
-    if len(parts) != 5 or parts[:3] != ["confirm", family, "v1"]:
-        return None, f"{family} confirm_token is malformed or has an unsupported family."
-    encoded, signature = parts[3:]
-    expected = hmac.new(_GROUP_TOKEN_SECRET, encoded.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(signature, expected):
-        return None, f"{family} confirm_token signature is invalid."
-    try:
-        payload = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)).decode())
-    except Exception:
-        return None, f"{family} confirm_token payload is invalid."
-    if not isinstance(payload, dict) or not isinstance(payload.get("expires_at"), int):
-        return None, f"{family} confirm_token payload is invalid."
-    if payload["expires_at"] < int(time.time()):
-        return None, f"{family} confirm_token has expired."
-    return payload, None
 
 
 def _sha256(value: Any) -> str:

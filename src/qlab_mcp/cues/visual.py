@@ -9,11 +9,21 @@ from .family import AudioCrosspoint
 from .list_models import CueListReadResult, CueListState, FiniteNumber
 from .mic import MicBasics, MicSettings, MicTiming
 from .profiles import _video_effects_summary
+from .control import ControlTriggers
 
 Pair = Annotated[list[FiniteNumber], Field(min_length=2, max_length=2)]
 Quaternion = Annotated[list[FiniteNumber], Field(min_length=4, max_length=4)]
 Color = Annotated[list[Annotated[FiniteNumber, Field(ge=0, le=1)]], Field(min_length=4, max_length=4)]
 TextRange = Annotated[list[Annotated[StrictInt, Field(ge=0)]], Field(min_length=2, max_length=2)]
+
+
+class FontsResult(BaseModel):
+    """Application-wide font inventory returned by QLab, never inferred locally."""
+    workspace_id: str
+    scope: Literal["application"] = "application"
+    font_names: list[Annotated[StrictStr, Field(min_length=1)]]
+    families_and_styles: dict[Annotated[StrictStr, Field(min_length=1)],
+                              list[Annotated[StrictStr, Field(min_length=1)]]]
 
 
 class Point(BaseModel):
@@ -68,7 +78,19 @@ class VisualGeometry(BaseModel):
     videoEffects: Effects | None = None
 
 
+class VisualBasics(MicBasics):
+    secondColorName: StrictStr | None = None
+    useSecondColor: StrictBool | None = None
+    allowsEditingDuration: StrictBool | None = None
+
+
+class VisualMediaBasics(AudioBasics, VisualBasics):
+    pass
+
+
 class VideoTiming(AudioTiming):
+    doFade: StrictBool | None = None
+    lockFadeToCue: StrictBool | None = None
     holdLastFrame: StrictBool | None = None
     clockType: Literal["audio", "video"] | None = None
 
@@ -80,6 +102,10 @@ class CameraGeometry(VisualGeometry):
 
 
 class TextRun(BaseModel):
+    # Preserve read-only native attributes for complete format snapshots.
+    model_config = ConfigDict(extra="allow")
+    __pydantic_extra__: dict[str, JsonValue] = Field(init=False)
+
     range: TextRange
     fontFamily: StrictStr | None = None
     fontStyle: StrictStr | None = None
@@ -158,10 +184,13 @@ class CameraCuesResult(AudioCuesResult):
 class VisualDetailsResult(CueListReadResult):
     cue_id: str
     profile: Literal["safe", "technical"] = "safe"
-    basics: MicBasics | None = None
+    basics: VisualBasics | None = None
     state: CueListState | None = None
     timing: MicTiming | None = None
     video: VisualGeometry | None = None
+    triggers: ControlTriggers | None = None
+    edit_capabilities: dict[str, JsonValue] = Field(default_factory=dict)
+    selected_video_effects: list[dict[str, JsonValue]] = Field(default_factory=list)
     technical_payload: JsonValue = None
     redactions: list[dict[str, str]] = Field(default_factory=list)
 
@@ -169,7 +198,7 @@ class VisualDetailsResult(CueListReadResult):
 class VideoCueDetailsResult(VisualDetailsResult):
     cue_type: ClassVar[str] = "Video"
     identity: VideoCueSummary | None = None
-    basics: AudioBasics | None = None
+    basics: VisualMediaBasics | None = None
     timing: VideoTiming | None = None
     audio: AudioSettings | None = None
     level: AudioCrosspoint | None = None
@@ -189,15 +218,41 @@ class TextCueDetailsResult(VisualDetailsResult):
     text: TextContent | None = None
 
 
-VIDEO_MODELS = {"basics": AudioBasics, "state": CueListState, "timing": VideoTiming,
+VIDEO_MODELS = {"triggers": ControlTriggers, "basics": VisualMediaBasics, "state": CueListState, "timing": VideoTiming,
                 "video": VisualGeometry, "audio": AudioSettings}
-CAMERA_MODELS = {"basics": MicBasics, "state": CueListState, "timing": MicTiming,
+CAMERA_MODELS = {"triggers": ControlTriggers, "basics": VisualBasics, "state": CueListState, "timing": MicTiming,
                  "video": CameraGeometry, "audio": MicSettings}
-TEXT_MODELS = {"basics": MicBasics, "state": CueListState, "timing": MicTiming,
+TEXT_MODELS = {"triggers": ControlTriggers, "basics": VisualBasics, "state": CueListState, "timing": MicTiming,
                "video": VisualGeometry, "text": TextContent}
 
 
 class VisualCuesMixin:
+    def get_fonts(self, workspace_id):
+        workspace_id = self._resolve_workspace_id_strict(workspace_id)
+        # The complete installed-font list can exceed a UDP datagram.
+        return FontsResult(workspace_id=workspace_id,
+                           font_names=self._request_tcp("/fontNames", workspace_id=workspace_id).data,
+                           families_and_styles=self._request_tcp("/fontFamiliesAndStyles", workspace_id=workspace_id).data)
+
+    def _selected_video_effects(self, result, selectors):
+        if not selectors or result.identity is None:
+            return result
+        from ..write.video_fx import read_selected
+        from ..sanitizer import sanitize_exception_message
+        try:
+            result.selected_video_effects = read_selected(self, result.workspace_id, result.cue_id, selectors)
+            if result.video and result.video.videoEffects:
+                for item in result.selected_video_effects:
+                    result.video.videoEffects[item['index']].type = item['type']
+                    result.video.videoEffects[item['index']].enabled = item['enabled']
+                from ..write.visual import capabilities
+                result.edit_capabilities = capabilities(result.identity.type, result)
+        except Exception as exc:
+            result.partial = True
+            result.status = 'partial'
+            result.errors['videoEffectSelectors'] = sanitize_exception_message(exc)
+            result.coverage.failed_routes.append('videoEffectIndex/selected')
+        return result
     def get_video_cues(self, workspace_id, cue_list_id, limit=100, offset=0, max_cues_scanned=5000):
         return self._get_family_cues(workspace_id, cue_list_id, limit, offset, max_cues_scanned,
                                      VideoCuesResult, VideoCueSummary)
@@ -210,14 +265,17 @@ class VisualCuesMixin:
         return self._get_family_cues(workspace_id, cue_list_id, limit, offset, max_cues_scanned,
                                      CameraCuesResult, CameraCueSummary)
 
-    def get_video_cue_details(self, workspace_id, cue_id, profile="safe", input_channel=None, output_channel=None):
-        return self._get_family_details(workspace_id, cue_id, profile, input_channel, output_channel,
-                                        VideoCueDetailsResult, VideoCueSummary, VIDEO_MODELS)
+    def get_video_cue_details(self, workspace_id, cue_id, profile="safe", input_channel=None, output_channel=None, video_effects=None, include_native_triggers=False):
+        result = self._get_family_details(workspace_id, cue_id, profile, input_channel, output_channel,
+                                         VideoCueDetailsResult, VideoCueSummary, VIDEO_MODELS, include_native_triggers=include_native_triggers)
+        return self._selected_video_effects(result, video_effects)
 
-    def get_camera_cue_details(self, workspace_id, cue_id, profile="safe", input_channel=None, output_channel=None):
-        return self._get_family_details(workspace_id, cue_id, profile, input_channel, output_channel,
-                                        CameraCueDetailsResult, CameraCueSummary, CAMERA_MODELS)
+    def get_camera_cue_details(self, workspace_id, cue_id, profile="safe", input_channel=None, output_channel=None, video_effects=None, include_native_triggers=False):
+        result = self._get_family_details(workspace_id, cue_id, profile, input_channel, output_channel,
+                                         CameraCueDetailsResult, CameraCueSummary, CAMERA_MODELS, include_native_triggers=include_native_triggers)
+        return self._selected_video_effects(result, video_effects)
 
-    def get_text_cue_details(self, workspace_id, cue_id, profile="safe"):
-        return self._get_family_details(workspace_id, cue_id, profile, None, None,
-                                        TextCueDetailsResult, TextCueSummary, TEXT_MODELS)
+    def get_text_cue_details(self, workspace_id, cue_id, profile="safe", video_effects=None, include_native_triggers=False):
+        result = self._get_family_details(workspace_id, cue_id, profile, None, None,
+                                         TextCueDetailsResult, TextCueSummary, TEXT_MODELS, include_native_triggers=include_native_triggers)
+        return self._selected_video_effects(result, video_effects)

@@ -1,89 +1,89 @@
-# `qlab_create_cue` Runtime Checklist
+# `qlab_create_cues` Runtime Checklist
 
-Use this checklist only in a disposable editable QLab workspace. Workorder 031
-runtime proof covers one blank anchored Wait cue. Create uses only QLab's Cue
-Template defaults; it does not accept initial properties or send setters.
-First-cue creation also supports an empty Cue List, Group, or Cue Cart through
-the container-specific OSC route.
+## Current contract
 
-## Hard limits
+One call accepts 1–100 ordered mixed cue types from workspace Cue Templates.
+Specify one exact Cue List, Group, or empty Cart UUID. Lists and Groups append
+by default; `after_cue_id` inserts after a direct child. A Cart accepts only
+one non-Group cue. No initial setters or cue numbers are sent. Structural
+creation does not prove readiness for GO.
 
-- Use only QLab MCP tools; do not send raw OSC.
-- Use an explicit workspace UUID and exactly one placement selector: an exact
-  anchor cue UUID or an exact empty-container UUID.
-- Require Edit Mode, an empty target (or inactive, structurally stable anchor
-  inside a linear Cue List or Group), and `running/paused/auditioning = 0/0/0`.
-- Record DMX Output before writing and verify it is unchanged afterward.
-- Do not use GO, playback, Audition, Stop, Panic, `/live`, workspace save, or
-  automatic cleanup.
-- Send `/new` once at most. Never retry after a timeout.
+Review a dry run and its exact `confirm:createCues:v2` token (five minutes,
+one use). Each `/new` must return a valid UUID, verified before proceeding.
+The first cue in an empty Cue List changes the active list; QLab selects new
+cues. Selecting the empty List can require control permission. Status-only
+write acknowledgements are accepted only on documented routes and verified
+by fresh reads; reads and `/new` require data.
 
-## Create procedure
+Public timeout is 300 seconds; execution budget is 270 seconds. An accepted
+100-cue request can stop early. Results preserve confirmed cues and their UUIDs:
+`pending_indices` identify unattempted requested positions; `uncertain_indices`
+identify attempted creations not verified, potentially without a UUID.
+`created_count` counts confirmed items, not all possibly-created items.
+`batch_verified` certifies the final simulated structure and inactive state.
+Final read failures retain all confirmed counts. No mutation is retried and
+there is no automatic rollback or cleanup.
 
-1. Call `qlab_check_connection(require_read_access=true)` and resolve exactly
-   one workspace UUID.
-2. Read the workspace overview, status, settings, and anchor details. Confirm
-   Edit Mode, zero activity, anchor UUID, parent, and current sibling order.
-   `isBroken`/`isWarning` are informational and do not block placement.
-3. Run:
+## Installed validation — 2026-09-27
 
-   ```text
-   qlab_create_cue(
-       workspace_id=<workspace UUID>,
-       cue_type="wait",
-       after_cue_id=<anchor UUID>,  # or parent_container_id=<empty UUID>
-       dry_run=true,
-   )
-   ```
+The restarted MCP exposed 49 tools, Create maxItems=100 and all three new result
+fields. On QLab 5.5.10, the UDP workspace `redacted-workspace-6b31c91e.qlab5` was ready in Edit
+Mode with no active cues. A 100-item mixed batch (all 24 types, then 76 Memo/
+Wait items) was planned and sent once to the previously empty Group
+`7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D`.
 
-4. Require structured content, `status="dry_run"`, a fresh
-   `confirm:createCue:v2` token, a container-specific placement plan,
-   parent/order fingerprints, and `executed_operations=[]`.
-5. Execute exactly one real Create with the exact token. Require
-   `status="created"`, a valid `created_cue_id`, and
-   `cleanup_required=false`. `created` certifies identity and placement; it does
-   not certify readiness for GO. Broken or warning health is informational.
-6. Perform fresh readback of the created UUID/`uniqueID`, type, parent, health,
-   `isRunning`, `isPaused`, `isAuditioning`, and placement. Confirm either
-   immediate-after anchor order, container index `0`, or Cart request `0,0`
-   with QLab 5.5.10 readback coordinates `1,1`.
+QLab created all 100 cues. Per-item results and independent MCP readback
+confirmed every UUID, type, parent and position; Computer Use showed cue 125
+with 100 children, the requested type order and no active cues. The tool still
+returned `partial_failed`, `batch_verified=false`, with
+`Final Create structure differs from the complete simulated batch.` The cause
+was UUID casing: QLab's returned UUIDs were uppercase, while structural reads
+normalize them to lowercase. The final simulator compared them literally.
+The fix canonicalizes those UUIDs. After the next user-confirmed restart,
+the same mixed 100-item batch completed in 15.274 seconds with `ok=true`,
+`status=created`, `created_count=100`, `batch_verified=true`, and empty
+pending/uncertain indices. Independent readback matched every UUID and type
+in order; Computer Use showed all 100 children and the 341-cue total.
+Reviewed cleanup deleted exactly those 100 fixtures in 10.708 seconds.
+Fresh full cue-index rows, root order, list contents, current Cue List and
+output overrides matched the baseline; Computer Use returned to 241 cues,
+zero children in Group 125 and zero active cues. See the
+[restart recheck capture](2026-09-27-create-installed-100-recheck.json).
 
-Stop immediately on timeout ambiguity, structural drift, missing structured
-content, invalid identity/type, wrong parent/order, active-state verification,
-or any unexpected extra cue. A broken/warning cue is still a valid Create
-result. Never send setters or retry after an ambiguous `/new` result.
+Delete's reviewed recursive dry-run listed exactly those 100 fixture UUIDs and
+preserved the original Group. The single cleanup deleted all 100. Fresh MCP
+readback and Computer Use confirmed the Group empty, its seven original
+siblings/order intact, 18 roots, 241 cues, the original active Cue List and no
+active cues. Sanitized per-item Create results and compact Delete records are
+in [the runtime capture](2026-09-27-create-installed-100.json).
 
-## Manual cleanup
+Two QLab app instances showed the same workspace path. The instance at
+`<redacted-local-path-2e4542d9aa>.app` reflected the MCP changes (341 cues during
+the test, 241 after cleanup); `/Applications/QLab.app` stayed at the old
+241-cue view during the run. Computer Use validation used the live instance.
+Both windows were returned to the original active Cue List; no GO, playback,
+Save, or settings change occurred.
 
-Only after the new UUID is proven unambiguous:
+## Remaining live coverage
 
-1. Run `qlab_delete_cues` dry-run for that UUID only.
-2. Confirm the plan contains one exact leaf cue and a fresh
-   `confirm:deleteCues:v1` token.
-3. Execute the Delete once with that token.
-4. Read back non-existence of the created UUID, continued existence of the
-   anchor, original parent children, `0/0/0` activity, and unchanged DMX.
+The mixed 100-item restart recheck and cleanup passed. The live 50-item case,
+rejected 0/101 requests, expired or
+replayed tokens, empty-List selection, Cart creation, TCP acknowledgements and
+budget exhaustion were not tested against the installed MCP. Local tests cover
+the simulated validation and error cases; they do not replace these live cases.
 
-Create never performs automatic cleanup. `cleanup_required=true` means manual
-inspection is required; it is not permission to guess or retry. `/new` timeout
-or invalid identity is indeterminate because QLab may have created the cue.
-The Create token is consumed before `/new`; replay is rejected and recovery
-requires workspace inspection plus a fresh dry-run/token. There is no idempotency
-key or public AppleScript fallback backend.
-
-For ordered sequences use `qlab_create_cues` with `cue_types=[...]`. The first
-item uses the initial placement selector; each later item uses the previous
-verified UUID. Review one batch dry-run/token, expect one `/new` per item, and
-stop on the first failure without rollback.
+Use `scripts/capture_move_delete.py` with `tool=qlab_create_cues` to capture
+one reviewed call, elapsed time and errors. Tokens/sensitive fields are
+redacted; exclusive output creation prevents overwriting prior evidence.
+Execution requires `--execute`, `dry_run=false` and its reviewed token. The
+script never retries.
 
 ## Evidence boundary
 
-Real Create uses one generic `/new` path for all enabled non-script, non-container
-cue types. 031 runtime evidence certifies only blank `Wait`; it does not certify
-every type's operational readiness. Empty-container placement is limited to the
-  documented Cue List, Group, and Cart routes above. An experimental raw-OSC
-  smoke in disposable QLab 5.5.10 confirmed Group index `0` and Cart request
-  `0,0` with readback `1,1`; this is transport evidence, not a replacement for
-  the MCP-tool checklist above.
-“Blank” means Create does not provide an initial-properties input; Cue
-Templates and QLab normalization may affect readback.
+Previous Workorder 031 runtime evidence covered one anchored Wait. Raw OSC
+experiments covered Group insertion and Cart coordinates (request 0,0,
+QLab 5.5.10 readback 1,1). An installed Create attempt on 2026-09-27 failed
+with `QLab successful reply JSON missing data` while selecting an empty List;
+this motivated acknowledgement handling. These are historical observations,
+not installed validation of the new 100-item contract. Local fixture tests
+cannot establish real QLab batch duration or operational readiness.

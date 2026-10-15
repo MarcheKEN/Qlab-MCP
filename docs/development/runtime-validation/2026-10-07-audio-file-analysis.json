@@ -1,0 +1,2331 @@
+{
+  "calls": [
+    {
+      "label": "song",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "715f4d5970c6bad622e1d201d3fc82804fe180835b30847dfc4785a8cfbb3cc9",
+      "source": {
+        "path": "<redacted-local-path-d50a65f76e>.mp3",
+        "fingerprint": {
+          "path": "<redacted-local-path-d50a65f76e>.mp3",
+          "device": 16777232,
+          "inode": 6897898,
+          "size": 3740297,
+          "mtime_ns": 1776032892862207249,
+          "ctime_ns": 1784703626889255041
+        },
+        "format": "mp3",
+        "codec": "mp3",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_rate": 44100,
+        "bit_depth": null,
+        "duration_reported_s": 226.246531,
+        "duration_decoded_s": 226.2214739229025
+      },
+      "summary": {
+        "start_s": 0.0,
+        "end_s": 226.2214739229025,
+        "scope": "analyzed_range",
+        "rms_dbfs": -12.046940817731471,
+        "peak_dbfs": 1.623573673344569,
+        "first_significant_audio_s": 1.02,
+        "last_significant_audio_s": 223.14,
+        "silence_regions": [
+          {
+            "start_s": 0.0,
+            "end_s": 1.02
+          },
+          {
+            "start_s": 223.14,
+            "end_s": 226.221473923
+          }
+        ],
+        "onset_count": 742,
+        "beat_count": 271,
+        "rhythm": [
+          {
+            "start_s": 0.0,
+            "end_s": 226.2214739229025,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 0.0,
+          "end_s": 226.2214739229025,
+          "scope": "source_file",
+          "integrated_lufs": -10.19,
+          "loudness_range_lu": 4.3,
+          "true_peak_dbtp": 2.22,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 742,
+        "beats": 271
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 100,
+        "total_frames": 2263,
+        "offset": 0,
+        "complete": true,
+        "next_offset": null,
+        "covered_start_s": 0.0,
+        "covered_end_s": 226.2214739229025,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          0.0,
+          0.1,
+          -118.26181306824809,
+          -106.66937556824948,
+          8.757012816359938e-10,
+          1.0314004913886032e-08,
+          0.9999999888102938,
+          9302.129477697823,
+          0.0,
+          null,
+          true
+        ],
+        [
+          0.1,
+          0.2,
+          -115.03538083876805,
+          -104.23265901968543,
+          4.949796544105699e-12,
+          4.280107893899513e-11,
+          0.9999999999522491,
+          9299.520239836216,
+          0.004847526550292969,
+          3.2264322294800394,
+          true
+        ]
+      ],
+      "last_rows": [
+        [
+          226.10000000000002,
+          226.20000000000002,
+          -104.93473535711969,
+          -88.48046739264535,
+          0.4954165645986692,
+          0.07139369149179736,
+          0.43318974390953346,
+          8391.153341718182,
+          0.0466151237487793,
+          -26.726297471519445,
+          true
+        ],
+        [
+          226.20000000000002,
+          226.2214739229025,
+          -115.67818915356528,
+          -99.6769340472078,
+          6.936347085845265e-08,
+          5.542884344835318e-07,
+          0.9999993763480945,
+          9054.09040376428,
+          0.0,
+          -10.743453796445593,
+          true
+        ]
+      ],
+      "row_count": 2263,
+      "json_bytes": 466231,
+      "elapsed_s": 11.816504374999568,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    },
+    {
+      "label": "cached detail",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "715f4d5970c6bad622e1d201d3fc82804fe180835b30847dfc4785a8cfbb3cc9",
+      "source": {
+        "path": "<redacted-local-path-d50a65f76e>.mp3",
+        "fingerprint": {
+          "path": "<redacted-local-path-d50a65f76e>.mp3",
+          "device": 16777232,
+          "inode": 6897898,
+          "size": 3740297,
+          "mtime_ns": 1776032892862207249,
+          "ctime_ns": 1784703626889255041
+        },
+        "format": "mp3",
+        "codec": "mp3",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_rate": 44100,
+        "bit_depth": null,
+        "duration_reported_s": 226.246531,
+        "duration_decoded_s": 226.2214739229025
+      },
+      "summary": {
+        "start_s": 1.0,
+        "end_s": 2.0,
+        "scope": "analyzed_range",
+        "rms_dbfs": -19.704804206447303,
+        "peak_dbfs": -6.426443692653818,
+        "first_significant_audio_s": 1.02,
+        "last_significant_audio_s": 2.0,
+        "silence_regions": [
+          {
+            "start_s": 1.0,
+            "end_s": 1.02
+          }
+        ],
+        "onset_count": 3,
+        "beat_count": 2,
+        "rhythm": [
+          {
+            "start_s": 0.0,
+            "end_s": 226.2214739229025,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 0.0,
+          "end_s": 226.2214739229025,
+          "scope": "source_file",
+          "integrated_lufs": -10.19,
+          "loudness_range_lu": 4.3,
+          "true_peak_dbtp": 2.22,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 3,
+        "beats": 2
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 10,
+        "total_frames": 100,
+        "offset": 0,
+        "complete": true,
+        "next_offset": null,
+        "covered_start_s": 1.0,
+        "covered_end_s": 2.0,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          1.0,
+          1.01,
+          -84.67112026024189,
+          -72.95213535146604,
+          0.00788309207395358,
+          0.09992921371153278,
+          0.8921876942145136,
+          3855.881059816055,
+          17.539236068725586,
+          null,
+          true
+        ],
+        [
+          1.01,
+          1.02,
+          -63.965631901644564,
+          -49.11225406075239,
+          0.00788309207395358,
+          0.09992921371153278,
+          0.8921876942145136,
+          3855.881059816055,
+          17.539236068725586,
+          20.70548835859733,
+          true
+        ]
+      ],
+      "last_rows": [
+        [
+          1.98,
+          1.99,
+          -16.134393266682007,
+          -9.20091015625217,
+          2.036198263166221e-05,
+          0.8932663758523883,
+          0.10671326216498,
+          2271.0623088026437,
+          0.8112890720367432,
+          0.25119516125518615,
+          false
+        ],
+        [
+          1.99,
+          2.0,
+          -16.58594337414017,
+          -8.899242504975431,
+          2.1498593145204563e-05,
+          0.885022113137756,
+          0.11495638826909868,
+          2234.9873921784647,
+          0.8023343086242676,
+          -0.45155010745816426,
+          false
+        ]
+      ],
+      "row_count": 100,
+      "json_bytes": 20980,
+      "elapsed_s": 0.12447458299993741,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    },
+    {
+      "label": "second authorized file",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "8e9077130dd231d9598be898e9c9628165cd2fd4c89ff107f8cbd43fdfada06f",
+      "source": {
+        "path": "<redacted-local-path-28c6cc97d1>.wav",
+        "fingerprint": {
+          "path": "<redacted-local-path-28c6cc97d1>.wav",
+          "device": 16777232,
+          "inode": 11394298,
+          "size": 21712988,
+          "mtime_ns": 1785261082466465761,
+          "ctime_ns": 1785337565011240684
+        },
+        "format": "wav",
+        "codec": "pcm_s16le",
+        "channels": 2,
+        "channel_layout": null,
+        "sample_rate": 44100,
+        "bit_depth": 16,
+        "duration_reported_s": 123.08898,
+        "duration_decoded_s": 123.08897959183673
+      },
+      "summary": {
+        "start_s": 0.0,
+        "end_s": 123.08897959183673,
+        "scope": "analyzed_range",
+        "rms_dbfs": -13.883977643911038,
+        "peak_dbfs": 0.0,
+        "first_significant_audio_s": 0.02,
+        "last_significant_audio_s": 122.81,
+        "silence_regions": [],
+        "onset_count": 218,
+        "beat_count": 185,
+        "rhythm": [
+          {
+            "start_s": 0.0,
+            "end_s": 123.08897959183673,
+            "scope": "analysis_context",
+            "bpm": 103.359375,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 0.0,
+          "end_s": 123.08897959183673,
+          "scope": "source_file",
+          "integrated_lufs": -10.53,
+          "loudness_range_lu": 12.9,
+          "true_peak_dbtp": 0.09,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 218,
+        "beats": 185
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 100,
+        "total_frames": 1231,
+        "offset": 0,
+        "complete": true,
+        "next_offset": null,
+        "covered_start_s": 0.0,
+        "covered_end_s": 123.08897959183673,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          0.0,
+          0.1,
+          -41.15761594408565,
+          -31.669676404630906,
+          0.008585989073294553,
+          0.9899991762486575,
+          0.0014148346780479292,
+          1532.4533522409556,
+          43.39159393310547,
+          null,
+          false
+        ],
+        [
+          0.1,
+          0.2,
+          -33.52114415029525,
+          -20.141098036533297,
+          0.015330479283049526,
+          0.9843549457483711,
+          0.0003145749685793352,
+          928.2019500772171,
+          3.1893770694732666,
+          7.636471793790399,
+          false
+        ]
+      ],
+      "last_rows": [
+        [
+          122.9,
+          123.0,
+          -68.49567120621315,
+          -55.823481307178575,
+          0.013991328588016617,
+          0.9800194140804963,
+          0.005989257331487028,
+          2664.517070849974,
+          1.4924581050872803,
+          -5.0860017013396615,
+          true
+        ],
+        [
+          123.0,
+          123.08897959183673,
+          -78.21981688508833,
+          -66.78717351808073,
+          0.0006810803678207804,
+          0.9621240879478776,
+          0.037194831684301606,
+          4436.145136396319,
+          1.4359277486801147,
+          -9.724145678875189,
+          true
+        ]
+      ],
+      "row_count": 1231,
+      "json_bytes": 245016,
+      "elapsed_s": 5.039274540999941,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    },
+    {
+      "label": "long first page",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "aab25a9a83e3be9c481aa7ed034a039de15606a79439a0f28abf8ab77a43a1fc",
+      "source": {
+        "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+        "fingerprint": {
+          "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+          "device": 16777232,
+          "inode": 16016565,
+          "size": 32524256,
+          "mtime_ns": 1791368615352263323,
+          "ctime_ns": 1791368615352263323
+        },
+        "format": "mp3",
+        "codec": "mp3",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_rate": 44100,
+        "bit_depth": null,
+        "duration_reported_s": 1800.85551,
+        "duration_decoded_s": null
+      },
+      "summary": {
+        "start_s": 0.0,
+        "end_s": 254.0,
+        "scope": "analyzed_range",
+        "rms_dbfs": -12.067155244973984,
+        "peak_dbfs": 1.7557906140155566,
+        "first_significant_audio_s": 1.02,
+        "last_significant_audio_s": 254.0,
+        "silence_regions": [
+          {
+            "start_s": 0.0,
+            "end_s": 1.02
+          },
+          {
+            "start_s": 223.14,
+            "end_s": 227.24
+          }
+        ],
+        "onset_count": 853,
+        "beat_count": 339,
+        "rhythm": [
+          {
+            "start_s": 0.0,
+            "end_s": 315.0,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 0.0,
+          "end_s": 300.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.15,
+          "loudness_range_lu": 4.6,
+          "true_peak_dbtp": 2.02,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 853,
+        "beats": 339
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 100,
+        "total_frames": 18009,
+        "offset": 0,
+        "complete": false,
+        "next_offset": 2540,
+        "covered_start_s": 0.0,
+        "covered_end_s": 254.0,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          0.0,
+          0.1,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0.0,
+          null,
+          true
+        ],
+        [
+          0.1,
+          0.2,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0.0,
+          null,
+          true
+        ]
+      ],
+      "last_rows": [
+        [
+          253.8,
+          253.9,
+          -8.118414704516347,
+          -0.5323118841978067,
+          0.8517015372323862,
+          0.13824661686484618,
+          0.010051845902767583,
+          1378.7578754715373,
+          1.267815351486206,
+          0.9421085548659569,
+          false
+        ],
+        [
+          253.9,
+          254.0,
+          -7.437306223810286,
+          -1.3091224612758592,
+          0.9670706988562089,
+          0.029582018816565532,
+          0.003347282327225729,
+          1749.6940359401583,
+          3.5734899044036865,
+          0.6811084807060608,
+          false
+        ]
+      ],
+      "row_count": 2540,
+      "json_bytes": 524210,
+      "elapsed_s": 12.534932249999656,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    },
+    {
+      "label": "long at minute 25",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "aab25a9a83e3be9c481aa7ed034a039de15606a79439a0f28abf8ab77a43a1fc",
+      "source": {
+        "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+        "fingerprint": {
+          "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+          "device": 16777232,
+          "inode": 16016565,
+          "size": 32524256,
+          "mtime_ns": 1791368615352263323,
+          "ctime_ns": 1791368615352263323
+        },
+        "format": "mp3",
+        "codec": "mp3",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_rate": 44100,
+        "bit_depth": null,
+        "duration_reported_s": 1800.85551,
+        "duration_decoded_s": 1800.8246031746032
+      },
+      "summary": {
+        "start_s": 1500.0,
+        "end_s": 1502.0,
+        "scope": "analyzed_range",
+        "rms_dbfs": -16.11643783366284,
+        "peak_dbfs": -1.367709230021118,
+        "first_significant_audio_s": 1500.0,
+        "last_significant_audio_s": 1502.0,
+        "silence_regions": [],
+        "onset_count": 9,
+        "beat_count": 2,
+        "rhythm": [
+          {
+            "start_s": 1485.0,
+            "end_s": 1800.8246031746032,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 1500.0,
+          "end_s": 1800.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.26,
+          "loudness_range_lu": 4.3,
+          "true_peak_dbtp": 2.17,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 9,
+        "beats": 2
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 10,
+        "total_frames": 200,
+        "offset": 0,
+        "complete": true,
+        "next_offset": null,
+        "covered_start_s": 1500.0,
+        "covered_end_s": 1502.0,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          1500.0,
+          1500.01,
+          -13.639490900186264,
+          -6.210642574366077,
+          0.0133154109245942,
+          0.5949148418328903,
+          0.39176974724251545,
+          3225.767410249078,
+          1.6767247915267944,
+          null,
+          false
+        ],
+        [
+          1500.01,
+          1500.02,
+          -14.472094163585707,
+          -5.6197257421244675,
+          0.03789297698651312,
+          0.6134093678752919,
+          0.348697655138195,
+          3220.060868570184,
+          1.9362972974777222,
+          -0.8326032633994433,
+          false
+        ]
+      ],
+      "last_rows": [
+        [
+          1501.98,
+          1501.99,
+          -14.315708306231159,
+          -5.557134389394846,
+          0.01363534839270875,
+          0.9214466205909595,
+          0.0649180310163318,
+          1983.2198799972055,
+          0.8225911855697632,
+          -0.4289862623030789,
+          false
+        ],
+        [
+          1501.99,
+          1502.0,
+          -14.801373903609853,
+          -5.649643981662979,
+          0.0209373745364999,
+          0.9234666254576548,
+          0.055596000005845365,
+          1867.6962357560367,
+          0.7695870995521545,
+          -0.48566559737869497,
+          false
+        ]
+      ],
+      "row_count": 200,
+      "json_bytes": 39185,
+      "elapsed_s": 11.641756375000114,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    },
+    {
+      "label": "long continuation",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "aab25a9a83e3be9c481aa7ed034a039de15606a79439a0f28abf8ab77a43a1fc",
+      "source": {
+        "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+        "fingerprint": {
+          "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+          "device": 16777232,
+          "inode": 16016565,
+          "size": 32524256,
+          "mtime_ns": 1791368615352263323,
+          "ctime_ns": 1791368615352263323
+        },
+        "format": "mp3",
+        "codec": "mp3",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_rate": 44100,
+        "bit_depth": null,
+        "duration_reported_s": 1800.85551,
+        "duration_decoded_s": null
+      },
+      "summary": {
+        "start_s": 0.0,
+        "end_s": 254.0,
+        "scope": "analyzed_range",
+        "rms_dbfs": -12.067155244973984,
+        "peak_dbfs": 1.7557906140155566,
+        "first_significant_audio_s": 1.02,
+        "last_significant_audio_s": 254.0,
+        "silence_regions": [
+          {
+            "start_s": 0.0,
+            "end_s": 1.02
+          },
+          {
+            "start_s": 223.14,
+            "end_s": 227.24
+          }
+        ],
+        "onset_count": 853,
+        "beat_count": 339,
+        "rhythm": [
+          {
+            "start_s": 0.0,
+            "end_s": 315.0,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 0.0,
+          "end_s": 300.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.15,
+          "loudness_range_lu": 4.6,
+          "true_peak_dbtp": 2.02,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 853,
+        "beats": 339
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 100,
+        "total_frames": 18009,
+        "offset": 0,
+        "complete": false,
+        "next_offset": 2540,
+        "covered_start_s": 0.0,
+        "covered_end_s": 254.0,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          0.0,
+          0.1,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0.0,
+          null,
+          true
+        ],
+        [
+          0.1,
+          0.2,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0.0,
+          null,
+          true
+        ]
+      ],
+      "last_rows": [
+        [
+          253.8,
+          253.9,
+          -8.118414704516347,
+          -0.5323118841978067,
+          0.8517015372323862,
+          0.13824661686484618,
+          0.010051845902767583,
+          1378.7578754715373,
+          1.267815351486206,
+          0.9421085548659569,
+          false
+        ],
+        [
+          253.9,
+          254.0,
+          -7.437306223810286,
+          -1.3091224612758592,
+          0.9670706988562089,
+          0.029582018816565532,
+          0.003347282327225729,
+          1749.6940359401583,
+          3.5734899044036865,
+          0.6811084807060608,
+          false
+        ]
+      ],
+      "row_count": 2540,
+      "json_bytes": 524210,
+      "elapsed_s": 1.1327314580003076,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    },
+    {
+      "label": "long continuation",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "aab25a9a83e3be9c481aa7ed034a039de15606a79439a0f28abf8ab77a43a1fc",
+      "source": {
+        "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+        "fingerprint": {
+          "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+          "device": 16777232,
+          "inode": 16016565,
+          "size": 32524256,
+          "mtime_ns": 1791368615352263323,
+          "ctime_ns": 1791368615352263323
+        },
+        "format": "mp3",
+        "codec": "mp3",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_rate": 44100,
+        "bit_depth": null,
+        "duration_reported_s": 1800.85551,
+        "duration_decoded_s": null
+      },
+      "summary": {
+        "start_s": 254.0,
+        "end_s": 507.90000000000003,
+        "scope": "analyzed_range",
+        "rms_dbfs": -11.965075182394306,
+        "peak_dbfs": 1.5590947685909564,
+        "first_significant_audio_s": 254.0,
+        "last_significant_audio_s": 507.90000000000003,
+        "silence_regions": [
+          {
+            "start_s": 449.37,
+            "end_s": 453.46
+          }
+        ],
+        "onset_count": 817,
+        "beat_count": 340,
+        "rhythm": [
+          {
+            "start_s": 0.0,
+            "end_s": 315.0,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          },
+          {
+            "start_s": 285.0,
+            "end_s": 615.0,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 0.0,
+          "end_s": 300.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.15,
+          "loudness_range_lu": 4.6,
+          "true_peak_dbtp": 2.02,
+          "error": null
+        },
+        {
+          "start_s": 300.0,
+          "end_s": 600.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.15,
+          "loudness_range_lu": 4.1,
+          "true_peak_dbtp": 2.04,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 817,
+        "beats": 340
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 100,
+        "total_frames": 18009,
+        "offset": 2540,
+        "complete": false,
+        "next_offset": 5079,
+        "covered_start_s": 254.0,
+        "covered_end_s": 507.90000000000003,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          254.0,
+          254.10000000000002,
+          -9.556321474768756,
+          -1.306278777809654,
+          0.8387379524152974,
+          0.14796260489565025,
+          0.013299442689052391,
+          2220.4197828164524,
+          1.720884919166565,
+          -2.11901525095847,
+          false
+        ],
+        [
+          254.10000000000002,
+          254.20000000000002,
+          -10.497683271863185,
+          -2.2235710450068136,
+          0.7464843794234512,
+          0.22923745791203456,
+          0.024278162664514137,
+          2120.2597411789234,
+          4.319940567016602,
+          -0.9413617970944284,
+          false
+        ]
+      ],
+      "last_rows": [
+        [
+          507.70000000000005,
+          507.8,
+          -34.91162557963854,
+          -23.588836322580022,
+          0.013002935363735289,
+          0.8993624351562204,
+          0.0876346294800442,
+          1744.9206721853484,
+          1.301012396812439,
+          2.8357403111624677,
+          false
+        ],
+        [
+          507.8,
+          507.90000000000003,
+          -29.868382955003455,
+          -15.983976795614524,
+          0.013079011487449069,
+          0.949240006974075,
+          0.0376809815384759,
+          1278.716492100516,
+          1.5894320011138916,
+          5.043242624635084,
+          false
+        ]
+      ],
+      "row_count": 2539,
+      "json_bytes": 524208,
+      "elapsed_s": 13.031721374999506,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    },
+    {
+      "label": "long continuation",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "aab25a9a83e3be9c481aa7ed034a039de15606a79439a0f28abf8ab77a43a1fc",
+      "source": {
+        "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+        "fingerprint": {
+          "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+          "device": 16777232,
+          "inode": 16016565,
+          "size": 32524256,
+          "mtime_ns": 1791368615352263323,
+          "ctime_ns": 1791368615352263323
+        },
+        "format": "mp3",
+        "codec": "mp3",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_rate": 44100,
+        "bit_depth": null,
+        "duration_reported_s": 1800.85551,
+        "duration_decoded_s": null
+      },
+      "summary": {
+        "start_s": 507.90000000000003,
+        "end_s": 763.6,
+        "scope": "analyzed_range",
+        "rms_dbfs": -11.92518558975304,
+        "peak_dbfs": 1.3692649189046824,
+        "first_significant_audio_s": 507.90000000000003,
+        "last_significant_audio_s": 763.6,
+        "silence_regions": [
+          {
+            "start_s": 675.59,
+            "end_s": 679.68
+          }
+        ],
+        "onset_count": 840,
+        "beat_count": 343,
+        "rhythm": [
+          {
+            "start_s": 285.0,
+            "end_s": 615.0,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          },
+          {
+            "start_s": 585.0,
+            "end_s": 915.0,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 300.0,
+          "end_s": 600.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.15,
+          "loudness_range_lu": 4.1,
+          "true_peak_dbtp": 2.04,
+          "error": null
+        },
+        {
+          "start_s": 600.0,
+          "end_s": 900.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.24,
+          "loudness_range_lu": 4.4,
+          "true_peak_dbtp": 2.18,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 840,
+        "beats": 343
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 100,
+        "total_frames": 18009,
+        "offset": 5079,
+        "complete": false,
+        "next_offset": 7636,
+        "covered_start_s": 507.90000000000003,
+        "covered_end_s": 763.6,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          507.90000000000003,
+          508.0,
+          -16.665750420484013,
+          -2.1357808012069155,
+          0.0757655984893151,
+          0.8892133981314133,
+          0.03502100337927167,
+          1577.6354644744597,
+          10.252935409545898,
+          13.202632534519442,
+          false
+        ],
+        [
+          508.0,
+          508.1,
+          -21.967506356277823,
+          -11.08474017510141,
+          0.35716720210973757,
+          0.5848235121438612,
+          0.05800928574640122,
+          1296.460116330715,
+          0.8885725736618042,
+          -5.30175593579381,
+          false
+        ]
+      ],
+      "last_rows": [
+        [
+          763.4000000000001,
+          763.5,
+          -7.3855148627450085,
+          -1.302611951101412,
+          0.971911980298151,
+          0.021660624984842367,
+          0.006427394717006706,
+          1085.2025846333645,
+          2.9225549697875977,
+          1.1656878022385015,
+          false
+        ],
+        [
+          763.5,
+          763.6,
+          -9.415966386023104,
+          -1.8190921342366377,
+          0.931852065230964,
+          0.06064833976210363,
+          0.007499595006932322,
+          1547.0314781191125,
+          6.57502555847168,
+          -2.0304515232780957,
+          false
+        ]
+      ],
+      "row_count": 2557,
+      "json_bytes": 524122,
+      "elapsed_s": 13.142049042000508,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    },
+    {
+      "label": "long continuation",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "aab25a9a83e3be9c481aa7ed034a039de15606a79439a0f28abf8ab77a43a1fc",
+      "source": {
+        "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+        "fingerprint": {
+          "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+          "device": 16777232,
+          "inode": 16016565,
+          "size": 32524256,
+          "mtime_ns": 1791368615352263323,
+          "ctime_ns": 1791368615352263323
+        },
+        "format": "mp3",
+        "codec": "mp3",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_rate": 44100,
+        "bit_depth": null,
+        "duration_reported_s": 1800.85551,
+        "duration_decoded_s": null
+      },
+      "summary": {
+        "start_s": 763.6,
+        "end_s": 1017.0,
+        "scope": "analyzed_range",
+        "rms_dbfs": -11.93082196247781,
+        "peak_dbfs": 1.6623499179093528,
+        "first_significant_audio_s": 763.6,
+        "last_significant_audio_s": 1017.0,
+        "silence_regions": [
+          {
+            "start_s": 901.81,
+            "end_s": 905.9
+          }
+        ],
+        "onset_count": 828,
+        "beat_count": 331,
+        "rhythm": [
+          {
+            "start_s": 585.0,
+            "end_s": 915.0,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          },
+          {
+            "start_s": 885.0,
+            "end_s": 1215.0,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 600.0,
+          "end_s": 900.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.24,
+          "loudness_range_lu": 4.4,
+          "true_peak_dbtp": 2.18,
+          "error": null
+        },
+        {
+          "start_s": 900.0,
+          "end_s": 1200.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.19,
+          "loudness_range_lu": 4.7,
+          "true_peak_dbtp": 1.9,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 828,
+        "beats": 331
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 100,
+        "total_frames": 18009,
+        "offset": 7636,
+        "complete": false,
+        "next_offset": 10170,
+        "covered_start_s": 763.6,
+        "covered_end_s": 1017.0,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          763.6,
+          763.7,
+          -7.835315773120785,
+          -2.3087086507066283,
+          0.9504243196393559,
+          0.0485436261415491,
+          0.00103205421909501,
+          886.6678501136287,
+          0.8641479015350342,
+          1.5806506129023195,
+          false
+        ],
+        [
+          763.7,
+          763.8000000000001,
+          -7.326606228264207,
+          -1.8940835920867753,
+          0.9795816227060663,
+          0.01895407037716608,
+          0.001464306916767538,
+          989.9008471124592,
+          4.329098701477051,
+          0.5087095448565782,
+          false
+        ]
+      ],
+      "last_rows": [
+        [
+          1016.8000000000001,
+          1016.9000000000001,
+          -12.285157918832368,
+          -5.158540440904499,
+          0.9377242993472208,
+          0.04110667576159655,
+          0.021169024891182622,
+          1930.1564722548983,
+          1.2369635105133057,
+          0.6545468952673641,
+          false
+        ],
+        [
+          1016.9000000000001,
+          1017.0,
+          -12.054023580804367,
+          -2.430895673115051,
+          0.7750409489678414,
+          0.19594599567616502,
+          0.029013055355993744,
+          1866.5993364880258,
+          4.08090877532959,
+          0.2311343380280011,
+          false
+        ]
+      ],
+      "row_count": 2534,
+      "json_bytes": 524208,
+      "elapsed_s": 13.000747208000575,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    },
+    {
+      "label": "long continuation",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "aab25a9a83e3be9c481aa7ed034a039de15606a79439a0f28abf8ab77a43a1fc",
+      "source": {
+        "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+        "fingerprint": {
+          "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+          "device": 16777232,
+          "inode": 16016565,
+          "size": 32524256,
+          "mtime_ns": 1791368615352263323,
+          "ctime_ns": 1791368615352263323
+        },
+        "format": "mp3",
+        "codec": "mp3",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_rate": 44100,
+        "bit_depth": null,
+        "duration_reported_s": 1800.85551,
+        "duration_decoded_s": null
+      },
+      "summary": {
+        "start_s": 1017.0,
+        "end_s": 1271.4,
+        "scope": "analyzed_range",
+        "rms_dbfs": -12.08855775728158,
+        "peak_dbfs": 1.8760884674998994,
+        "first_significant_audio_s": 1017.0,
+        "last_significant_audio_s": 1271.4,
+        "silence_regions": [
+          {
+            "start_s": 1128.03,
+            "end_s": 1132.13
+          }
+        ],
+        "onset_count": 862,
+        "beat_count": 340,
+        "rhythm": [
+          {
+            "start_s": 885.0,
+            "end_s": 1215.0,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          },
+          {
+            "start_s": 1185.0,
+            "end_s": 1515.0,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 900.0,
+          "end_s": 1200.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.19,
+          "loudness_range_lu": 4.7,
+          "true_peak_dbtp": 1.9,
+          "error": null
+        },
+        {
+          "start_s": 1200.0,
+          "end_s": 1500.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.1,
+          "loudness_range_lu": 4.1,
+          "true_peak_dbtp": 2.2,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 862,
+        "beats": 340
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 100,
+        "total_frames": 18009,
+        "offset": 10170,
+        "complete": false,
+        "next_offset": 12714,
+        "covered_start_s": 1017.0,
+        "covered_end_s": 1271.4,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          1017.0,
+          1017.1,
+          -10.712222064852948,
+          -0.30993146443026925,
+          0.5944615816103919,
+          0.3654916537058126,
+          0.04004676468379559,
+          1675.1947997450538,
+          0.9014612436294556,
+          1.3418015159514187,
+          false
+        ],
+        [
+          1017.1,
+          1017.2,
+          -11.918114465664445,
+          -3.2454930278134944,
+          0.745443318343602,
+          0.2430393566583368,
+          0.011517324998061363,
+          1457.564590628182,
+          1.122615098953247,
+          -1.2058924008114964,
+          false
+        ]
+      ],
+      "last_rows": [
+        [
+          1271.2,
+          1271.3000000000002,
+          -20.307848895914663,
+          -8.354420629932473,
+          0.1406334448243557,
+          0.7811602350462203,
+          0.07820632012942402,
+          2802.73668678406,
+          1.7544777393341064,
+          -5.4239843627842355,
+          false
+        ],
+        [
+          1271.3000000000002,
+          1271.4,
+          -15.000560204009616,
+          -5.322229733461166,
+          0.061168996760505405,
+          0.9164039993806025,
+          0.022427003858892177,
+          1790.3591413888425,
+          2.138758420944214,
+          5.307288691905047,
+          false
+        ]
+      ],
+      "row_count": 2544,
+      "json_bytes": 524160,
+      "elapsed_s": 13.141259957999864,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    },
+    {
+      "label": "long continuation",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "aab25a9a83e3be9c481aa7ed034a039de15606a79439a0f28abf8ab77a43a1fc",
+      "source": {
+        "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+        "fingerprint": {
+          "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+          "device": 16777232,
+          "inode": 16016565,
+          "size": 32524256,
+          "mtime_ns": 1791368615352263323,
+          "ctime_ns": 1791368615352263323
+        },
+        "format": "mp3",
+        "codec": "mp3",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_rate": 44100,
+        "bit_depth": null,
+        "duration_reported_s": 1800.85551,
+        "duration_decoded_s": 1800.8246031746032
+      },
+      "summary": {
+        "start_s": 1271.4,
+        "end_s": 1519.2,
+        "scope": "analyzed_range",
+        "rms_dbfs": -12.200094509365982,
+        "peak_dbfs": 1.6147826159667111,
+        "first_significant_audio_s": 1271.4,
+        "last_significant_audio_s": 1519.2,
+        "silence_regions": [
+          {
+            "start_s": 1354.25,
+            "end_s": 1358.35
+          }
+        ],
+        "onset_count": 910,
+        "beat_count": 332,
+        "rhythm": [
+          {
+            "start_s": 1185.0,
+            "end_s": 1515.0,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          },
+          {
+            "start_s": 1485.0,
+            "end_s": 1800.8246031746032,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 1200.0,
+          "end_s": 1500.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.1,
+          "loudness_range_lu": 4.1,
+          "true_peak_dbtp": 2.2,
+          "error": null
+        },
+        {
+          "start_s": 1500.0,
+          "end_s": 1800.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.26,
+          "loudness_range_lu": 4.3,
+          "true_peak_dbtp": 2.17,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 910,
+        "beats": 332
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 100,
+        "total_frames": 18009,
+        "offset": 12714,
+        "complete": false,
+        "next_offset": 15192,
+        "covered_start_s": 1271.4,
+        "covered_end_s": 1519.2,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          1271.4,
+          1271.5,
+          -21.17062493630658,
+          -5.201264327589463,
+          0.052522771796433596,
+          0.5957202194482499,
+          0.3517570087553164,
+          2029.4715540728848,
+          7.498917102813721,
+          -6.170064732296964,
+          false
+        ],
+        [
+          1271.5,
+          1271.6000000000001,
+          -15.194607299833017,
+          -3.0900457418630793,
+          0.056184851142527206,
+          0.7774668098563836,
+          0.1663483390010891,
+          2889.891219633544,
+          3.469268321990967,
+          5.976017636473564,
+          false
+        ]
+      ],
+      "last_rows": [
+        [
+          1519.0,
+          1519.1000000000001,
+          -31.205517354616518,
+          -16.405058393951755,
+          0.15854018955431942,
+          0.1052657722113176,
+          0.7361940382343629,
+          6516.4911538575625,
+          2.8011727333068848,
+          -11.030194870533137,
+          false
+        ],
+        [
+          1519.1000000000001,
+          1519.2,
+          -23.313147135543744,
+          -12.540779896092495,
+          0.5742495383340684,
+          0.36189050070235657,
+          0.06385996096357496,
+          3231.4768376988695,
+          4.415949821472168,
+          7.892370219072774,
+          false
+        ]
+      ],
+      "row_count": 2478,
+      "json_bytes": 524035,
+      "elapsed_s": 12.921277625000585,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    },
+    {
+      "label": "long continuation",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "aab25a9a83e3be9c481aa7ed034a039de15606a79439a0f28abf8ab77a43a1fc",
+      "source": {
+        "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+        "fingerprint": {
+          "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+          "device": 16777232,
+          "inode": 16016565,
+          "size": 32524256,
+          "mtime_ns": 1791368615352263323,
+          "ctime_ns": 1791368615352263323
+        },
+        "format": "mp3",
+        "codec": "mp3",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_rate": 44100,
+        "bit_depth": null,
+        "duration_reported_s": 1800.85551,
+        "duration_decoded_s": 1800.8246031746032
+      },
+      "summary": {
+        "start_s": 1519.2,
+        "end_s": 1766.2,
+        "scope": "analyzed_range",
+        "rms_dbfs": -12.099083354056814,
+        "peak_dbfs": 1.62446345456162,
+        "first_significant_audio_s": 1519.2,
+        "last_significant_audio_s": 1766.2,
+        "silence_regions": [
+          {
+            "start_s": 1580.47,
+            "end_s": 1584.57
+          }
+        ],
+        "onset_count": 939,
+        "beat_count": 331,
+        "rhythm": [
+          {
+            "start_s": 1485.0,
+            "end_s": 1800.8246031746032,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 1500.0,
+          "end_s": 1800.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.26,
+          "loudness_range_lu": 4.3,
+          "true_peak_dbtp": 2.17,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 939,
+        "beats": 331
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 100,
+        "total_frames": 18009,
+        "offset": 15192,
+        "complete": false,
+        "next_offset": 17662,
+        "covered_start_s": 1519.2,
+        "covered_end_s": 1766.2,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          1519.2,
+          1519.3000000000002,
+          -20.90437372277234,
+          -14.003333414837735,
+          0.4315427443478117,
+          0.5587074127495987,
+          0.009749842902589647,
+          1906.1170495744539,
+          4.89757776260376,
+          2.408773412771403,
+          false
+        ],
+        [
+          1519.3000000000002,
+          1519.4,
+          -25.652088307981955,
+          -16.77722055136883,
+          0.23401472524306458,
+          0.7466246132683824,
+          0.01936066148855296,
+          2180.955281178151,
+          6.57889986038208,
+          -4.747714585209614,
+          false
+        ]
+      ],
+      "last_rows": [
+        [
+          1766.0,
+          1766.1000000000001,
+          -12.31947284670417,
+          -2.675525957330559,
+          0.08353507400778368,
+          0.8709908059745057,
+          0.045474120017710534,
+          1752.9923668572899,
+          1.0579323768615723,
+          -0.22157820445307763,
+          false
+        ],
+        [
+          1766.1000000000001,
+          1766.2,
+          -12.386912716208315,
+          -3.4767923335054185,
+          0.04085755630673465,
+          0.9118990824262528,
+          0.04724336126701246,
+          1726.2540867675211,
+          0.907575249671936,
+          -0.06743986950414538,
+          false
+        ]
+      ],
+      "row_count": 2470,
+      "json_bytes": 524164,
+      "elapsed_s": 1.1298187080001298,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    },
+    {
+      "label": "long continuation",
+      "ok": true,
+      "status": "ok",
+      "analysis_id": "aab25a9a83e3be9c481aa7ed034a039de15606a79439a0f28abf8ab77a43a1fc",
+      "source": {
+        "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+        "fingerprint": {
+          "path": "/private/tmp/qlab-audio-30min-audio-only.mp3",
+          "device": 16777232,
+          "inode": 16016565,
+          "size": 32524256,
+          "mtime_ns": 1791368615352263323,
+          "ctime_ns": 1791368615352263323
+        },
+        "format": "mp3",
+        "codec": "mp3",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "sample_rate": 44100,
+        "bit_depth": null,
+        "duration_reported_s": 1800.85551,
+        "duration_decoded_s": 1800.8246031746032
+      },
+      "summary": {
+        "start_s": 1766.2,
+        "end_s": 1800.8246031746032,
+        "scope": "analyzed_range",
+        "rms_dbfs": -11.488042468220108,
+        "peak_dbfs": 1.3375020353999192,
+        "first_significant_audio_s": 1766.2,
+        "last_significant_audio_s": 1800.8246031746032,
+        "silence_regions": [],
+        "onset_count": 122,
+        "beat_count": 27,
+        "rhythm": [
+          {
+            "start_s": 1485.0,
+            "end_s": 1800.8246031746032,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          },
+          {
+            "start_s": 1785.0,
+            "end_s": 1800.8246031746032,
+            "scope": "analysis_context",
+            "bpm": 79.50721153846153,
+            "confidence": null
+          }
+        ]
+      },
+      "loudness_regions": [
+        {
+          "start_s": 1500.0,
+          "end_s": 1800.0,
+          "scope": "source_block",
+          "integrated_lufs": -10.26,
+          "loudness_range_lu": 4.3,
+          "true_peak_dbtp": 2.17,
+          "error": null
+        },
+        {
+          "start_s": 1800.0,
+          "end_s": 1800.8246031746032,
+          "scope": "source_block",
+          "integrated_lufs": -10.8,
+          "loudness_range_lu": 0.0,
+          "true_peak_dbtp": 0.19,
+          "error": null
+        }
+      ],
+      "events_count": {
+        "onsets": 122,
+        "beats": 27
+      },
+      "timeline": {
+        "columns": [
+          "start_s",
+          "end_s",
+          "rms_dbfs",
+          "peak_dbfs",
+          "low_ratio",
+          "mid_ratio",
+          "high_ratio",
+          "centroid_hz",
+          "onset_strength",
+          "delta_rms_db",
+          "silent"
+        ],
+        "units": {
+          "start_s": "seconds",
+          "end_s": "seconds",
+          "rms_dbfs": "dBFS",
+          "peak_dbfs": "dBFS",
+          "low_ratio": "fraction",
+          "mid_ratio": "fraction",
+          "high_ratio": "fraction",
+          "centroid_hz": "Hz",
+          "onset_strength": "maximum positive mel-band dB change per analysis hop",
+          "delta_rms_db": "dB",
+          "silent": "boolean"
+        },
+        "resolution_ms": 100,
+        "total_frames": 18009,
+        "offset": 17662,
+        "complete": true,
+        "next_offset": null,
+        "covered_start_s": 1766.2,
+        "covered_end_s": 1800.8246031746032,
+        "max_response_bytes": 524288
+      },
+      "first_rows": [
+        [
+          1766.2,
+          1766.3000000000002,
+          -12.437095702471064,
+          -3.364450402169192,
+          0.04690980974279274,
+          0.9238338109875721,
+          0.029256379269635167,
+          1659.647159207777,
+          1.5292038917541504,
+          -0.050182986262749196,
+          false
+        ],
+        [
+          1766.3000000000002,
+          1766.4,
+          -12.499411076764407,
+          -3.178902198376993,
+          0.07041656922439025,
+          0.8833662237865821,
+          0.046217206989027704,
+          1655.2966336075801,
+          1.1490049362182617,
+          -0.062315374293342884,
+          false
+        ]
+      ],
+      "last_rows": [
+        [
+          1800.7,
+          1800.8000000000002,
+          -14.674459458804009,
+          -1.010887774481128,
+          0.049566589041686294,
+          0.9057154485140588,
+          0.04471796244425493,
+          1937.0951363389527,
+          3.222506284713745,
+          -0.5547900589510348,
+          false
+        ],
+        [
+          1800.8000000000002,
+          1800.8246031746032,
+          -16.545895188798735,
+          -5.49835595778398,
+          0.09733508153323624,
+          0.8729910454897399,
+          0.02967387297702376,
+          1889.9928325797207,
+          1.0144834518432617,
+          -1.871435729994726,
+          false
+        ]
+      ],
+      "row_count": 347,
+      "json_bytes": 75538,
+      "elapsed_s": 0.5653437920000215,
+      "versions": {
+        "algorithm": "1",
+        "numpy": "2.4.6",
+        "librosa": "0.11.0",
+        "ffprobe": "7.0",
+        "ffmpeg": "7.0"
+      },
+      "errors": {}
+    }
+  ],
+  "ui_comparison": {
+    "workspace": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "cue": "9B354ECC-3E85-5048-9985-2337DE975D41",
+    "file": "<redacted-local-path-d50a65f76e>.mp3",
+    "ui_duration_s": 226.233,
+    "osc_duration_s": 226.2334693877551,
+    "ui_channels": 2,
+    "ui_sample_rate": 44100,
+    "decoder_duration_delta_s": -0.011995464852589066
+  },
+  "long_fixture": "A temporary approximately 30-minute MP3 made by repeating the authorized song; exact duration checked by independent decode. No QLab playback or source changes.",
+  "registry_count": 73,
+  "long_initial_blocks": [
+    0,
+    5
+  ],
+  "independent_decode_duration_s": 1800.8246031746032,
+  "song_independent_decode_duration_s": 226.2214739229025,
+  "long_full": {
+    "rows": 18009,
+    "onsets": 6171,
+    "beats": 2383,
+    "computed_blocks": [
+      0,
+      5,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "rows_sha256": "99fee6b0041745fa7fea9f0979c65c70e8f93cd2a04d58546f400ef2a987c716",
+    "cache_blocks": 4,
+    "cache_feature_bytes": 6138200
+  },
+  "max_rss_bytes": 579584000
+}

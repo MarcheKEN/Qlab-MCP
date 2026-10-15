@@ -75,7 +75,7 @@ class OscMessageTests(unittest.TestCase):
 
     def test_transport_accepts_status_only_write_acknowledgements(self) -> None:
         client = QLabOscClient(QLabConfig())
-        for address, args in (("/alwaysReply", (1,)), ("/workspace/ws-1/delete_id/cue-1", ())):
+        for address, args in (("/alwaysReply", (1,)), ("/workspace/ws-1/delete_id/cue-1", ()), ("/workspace/ws-1/currentCueListID/cue-1", ()), ("/workspace/ws-1/move/cue-1", (0, "group-1"))):
             packet = encode_message(
                 f"/reply{address}", json.dumps({"status": "ok", "address": address})
             )
@@ -93,7 +93,7 @@ class OscMessageTests(unittest.TestCase):
 
     def test_transport_still_rejects_status_only_read_replies(self) -> None:
         client = QLabOscClient(QLabConfig())
-        for address in ("/alwaysReply", "/workspace/ws-1/cue/cue-1/name"):
+        for address in ("/alwaysReply", "/workspace/ws-1/cue/cue-1/name", "/workspace/ws-1/currentCueListID", "/workspace/ws-1/new", "/workspace/ws-1/move/cue-1", "/elsewhere/delete_id/cue-1"):
             packet = encode_message(f"/reply{address}", json.dumps({"status": "ok"}))
             for transport in ("udp", "tcp"):
                 with self.subTest(address=address, transport=transport):
@@ -105,6 +105,26 @@ class OscMessageTests(unittest.TestCase):
                             client._send_with_reply_on_socket(sock, address)
                         else:
                             client._send_with_reply_on_tcp_socket(sock, address)
+
+    def test_transport_accepts_status_only_cue_setter_but_not_its_read(self) -> None:
+        client = QLabOscClient(QLabConfig())
+        address = "/workspace/ws-1/cue_id/cue-1/name"
+        packet = encode_message(f"/reply{address}", json.dumps({"status": "ok"}))
+        for transport in ("udp", "tcp"):
+            sock = Mock()
+            sock.recvfrom.return_value = (packet, ("127.0.0.1", 53000))
+            sock.recv.return_value = _slip_encode(packet)
+            send = client._send_with_reply_on_socket if transport == "udp" else client._send_with_reply_on_tcp_socket
+            with self.subTest(transport=transport):
+                self.assertEqual(send(sock, address, "New name", allow_empty_data=True).status, "ok")
+                with self.assertRaisesRegex(OscProtocolError, "missing data"):
+                    send(sock, address, "New name")
+                values_address = "/workspace/ws-1/cue_id/cue-1/valuesForKeys"
+                values_packet = encode_message(f"/reply{values_address}", json.dumps({"status": "ok"}))
+                sock.recvfrom.return_value = (values_packet, ("127.0.0.1", 53000))
+                sock.recv.return_value = _slip_encode(values_packet)
+                with self.assertRaisesRegex(OscProtocolError, "missing data"):
+                    send(sock, values_address, '["name"]')
 
     def test_parse_reply_rejects_empty_workspace_id(self) -> None:
         packet = encode_message(
@@ -176,6 +196,14 @@ class OscMessageTests(unittest.TestCase):
         self.assertEqual(framed[0], 0xC0)
         self.assertEqual(framed[-1], 0xC0)
         self.assertEqual(_slip_decode(framed[1:-1]), packet)
+
+    def test_slip_unescaped_reply_needs_no_copy(self) -> None:
+        packet = b"QLab reply " * 50_000
+        self.assertTrue(_slip_decode(packet) is packet, "Unescaped replies should reuse immutable bytes")
+
+    def test_slip_roundtrip_all_byte_values(self) -> None:
+        packet = bytes(range(256)) * 100
+        self.assertEqual(_slip_decode(_slip_encode(packet)[1:-1]), packet)
 
     def test_udp_connect_cache_does_not_suppress_tcp_connect(self) -> None:
         client = QLabOscClient(

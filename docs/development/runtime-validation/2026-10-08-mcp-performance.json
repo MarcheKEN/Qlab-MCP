@@ -1,0 +1,3056 @@
+{
+  "date": "2026-10-08",
+  "runtime_version": "QLab 5.5.10",
+  "runtime_connector_reloaded_after_changes": false,
+  "workspace_mutations": 0,
+  "live_baseline": [
+    {
+      "tool": "qlab_check_connection",
+      "run": 1,
+      "ms": 23,
+      "error": false,
+      "response_json_characters": 8510
+    },
+    {
+      "tool": "qlab_check_connection",
+      "run": 2,
+      "ms": 20,
+      "error": false,
+      "response_json_characters": 8510
+    },
+    {
+      "tool": "qlab_check_connection",
+      "run": 3,
+      "ms": 17,
+      "error": false,
+      "response_json_characters": 8510
+    },
+    {
+      "tool": "qlab_get_cue_lists",
+      "run": 1,
+      "ms": 26,
+      "error": false,
+      "response_json_characters": 18426
+    },
+    {
+      "tool": "qlab_get_cue_lists",
+      "run": 2,
+      "ms": 26,
+      "error": false,
+      "response_json_characters": 18426
+    },
+    {
+      "tool": "qlab_get_cue_lists",
+      "run": 3,
+      "ms": 26,
+      "error": false,
+      "response_json_characters": 18426
+    },
+    {
+      "tool": "qlab_get_audio_cue_details",
+      "run": 1,
+      "ms": 70,
+      "error": false,
+      "response_json_characters": 41994
+    },
+    {
+      "tool": "qlab_get_audio_cue_details",
+      "run": 2,
+      "ms": 70,
+      "error": false,
+      "response_json_characters": 41994
+    },
+    {
+      "tool": "qlab_get_audio_cue_details",
+      "run": 3,
+      "ms": 71,
+      "error": false,
+      "response_json_characters": 41994
+    },
+    {
+      "tool": "qlab_get_control_cue_details",
+      "run": 1,
+      "ms": 68,
+      "error": false,
+      "response_json_characters": 7484
+    },
+    {
+      "tool": "qlab_get_control_cue_details",
+      "run": 2,
+      "ms": 67,
+      "error": false,
+      "response_json_characters": 7484
+    },
+    {
+      "tool": "qlab_get_control_cue_details",
+      "run": 3,
+      "ms": 78,
+      "error": false,
+      "response_json_characters": 7484
+    },
+    {
+      "tool": "qlab_get_workspace_video_settings",
+      "run": 1,
+      "ms": 72,
+      "error": false,
+      "response_json_characters": 16524
+    },
+    {
+      "tool": "qlab_get_workspace_video_settings",
+      "run": 2,
+      "ms": 65,
+      "error": false,
+      "response_json_characters": 16524
+    },
+    {
+      "tool": "qlab_get_workspace_video_settings",
+      "run": 3,
+      "ms": 67,
+      "error": false,
+      "response_json_characters": 16524
+    },
+    {
+      "tool": "qlab_get_video_cue_details",
+      "run": 1,
+      "ms": 88,
+      "error": false,
+      "response_json_characters": 14916
+    },
+    {
+      "tool": "qlab_get_video_cue_details",
+      "run": 2,
+      "ms": 84,
+      "error": false,
+      "response_json_characters": 14916
+    },
+    {
+      "tool": "qlab_get_video_cue_details",
+      "run": 3,
+      "ms": 87,
+      "error": false,
+      "response_json_characters": 14916
+    },
+    {
+      "tool": "qlab_get_workspace_overview",
+      "run": 1,
+      "ms": 116,
+      "error": false,
+      "response_json_characters": 474442
+    },
+    {
+      "tool": "qlab_get_workspace_overview",
+      "run": 2,
+      "ms": 108,
+      "error": false,
+      "response_json_characters": 474442
+    },
+    {
+      "tool": "qlab_get_workspace_overview",
+      "run": 3,
+      "ms": 233,
+      "error": false,
+      "response_json_characters": 474442
+    }
+  ],
+  "live_result_states": [
+    {
+      "tool": "qlab_check_connection",
+      "ok": true,
+      "status": "ready"
+    },
+    {
+      "tool": "qlab_get_cue_lists",
+      "ok": true,
+      "partial": false,
+      "status": "ok"
+    },
+    {
+      "tool": "qlab_get_audio_cue_details",
+      "ok": true,
+      "partial": false,
+      "status": "ok"
+    },
+    {
+      "tool": "qlab_get_control_cue_details",
+      "ok": true,
+      "partial": false,
+      "status": "ok"
+    },
+    {
+      "tool": "qlab_get_workspace_video_settings",
+      "ok": true,
+      "partial": false,
+      "status": "ok"
+    },
+    {
+      "tool": "qlab_get_video_cue_details",
+      "ok": true,
+      "partial": true,
+      "status": "partial"
+    },
+    {
+      "tool": "qlab_get_workspace_overview",
+      "ok": true,
+      "partial": true,
+      "status": "partial"
+    }
+  ],
+  "live_baseline_samples_per_tool": 3,
+  "fixture_benchmarks": {
+    "audio": {
+      "before": {
+        "reader": {
+          "median_ms": 1.9899,
+          "p95_ms": 2.0983,
+          "samples": 200
+        },
+        "mcp": {
+          "median_ms": 95.5032,
+          "p95_ms": 96.609,
+          "samples": 50
+        },
+        "first_reader_ms": 2.7876,
+        "osc_requests": 6
+      },
+      "after": {
+        "reader": {
+          "median_ms": 0.4281,
+          "p95_ms": 0.476,
+          "samples": 200
+        },
+        "mcp": {
+          "median_ms": 93.4492,
+          "p95_ms": 94.8482,
+          "samples": 50
+        },
+        "first_reader_ms": 3.0818,
+        "osc_requests": 6
+      },
+      "observed_results_equal": true,
+      "osc_request_traces_equal": true
+    },
+    "video": {
+      "before": {
+        "reader": {
+          "median_ms": 4.609,
+          "p95_ms": 4.784,
+          "samples": 200
+        },
+        "mcp": {
+          "median_ms": 129.2545,
+          "p95_ms": 130.8561,
+          "samples": 50
+        },
+        "first_reader_ms": 5.1298,
+        "osc_requests": 6
+      },
+      "after": {
+        "reader": {
+          "median_ms": 0.4895,
+          "p95_ms": 0.5329,
+          "samples": 200
+        },
+        "mcp": {
+          "median_ms": 124.0451,
+          "p95_ms": 125.5261,
+          "samples": 50
+        },
+        "first_reader_ms": 4.2854,
+        "osc_requests": 6
+      },
+      "observed_results_equal": true,
+      "osc_request_traces_equal": true
+    },
+    "text": {
+      "before": {
+        "reader": {
+          "median_ms": 3.9753,
+          "p95_ms": 4.1032,
+          "samples": 200
+        },
+        "mcp": {
+          "median_ms": 142.5348,
+          "p95_ms": 150.824,
+          "samples": 50
+        },
+        "first_reader_ms": 4.6558,
+        "osc_requests": 16
+      },
+      "after": {
+        "reader": {
+          "median_ms": 0.6457,
+          "p95_ms": 0.7165,
+          "samples": 200
+        },
+        "mcp": {
+          "median_ms": 138.8947,
+          "p95_ms": 140.0725,
+          "samples": 50
+        },
+        "first_reader_ms": 2.6955,
+        "osc_requests": 16
+      },
+      "observed_results_equal": true,
+      "osc_request_traces_equal": true
+    },
+    "cue_list": {
+      "before": {
+        "reader": {
+          "median_ms": 1.5175,
+          "p95_ms": 1.6219,
+          "samples": 200
+        },
+        "mcp": {
+          "median_ms": 79.9602,
+          "p95_ms": 81.382,
+          "samples": 50
+        },
+        "first_reader_ms": 1.9496,
+        "osc_requests": 5
+      },
+      "after": {
+        "reader": {
+          "median_ms": 0.1267,
+          "p95_ms": 0.2,
+          "samples": 200
+        },
+        "mcp": {
+          "median_ms": 78.8673,
+          "p95_ms": 80.023,
+          "samples": 50
+        },
+        "first_reader_ms": 1.8933,
+        "osc_requests": 5
+      },
+      "observed_results_equal": true,
+      "osc_request_traces_equal": true
+    }
+  },
+  "tcp_reply_benchmarks": [
+    {
+      "bytes": 4096,
+      "decoder_before": {
+        "median_ms": 0.239708,
+        "p95_ms": 0.416125,
+        "samples": 50
+      },
+      "decoder_after": {
+        "median_ms": 0.000292,
+        "p95_ms": 0.000458,
+        "samples": 50
+      },
+      "tcp_reply_before": {
+        "median_ms": 0.274104,
+        "p95_ms": 0.288208,
+        "samples": 50
+      },
+      "tcp_reply_after": {
+        "median_ms": 0.015833,
+        "p95_ms": 0.018041,
+        "samples": 50
+      }
+    },
+    {
+      "bytes": 131072,
+      "decoder_before": {
+        "median_ms": 7.636792,
+        "p95_ms": 7.753,
+        "samples": 50
+      },
+      "decoder_after": {
+        "median_ms": 0.004458,
+        "p95_ms": 0.004583,
+        "samples": 50
+      },
+      "tcp_reply_before": {
+        "median_ms": 7.9275,
+        "p95_ms": 8.489958,
+        "samples": 50
+      },
+      "tcp_reply_after": {
+        "median_ms": 0.228021,
+        "p95_ms": 0.2335,
+        "samples": 50
+      }
+    },
+    {
+      "bytes": 524288,
+      "decoder_before": {
+        "median_ms": 30.516792,
+        "p95_ms": 30.737708,
+        "samples": 50
+      },
+      "decoder_after": {
+        "median_ms": 0.016083,
+        "p95_ms": 0.016333,
+        "samples": 50
+      },
+      "tcp_reply_before": {
+        "median_ms": 31.589313,
+        "p95_ms": 32.52975,
+        "samples": 50
+      },
+      "tcp_reply_after": {
+        "median_ms": 0.927709,
+        "p95_ms": 0.961709,
+        "samples": 50
+      }
+    }
+  ],
+  "source_schema_inspection": {
+    "tools": 73,
+    "list_tools_ms": 167.38,
+    "serialized_schema_characters": 727111
+  },
+  "verification": {
+    "focused_read_tests": 273,
+    "transport_tests": 56,
+    "transport_subtests": 26,
+    "full_suite_passed": 1629,
+    "full_suite_skipped": 35,
+    "full_suite_subtests": 61,
+    "full_suite_seconds": 49.9
+  },
+  "follow_up_after_restart": {
+    "connector_restarted_by_user": true,
+    "version": "QLab 5.5.10",
+    "samples_per_tool": 10,
+    "samples": [
+      {
+        "tool": "qlab_check_connection",
+        "run": 1,
+        "ms": 19,
+        "response_json_characters": 8510,
+        "error": false
+      },
+      {
+        "tool": "qlab_check_connection",
+        "run": 2,
+        "ms": 20,
+        "response_json_characters": 8510,
+        "error": false
+      },
+      {
+        "tool": "qlab_check_connection",
+        "run": 3,
+        "ms": 18,
+        "response_json_characters": 8510,
+        "error": false
+      },
+      {
+        "tool": "qlab_check_connection",
+        "run": 4,
+        "ms": 19,
+        "response_json_characters": 8510,
+        "error": false
+      },
+      {
+        "tool": "qlab_check_connection",
+        "run": 5,
+        "ms": 17,
+        "response_json_characters": 8510,
+        "error": false
+      },
+      {
+        "tool": "qlab_check_connection",
+        "run": 6,
+        "ms": 20,
+        "response_json_characters": 8510,
+        "error": false
+      },
+      {
+        "tool": "qlab_check_connection",
+        "run": 7,
+        "ms": 19,
+        "response_json_characters": 8510,
+        "error": false
+      },
+      {
+        "tool": "qlab_check_connection",
+        "run": 8,
+        "ms": 19,
+        "response_json_characters": 8510,
+        "error": false
+      },
+      {
+        "tool": "qlab_check_connection",
+        "run": 9,
+        "ms": 19,
+        "response_json_characters": 8510,
+        "error": false
+      },
+      {
+        "tool": "qlab_check_connection",
+        "run": 10,
+        "ms": 19,
+        "response_json_characters": 8510,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_cue_lists",
+        "run": 1,
+        "ms": 25,
+        "response_json_characters": 18426,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_cue_lists",
+        "run": 2,
+        "ms": 25,
+        "response_json_characters": 18426,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_cue_lists",
+        "run": 3,
+        "ms": 25,
+        "response_json_characters": 18426,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_cue_lists",
+        "run": 4,
+        "ms": 25,
+        "response_json_characters": 18426,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_cue_lists",
+        "run": 5,
+        "ms": 25,
+        "response_json_characters": 18426,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_cue_lists",
+        "run": 6,
+        "ms": 26,
+        "response_json_characters": 18426,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_cue_lists",
+        "run": 7,
+        "ms": 25,
+        "response_json_characters": 18426,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_cue_lists",
+        "run": 8,
+        "ms": 24,
+        "response_json_characters": 18426,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_cue_lists",
+        "run": 9,
+        "ms": 25,
+        "response_json_characters": 18426,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_cue_lists",
+        "run": 10,
+        "ms": 24,
+        "response_json_characters": 18426,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_audio_cue_details",
+        "run": 1,
+        "ms": 139,
+        "response_json_characters": 41994,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_audio_cue_details",
+        "run": 2,
+        "ms": 118,
+        "response_json_characters": 41994,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_audio_cue_details",
+        "run": 3,
+        "ms": 86,
+        "response_json_characters": 41994,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_audio_cue_details",
+        "run": 4,
+        "ms": 68,
+        "response_json_characters": 41994,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_audio_cue_details",
+        "run": 5,
+        "ms": 66,
+        "response_json_characters": 41994,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_audio_cue_details",
+        "run": 6,
+        "ms": 67,
+        "response_json_characters": 41994,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_audio_cue_details",
+        "run": 7,
+        "ms": 66,
+        "response_json_characters": 41994,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_audio_cue_details",
+        "run": 8,
+        "ms": 67,
+        "response_json_characters": 41994,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_audio_cue_details",
+        "run": 9,
+        "ms": 65,
+        "response_json_characters": 41994,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_audio_cue_details",
+        "run": 10,
+        "ms": 67,
+        "response_json_characters": 41994,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_control_cue_details",
+        "run": 1,
+        "ms": 66,
+        "response_json_characters": 7484,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_control_cue_details",
+        "run": 2,
+        "ms": 64,
+        "response_json_characters": 7484,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_control_cue_details",
+        "run": 3,
+        "ms": 61,
+        "response_json_characters": 7484,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_control_cue_details",
+        "run": 4,
+        "ms": 63,
+        "response_json_characters": 7484,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_control_cue_details",
+        "run": 5,
+        "ms": 62,
+        "response_json_characters": 7484,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_control_cue_details",
+        "run": 6,
+        "ms": 62,
+        "response_json_characters": 7484,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_control_cue_details",
+        "run": 7,
+        "ms": 60,
+        "response_json_characters": 7484,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_control_cue_details",
+        "run": 8,
+        "ms": 62,
+        "response_json_characters": 7484,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_control_cue_details",
+        "run": 9,
+        "ms": 62,
+        "response_json_characters": 7484,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_control_cue_details",
+        "run": 10,
+        "ms": 67,
+        "response_json_characters": 7484,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_video_settings",
+        "run": 1,
+        "ms": 51,
+        "response_json_characters": 16524,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_video_settings",
+        "run": 2,
+        "ms": 50,
+        "response_json_characters": 16524,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_video_settings",
+        "run": 3,
+        "ms": 52,
+        "response_json_characters": 16524,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_video_settings",
+        "run": 4,
+        "ms": 49,
+        "response_json_characters": 16524,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_video_settings",
+        "run": 5,
+        "ms": 51,
+        "response_json_characters": 16524,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_video_settings",
+        "run": 6,
+        "ms": 51,
+        "response_json_characters": 16524,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_video_settings",
+        "run": 7,
+        "ms": 50,
+        "response_json_characters": 16524,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_video_settings",
+        "run": 8,
+        "ms": 49,
+        "response_json_characters": 16524,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_video_settings",
+        "run": 9,
+        "ms": 49,
+        "response_json_characters": 16524,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_video_settings",
+        "run": 10,
+        "ms": 52,
+        "response_json_characters": 16524,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_video_cue_details",
+        "run": 1,
+        "ms": 81,
+        "response_json_characters": 14916,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_video_cue_details",
+        "run": 2,
+        "ms": 77,
+        "response_json_characters": 14916,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_video_cue_details",
+        "run": 3,
+        "ms": 76,
+        "response_json_characters": 14916,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_video_cue_details",
+        "run": 4,
+        "ms": 77,
+        "response_json_characters": 14916,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_video_cue_details",
+        "run": 5,
+        "ms": 75,
+        "response_json_characters": 14916,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_video_cue_details",
+        "run": 6,
+        "ms": 77,
+        "response_json_characters": 14916,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_video_cue_details",
+        "run": 7,
+        "ms": 75,
+        "response_json_characters": 14916,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_video_cue_details",
+        "run": 8,
+        "ms": 77,
+        "response_json_characters": 14916,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_video_cue_details",
+        "run": 9,
+        "ms": 76,
+        "response_json_characters": 14916,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_video_cue_details",
+        "run": 10,
+        "ms": 77,
+        "response_json_characters": 14916,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_overview",
+        "run": 1,
+        "ms": 94,
+        "response_json_characters": 474442,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_overview",
+        "run": 2,
+        "ms": 96,
+        "response_json_characters": 474442,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_overview",
+        "run": 3,
+        "ms": 99,
+        "response_json_characters": 474442,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_overview",
+        "run": 4,
+        "ms": 96,
+        "response_json_characters": 474442,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_overview",
+        "run": 5,
+        "ms": 94,
+        "response_json_characters": 474442,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_overview",
+        "run": 6,
+        "ms": 105,
+        "response_json_characters": 474442,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_overview",
+        "run": 7,
+        "ms": 114,
+        "response_json_characters": 474442,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_overview",
+        "run": 8,
+        "ms": 91,
+        "response_json_characters": 474442,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_overview",
+        "run": 9,
+        "ms": 94,
+        "response_json_characters": 474442,
+        "error": false
+      },
+      {
+        "tool": "qlab_get_workspace_overview",
+        "run": 10,
+        "ms": 103,
+        "response_json_characters": 474442,
+        "error": false
+      }
+    ],
+    "result_states": [
+      {
+        "tool": "qlab_check_connection",
+        "ok": true,
+        "status": "ready"
+      },
+      {
+        "tool": "qlab_get_cue_lists",
+        "ok": true,
+        "partial": false,
+        "status": "ok"
+      },
+      {
+        "tool": "qlab_get_audio_cue_details",
+        "ok": true,
+        "partial": false,
+        "status": "ok"
+      },
+      {
+        "tool": "qlab_get_control_cue_details",
+        "ok": true,
+        "partial": false,
+        "status": "ok"
+      },
+      {
+        "tool": "qlab_get_workspace_video_settings",
+        "ok": true,
+        "partial": false,
+        "status": "ok"
+      },
+      {
+        "tool": "qlab_get_video_cue_details",
+        "ok": true,
+        "partial": true,
+        "status": "partial"
+      },
+      {
+        "tool": "qlab_get_workspace_overview",
+        "ok": true,
+        "partial": true,
+        "status": "partial"
+      }
+    ],
+    "workspace_mutations": 0,
+    "new_catalogue_and_expiry_changes_reloaded": false,
+    "cache_benchmarks_before": [
+      {
+        "entries": 100,
+        "cache_hit": {
+          "median_us": 2.6158,
+          "batches": 5,
+          "calls_per_batch": 1000
+        },
+        "reader_cached_cue_lists": {
+          "median_us": 3.9225,
+          "batches": 5,
+          "calls_per_batch": 1000
+        }
+      },
+      {
+        "entries": 1000,
+        "cache_hit": {
+          "median_us": 21.7958,
+          "batches": 5,
+          "calls_per_batch": 1000
+        },
+        "reader_cached_cue_lists": {
+          "median_us": 23.6935,
+          "batches": 5,
+          "calls_per_batch": 1000
+        }
+      },
+      {
+        "entries": 5000,
+        "cache_hit": {
+          "median_us": 104.1676,
+          "batches": 5,
+          "calls_per_batch": 1000
+        },
+        "reader_cached_cue_lists": {
+          "median_us": 106.838,
+          "batches": 5,
+          "calls_per_batch": 1000
+        }
+      }
+    ],
+    "cache_benchmarks_after": [
+      {
+        "entries": 100,
+        "cache_hit": {
+          "median_us": 0.3712,
+          "batches": 5,
+          "calls_per_batch": 1000
+        },
+        "reader_cached_cue_lists": {
+          "median_us": 1.6123,
+          "batches": 5,
+          "calls_per_batch": 1000
+        }
+      },
+      {
+        "entries": 1000,
+        "cache_hit": {
+          "median_us": 0.3873,
+          "batches": 5,
+          "calls_per_batch": 1000
+        },
+        "reader_cached_cue_lists": {
+          "median_us": 1.6625,
+          "batches": 5,
+          "calls_per_batch": 1000
+        }
+      },
+      {
+        "entries": 5000,
+        "cache_hit": {
+          "median_us": 0.3759,
+          "batches": 5,
+          "calls_per_batch": 1000
+        },
+        "reader_cached_cue_lists": {
+          "median_us": 1.6363,
+          "batches": 5,
+          "calls_per_batch": 1000
+        }
+      }
+    ],
+    "catalogue_benchmark": {
+      "before": {
+        "process_import": {
+          "median_ms": 2127.8858,
+          "min_ms": 2114.0135,
+          "max_ms": 2158.729,
+          "samples": 5
+        },
+        "catalogue_first_ms": 170.841,
+        "catalogue_warm": {
+          "median_ms": 225.5225,
+          "min_ms": 170.5895,
+          "max_ms": 236.4293,
+          "samples": 19
+        },
+        "tools": 73,
+        "catalogue_sha256": "64b2fd470a728295067838f3a14028c195e672076c82653d0ee9292929a9c694",
+        "tool_same_client_warm": {
+          "median_ms": 94.4076,
+          "min_ms": 93.6831,
+          "max_ms": 96.9227,
+          "samples": 24
+        },
+        "fixture_result_sha256": "77c070fbad51c46e70b504828aa274f5fdbb52a9fcf8f20fed551cfb20d7cabd",
+        "first_tool_new_client": {
+          "median_ms": 294.9076,
+          "min_ms": 266.1433,
+          "max_ms": 328.086,
+          "samples": 10
+        }
+      },
+      "after": {
+        "process_import": {
+          "median_ms": 2256.1995,
+          "min_ms": 2204.7007,
+          "max_ms": 2358.2557,
+          "samples": 5
+        },
+        "catalogue_first_ms": 261.4089,
+        "catalogue_warm": {
+          "median_ms": 20.0283,
+          "min_ms": 17.5982,
+          "max_ms": 88.2093,
+          "samples": 19
+        },
+        "tools": 73,
+        "catalogue_sha256": "64b2fd470a728295067838f3a14028c195e672076c82653d0ee9292929a9c694",
+        "tool_same_client_warm": {
+          "median_ms": 94.9041,
+          "min_ms": 93.587,
+          "max_ms": 96.0842,
+          "samples": 24
+        },
+        "fixture_result_sha256": "77c070fbad51c46e70b504828aa274f5fdbb52a9fcf8f20fed551cfb20d7cabd",
+        "first_tool_new_client": {
+          "median_ms": 117.5666,
+          "min_ms": 114.7447,
+          "max_ms": 183.5705,
+          "samples": 10
+        }
+      },
+      "catalogue_identical": true,
+      "fixture_results_identical": true
+    },
+    "interleaved_catalogue_benchmark": {
+      "uncached": {
+        "samples": 20,
+        "median_ms": 173.5398
+      },
+      "cached": {
+        "samples": 20,
+        "median_ms": 24.635
+      }
+    },
+    "verification": {
+      "focused_cache_and_catalogue": 9,
+      "focused_reader_writer_regressions": 345,
+      "focused_subtests": 35,
+      "full_suite_passed": 1632,
+      "full_suite_skipped": 35,
+      "full_suite_subtests": 61,
+      "full_suite_seconds": 30.65,
+      "public_tools": 73,
+      "invalid_output_rejected_with_warm_catalogue": true
+    }
+  },
+  "final_live_after_catalogue_restart": {
+    "timestamp_utc": "2026-10-08T21:01:36.574Z",
+    "connector_restarted_by_user": true,
+    "connection": {
+      "workspace_name": "redacted-workspace-6b31c91e.qlab5",
+      "qlab_version": "5.5.10",
+      "workspace_count": 1,
+      "workspace_mode": "edit",
+      "transport": "udp"
+    },
+    "clock": "Date.now() wall milliseconds around installed MCP calls; resolution 1 ms",
+    "samples_per_standard_tool": 10,
+    "standard_tool_count": 14,
+    "recorded_timed_calls": 205,
+    "preliminary_batch_calls_excluded_from_aggregates": 15,
+    "untimed_connection_checks": 1,
+    "workspace_mutations": 0,
+    "tools": [
+      {
+        "key": "connection",
+        "tool": "qlab_check_connection",
+        "samples": 10,
+        "previous_median_ms": 19,
+        "first_call_ms": 23,
+        "median_ms": 19.5,
+        "min_ms": 19,
+        "max_ms": 23,
+        "p95_ms": 23,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 23,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 8510
+          },
+          {
+            "run": 2,
+            "wall_ms": 21,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 8510
+          },
+          {
+            "run": 3,
+            "wall_ms": 19,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 8510
+          },
+          {
+            "run": 4,
+            "wall_ms": 20,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 8510
+          },
+          {
+            "run": 5,
+            "wall_ms": 19,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 8510
+          },
+          {
+            "run": 6,
+            "wall_ms": 20,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 8510
+          },
+          {
+            "run": 7,
+            "wall_ms": 19,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 8510
+          },
+          {
+            "run": 8,
+            "wall_ms": 19,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 8510
+          },
+          {
+            "run": 9,
+            "wall_ms": 20,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 8510
+          },
+          {
+            "run": 10,
+            "wall_ms": 19,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 8510
+          }
+        ]
+      },
+      {
+        "key": "cue_lists",
+        "tool": "qlab_get_cue_lists",
+        "samples": 10,
+        "previous_median_ms": 25,
+        "first_call_ms": 25,
+        "median_ms": 25,
+        "min_ms": 24,
+        "max_ms": 31,
+        "p95_ms": 31,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 25,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 18426
+          },
+          {
+            "run": 2,
+            "wall_ms": 25,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 18426
+          },
+          {
+            "run": 3,
+            "wall_ms": 26,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 18426
+          },
+          {
+            "run": 4,
+            "wall_ms": 24,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 18426
+          },
+          {
+            "run": 5,
+            "wall_ms": 24,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 18426
+          },
+          {
+            "run": 6,
+            "wall_ms": 25,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 18426
+          },
+          {
+            "run": 7,
+            "wall_ms": 25,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 18426
+          },
+          {
+            "run": 8,
+            "wall_ms": 24,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 18426
+          },
+          {
+            "run": 9,
+            "wall_ms": 26,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 18426
+          },
+          {
+            "run": 10,
+            "wall_ms": 31,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 18426
+          }
+        ]
+      },
+      {
+        "key": "audio_details",
+        "tool": "qlab_get_audio_cue_details",
+        "samples": 10,
+        "previous_median_ms": 67,
+        "first_call_ms": 86,
+        "median_ms": 67,
+        "min_ms": 66,
+        "max_ms": 86,
+        "p95_ms": 86,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 86,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 41994
+          },
+          {
+            "run": 2,
+            "wall_ms": 80,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 41994
+          },
+          {
+            "run": 3,
+            "wall_ms": 68,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 41994
+          },
+          {
+            "run": 4,
+            "wall_ms": 66,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 41994
+          },
+          {
+            "run": 5,
+            "wall_ms": 66,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 41994
+          },
+          {
+            "run": 6,
+            "wall_ms": 67,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 41994
+          },
+          {
+            "run": 7,
+            "wall_ms": 66,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 41994
+          },
+          {
+            "run": 8,
+            "wall_ms": 67,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 41994
+          },
+          {
+            "run": 9,
+            "wall_ms": 70,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 41994
+          },
+          {
+            "run": 10,
+            "wall_ms": 67,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 41994
+          }
+        ]
+      },
+      {
+        "key": "control_details",
+        "tool": "qlab_get_control_cue_details",
+        "samples": 10,
+        "previous_median_ms": 62,
+        "first_call_ms": 67,
+        "median_ms": 62,
+        "min_ms": 61,
+        "max_ms": 67,
+        "p95_ms": 67,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 67,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 7484
+          },
+          {
+            "run": 2,
+            "wall_ms": 65,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 7484
+          },
+          {
+            "run": 3,
+            "wall_ms": 62,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 7484
+          },
+          {
+            "run": 4,
+            "wall_ms": 61,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 7484
+          },
+          {
+            "run": 5,
+            "wall_ms": 61,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 7484
+          },
+          {
+            "run": 6,
+            "wall_ms": 63,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 7484
+          },
+          {
+            "run": 7,
+            "wall_ms": 61,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 7484
+          },
+          {
+            "run": 8,
+            "wall_ms": 62,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 7484
+          },
+          {
+            "run": 9,
+            "wall_ms": 61,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 7484
+          },
+          {
+            "run": 10,
+            "wall_ms": 62,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 7484
+          }
+        ]
+      },
+      {
+        "key": "video_settings",
+        "tool": "qlab_get_workspace_video_settings",
+        "samples": 10,
+        "previous_median_ms": 50.5,
+        "first_call_ms": 51,
+        "median_ms": 51,
+        "min_ms": 49,
+        "max_ms": 52,
+        "p95_ms": 52,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 51,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 16524
+          },
+          {
+            "run": 2,
+            "wall_ms": 50,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 16524
+          },
+          {
+            "run": 3,
+            "wall_ms": 50,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 16524
+          },
+          {
+            "run": 4,
+            "wall_ms": 49,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 16524
+          },
+          {
+            "run": 5,
+            "wall_ms": 51,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 16524
+          },
+          {
+            "run": 6,
+            "wall_ms": 52,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 16524
+          },
+          {
+            "run": 7,
+            "wall_ms": 52,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 16524
+          },
+          {
+            "run": 8,
+            "wall_ms": 52,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 16524
+          },
+          {
+            "run": 9,
+            "wall_ms": 50,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 16524
+          },
+          {
+            "run": 10,
+            "wall_ms": 51,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 16524
+          }
+        ]
+      },
+      {
+        "key": "video_details",
+        "tool": "qlab_get_video_cue_details",
+        "samples": 10,
+        "previous_median_ms": 77,
+        "first_call_ms": 87,
+        "median_ms": 76.5,
+        "min_ms": 75,
+        "max_ms": 87,
+        "p95_ms": 87,
+        "transport_errors": 0,
+        "partial_calls": 10,
+        "errors": {
+          "infiniteLoop": "Invalid OSC value for this field"
+        },
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 87,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {
+              "infiniteLoop": "Invalid OSC value for this field"
+            },
+            "result_json_chars": 14916
+          },
+          {
+            "run": 2,
+            "wall_ms": 76,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {
+              "infiniteLoop": "Invalid OSC value for this field"
+            },
+            "result_json_chars": 14916
+          },
+          {
+            "run": 3,
+            "wall_ms": 77,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {
+              "infiniteLoop": "Invalid OSC value for this field"
+            },
+            "result_json_chars": 14916
+          },
+          {
+            "run": 4,
+            "wall_ms": 75,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {
+              "infiniteLoop": "Invalid OSC value for this field"
+            },
+            "result_json_chars": 14916
+          },
+          {
+            "run": 5,
+            "wall_ms": 77,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {
+              "infiniteLoop": "Invalid OSC value for this field"
+            },
+            "result_json_chars": 14916
+          },
+          {
+            "run": 6,
+            "wall_ms": 75,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {
+              "infiniteLoop": "Invalid OSC value for this field"
+            },
+            "result_json_chars": 14916
+          },
+          {
+            "run": 7,
+            "wall_ms": 78,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {
+              "infiniteLoop": "Invalid OSC value for this field"
+            },
+            "result_json_chars": 14916
+          },
+          {
+            "run": 8,
+            "wall_ms": 75,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {
+              "infiniteLoop": "Invalid OSC value for this field"
+            },
+            "result_json_chars": 14916
+          },
+          {
+            "run": 9,
+            "wall_ms": 76,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {
+              "infiniteLoop": "Invalid OSC value for this field"
+            },
+            "result_json_chars": 14916
+          },
+          {
+            "run": 10,
+            "wall_ms": 78,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {
+              "infiniteLoop": "Invalid OSC value for this field"
+            },
+            "result_json_chars": 14916
+          }
+        ]
+      },
+      {
+        "key": "overview",
+        "tool": "qlab_get_workspace_overview",
+        "samples": 10,
+        "previous_median_ms": 96,
+        "first_call_ms": 93,
+        "median_ms": 95.5,
+        "min_ms": 93,
+        "max_ms": 164,
+        "p95_ms": 164,
+        "transport_errors": 0,
+        "partial_calls": 10,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 93,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {},
+            "result_json_chars": 474442
+          },
+          {
+            "run": 2,
+            "wall_ms": 94,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {},
+            "result_json_chars": 474442
+          },
+          {
+            "run": 3,
+            "wall_ms": 93,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {},
+            "result_json_chars": 474442
+          },
+          {
+            "run": 4,
+            "wall_ms": 95,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {},
+            "result_json_chars": 474442
+          },
+          {
+            "run": 5,
+            "wall_ms": 104,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {},
+            "result_json_chars": 474442
+          },
+          {
+            "run": 6,
+            "wall_ms": 95,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {},
+            "result_json_chars": 474442
+          },
+          {
+            "run": 7,
+            "wall_ms": 100,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {},
+            "result_json_chars": 474442
+          },
+          {
+            "run": 8,
+            "wall_ms": 96,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {},
+            "result_json_chars": 474442
+          },
+          {
+            "run": 9,
+            "wall_ms": 111,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {},
+            "result_json_chars": 474442
+          },
+          {
+            "run": 10,
+            "wall_ms": 164,
+            "is_error": false,
+            "ok": true,
+            "status": "partial",
+            "partial": true,
+            "errors": {},
+            "result_json_chars": 474442
+          }
+        ]
+      }
+    ],
+    "extended_tools": [
+      {
+        "key": "readiness",
+        "tool": "qlab_check_write_readiness",
+        "samples": 10,
+        "first_call_ms": 17,
+        "median_ms": 16,
+        "min_ms": 15,
+        "max_ms": 58,
+        "p95_ms": 58,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 17,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 51976
+          },
+          {
+            "run": 2,
+            "wall_ms": 16,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 51976
+          },
+          {
+            "run": 3,
+            "wall_ms": 15,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 51976
+          },
+          {
+            "run": 4,
+            "wall_ms": 17,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 51976
+          },
+          {
+            "run": 5,
+            "wall_ms": 16,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 51976
+          },
+          {
+            "run": 6,
+            "wall_ms": 15,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 51976
+          },
+          {
+            "run": 7,
+            "wall_ms": 58,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 51976
+          },
+          {
+            "run": 8,
+            "wall_ms": 17,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 51976
+          },
+          {
+            "run": 9,
+            "wall_ms": 16,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 51976
+          },
+          {
+            "run": 10,
+            "wall_ms": 15,
+            "is_error": false,
+            "ok": true,
+            "status": "ready",
+            "partial": null,
+            "errors": {},
+            "result_json_chars": 51976
+          }
+        ]
+      },
+      {
+        "key": "cue_list_details",
+        "tool": "qlab_get_cue_list_details",
+        "samples": 10,
+        "first_call_ms": 53,
+        "median_ms": 50,
+        "min_ms": 48,
+        "max_ms": 190,
+        "p95_ms": 190,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 53,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 10186
+          },
+          {
+            "run": 2,
+            "wall_ms": 49,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 10186
+          },
+          {
+            "run": 3,
+            "wall_ms": 50,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 10186
+          },
+          {
+            "run": 4,
+            "wall_ms": 48,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 10186
+          },
+          {
+            "run": 5,
+            "wall_ms": 50,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 10186
+          },
+          {
+            "run": 6,
+            "wall_ms": 50,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 10186
+          },
+          {
+            "run": 7,
+            "wall_ms": 48,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 10186
+          },
+          {
+            "run": 8,
+            "wall_ms": 48,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 10186
+          },
+          {
+            "run": 9,
+            "wall_ms": 67,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 10186
+          },
+          {
+            "run": 10,
+            "wall_ms": 190,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 10186
+          }
+        ]
+      },
+      {
+        "key": "audio_inventory",
+        "tool": "qlab_get_audio_cues",
+        "samples": 10,
+        "first_call_ms": 38,
+        "median_ms": 22,
+        "min_ms": 21,
+        "max_ms": 38,
+        "p95_ms": 38,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 38,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 2244
+          },
+          {
+            "run": 2,
+            "wall_ms": 25,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 2244
+          },
+          {
+            "run": 3,
+            "wall_ms": 24,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 2244
+          },
+          {
+            "run": 4,
+            "wall_ms": 22,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 2244
+          },
+          {
+            "run": 5,
+            "wall_ms": 22,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 2244
+          },
+          {
+            "run": 6,
+            "wall_ms": 22,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 2244
+          },
+          {
+            "run": 7,
+            "wall_ms": 21,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 2244
+          },
+          {
+            "run": 8,
+            "wall_ms": 21,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 2244
+          },
+          {
+            "run": 9,
+            "wall_ms": 21,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 2244
+          },
+          {
+            "run": 10,
+            "wall_ms": 22,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 2244
+          }
+        ]
+      },
+      {
+        "key": "light_details",
+        "tool": "qlab_get_light_cue_details",
+        "samples": 10,
+        "first_call_ms": 51,
+        "median_ms": 46.5,
+        "min_ms": 45,
+        "max_ms": 51,
+        "p95_ms": 51,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 51,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 21264
+          },
+          {
+            "run": 2,
+            "wall_ms": 47,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 21264
+          },
+          {
+            "run": 3,
+            "wall_ms": 47,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 21264
+          },
+          {
+            "run": 4,
+            "wall_ms": 47,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 21264
+          },
+          {
+            "run": 5,
+            "wall_ms": 46,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 21264
+          },
+          {
+            "run": 6,
+            "wall_ms": 47,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 21264
+          },
+          {
+            "run": 7,
+            "wall_ms": 45,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 21264
+          },
+          {
+            "run": 8,
+            "wall_ms": 45,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 21264
+          },
+          {
+            "run": 9,
+            "wall_ms": 45,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 21264
+          },
+          {
+            "run": 10,
+            "wall_ms": 46,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 21264
+          }
+        ]
+      },
+      {
+        "key": "fade_details",
+        "tool": "qlab_get_fade_cue_details",
+        "samples": 10,
+        "first_call_ms": 78,
+        "median_ms": 75,
+        "min_ms": 73,
+        "max_ms": 78,
+        "p95_ms": 78,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 78,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 35726
+          },
+          {
+            "run": 2,
+            "wall_ms": 74,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 35726
+          },
+          {
+            "run": 3,
+            "wall_ms": 76,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 35726
+          },
+          {
+            "run": 4,
+            "wall_ms": 75,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 35726
+          },
+          {
+            "run": 5,
+            "wall_ms": 77,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 35726
+          },
+          {
+            "run": 6,
+            "wall_ms": 75,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 35726
+          },
+          {
+            "run": 7,
+            "wall_ms": 76,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 35726
+          },
+          {
+            "run": 8,
+            "wall_ms": 74,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 35726
+          },
+          {
+            "run": 9,
+            "wall_ms": 74,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 35726
+          },
+          {
+            "run": 10,
+            "wall_ms": 73,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 35726
+          }
+        ]
+      },
+      {
+        "key": "audio_search",
+        "tool": "qlab_query_cues",
+        "samples": 10,
+        "first_call_ms": 211,
+        "median_ms": 58,
+        "min_ms": 57,
+        "max_ms": 211,
+        "p95_ms": 211,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 211,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 128848
+          },
+          {
+            "run": 2,
+            "wall_ms": 59,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 128848
+          },
+          {
+            "run": 3,
+            "wall_ms": 68,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 128848
+          },
+          {
+            "run": 4,
+            "wall_ms": 57,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 128848
+          },
+          {
+            "run": 5,
+            "wall_ms": 58,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 128848
+          },
+          {
+            "run": 6,
+            "wall_ms": 58,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 128848
+          },
+          {
+            "run": 7,
+            "wall_ms": 58,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 128848
+          },
+          {
+            "run": 8,
+            "wall_ms": 59,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 128848
+          },
+          {
+            "run": 9,
+            "wall_ms": 58,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 128848
+          },
+          {
+            "run": 10,
+            "wall_ms": 58,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 128848
+          }
+        ]
+      },
+      {
+        "key": "workspace_status",
+        "tool": "qlab_get_workspace_status",
+        "samples": 10,
+        "first_call_ms": 252,
+        "median_ms": 109.5,
+        "min_ms": 104,
+        "max_ms": 252,
+        "p95_ms": 252,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "errors": {},
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 252,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 14738
+          },
+          {
+            "run": 2,
+            "wall_ms": 106,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 14738
+          },
+          {
+            "run": 3,
+            "wall_ms": 104,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 14738
+          },
+          {
+            "run": 4,
+            "wall_ms": 105,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 14738
+          },
+          {
+            "run": 5,
+            "wall_ms": 107,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 14738
+          },
+          {
+            "run": 6,
+            "wall_ms": 115,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 14738
+          },
+          {
+            "run": 7,
+            "wall_ms": 114,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 14738
+          },
+          {
+            "run": 8,
+            "wall_ms": 111,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 14738
+          },
+          {
+            "run": 9,
+            "wall_ms": 111,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 14738
+          },
+          {
+            "run": 10,
+            "wall_ms": 108,
+            "is_error": false,
+            "ok": true,
+            "status": "ok",
+            "partial": false,
+            "errors": {},
+            "result_json_chars": 14738
+          }
+        ]
+      }
+    ],
+    "health_batches": [
+      {
+        "tool": "qlab_get_cue_details",
+        "profile": "health",
+        "cue_count": 1,
+        "samples": 5,
+        "first_call_ms": 11,
+        "median_ms": 6,
+        "min_ms": 5,
+        "max_ms": 11,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "failed_cues": 0,
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 11,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 1,
+            "succeeded_count": 1,
+            "failed_count": 0,
+            "result_json_chars": 3339
+          },
+          {
+            "run": 2,
+            "wall_ms": 6,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 1,
+            "succeeded_count": 1,
+            "failed_count": 0,
+            "result_json_chars": 3339
+          },
+          {
+            "run": 3,
+            "wall_ms": 6,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 1,
+            "succeeded_count": 1,
+            "failed_count": 0,
+            "result_json_chars": 3339
+          },
+          {
+            "run": 4,
+            "wall_ms": 5,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 1,
+            "succeeded_count": 1,
+            "failed_count": 0,
+            "result_json_chars": 3339
+          },
+          {
+            "run": 5,
+            "wall_ms": 7,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 1,
+            "succeeded_count": 1,
+            "failed_count": 0,
+            "result_json_chars": 3339
+          }
+        ]
+      },
+      {
+        "tool": "qlab_get_cue_details",
+        "profile": "health",
+        "cue_count": 10,
+        "samples": 5,
+        "first_call_ms": 16,
+        "median_ms": 16,
+        "min_ms": 15,
+        "max_ms": 16,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "failed_cues": 0,
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 16,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 10,
+            "succeeded_count": 10,
+            "failed_count": 0,
+            "result_json_chars": 23965
+          },
+          {
+            "run": 2,
+            "wall_ms": 15,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 10,
+            "succeeded_count": 10,
+            "failed_count": 0,
+            "result_json_chars": 23965
+          },
+          {
+            "run": 3,
+            "wall_ms": 16,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 10,
+            "succeeded_count": 10,
+            "failed_count": 0,
+            "result_json_chars": 23965
+          },
+          {
+            "run": 4,
+            "wall_ms": 16,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 10,
+            "succeeded_count": 10,
+            "failed_count": 0,
+            "result_json_chars": 23965
+          },
+          {
+            "run": 5,
+            "wall_ms": 16,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 10,
+            "succeeded_count": 10,
+            "failed_count": 0,
+            "result_json_chars": 23965
+          }
+        ]
+      },
+      {
+        "tool": "qlab_get_cue_details",
+        "profile": "health",
+        "cue_count": 50,
+        "samples": 5,
+        "first_call_ms": 46,
+        "median_ms": 42,
+        "min_ms": 37,
+        "max_ms": 46,
+        "transport_errors": 0,
+        "partial_calls": 0,
+        "failed_cues": 0,
+        "runs": [
+          {
+            "run": 1,
+            "wall_ms": 46,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 50,
+            "succeeded_count": 50,
+            "failed_count": 0,
+            "result_json_chars": 111345
+          },
+          {
+            "run": 2,
+            "wall_ms": 42,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 50,
+            "succeeded_count": 50,
+            "failed_count": 0,
+            "result_json_chars": 111345
+          },
+          {
+            "run": 3,
+            "wall_ms": 40,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 50,
+            "succeeded_count": 50,
+            "failed_count": 0,
+            "result_json_chars": 111345
+          },
+          {
+            "run": 4,
+            "wall_ms": 37,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 50,
+            "succeeded_count": 50,
+            "failed_count": 0,
+            "result_json_chars": 111345
+          },
+          {
+            "run": 5,
+            "wall_ms": 42,
+            "is_error": false,
+            "ok": true,
+            "partial": false,
+            "errors": {},
+            "requested_count": 50,
+            "succeeded_count": 50,
+            "failed_count": 0,
+            "result_json_chars": 111345
+          }
+        ]
+      }
+    ],
+    "health_batch_vs_individual": {
+      "tool": "qlab_get_cue_details",
+      "profile": "health",
+      "cue_count": 50,
+      "single_call_count": 50,
+      "individual_total_ms": 287,
+      "individual_min_ms": 4,
+      "individual_max_ms": 7,
+      "batch_median_ms": 42,
+      "individual_errors": 0,
+      "property_mismatch_ids": [],
+      "cache_condition": "Consecutive safe-profile reads with the existing short-lived OSC read cache; batch sampled before individual calls."
+    },
+    "coverage": {
+      "overview_inspected_items": 427,
+      "overview_containers": 25,
+      "query_scanned_items": 427,
+      "query_audio_matches": 68,
+      "query_truncated": false,
+      "batch_succeeded": 50
+    },
+    "known_partial_results": {
+      "image_video_detail": {
+        "field": "infiniteLoop",
+        "error": "Invalid OSC value for this field",
+        "previously_observed": true
+      },
+      "overview": {
+        "reason": "Shallow health coverage is non-authoritative",
+        "previously_observed": true
+      }
+    },
+    "conclusions": [
+      "The installed MCP remains fast after the user restart; repeated request medians are effectively unchanged versus the preceding reload.",
+      "Catalogue caching improvements are measured in local Client(mcp) experiments, not as installed connector discovery latency.",
+      "Existing health-profile batching reduces total observed connector call overhead with matching properties.",
+      "No QLab setters or execution were sent and no further source optimization was needed to close this live-read validation."
+    ],
+    "not_measured": [
+      "Installed connector tools/list discovery latency",
+      "Process cold start in the installed connector",
+      "Live writer throughput",
+      "Cue playback",
+      "Long-file audio analysis"
+    ]
+  }
+}

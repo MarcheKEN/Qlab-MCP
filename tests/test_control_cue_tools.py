@@ -13,6 +13,12 @@ from test_light_group_cue_tools import fixture, FIRST, SECOND
 from test_cue_list_tools import WS, LIST, CART, OTHER, root
 
 
+@pytest.fixture(autouse=True)
+def native_control_reads(monkeypatch):
+    from qlab_mcp import control_applescript
+    monkeypatch.setattr(control_applescript, "request", lambda _reader, ws, uid, key: 0.0 if key == "loadTime" else "")
+
+
 def control_fixture(kind="Start"):
     osc = fixture(kind)
     osc.cell_values[FIRST].update(
@@ -42,6 +48,7 @@ def test_all_types_complete_common_and_conditional_details(kind, profile):
     assert result.identity.type == kind and result.identity.parent_id == OTHER
     assert result.basics.secondTriggerAction == 2 and result.basics.duckLevel == -12
     assert result.timing.currentDuration == 5 and result.timing.timecodeTriggerText == "00:00:00:00"
+    assert result.triggers.timecodeTriggerText == "00:00:00:00"
     assert result.state.isNextInPlaylist is False
     assert (result.basics.notes == "private") == (profile == "technical" or kind == "Memo")
     assert (result.target is not None) == (kind not in {"Wait", "Memo"})
@@ -52,7 +59,7 @@ def test_all_types_complete_common_and_conditional_details(kind, profile):
     assert ("patchTargetID" in keys) == (kind == "Reset")
     assert not keys.intersection({"audioMapTargetID", "loadAt", "loadTime", "assignedNumber"})
     assert all("settings" not in path and "/live" not in path for path, _ in osc.calls)
-    assert all(path.endswith(("/workspaces", "/valuesForKeys", "/timecodeTrigger/text")) for path, _ in osc.calls)
+    assert all(path.endswith(("/workspaces", "/valuesForKeys", "/timecodeTrigger/text", "/fadeAndStopOthers")) for path, _ in osc.calls)
 
 
 def test_inventory_filters_before_pagination_and_rejects_cart():
@@ -106,6 +113,9 @@ def test_allowlisted_documented_fields():
     for kind in CONTROL_TYPES:
         for model in _models(kind).values():
             for name, field in model.model_fields.items():
+                from qlab_mcp.control_applescript import TRIGGER_KEYS
+                if name in TRIGGER_KEYS:
+                    continue  # Native fields must never be treated as OSC routes.
                 validate_property_path(field.validation_alias or name)
 
 
@@ -125,7 +135,7 @@ def test_fastmcp_tools(monkeypatch):
     async def run():
         async with Client(server.mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-            assert len(tools) == 48
+            assert len(tools) == 79
             for name in ("qlab_get_control_cues", "qlab_get_control_cue_details"):
                 assert tools[name].annotations.readOnlyHint and tools[name].outputSchema
             inventory = await client.call_tool("qlab_get_control_cues", {"workspace_id": WS, "cue_list_id": LIST})

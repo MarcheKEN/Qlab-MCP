@@ -1,0 +1,3572 @@
+{
+  "date": "2026-10-09",
+  "qlab_version": "5.5.10",
+  "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+  "workspace_path": "<redacted-local-path-851cab375f>.qlab5",
+  "transport": "source FastMCP Client(mcp), OSC TCP; signed dry run before each production setter",
+  "source_tool_count": 74,
+  "last_observed_installed_tool_count": 73,
+  "playback_executed": false,
+  "fixtures": {
+    "text": "1A325917-012D-5A98-97C3-968E623092EB",
+    "video": "CC889BBC-471F-5039-854E-5F61184B73D6"
+  },
+  "fonts": {
+    "name_count": 529,
+    "family_count": 181,
+    "Helvetica Neue": [
+      "Regular",
+      "Italic",
+      "UltraLight",
+      "UltraLight Italic",
+      "Thin",
+      "Thin Italic",
+      "Light",
+      "Light Italic",
+      "Medium",
+      "Medium Italic",
+      "Bold",
+      "Bold Italic",
+      "Condensed Bold",
+      "Condensed Black"
+    ]
+  },
+  "text_native_semantics": {
+    "preparation": "Experimental normalize used documented scalar native percentage/word routes to discover semantics; production emits resolved UTF-16 JSON ranges.",
+    "baseline": {
+      "text": "Codex MCP text test — placeholder only",
+      "fixedWidth": 0.0,
+      "outputSize": {
+        "width": 1390.0,
+        "height": 100.0
+      },
+      "fragments": [
+        {
+          "range": [
+            0,
+            38
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "alignment": "center",
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      ],
+      "alignment": "center",
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold",
+      "fontFamilyAndStyle": {
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold"
+      },
+      "fontName": "HelveticaNeue-Bold",
+      "fontSize": 72.0,
+      "lineSpacing": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "backgroundColor": null,
+      "shadowColor": null,
+      "shadowBlurRadius": null,
+      "shadowOffset": null,
+      "strikethroughColor": null,
+      "underlineColor": null,
+      "strikethroughStyle": null,
+      "underlineStyle": null
+    },
+    "operations": {
+      "prepare": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text",
+            "key": "text",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text",
+            "args": [
+              "Árbol uno dos\ncuatro"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "Árbol uno dos\ncuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 481.0,
+            "height": 175.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                20
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "unicode_accent": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontSize\":67.0,\"range\":[0,1]}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "Árbol uno dos\ncuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 477.0,
+            "height": 175.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                1
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 67.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                1,
+                19
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 67.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "unicode_restored": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontSize\":72.0}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "Árbol uno dos\ncuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 481.0,
+            "height": 175.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                20
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "ascii_prepare": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text",
+            "key": "text",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text",
+            "args": [
+              "uno dos tres cuatro"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 670.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                19
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "native_percent_25": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format/fontSize/25%/25%",
+            "args": [
+              67.0
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 660.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                5
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                5,
+                5
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 67.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                10,
+                9
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "percent_restore_25": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontSize\":72.0}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 670.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                19
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "native_percent_33": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format/fontSize/33%/25%",
+            "args": [
+              67.0
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 659.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                6
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                6,
+                5
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 67.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                11,
+                8
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "percent_restore_33": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontSize\":72.0}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 670.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                19
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "native_percent_50": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format/fontSize/50%/25%",
+            "args": [
+              67.0
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 659.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                10
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                10,
+                5
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 67.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                15,
+                4
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "percent_restore_50": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontSize\":72.0}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 670.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                19
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "native_word_0": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format/fontSize/word/0",
+            "args": [
+              67.0
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 661.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                3
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 67.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                3,
+                16
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 67.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "word_restore_0": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontSize\":72.0}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 670.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                19
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "native_word_1": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format/fontSize/word/1",
+            "args": [
+              67.0
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 661.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                4
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                4,
+                3
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 67.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                7,
+                12
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "word_restore_1": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontSize\":72.0}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 670.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                19
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "native_word_2": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format/fontSize/word/2",
+            "args": [
+              67.0
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 661.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                8
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                8,
+                4
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 67.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                12,
+                7
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "word_restore_2": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontSize\":72.0}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 670.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                19
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "native_word_3": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format/fontSize/word/3",
+            "args": [
+              67.0
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 655.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                13
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                13,
+                6
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 67.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "word_restore_3": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontSize\":72.0}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "uno dos tres cuatro",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 670.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                19
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "content_restore": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text",
+            "key": "text",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text",
+            "args": [
+              "Codex MCP text test — placeholder only"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "Codex MCP text test — placeholder only",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 1390.0,
+            "height": 100.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                38
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "final_format_restore": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontSize\":72.0}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "text": {
+          "text": "Codex MCP text test — placeholder only",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 1390.0,
+            "height": 100.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                38
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      }
+    },
+    "restored": {
+      "text": "Codex MCP text test — placeholder only",
+      "fixedWidth": 0.0,
+      "outputSize": {
+        "width": 1390.0,
+        "height": 100.0
+      },
+      "fragments": [
+        {
+          "range": [
+            0,
+            38
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "alignment": "center",
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      ],
+      "alignment": "center",
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold",
+      "fontFamilyAndStyle": {
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold"
+      },
+      "fontName": "HelveticaNeue-Bold",
+      "fontSize": 72.0,
+      "lineSpacing": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "backgroundColor": null,
+      "shadowColor": null,
+      "shadowBlurRadius": null,
+      "shadowOffset": null,
+      "strikethroughColor": null,
+      "underlineColor": null,
+      "strikethroughStyle": null,
+      "underlineStyle": null
+    }
+  },
+  "text_production_fonts_and_selectors": {
+    "preparation": "Mixed font fixture seeded experimentally using complete tuples observed through the same cue global scalar getter; this bypass is absent from production.",
+    "baseline": {
+      "text": "Codex MCP text test — placeholder only",
+      "fixedWidth": 0.0,
+      "outputSize": {
+        "width": 1390.0,
+        "height": 100.0
+      },
+      "fragments": [
+        {
+          "range": [
+            0,
+            38
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "alignment": "center",
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      ],
+      "alignment": "center",
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold",
+      "fontFamilyAndStyle": {
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold"
+      },
+      "fontName": "HelveticaNeue-Bold",
+      "fontSize": 72.0,
+      "lineSpacing": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "backgroundColor": null,
+      "shadowColor": null,
+      "shadowBlurRadius": null,
+      "shadowOffset": null,
+      "strikethroughColor": null,
+      "underlineColor": null,
+      "strikethroughStyle": null,
+      "underlineStyle": null
+    },
+    "operations": {
+      "global_font_regular": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format/fontName",
+            "key": "text/format/fontName",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format/fontName",
+            "args": [
+              "HelveticaNeue"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "readback": {
+          "text": "Codex MCP text test — placeholder only",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 1318.0,
+            "height": 100.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                38
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Regular",
+              "fontName": "HelveticaNeue",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Regular",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Regular"
+          },
+          "fontName": "HelveticaNeue",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "global_font_restored": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format/fontName",
+            "key": "text/format/fontName",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format/fontName",
+            "args": [
+              "HelveticaNeue-Bold"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "readback": {
+          "text": "Codex MCP text test — placeholder only",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 1390.0,
+            "height": 100.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                38
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "prepare_content": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text",
+            "key": "text",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text",
+            "args": [
+              "one two three"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "readback": {
+          "text": "one two three",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 474.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                13
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "prepare_mixed_fonts": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontName\":\"HelveticaNeue\",\"range\":[4,3]}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "readback": {
+          "text": "one two three",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 465.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                4
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                4,
+                3
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Regular",
+              "fontName": "HelveticaNeue",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                7,
+                6
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "source_word_font_pair": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontSize\":67.0,\"fontName\":\"HelveticaNeue\",\"range\":[0,3]}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "readback": {
+          "text": "one two three",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 448.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                3
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Regular",
+              "fontName": "HelveticaNeue",
+              "fontSize": 67.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                3,
+                1
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                4,
+                3
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Regular",
+              "fontName": "HelveticaNeue",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                7,
+                6
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Regular",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Regular"
+          },
+          "fontName": "HelveticaNeue",
+          "fontSize": 67.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "source_percentage_color": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"color\":[0,0.5,1,1],\"range\":[4,4]}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "readback": {
+          "text": "one two three",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 448.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                3
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Regular",
+              "fontName": "HelveticaNeue",
+              "fontSize": 67.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                3,
+                1
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                4,
+                3
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Regular",
+              "fontName": "HelveticaNeue",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                0.0,
+                0.5,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                7,
+                1
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                0.0,
+                0.5,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            },
+            {
+              "range": [
+                8,
+                5
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Regular",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Regular"
+          },
+          "fontName": "HelveticaNeue",
+          "fontSize": 67.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "restored_format": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text/format",
+            "args": [
+              "{\"fontName\":\"HelveticaNeue-Bold\",\"fontSize\":72.0,\"color\":[1.0,1.0,1.0,1.0]}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "readback": {
+          "text": "one two three",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 474.0,
+            "height": 87.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                13
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      },
+      "restored_content": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "text",
+            "key": "text",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/text",
+            "args": [
+              "Codex MCP text test — placeholder only"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "readback": {
+          "text": "Codex MCP text test — placeholder only",
+          "fixedWidth": 0.0,
+          "outputSize": {
+            "width": 1390.0,
+            "height": 100.0
+          },
+          "fragments": [
+            {
+              "range": [
+                0,
+                38
+              ],
+              "fontFamily": "Helvetica Neue",
+              "fontStyle": "Bold",
+              "fontName": "HelveticaNeue-Bold",
+              "fontSize": 72.0,
+              "lineSpacing": 1.0,
+              "color": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "alignment": "center",
+              "backgroundColor": null,
+              "shadowColor": null,
+              "shadowBlurRadius": null,
+              "shadowOffset": null,
+              "strikethroughColor": null,
+              "underlineColor": null,
+              "strikethroughStyle": null,
+              "underlineStyle": null
+            }
+          ],
+          "alignment": "center",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontFamilyAndStyle": {
+            "fontFamily": "Helvetica Neue",
+            "fontStyle": "Bold"
+          },
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      }
+    },
+    "restored": {
+      "text": "Codex MCP text test — placeholder only",
+      "fixedWidth": 0.0,
+      "outputSize": {
+        "width": 1390.0,
+        "height": 100.0
+      },
+      "fragments": [
+        {
+          "range": [
+            0,
+            38
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.0,
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "alignment": "center",
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      ],
+      "alignment": "center",
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold",
+      "fontFamilyAndStyle": {
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold"
+      },
+      "fontName": "HelveticaNeue-Bold",
+      "fontSize": 72.0,
+      "lineSpacing": 1.0,
+      "color": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "backgroundColor": null,
+      "shadowColor": null,
+      "shadowBlurRadius": null,
+      "shadowOffset": null,
+      "strikethroughColor": null,
+      "underlineColor": null,
+      "strikethroughStyle": null,
+      "underlineStyle": null
+    }
+  },
+  "video_parameter": {
+    "effect_type": "EdgeWork",
+    "note": "Radius 10 -> 8 -> 10; baseline at file top was refreshed during restoration; before/after in operation is authoritative. Out-of-band intensity preserved.",
+    "operations": {
+      "native_fx_radius": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "videoEffectIndex/0/parameter/inputRadius",
+            "key": "videoEffectIndex/0/parameter/inputRadius",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/CC889BBC-471F-5039-854E-5F61184B73D6/videoEffectIndex/0/parameter/inputRadius",
+            "args": [
+              8
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "readback": [
+          {
+            "index": 0,
+            "type": "EdgeWork",
+            "parameters": {
+              "inputIntensity": 2.6191787719726562,
+              "inputRadius": 8,
+              "Choose_Effect": 0
+            },
+            "raw_attributes": {
+              "inputIntensity": 2.6191787719726562,
+              "inputRadius": 8,
+              "Choose_Effect": 0
+            }
+          }
+        ]
+      },
+      "restored": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "videoEffectIndex/0/parameter/inputRadius",
+            "key": "videoEffectIndex/0/parameter/inputRadius",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/CC889BBC-471F-5039-854E-5F61184B73D6/videoEffectIndex/0/parameter/inputRadius",
+            "args": [
+              10
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "readback": [
+          {
+            "index": 0,
+            "type": "EdgeWork",
+            "parameters": {
+              "inputIntensity": 2.6191787719726562,
+              "inputRadius": 10,
+              "Choose_Effect": 0
+            },
+            "raw_attributes": {
+              "inputIntensity": 2.6191787719726562,
+              "inputRadius": 10,
+              "Choose_Effect": 0
+            }
+          }
+        ]
+      }
+    }
+  },
+  "fx_structure_production": {
+    "baseline_stack": [],
+    "operations": {
+      "add_gamma": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "videoEffects/add",
+            "key": "videoEffects/add",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/videoEffects/add",
+            "args": [
+              "Gamma"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "parent": "BB539EA6-80C0-58F1-A11D-31CAFAAA552F",
+          "type": "Text",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "1A325917-012D-5A98-97C3-968E623092EB",
+          "isWarning": false,
+          "allowsEditingDuration": true,
+          "isBroken": false,
+          "videoEffects/add": []
+        },
+        "after": {
+          "type": "Text",
+          "uniqueID": "1A325917-012D-5A98-97C3-968E623092EB",
+          "videoEffects/add": [
+            {
+              "type": "Gamma",
+              "enabled": true,
+              "parameters": {
+                "inputPower": 1
+              },
+              "raw": {
+                "inputPower": 1
+              }
+            }
+          ]
+        }
+      },
+      "gamma_parameter": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "videoEffectIndex/0/parameter/inputPower",
+            "key": "videoEffectIndex/0/parameter/inputPower",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/videoEffectIndex/0/parameter/inputPower",
+            "args": [
+              1.4
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "parent": "BB539EA6-80C0-58F1-A11D-31CAFAAA552F",
+          "type": "Text",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "1A325917-012D-5A98-97C3-968E623092EB",
+          "isWarning": false,
+          "allowsEditingDuration": true,
+          "isBroken": false,
+          "videoEffectIndex/0/parameter/inputPower": 1
+        },
+        "after": {
+          "type": "Text",
+          "uniqueID": "1A325917-012D-5A98-97C3-968E623092EB",
+          "videoEffectIndex/0/parameter/inputPower": 1.399999976158142
+        }
+      },
+      "insert_exposure": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "videoEffects/insert",
+            "key": "videoEffects/insert",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/videoEffects/insert",
+            "args": [
+              "Exposure",
+              0
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "parent": "BB539EA6-80C0-58F1-A11D-31CAFAAA552F",
+          "type": "Text",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "1A325917-012D-5A98-97C3-968E623092EB",
+          "isWarning": false,
+          "allowsEditingDuration": true,
+          "isBroken": false,
+          "videoEffects/insert": [
+            {
+              "type": "Gamma",
+              "enabled": true,
+              "parameters": {
+                "inputPower": 1.399999976158142
+              },
+              "raw": {
+                "inputPower": 1.399999976158142
+              }
+            }
+          ]
+        },
+        "after": {
+          "type": "Text",
+          "uniqueID": "1A325917-012D-5A98-97C3-968E623092EB",
+          "videoEffects/insert": [
+            {
+              "type": "Exposure",
+              "enabled": true,
+              "parameters": {
+                "inputEV": 0
+              },
+              "raw": {
+                "inputEV": 0
+              }
+            },
+            {
+              "type": "Gamma",
+              "enabled": true,
+              "parameters": {
+                "inputPower": 1.399999976158142
+              },
+              "raw": {
+                "inputPower": 1.399999976158142
+              }
+            }
+          ]
+        }
+      },
+      "move_gamma": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "videoEffectIndex/1/move",
+            "key": "videoEffectIndex/1/move",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/videoEffectIndex/1/move",
+            "args": [
+              0
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "parent": "BB539EA6-80C0-58F1-A11D-31CAFAAA552F",
+          "type": "Text",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "1A325917-012D-5A98-97C3-968E623092EB",
+          "isWarning": false,
+          "allowsEditingDuration": true,
+          "isBroken": false,
+          "videoEffectIndex/1/move": [
+            {
+              "type": "Exposure",
+              "enabled": true,
+              "parameters": {
+                "inputEV": 0
+              },
+              "raw": {
+                "inputEV": 0
+              }
+            },
+            {
+              "type": "Gamma",
+              "enabled": true,
+              "parameters": {
+                "inputPower": 1.399999976158142
+              },
+              "raw": {
+                "inputPower": 1.399999976158142
+              }
+            }
+          ]
+        },
+        "after": {
+          "type": "Text",
+          "uniqueID": "1A325917-012D-5A98-97C3-968E623092EB",
+          "videoEffectIndex/1/move": [
+            {
+              "type": "Gamma",
+              "enabled": true,
+              "parameters": {
+                "inputPower": 1.399999976158142
+              },
+              "raw": {
+                "inputPower": 1.399999976158142
+              }
+            },
+            {
+              "type": "Exposure",
+              "enabled": true,
+              "parameters": {
+                "inputEV": 0
+              },
+              "raw": {
+                "inputEV": 0
+              }
+            }
+          ]
+        }
+      },
+      "delete_exposure": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "videoEffectIndex/1/delete",
+            "key": "videoEffectIndex/1/delete",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/videoEffectIndex/1/delete",
+            "args": [],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "parent": "BB539EA6-80C0-58F1-A11D-31CAFAAA552F",
+          "type": "Text",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "1A325917-012D-5A98-97C3-968E623092EB",
+          "isWarning": false,
+          "allowsEditingDuration": true,
+          "isBroken": false,
+          "videoEffectIndex/1/delete": [
+            {
+              "type": "Gamma",
+              "enabled": true,
+              "parameters": {
+                "inputPower": 1.399999976158142
+              },
+              "raw": {
+                "inputPower": 1.399999976158142
+              }
+            },
+            {
+              "type": "Exposure",
+              "enabled": true,
+              "parameters": {
+                "inputEV": 0
+              },
+              "raw": {
+                "inputEV": 0
+              }
+            }
+          ]
+        },
+        "after": {
+          "type": "Text",
+          "uniqueID": "1A325917-012D-5A98-97C3-968E623092EB",
+          "videoEffectIndex/1/delete": [
+            {
+              "type": "Gamma",
+              "enabled": true,
+              "parameters": {
+                "inputPower": 1.399999976158142
+              },
+              "raw": {
+                "inputPower": 1.399999976158142
+              }
+            }
+          ]
+        }
+      },
+      "delete_gamma": {
+        "ok": true,
+        "status": "updated",
+        "errors": null,
+        "executed": [
+          {
+            "operation": "set_property",
+            "property": "videoEffectIndex/0/delete",
+            "key": "videoEffectIndex/0/delete",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/1A325917-012D-5A98-97C3-968E623092EB/videoEffectIndex/0/delete",
+            "args": [],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "parent": "BB539EA6-80C0-58F1-A11D-31CAFAAA552F",
+          "type": "Text",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "1A325917-012D-5A98-97C3-968E623092EB",
+          "isWarning": false,
+          "allowsEditingDuration": true,
+          "isBroken": false,
+          "videoEffectIndex/0/delete": [
+            {
+              "type": "Gamma",
+              "enabled": true,
+              "parameters": {
+                "inputPower": 1.399999976158142
+              },
+              "raw": {
+                "inputPower": 1.399999976158142
+              }
+            }
+          ]
+        },
+        "after": {
+          "type": "Text",
+          "uniqueID": "1A325917-012D-5A98-97C3-968E623092EB",
+          "videoEffectIndex/0/delete": []
+        }
+      }
+    },
+    "restored_stack": []
+  },
+  "computer_use": {
+    "modified": "EdgeWork radius 8; Gamma/Exposure stack order and Gamma 1.400; mixed Text Regular/Bold and blue word two.",
+    "restored": "Radius 10; original Text content and no video effects in Text fixture; Edit mode, 0 Active Cues."
+  },
+  "limits": [
+    "partial shadows/absent attributes",
+    "unobserved partial font tuples",
+    "non-Latin/emoji fallback",
+    "punctuated/Unicode/tab/newline word tokenization",
+    "duplicate/ambiguous native FX identity",
+    "new-effect defaults beyond Gamma/Exposure",
+    "structural QLab versions other than 5.5.10",
+    "Fade-dependent shifted FX indices"
+  ],
+  "post_restart_installed_mcp": {
+    "tool_count": 74,
+    "readonly_tools": 47,
+    "gated_write_tools": 27,
+    "get_fonts_present": true,
+    "generic_editor_present": false,
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "qlab_version": "5.5.10",
+    "workspace_count": 1,
+    "readiness": "ready; Edit Mode and /connect Edit confirmed",
+    "active_cues": 0,
+    "font_inventory": {
+      "postscript_names": 529,
+      "families_and_styles": 181
+    },
+    "text": {
+      "cue_id": "1A325917-012D-5A98-97C3-968E623092EB",
+      "word_index_2_range": [
+        8,
+        5
+      ],
+      "percentage_0_13_range": [
+        0,
+        5
+      ],
+      "ui_contrast": "first five characters blue; remaining text white",
+      "restored_content": "Codex MCP text test — placeholder only",
+      "restored_font": "HelveticaNeue-Bold",
+      "restored_size": 72,
+      "restored_color": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "safe_blocks": [
+        "alignment JSON attribute",
+        "whole-text color range includes em dash; partial Latin range restored"
+      ],
+      "observed_font_tuple_edit": {
+        "request": {
+          "family": "Helvetica Neue",
+          "style": "Bold"
+        },
+        "resolved_font_name": "HelveticaNeue-Bold",
+        "range": [
+          0,
+          5
+        ],
+        "setter_count": 1,
+        "verification": "all three companion values and surrounding attributes preserved"
+      }
+    },
+    "video_parameter": {
+      "cue_id": "CC889BBC-471F-5039-854E-5F61184B73D6",
+      "effect": "EdgeWork",
+      "radius": [
+        10,
+        8,
+        10
+      ],
+      "intensity_preserved": 2.6191787719726562,
+      "ui_contrasted": true
+    },
+    "structure": {
+      "cue_id": "1A325917-012D-5A98-97C3-968E623092EB",
+      "operations": [
+        "add Gamma",
+        "insert Exposure at 0",
+        "move Gamma from 1 to 0",
+        "delete Exposure",
+        "delete Gamma"
+      ],
+      "observed_order": [
+        "Gamma",
+        "Exposure"
+      ],
+      "gamma_default_inputPower": 1,
+      "exposure_default_inputEV": 0,
+      "final_stack": [],
+      "ui_contrasted": true
+    },
+    "all_fixture_changes_restored": true,
+    "playback_or_cue_execution": false
+  }
+}

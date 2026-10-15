@@ -2690,6 +2690,7 @@ class QLabReaderTests(unittest.TestCase):
                 "name": "Main", "uniqueID": "patch-1", "routing": [1, 2]
             },
             "/workspace/ws-1/settings/audio/patchID/patch-1/cueOutputChannels": 2,
+            "/workspace/ws-1/settings/audio/patchID/patch-1/name": "Main",
             "/workspace/ws-1/settings/audio/outputChannelNames": {
                 "patch-1": {"1": "Left", "2": "Right"}
             },
@@ -2709,6 +2710,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["details"]["routing"], [1, 2])
         self.assertEqual(result["details"]["cue_output_count"], 2)
+        self.assertEqual(result["details"]["name_property"], "Main")
         self.assertEqual(
             result["details"]["output_channel_names"],
             [{"channel": 1, "name": "Left"}, {"channel": 2, "name": "Right"}],
@@ -2725,6 +2727,7 @@ class QLabReaderTests(unittest.TestCase):
                 "/workspace/ws-1/settings/audio/patchList",
                 "/workspace/ws-1/settings/audio/patchID/patch-1",
                 "/workspace/ws-1/settings/audio/patchID/patch-1/cueOutputChannels",
+                "/workspace/ws-1/settings/audio/patchID/patch-1/name",
                 "/workspace/ws-1/settings/audio/outputChannelNames",
                 "/workspace/ws-1/settings/audio/patchID/patch-1/muteChannels",
                 "/workspace/ws-1/settings/audio/patchID/patch-1/soloChannels",
@@ -3329,6 +3332,7 @@ class QLabReaderTests(unittest.TestCase):
                 "deviceName": "Secret Audio Device",
             },
             "/workspace/ws-1/settings/audio/patchID/audio-1/cueOutputChannels": 1,
+            "/workspace/ws-1/settings/audio/patchID/audio-1/name": "Main Out",
             "/workspace/ws-1/settings/audio/outputChannelNames": {},
             "/workspace/ws-1/settings/audio/patchID/audio-1/muteChannels": [],
             "/workspace/ws-1/settings/audio/patchID/audio-1/soloChannels": [],
@@ -3364,6 +3368,7 @@ class QLabReaderTests(unittest.TestCase):
             midi = reader.get_workspace_setting_details("ws-1", "midi", "midi_patch", "MIDI")
 
         self.assertEqual(audio["details"]["routing_count"], 1)
+        self.assertEqual(audio["details"]["name_property"], "Main Out")
         self.assertTrue(audio["details"]["device_present"])
         self.assertEqual(route["details"]["destination_type"], "Display")
         self.assertTrue(route["details"]["destination_present"])
@@ -3385,6 +3390,7 @@ class QLabReaderTests(unittest.TestCase):
                 "/workspace/ws-1/settings/audio/patchList",
                 "/workspace/ws-1/settings/audio/patchID/audio-1",
                 "/workspace/ws-1/settings/audio/patchID/audio-1/cueOutputChannels",
+                "/workspace/ws-1/settings/audio/patchID/audio-1/name",
                 "/workspace/ws-1/settings/audio/outputChannelNames",
                 "/workspace/ws-1/settings/audio/patchID/audio-1/muteChannels",
                 "/workspace/ws-1/settings/audio/patchID/audio-1/soloChannels",
@@ -3630,6 +3636,7 @@ class QLabReaderTests(unittest.TestCase):
             "/workspace/ws-1/settings/audio/patchList": [{"name": "Main", "uniqueID": "audio-1"}],
             "/workspace/ws-1/settings/audio/patchID/audio-1": {"name": "Main", "uniqueID": "audio-1"},
             "/workspace/ws-1/settings/audio/patchID/audio-1/cueOutputChannels": 1,
+            "/workspace/ws-1/settings/audio/patchID/audio-1/name": "Main",
             "/workspace/ws-1/settings/audio/outputChannelNames": {},
             "/workspace/ws-1/settings/audio/patchID/audio-1/muteChannels": [],
             "/workspace/ws-1/settings/audio/patchID/audio-1/soloChannels": [],
@@ -3662,6 +3669,7 @@ class QLabReaderTests(unittest.TestCase):
                 "/workspace/ws-1/settings/audio/patchList",
                 "/workspace/ws-1/settings/audio/patchID/audio-1",
                 "/workspace/ws-1/settings/audio/patchID/audio-1/cueOutputChannels",
+                "/workspace/ws-1/settings/audio/patchID/audio-1/name",
                 "/workspace/ws-1/settings/audio/outputChannelNames",
                 "/workspace/ws-1/settings/audio/patchID/audio-1/muteChannels",
                 "/workspace/ws-1/settings/audio/patchID/audio-1/soloChannels",
@@ -6757,10 +6765,9 @@ class QLabReaderTests(unittest.TestCase):
         capabilities = result["update_capabilities"]
         self.assertEqual(capabilities["compatible_profiles"], ["common", "audio_basic"])
         self.assertEqual(capabilities["recommended_profile"], "audio_basic")
-        for prop in ("name", "flagged", "colorName", "rate", "startTime"):
+        for prop in ("name", "flagged", "colorName", "rate", "startTime", "fileTarget"):
             self.assertIn(prop, capabilities["real_write_properties"])
         for prop in (
-            "fileTarget",
             "level",
             "sliderLevel",
             "deleteSliceMarker",

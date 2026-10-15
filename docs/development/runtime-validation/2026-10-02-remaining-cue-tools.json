@@ -1,0 +1,147 @@
+{
+  "date": "2026-10-02",
+  "qlab_version": "5.5.10",
+  "transport": "source FastMCP Client(mcp) public tools over configured OSC",
+  "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+  "workspace_path": "<redacted-local-path-851cab375f>.qlab5",
+  "workspace_count": 1,
+  "schema_tools": 72,
+  "installed_process_requires_restart": true,
+  "operations": [
+    {
+      "family": "audio",
+      "cue_id": "C45EE972-F0E8-5241-8D10-28F86D5F05EC",
+      "before": "",
+      "requested": "MCP_VERIFY_AUDIO_20261002",
+      "write_status": "updated",
+      "setter_count": 1,
+      "restore_status": "updated",
+      "restore_setter_count": 1,
+      "final_name": "",
+      "fresh_reads_ok": true,
+      "ui_names_checked": true
+    },
+    {
+      "family": "mic",
+      "cue_id": "FC19635A-B640-5367-8A37-D41D57D4B54C",
+      "before": "",
+      "requested": "MCP_VERIFY_MIC_20261002",
+      "write_status": "updated",
+      "setter_count": 1,
+      "restore_status": "updated",
+      "restore_setter_count": 1,
+      "final_name": "",
+      "fresh_reads_ok": true,
+      "ui_names_checked": true
+    },
+    {
+      "family": "light",
+      "cue_id": "487A36C7-8E32-5730-AE90-B3F151E0ECEF",
+      "before": "01 · Amanecer frío",
+      "requested": "MCP_VERIFY_LIGHT_20261002",
+      "write_status": "updated",
+      "setter_count": 1,
+      "restore_status": "updated",
+      "restore_setter_count": 1,
+      "final_name": "01 · Amanecer frío",
+      "fresh_reads_ok": true,
+      "ui_names_checked": true
+    },
+    {
+      "family": "fade",
+      "cue_id": "D793D1C2-C7EA-52A0-A40C-B8B5B4689D5B",
+      "before": "FADE_VALID_TARGET",
+      "requested": "MCP_VERIFY_FADE_20261002",
+      "write_status": "updated",
+      "setter_count": 1,
+      "restore_status": "updated",
+      "restore_setter_count": 1,
+      "final_name": "FADE_VALID_TARGET",
+      "fresh_reads_ok": true,
+      "ui_names_checked": true
+    },
+    {
+      "family": "network",
+      "cue_id": "CB2A17D1-A1F8-54CA-AB87-8E932B84CB0E",
+      "before": "NETWORK_VALID",
+      "requested": "MCP_VERIFY_NETWORK_20261002",
+      "write_status": "updated",
+      "setter_count": 1,
+      "restore_status": "updated",
+      "restore_setter_count": 1,
+      "final_name": "NETWORK_VALID",
+      "fresh_reads_ok": true,
+      "ui_names_checked": true
+    },
+    {
+      "family": "midi",
+      "cue_id": "484F9A61-A779-5EA4-AC4B-94F9552EFCAA",
+      "before": "",
+      "requested": "MCP_VERIFY_MIDI_20261002",
+      "write_status": "updated",
+      "setter_count": 1,
+      "restore_status": "updated",
+      "restore_setter_count": 1,
+      "final_name": "",
+      "fresh_reads_ok": true,
+      "ui_names_checked": true
+    },
+    {
+      "family": "midi_file",
+      "cue_id": "655C8326-B4E7-5D75-A204-08A5D34EE902",
+      "before": "",
+      "requested": "MCP_VERIFY_MIDI_FILE_20261002",
+      "write_status": "updated",
+      "setter_count": 1,
+      "restore_status": "updated",
+      "restore_setter_count": 1,
+      "final_name": "",
+      "fresh_reads_ok": true,
+      "ui_names_checked": true
+    },
+    {
+      "family": "timecode",
+      "cue_id": "FE1D267E-B24D-5511-AC94-AC4E4BEEAC2B",
+      "before": "",
+      "requested": "MCP_VERIFY_TIMECODE_20261002",
+      "write_status": "updated",
+      "setter_count": 1,
+      "restore_status": "updated",
+      "restore_setter_count": 1,
+      "final_name": "",
+      "fresh_reads_ok": true,
+      "ui_names_checked": true
+    },
+    {
+      "family": "script",
+      "cue_id": "9A4FAD15-D769-52B6-B9C2-F7C1809F1C62",
+      "before": "SCRIPT_SAFE_HIDDEN",
+      "requested": "MCP_VERIFY_SCRIPT_20261002",
+      "write_status": "updated",
+      "setter_count": 1,
+      "restore_status": "updated",
+      "restore_setter_count": 1,
+      "final_name": "SCRIPT_SAFE_HIDDEN",
+      "fresh_reads_ok": true,
+      "ui_names_checked": true
+    }
+  ],
+  "active_trigger_probe": {
+    "status": "preflight_failed",
+    "errors": {
+      "preflight": "Workspace has running or paused cues."
+    },
+    "executed_operations": []
+  },
+  "final_container_id": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+  "container_count": 19,
+  "ui_selection_restored": "AUDIO_MISSING_FILE",
+  "cues_executed": false,
+  "coverage_limit": "Live mutations cover name only in nine families. Existing running Mic was untouched. Unverified endpoints remain blocked or planned-only.",
+  "automated": {
+    "passed": 3566,
+    "subtests_passed": 61,
+    "schema_check": true,
+    "diff_check": true
+  }
+}

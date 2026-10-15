@@ -1,0 +1,2599 @@
+{
+  "source": "https://qlab.app/docs/v5/scripting/parameter-reference/#video-effects",
+  "evidence": "docs/development/research/2026-10-06-video-fx-parameter-inventory.md",
+  "verified_runtime": false,
+  "effects": {
+    "ColorControls": {
+      "inputBrightness": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "inputContrast": {
+        "kind": "number",
+        "minimum": 0.25,
+        "maximum": 4.0
+      },
+      "inputAngle": {
+        "kind": "number",
+        "minimum": -180.0,
+        "maximum": 180.0
+      },
+      "inputSaturation": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 2.0
+      }
+    },
+    "Exposure": {
+      "inputEV": {
+        "kind": "number",
+        "minimum": -10.0,
+        "maximum": 10.0
+      }
+    },
+    "Gamma": {
+      "inputPower": {
+        "kind": "number",
+        "minimum": -0.1,
+        "maximum": 3.0
+      }
+    },
+    "SepiaMonochrome": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Sepia",
+          "1": "Monochrome"
+        }
+      },
+      "inputColor": {
+        "kind": "vector",
+        "minimum": 0,
+        "maximum": 1,
+        "semantic": "rgba"
+      },
+      "inputIntensity": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      }
+    },
+    "MinMaxInvert": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Minimum Component",
+          "1": "Maximum Component",
+          "2": "Color Invert"
+        }
+      }
+    },
+    "WhitePoint": {
+      "inputColor": {
+        "kind": "vector",
+        "minimum": 0,
+        "maximum": 1,
+        "semantic": "rgba"
+      }
+    },
+    "HighlightShadow": {
+      "inputHighlightAmount": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputShadowAmount": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 100.0
+      }
+    },
+    "TemperatureTint": {
+      "Source_Temperature": {
+        "kind": "number",
+        "minimum": 2000.0,
+        "maximum": 10000.0
+      },
+      "Target_Temperature": {
+        "kind": "number",
+        "minimum": 2000.0,
+        "maximum": 10000.0
+      },
+      "Source_Tint": {
+        "kind": "number",
+        "minimum": -500.0,
+        "maximum": 500.0
+      },
+      "Target_Tint": {
+        "kind": "number",
+        "minimum": -500.0,
+        "maximum": 500.0
+      }
+    },
+    "Vibrance": {
+      "inputAmount": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      }
+    },
+    "ToneCurve": {
+      "Point_0_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_0_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_1_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_1_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_2_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_2_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_3_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_3_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_4_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_4_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      }
+    },
+    "ColorClamp": {
+      "Min_R": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Max_R": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Min_G": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Max_G": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Min_B": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Max_B": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Min_A": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Max_A": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      }
+    },
+    "ColorMatrix": {
+      "R_R": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "G_R": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "B_R": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "A_R": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "R_Bias": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "R_G": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "G_G": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "B_G": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "A_G": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "G_Bias": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "R_B": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "G_B": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "B_B": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "A_B": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "B_Bias": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "R_A": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "G_A": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "B_A": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "A_A": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "A_Bias": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      }
+    },
+    "ColorThreshold": {
+      "inputThreshold": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      }
+    },
+    "SpotColor": {
+      "inputCenterColor1": {
+        "kind": "vector",
+        "minimum": 0,
+        "maximum": 1,
+        "semantic": "rgba"
+      },
+      "inputReplacementColor1": {
+        "kind": "vector",
+        "minimum": 0,
+        "maximum": 1,
+        "semantic": "rgba"
+      },
+      "inputCenterColor2": {
+        "kind": "vector",
+        "minimum": 0,
+        "maximum": 1,
+        "semantic": "rgba"
+      },
+      "inputReplacementColor2": {
+        "kind": "vector",
+        "minimum": 0,
+        "maximum": 1,
+        "semantic": "rgba"
+      },
+      "inputCenterColor3": {
+        "kind": "vector",
+        "minimum": 0,
+        "maximum": 1,
+        "semantic": "rgba"
+      },
+      "inputReplacementColor3": {
+        "kind": "vector",
+        "minimum": 0,
+        "maximum": 1,
+        "semantic": "rgba"
+      },
+      "inputCloseness1": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputCloseness2": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputCloseness3": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputContrast1": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 10.0
+      },
+      "inputContrast2": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 10.0
+      },
+      "inputContrast3": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 10.0
+      }
+    },
+    "LinearKey": {
+      "inputKeyColor": {
+        "kind": "enum",
+        "values": {
+          "0": "Green",
+          "1": "Blue"
+        }
+      },
+      "inputCutoff": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 4.0
+      },
+      "inputContrast": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 10.0
+      }
+    },
+    "BoxDiscGaussianBlur": {
+      "Choose_Blur": {
+        "kind": "enum",
+        "values": {
+          "0": "Box Blur",
+          "1": "Disc Blur",
+          "2": "Gaussian Blur"
+        }
+      },
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 400.0
+      }
+    },
+    "BokehBlur": {
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 500.0
+      },
+      "inputRingAmount": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputRingSize": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 500.0
+      },
+      "inputSoftness": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 10.0
+      }
+    },
+    "MotionBlur": {
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 400.0
+      },
+      "inputAngle": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      }
+    },
+    "SharpenLuminance": {
+      "inputSharpness": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 2.0
+      }
+    },
+    "UnsharpMask": {
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 100.0
+      },
+      "inputIntensity": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      }
+    },
+    "ZoomBlur": {
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputAmount": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 200.0
+      }
+    },
+    "MorphologyGradient": {
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 100.0
+      }
+    },
+    "MorphologyMinMax": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Morphology Minimum",
+          "1": "Morphology Maximum"
+        }
+      },
+      "inputWidth": {
+        "kind": "number",
+        "minimum": 1.0,
+        "maximum": 101.0
+      },
+      "inputHeight": {
+        "kind": "number",
+        "minimum": 1.0,
+        "maximum": 101.0
+      }
+    },
+    "DepthOfField": {
+      "Point_0_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_0_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_1_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_1_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 100.0
+      },
+      "inputSaturation": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 5.0
+      },
+      "inputUnsharpMaskIntensity": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 10.0
+      },
+      "inputUnsharpMaskRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 20.0
+      }
+    },
+    "Pixellation": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Pixellate",
+          "1": "Hexagonal Pixellate"
+        }
+      },
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputScale": {
+        "kind": "number",
+        "minimum": 1.0,
+        "maximum": 100.0
+      }
+    },
+    "Screen": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Dot Screen",
+          "1": "Line Screen",
+          "2": "Hatched Screen",
+          "3": "Circular Screen"
+        }
+      },
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputAngle": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      },
+      "inputWidth": {
+        "kind": "number",
+        "minimum": 2.0,
+        "maximum": 50.0
+      },
+      "inputSharpness": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      }
+    },
+    "BloomGloom": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Bloom",
+          "1": "Gloom"
+        }
+      },
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 100.0
+      },
+      "inputIntensity": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      }
+    },
+    "CMYKHalftone": {
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputAngle": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      },
+      "inputWidth": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 100.0
+      },
+      "inputSharpness": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputGCR": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputUCR": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      }
+    },
+    "PhotoEffects": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Chrome",
+          "1": "Fade",
+          "2": "Instant",
+          "3": "Mono",
+          "4": "Noir",
+          "5": "Process",
+          "6": "Tonal",
+          "7": "Transfer"
+        }
+      }
+    },
+    "ColorPosterize": {
+      "inputLevels": {
+        "kind": "number",
+        "minimum": 2.0,
+        "maximum": 30.0
+      }
+    },
+    "CrystallizePointillize": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Crystallize",
+          "1": "Pointillize"
+        }
+      },
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 100.0
+      }
+    },
+    "EdgeWork": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Edge Work",
+          "1": "Edges"
+        }
+      },
+      "inputIntensity": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 10.0
+      },
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 20.0
+      }
+    },
+    "LineOverlay": {
+      "inputContrast": {
+        "kind": "number",
+        "minimum": 0.25,
+        "maximum": 10.0
+      },
+      "inputEdgeIntensity": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputThreshold": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputNRSharpness": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputNRNoiseLevel": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 4.0
+      }
+    },
+    "Kaleidoscope": {
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputAngle": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      },
+      "inputCount": {
+        "kind": "number",
+        "minimum": 1.0,
+        "maximum": 64.0
+      }
+    },
+    "TriangleKaleidoscope": {
+      "Point_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputRotation": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      },
+      "inputSize": {
+        "kind": "number",
+        "minimum": 1.0,
+        "maximum": 4000.0
+      },
+      "inputDecay": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      }
+    },
+    "Droste": {
+      "Point_0_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_0_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_1_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_1_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputPeriodicity": {
+        "kind": "number",
+        "minimum": 1.0,
+        "maximum": 400.0
+      },
+      "inputStrands": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 20.0
+      },
+      "inputZoom": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 5.0
+      },
+      "inputRotation": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      }
+    },
+    "LightTunnel": {
+      "Center_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Center_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 1.0,
+        "maximum": 4000.0
+      },
+      "inputRotation": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      }
+    },
+    "MedianComicEffect": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Median",
+          "1": "Comic Effect"
+        }
+      }
+    },
+    "FalseColor": {},
+    "ThermalXRay": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Thermal",
+          "1": "X-Ray"
+        }
+      }
+    },
+    "GaborGradients": {},
+    "Spotlight": {
+      "inputColor": {
+        "kind": "vector",
+        "minimum": 0,
+        "maximum": 1,
+        "semantic": "rgba"
+      },
+      "inputBrightness": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 2.0
+      },
+      "inputConcentration": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 5.0
+      },
+      "Light_Pos_X": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 2.0
+      },
+      "Light_Pos_Y": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 2.0
+      },
+      "Light_Pos_Z": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 2.0
+      },
+      "Light_Points_X": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 2.0
+      },
+      "Light_Points_Y": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 2.0
+      },
+      "Light_Points_Z": {
+        "kind": "number",
+        "minimum": -1.0,
+        "maximum": 2.0
+      }
+    },
+    "Dither": {
+      "inputIntensity": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 5.0
+      }
+    },
+    "NoiseReduction": {
+      "inputNoiseLevel": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 0.1
+      },
+      "inputSharpness": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 2.0
+      }
+    },
+    "CircleSplashHoleDistortion": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Circle Splash",
+          "1": "Hole"
+        }
+      },
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1000.0
+      }
+    },
+    "PinchBumpDistortion": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Pinch",
+          "1": "Bump",
+          "2": "Bump Linear"
+        }
+      },
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1000.0
+      },
+      "inputAngle": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      },
+      "inputScale": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 2.0
+      }
+    },
+    "TorusLensDistortion": {
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 500.0
+      },
+      "inputWidth": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 200.0
+      },
+      "inputRefraction": {
+        "kind": "number",
+        "minimum": -5.0,
+        "maximum": 5.0
+      }
+    },
+    "TwirlVortexDistortion": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Twirl",
+          "1": "Circular Wrap",
+          "2": "Vortex"
+        }
+      },
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1000.0
+      },
+      "inputAngle": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      }
+    },
+    "GlassLozenge": {
+      "Point_0_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_0_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_1_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Point_1_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1000.0
+      },
+      "inputRefraction": {
+        "kind": "number",
+        "minimum": -5.0,
+        "maximum": 5.0
+      }
+    },
+    "KeystoneCorrection": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Combined",
+          "1": "Horizontal",
+          "2": "Vertical"
+        }
+      },
+      "UL_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "UL_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "UR_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "UR_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "LL_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "LL_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "LR_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "LR_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputFocalLength": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 30.0
+      }
+    },
+    "OpTile": {
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputAngle": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      },
+      "inputScale": {
+        "kind": "number",
+        "minimum": 0.1,
+        "maximum": 10.0
+      },
+      "inputWidth": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1000.0
+      }
+    },
+    "PerspectiveTile": {
+      "Bottom_Left_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Bottom_Left_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Bottom_Right_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Bottom_Right_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Top_Left_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Top_Left_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Top_Right_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Top_Right_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      }
+    },
+    "QuadTiles": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Fourfold Translated Tile",
+          "1": "Fourfold Reflected Tile",
+          "2": "Parallelogram Tile"
+        }
+      },
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputAngle": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      },
+      "inputAcuteAngle": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      },
+      "inputWidth": {
+        "kind": "number",
+        "minimum": 1.0,
+        "maximum": 200.0
+      }
+    },
+    "ReflectedTiles": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Glide Tile",
+          "1": "Sixfold Reflected Tile",
+          "2": "Eightfold Reflected Tile",
+          "3": "Twelvefold Reflected Tile"
+        }
+      },
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputAngle": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      },
+      "inputWidth": {
+        "kind": "number",
+        "minimum": 1.0,
+        "maximum": 200.0
+      }
+    },
+    "RotatedTiles": {
+      "Choose_Effect": {
+        "kind": "enum",
+        "values": {
+          "0": "Triangle Tile",
+          "1": "Fourfold Reflected Tile",
+          "2": "Sixfold Reflected Tile"
+        }
+      },
+      "_protocolInput_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "_protocolInput_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputAngle": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      },
+      "inputWidth": {
+        "kind": "number",
+        "minimum": 1.0,
+        "maximum": 200.0
+      }
+    },
+    "NinePartStretched": {
+      "LL_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "LL_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "UR_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "UR_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Grow_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1000.0
+      },
+      "Grow_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1000.0
+      }
+    },
+    "NinePartTiled": {
+      "LL_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "LL_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "UR_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "UR_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Grow_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 5000.0
+      },
+      "Grow_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 5000.0
+      },
+      "inputFlipYTiles": {
+        "kind": "boolean"
+      }
+    },
+    "Shutter": {
+      "Shape": {
+        "kind": "enum",
+        "values": {
+          "0": "Rectangle",
+          "1": "Ellipse"
+        }
+      },
+      "Left": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Right": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Bottom": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Top": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Feather": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 800.0
+      }
+    },
+    "Window": {
+      "Origin_X": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Origin_Y": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Size_W": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "Size_H": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputRectangle": {
+        "kind": "vector",
+        "minimum": 0,
+        "maximum": 1,
+        "semantic": "rectangle"
+      }
+    },
+    "DropShadow": {
+      "Distance": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 400.0
+      },
+      "BlurRadius": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 400.0
+      },
+      "Angle": {
+        "kind": "number",
+        "minimum": -360.0,
+        "maximum": 360.0
+      },
+      "Alpha": {
+        "kind": "number",
+        "minimum": 0.0,
+        "maximum": 1.0
+      },
+      "inputColor": {
+        "kind": "vector",
+        "minimum": 0,
+        "maximum": 1,
+        "semantic": "rgba"
+      }
+    }
+  },
+  "native_parameter_aliases": {
+    "DropShadow": {
+      "Color": "inputColor"
+    }
+  },
+  "native_parameter_aliases_evidence": "docs/development/runtime-validation/2026-10-09-linear-key-drop-shadow.md",
+  "creation_defaults_qlab_version": "5.5.10",
+  "creation_defaults_evidence": "docs/development/runtime-validation/2026-10-09-fx-empty-stack-creation.json",
+  "creation_defaults": {
+    "ColorControls": {
+      "type": "ColorControls",
+      "enabled": true,
+      "parameters": {
+        "inputContrast": 1,
+        "inputAngle": 0,
+        "inputBrightness": 0,
+        "inputSaturation": 1
+      },
+      "raw": {
+        "inputContrast": 1,
+        "inputAngle": 0,
+        "inputBrightness": 0,
+        "inputSaturation": 1
+      }
+    },
+    "Exposure": {
+      "type": "Exposure",
+      "enabled": true,
+      "parameters": {
+        "inputEV": 0
+      },
+      "raw": {
+        "inputEV": 0
+      }
+    },
+    "Gamma": {
+      "type": "Gamma",
+      "enabled": true,
+      "parameters": {
+        "inputPower": 1
+      },
+      "raw": {
+        "inputPower": 1
+      }
+    },
+    "SepiaMonochrome": {
+      "type": "SepiaMonochrome",
+      "enabled": true,
+      "parameters": {
+        "inputColor": [
+          1,
+          0.2527676224708557,
+          1,
+          1
+        ],
+        "Choose_Effect": 0,
+        "inputIntensity": 1
+      },
+      "raw": {
+        "inputColor": [
+          1,
+          0.2527676224708557,
+          1,
+          1
+        ],
+        "Choose_Effect": 0,
+        "inputIntensity": 1
+      }
+    },
+    "MinMaxInvert": {
+      "type": "MinMaxInvert",
+      "enabled": true,
+      "parameters": {
+        "Choose_Effect": 0
+      },
+      "raw": {
+        "Choose_Effect": 0
+      }
+    },
+    "WhitePoint": {
+      "type": "WhitePoint",
+      "enabled": true,
+      "parameters": {
+        "inputColor": [
+          1,
+          0.2527676224708557,
+          1,
+          1
+        ]
+      },
+      "raw": {
+        "inputColor": [
+          1,
+          0.2527676224708557,
+          1,
+          1
+        ]
+      }
+    },
+    "HighlightShadow": {
+      "type": "HighlightShadow",
+      "enabled": true,
+      "parameters": {
+        "inputShadowAmount": 0,
+        "inputRadius": 10,
+        "inputHighlightAmount": 1
+      },
+      "raw": {
+        "inputShadowAmount": 0,
+        "inputRadius": 10,
+        "inputHighlightAmount": 1
+      }
+    },
+    "TemperatureTint": {
+      "type": "TemperatureTint",
+      "enabled": true,
+      "parameters": {
+        "Target_Temperature": 6500,
+        "Source_Tint": 0,
+        "Source_Temperature": 6500,
+        "Target_Tint": 0
+      },
+      "raw": {
+        "Target_Temperature": 6500,
+        "Source_Tint": 0,
+        "Source_Temperature": 6500,
+        "Target_Tint": 0
+      }
+    },
+    "Vibrance": {
+      "type": "Vibrance",
+      "enabled": true,
+      "parameters": {
+        "inputAmount": 0
+      },
+      "raw": {
+        "inputAmount": 0
+      }
+    },
+    "ToneCurve": {
+      "type": "ToneCurve",
+      "enabled": true,
+      "parameters": {
+        "Point_1_X": 0.25,
+        "Point_2_X": 0.5,
+        "Point_0_Y": 0,
+        "Point_3_X": 0.75,
+        "Point_1_Y": 0.25,
+        "Point_4_X": 1,
+        "Point_2_Y": 0.5,
+        "Point_3_Y": 0.75,
+        "Point_0_X": 0,
+        "Point_4_Y": 1
+      },
+      "raw": {
+        "Point_1_X": 0.25,
+        "Point_2_X": 0.5,
+        "Point_0_Y": 0,
+        "Point_3_X": 0.75,
+        "Point_1_Y": 0.25,
+        "Point_4_X": 1,
+        "Point_2_Y": 0.5,
+        "Point_3_Y": 0.75,
+        "Point_0_X": 0,
+        "Point_4_Y": 1
+      }
+    },
+    "ColorClamp": {
+      "type": "ColorClamp",
+      "enabled": true,
+      "parameters": {
+        "Max_G": 1,
+        "Min_R": 0,
+        "Min_G": 0,
+        "Max_B": 1,
+        "Min_B": 0,
+        "Max_A": 1,
+        "Max_R": 1,
+        "Min_A": 0
+      },
+      "raw": {
+        "Max_G": 1,
+        "Min_R": 0,
+        "Min_G": 0,
+        "Max_B": 1,
+        "Min_B": 0,
+        "Max_A": 1,
+        "Max_R": 1,
+        "Min_A": 0
+      }
+    },
+    "ColorMatrix": {
+      "type": "ColorMatrix",
+      "enabled": true,
+      "parameters": {
+        "G_A": 0,
+        "R_A": 0,
+        "B_A": 0,
+        "G_B": 0,
+        "B_Bias": 0,
+        "R_Bias": 0,
+        "G_G": 1,
+        "A_R": 0,
+        "R_B": 0,
+        "A_Bias": 0,
+        "B_B": 1,
+        "R_G": 0,
+        "B_G": 0,
+        "A_A": 1,
+        "G_R": 0,
+        "A_B": 0,
+        "R_R": 1,
+        "B_R": 0,
+        "G_Bias": 0,
+        "A_G": 0
+      },
+      "raw": {
+        "G_A": 0,
+        "R_A": 0,
+        "B_A": 0,
+        "G_B": 0,
+        "B_Bias": 0,
+        "R_Bias": 0,
+        "G_G": 1,
+        "A_R": 0,
+        "R_B": 0,
+        "A_Bias": 0,
+        "B_B": 1,
+        "R_G": 0,
+        "B_G": 0,
+        "A_A": 1,
+        "G_R": 0,
+        "A_B": 0,
+        "R_R": 1,
+        "B_R": 0,
+        "G_Bias": 0,
+        "A_G": 0
+      }
+    },
+    "ColorThreshold": {
+      "type": "ColorThreshold",
+      "enabled": true,
+      "parameters": {
+        "inputThreshold": 0.3
+      },
+      "raw": {
+        "inputThreshold": 0.3
+      }
+    },
+    "SpotColor": {
+      "type": "SpotColor",
+      "enabled": true,
+      "parameters": {
+        "inputCenterColor2": [
+          0.572306752204895,
+          0.572306752204895,
+          0.572306752204895,
+          1
+        ],
+        "inputCloseness3": 0.8,
+        "inputCloseness2": 0.3,
+        "inputContrast1": 1,
+        "inputCenterColor1": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "inputCloseness1": 0.1,
+        "inputContrast2": 1,
+        "inputReplacementColor1": [
+          0.26272884011268616,
+          0.17191565036773682,
+          0.34046435356140137,
+          1
+        ],
+        "inputReplacementColor2": [
+          0.5788564682006836,
+          0.0663587674498558,
+          0,
+          1
+        ],
+        "inputCenterColor3": [
+          1,
+          0.9999999403953552,
+          1,
+          1
+        ],
+        "inputReplacementColor3": [
+          0,
+          0.5585054755210876,
+          0,
+          1
+        ],
+        "inputContrast3": 1
+      },
+      "raw": {
+        "inputCenterColor2": [
+          0.572306752204895,
+          0.572306752204895,
+          0.572306752204895,
+          1
+        ],
+        "inputCloseness3": 0.8,
+        "inputCloseness2": 0.3,
+        "inputContrast1": 1,
+        "inputCenterColor1": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "inputCloseness1": 0.1,
+        "inputContrast2": 1,
+        "inputReplacementColor1": [
+          0.26272884011268616,
+          0.17191565036773682,
+          0.34046435356140137,
+          1
+        ],
+        "inputReplacementColor2": [
+          0.5788564682006836,
+          0.0663587674498558,
+          0,
+          1
+        ],
+        "inputCenterColor3": [
+          1,
+          0.9999999403953552,
+          1,
+          1
+        ],
+        "inputReplacementColor3": [
+          0,
+          0.5585054755210876,
+          0,
+          1
+        ],
+        "inputContrast3": 1
+      }
+    },
+    "BoxDiscGaussianBlur": {
+      "type": "BoxDiscGaussianBlur",
+      "enabled": true,
+      "parameters": {
+        "Choose_Blur": 0,
+        "inputRadius": 10
+      },
+      "raw": {
+        "Choose_Blur": 0,
+        "inputRadius": 10
+      }
+    },
+    "BokehBlur": {
+      "type": "BokehBlur",
+      "enabled": true,
+      "parameters": {
+        "inputSoftness": 0,
+        "inputRingAmount": 0,
+        "inputRadius": 10,
+        "inputRingSize": 0
+      },
+      "raw": {
+        "inputSoftness": 0,
+        "inputRingAmount": 0,
+        "inputRadius": 10,
+        "inputRingSize": 0
+      }
+    },
+    "MotionBlur": {
+      "type": "MotionBlur",
+      "enabled": true,
+      "parameters": {
+        "inputRadius": 20,
+        "inputAngle": 0
+      },
+      "raw": {
+        "inputRadius": 20,
+        "inputAngle": 0
+      }
+    },
+    "SharpenLuminance": {
+      "type": "SharpenLuminance",
+      "enabled": true,
+      "parameters": {
+        "inputSharpness": 2
+      },
+      "raw": {
+        "inputSharpness": 2
+      }
+    },
+    "UnsharpMask": {
+      "type": "UnsharpMask",
+      "enabled": true,
+      "parameters": {
+        "inputIntensity": 0.5,
+        "inputRadius": 2.5
+      },
+      "raw": {
+        "inputIntensity": 0.5,
+        "inputRadius": 2.5
+      }
+    },
+    "ZoomBlur": {
+      "type": "ZoomBlur",
+      "enabled": true,
+      "parameters": {
+        "_protocolInput_Y": 0.5,
+        "inputAmount": 20,
+        "_protocolInput_X": 0.5
+      },
+      "raw": {
+        "_protocolInput_Y": 0.5,
+        "inputAmount": 20,
+        "_protocolInput_X": 0.5
+      }
+    },
+    "MorphologyGradient": {
+      "type": "MorphologyGradient",
+      "enabled": true,
+      "parameters": {
+        "inputRadius": 10
+      },
+      "raw": {
+        "inputRadius": 10
+      }
+    },
+    "MorphologyMinMax": {
+      "type": "MorphologyMinMax",
+      "enabled": true,
+      "parameters": {
+        "inputWidth": 1,
+        "Choose_Effect": 0,
+        "inputHeight": 1
+      },
+      "raw": {
+        "inputWidth": 1,
+        "Choose_Effect": 0,
+        "inputHeight": 1
+      }
+    },
+    "DepthOfField": {
+      "type": "DepthOfField",
+      "enabled": true,
+      "parameters": {
+        "Point_1_X": 1,
+        "inputUnsharpMaskRadius": 4,
+        "inputUnsharpMaskIntensity": 0,
+        "Point_0_Y": 0.5,
+        "inputSaturation": 1,
+        "Point_1_Y": 0.5,
+        "inputRadius": 10,
+        "Point_0_X": 0
+      },
+      "raw": {
+        "Point_1_X": 1,
+        "inputUnsharpMaskRadius": 4,
+        "inputUnsharpMaskIntensity": 0,
+        "Point_0_Y": 0.5,
+        "inputSaturation": 1,
+        "Point_1_Y": 0.5,
+        "inputRadius": 10,
+        "Point_0_X": 0
+      }
+    },
+    "Pixellation": {
+      "type": "Pixellation",
+      "enabled": true,
+      "parameters": {
+        "inputScale": 8,
+        "_protocolInput_X": 0.5,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      },
+      "raw": {
+        "inputScale": 8,
+        "_protocolInput_X": 0.5,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      }
+    },
+    "Screen": {
+      "type": "Screen",
+      "enabled": true,
+      "parameters": {
+        "inputSharpness": 0.7,
+        "inputAngle": 0,
+        "_protocolInput_X": 0.5,
+        "inputWidth": 5,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      },
+      "raw": {
+        "inputSharpness": 0.7,
+        "inputAngle": 0,
+        "_protocolInput_X": 0.5,
+        "inputWidth": 5,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      }
+    },
+    "BloomGloom": {
+      "type": "BloomGloom",
+      "enabled": true,
+      "parameters": {
+        "inputIntensity": 1,
+        "inputRadius": 10,
+        "Choose_Effect": 0
+      },
+      "raw": {
+        "inputIntensity": 1,
+        "inputRadius": 10,
+        "Choose_Effect": 0
+      }
+    },
+    "CMYKHalftone": {
+      "type": "CMYKHalftone",
+      "enabled": true,
+      "parameters": {
+        "inputGCR": 1,
+        "inputAngle": 0,
+        "_protocolInput_Y": 0.5,
+        "inputSharpness": 0.7,
+        "inputWidth": 6,
+        "_protocolInput_X": 0.5,
+        "inputUCR": 0.5
+      },
+      "raw": {
+        "inputGCR": 1,
+        "inputAngle": 0,
+        "_protocolInput_Y": 0.5,
+        "inputSharpness": 0.7,
+        "inputWidth": 6,
+        "_protocolInput_X": 0.5,
+        "inputUCR": 0.5
+      }
+    },
+    "PhotoEffects": {
+      "type": "PhotoEffects",
+      "enabled": true,
+      "parameters": {
+        "Choose_Effect": 0
+      },
+      "raw": {
+        "Choose_Effect": 0
+      }
+    },
+    "ColorPosterize": {
+      "type": "ColorPosterize",
+      "enabled": true,
+      "parameters": {
+        "inputLevels": 6
+      },
+      "raw": {
+        "inputLevels": 6
+      }
+    },
+    "CrystallizePointillize": {
+      "type": "CrystallizePointillize",
+      "enabled": true,
+      "parameters": {
+        "_protocolInput_X": 0.5,
+        "inputRadius": 20,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      },
+      "raw": {
+        "_protocolInput_X": 0.5,
+        "inputRadius": 20,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      }
+    },
+    "EdgeWork": {
+      "type": "EdgeWork",
+      "enabled": true,
+      "parameters": {
+        "inputIntensity": 1,
+        "inputRadius": 10,
+        "Choose_Effect": 0
+      },
+      "raw": {
+        "inputIntensity": 1,
+        "inputRadius": 10,
+        "Choose_Effect": 0
+      }
+    },
+    "LineOverlay": {
+      "type": "LineOverlay",
+      "enabled": true,
+      "parameters": {
+        "inputContrast": 10,
+        "inputEdgeIntensity": 0.5,
+        "inputNRNoiseLevel": 1,
+        "inputThreshold": 0.1,
+        "inputNRSharpness": 0
+      },
+      "raw": {
+        "inputContrast": 10,
+        "inputEdgeIntensity": 0.5,
+        "inputNRNoiseLevel": 1,
+        "inputThreshold": 0.1,
+        "inputNRSharpness": 0
+      }
+    },
+    "Kaleidoscope": {
+      "type": "Kaleidoscope",
+      "enabled": true,
+      "parameters": {
+        "inputCount": 6,
+        "inputAngle": 0,
+        "_protocolInput_X": 0.5,
+        "_protocolInput_Y": 0.5
+      },
+      "raw": {
+        "inputCount": 6,
+        "inputAngle": 0,
+        "_protocolInput_X": 0.5,
+        "_protocolInput_Y": 0.5
+      }
+    },
+    "TriangleKaleidoscope": {
+      "type": "TriangleKaleidoscope",
+      "enabled": true,
+      "parameters": {
+        "Point_X": 0.5,
+        "Point_Y": 0.5,
+        "inputRotation": 0,
+        "inputSize": 80,
+        "inputDecay": 0.8
+      },
+      "raw": {
+        "Point_X": 0.5,
+        "Point_Y": 0.5,
+        "inputRotation": 0,
+        "inputSize": 80,
+        "inputDecay": 0.8
+      }
+    },
+    "Droste": {
+      "type": "Droste",
+      "enabled": true,
+      "parameters": {
+        "Point_1_X": 0.75,
+        "inputStrands": 5,
+        "Point_0_Y": 0.25,
+        "inputZoom": 1,
+        "inputPeriodicity": 100,
+        "Point_1_Y": 0.75,
+        "inputRotation": 0,
+        "Point_0_X": 0.25
+      },
+      "raw": {
+        "Point_1_X": 0.75,
+        "inputStrands": 5,
+        "Point_0_Y": 0.25,
+        "inputZoom": 1,
+        "inputPeriodicity": 100,
+        "Point_1_Y": 0.75,
+        "inputRotation": 0,
+        "Point_0_X": 0.25
+      }
+    },
+    "LightTunnel": {
+      "type": "LightTunnel",
+      "enabled": true,
+      "parameters": {
+        "Center_Y": 0.5,
+        "Center_X": 0.5,
+        "inputRadius": 100,
+        "inputRotation": 0
+      },
+      "raw": {
+        "Center_Y": 0.5,
+        "Center_X": 0.5,
+        "inputRadius": 100,
+        "inputRotation": 0
+      }
+    },
+    "MedianComicEffect": {
+      "type": "MedianComicEffect",
+      "enabled": true,
+      "parameters": {
+        "Choose_Effect": 0
+      },
+      "raw": {
+        "Choose_Effect": 0
+      }
+    },
+    "FalseColor": {
+      "type": "FalseColor",
+      "enabled": true,
+      "parameters": {
+        "inputColor0": [
+          1,
+          0.9999999403953552,
+          1,
+          1
+        ],
+        "inputColor1": [
+          1,
+          0.9999999403953552,
+          1,
+          1
+        ]
+      },
+      "raw": {
+        "inputColor0": [
+          1,
+          0.9999999403953552,
+          1,
+          1
+        ],
+        "inputColor1": [
+          1,
+          0.9999999403953552,
+          1,
+          1
+        ]
+      }
+    },
+    "ThermalXRay": {
+      "type": "ThermalXRay",
+      "enabled": true,
+      "parameters": {
+        "Choose_Effect": 0
+      },
+      "raw": {
+        "Choose_Effect": 0
+      }
+    },
+    "GaborGradients": {
+      "type": "GaborGradients",
+      "enabled": true,
+      "parameters": {},
+      "raw": {}
+    },
+    "Spotlight": {
+      "type": "Spotlight",
+      "enabled": true,
+      "parameters": {
+        "inputBrightness": 1,
+        "inputConcentration": 1,
+        "Light_Pos_Y": 1,
+        "Light_Points_Z": 0,
+        "Light_Pos_X": 0,
+        "Light_Points_X": 1,
+        "inputColor": [
+          1,
+          0.9999999403953552,
+          1,
+          1
+        ],
+        "Light_Pos_Z": 1,
+        "Light_Points_Y": 0
+      },
+      "raw": {
+        "inputBrightness": 1,
+        "inputConcentration": 1,
+        "Light_Pos_Y": 1,
+        "Light_Points_Z": 0,
+        "Light_Pos_X": 0,
+        "Light_Points_X": 1,
+        "inputColor": [
+          1,
+          0.9999999403953552,
+          1,
+          1
+        ],
+        "Light_Pos_Z": 1,
+        "Light_Points_Y": 0
+      }
+    },
+    "Dither": {
+      "type": "Dither",
+      "enabled": true,
+      "parameters": {
+        "inputIntensity": 0
+      },
+      "raw": {
+        "inputIntensity": 0
+      }
+    },
+    "NoiseReduction": {
+      "type": "NoiseReduction",
+      "enabled": true,
+      "parameters": {
+        "inputNoiseLevel": 0.02,
+        "inputSharpness": 0.4
+      },
+      "raw": {
+        "inputNoiseLevel": 0.02,
+        "inputSharpness": 0.4
+      }
+    },
+    "CircleSplashHoleDistortion": {
+      "type": "CircleSplashHoleDistortion",
+      "enabled": true,
+      "parameters": {
+        "_protocolInput_X": 0.5,
+        "inputRadius": 150,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      },
+      "raw": {
+        "_protocolInput_X": 0.5,
+        "inputRadius": 150,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      }
+    },
+    "PinchBumpDistortion": {
+      "type": "PinchBumpDistortion",
+      "enabled": true,
+      "parameters": {
+        "inputScale": 0,
+        "inputAngle": 0,
+        "_protocolInput_X": 0.5,
+        "inputRadius": 150,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      },
+      "raw": {
+        "inputScale": 0,
+        "inputAngle": 0,
+        "_protocolInput_X": 0.5,
+        "inputRadius": 150,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      }
+    },
+    "TorusLensDistortion": {
+      "type": "TorusLensDistortion",
+      "enabled": true,
+      "parameters": {
+        "inputRefraction": 1.7,
+        "_protocolInput_X": 0.5,
+        "inputRadius": 160,
+        "inputWidth": 80,
+        "_protocolInput_Y": 0.5
+      },
+      "raw": {
+        "inputRefraction": 1.7,
+        "_protocolInput_X": 0.5,
+        "inputRadius": 160,
+        "inputWidth": 80,
+        "_protocolInput_Y": 0.5
+      }
+    },
+    "TwirlVortexDistortion": {
+      "type": "TwirlVortexDistortion",
+      "enabled": true,
+      "parameters": {
+        "inputAngle": 0,
+        "_protocolInput_X": 0.5,
+        "inputRadius": 150,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      },
+      "raw": {
+        "inputAngle": 0,
+        "_protocolInput_X": 0.5,
+        "inputRadius": 150,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      }
+    },
+    "GlassLozenge": {
+      "type": "GlassLozenge",
+      "enabled": true,
+      "parameters": {
+        "inputRadius": 100,
+        "inputRefraction": 1.7,
+        "Point_1_X": 0.5,
+        "Point_2_X": 0.5,
+        "Point_1_Y": 0.5,
+        "Point_2_Y": 0.5
+      },
+      "raw": {
+        "inputRadius": 100,
+        "inputRefraction": 1.7,
+        "Point_1_X": 0.5,
+        "Point_2_X": 0.5,
+        "Point_1_Y": 0.5,
+        "Point_2_Y": 0.5
+      }
+    },
+    "KeystoneCorrection": {
+      "type": "KeystoneCorrection",
+      "enabled": true,
+      "parameters": {
+        "LR_Y": 0,
+        "LL_X": 0,
+        "UR_Y": 1,
+        "UL_X": 0,
+        "LL_Y": 0,
+        "inputFocalLength": 10,
+        "UL_Y": 1,
+        "Choose_Effect": 0,
+        "LR_X": 1,
+        "UR_X": 1
+      },
+      "raw": {
+        "LR_Y": 0,
+        "LL_X": 0,
+        "UR_Y": 1,
+        "UL_X": 0,
+        "LL_Y": 0,
+        "inputFocalLength": 10,
+        "UL_Y": 1,
+        "Choose_Effect": 0,
+        "LR_X": 1,
+        "UR_X": 1
+      }
+    },
+    "OpTile": {
+      "type": "OpTile",
+      "enabled": true,
+      "parameters": {
+        "inputScale": 2.8,
+        "inputAngle": 0,
+        "_protocolInput_X": 0.5,
+        "inputWidth": 65,
+        "_protocolInput_Y": 0.5
+      },
+      "raw": {
+        "inputScale": 2.8,
+        "inputAngle": 0,
+        "_protocolInput_X": 0.5,
+        "inputWidth": 65,
+        "_protocolInput_Y": 0.5
+      }
+    },
+    "PerspectiveTile": {
+      "type": "PerspectiveTile",
+      "enabled": true,
+      "parameters": {
+        "Bottom_Right_X": 1,
+        "Top_Right_Y": 1,
+        "Bottom_Left_X": 0,
+        "Bottom_Right_Y": 0,
+        "Top_Right_X": 1,
+        "Bottom_Left_Y": 0,
+        "Top_Left_Y": 1,
+        "Top_Left_X": 0
+      },
+      "raw": {
+        "Bottom_Right_X": 1,
+        "Top_Right_Y": 1,
+        "Bottom_Left_X": 0,
+        "Bottom_Right_Y": 0,
+        "Top_Right_X": 1,
+        "Bottom_Left_Y": 0,
+        "Top_Left_Y": 1,
+        "Top_Left_X": 0
+      }
+    },
+    "QuadTiles": {
+      "type": "QuadTiles",
+      "enabled": true,
+      "parameters": {
+        "Choose_Effect": 0,
+        "inputAcuteAngle": 90,
+        "inputAngle": 0,
+        "inputWidth": 100,
+        "_protocolInput_X": 0.5,
+        "_protocolInput_Y": 0.5
+      },
+      "raw": {
+        "Choose_Effect": 0,
+        "inputAcuteAngle": 90,
+        "inputAngle": 0,
+        "inputWidth": 100,
+        "_protocolInput_X": 0.5,
+        "_protocolInput_Y": 0.5
+      }
+    },
+    "ReflectedTiles": {
+      "type": "ReflectedTiles",
+      "enabled": true,
+      "parameters": {
+        "_inputY": 0.5,
+        "inputAngle": 0,
+        "inputWidth": 100,
+        "Choose_Effect": 0,
+        "_inputX": 0.5
+      },
+      "raw": {
+        "_inputY": 0.5,
+        "inputAngle": 0,
+        "inputWidth": 100,
+        "Choose_Effect": 0,
+        "_inputX": 0.5
+      }
+    },
+    "RotatedTiles": {
+      "type": "RotatedTiles",
+      "enabled": true,
+      "parameters": {
+        "inputAngle": 0,
+        "_protocolInput_X": 0.5,
+        "inputWidth": 100,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      },
+      "raw": {
+        "inputAngle": 0,
+        "_protocolInput_X": 0.5,
+        "inputWidth": 100,
+        "Choose_Effect": 0,
+        "_protocolInput_Y": 0.5
+      }
+    },
+    "NinePartStretched": {
+      "type": "NinePartStretched",
+      "enabled": true,
+      "parameters": {
+        "LL_Y": 0.25,
+        "UR_X": 0.75,
+        "Grow_X": 100,
+        "LL_X": 0.25,
+        "Grow_Y": 100,
+        "UR_Y": 0.75
+      },
+      "raw": {
+        "LL_Y": 0.25,
+        "UR_X": 0.75,
+        "Grow_X": 100,
+        "LL_X": 0.25,
+        "Grow_Y": 100,
+        "UR_Y": 0.75
+      }
+    },
+    "NinePartTiled": {
+      "type": "NinePartTiled",
+      "enabled": true,
+      "parameters": {
+        "Grow_X": 100,
+        "LL_X": 0.25,
+        "Grow_Y": 100,
+        "UR_Y": 0.75,
+        "inputFlipYTiles": false,
+        "LL_Y": 0.25,
+        "UR_X": 0.75
+      },
+      "raw": {
+        "Grow_X": 100,
+        "LL_X": 0.25,
+        "Grow_Y": 100,
+        "UR_Y": 0.75,
+        "inputFlipYTiles": false,
+        "LL_Y": 0.25,
+        "UR_X": 0.75
+      }
+    },
+    "Shutter": {
+      "type": "Shutter",
+      "enabled": true,
+      "parameters": {
+        "Right": 0,
+        "Feather": 0,
+        "Bottom": 0,
+        "Left": 0,
+        "Top": 0,
+        "Shape": 0
+      },
+      "raw": {
+        "Right": 0,
+        "Feather": 0,
+        "Bottom": 0,
+        "Left": 0,
+        "Top": 0,
+        "Shape": 0
+      }
+    },
+    "Window": {
+      "type": "Window",
+      "enabled": true,
+      "parameters": {
+        "Origin_Y": 0,
+        "Origin_X": 0,
+        "Size_H": 1,
+        "Size_W": 1
+      },
+      "raw": {
+        "Origin_Y": 0,
+        "Origin_X": 0,
+        "Size_H": 1,
+        "Size_W": 1
+      }
+    }
+  },
+  "blocked_creation": {
+    "LinearKey": "QLab 5.5.10 returned OSC status=error for documented add and insert; its unified log says 'unrecognized video effect name: LinearKey' although the UI tooltip and OSC dictionary give that exact name. Existing instances can be read and edited; creation stays blocked pending QLab-side resolution.",
+    "DropShadow": "QLab 5.5.10 returned OSC status=error for documented add and insert; its unified log says 'unrecognized video effect name: DropShadow' although the UI tooltip and OSC dictionary give that exact name. Existing instances can be read and edited; creation stays blocked pending QLab-side resolution."
+  }
+}

@@ -1,0 +1,1066 @@
+{
+  "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+  "path": "<redacted-local-path-851cab375f>.qlab5",
+  "authorization": "User explicitly permitted direct changes to redacted-test-workspace; other workspaces remain open.",
+  "operations": [
+    {
+      "tool": "qlab_edit_workspace_general_settings",
+      "ids": {},
+      "plan": {
+        "ok": true,
+        "status": "dry_run",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "general.minGoTime",
+        "dry_run": true,
+        "requested_value": 0.125,
+        "baseline": 0,
+        "readback": null,
+        "planned_operations": [
+          {
+            "operation": "set_workspace_setting",
+            "property": "general.minGoTime",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/general/minGoTime",
+            "args": [
+              0.125
+            ],
+            "mode": "saved",
+            "risk_tier": "tier2",
+            "real_write_enabled": true
+          }
+        ],
+        "executed_operations": [],
+        "verification": null,
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [
+          "The activity reader cannot prove workspace-wide Audition state; keep Audition disabled."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "Dry run succeeded; review the planned setter and use its fresh confirm_token to execute once."
+      },
+      "change": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "general.minGoTime",
+        "dry_run": false,
+        "requested_value": 0.125,
+        "baseline": 0,
+        "readback": 0.125,
+        "planned_operations": [
+          {
+            "operation": "set_workspace_setting",
+            "property": "general.minGoTime",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/general/minGoTime",
+            "args": [
+              0.125
+            ],
+            "mode": "saved",
+            "risk_tier": "tier2",
+            "real_write_enabled": true
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "set_workspace_setting",
+            "property": "general.minGoTime",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/general/minGoTime",
+            "args": [
+              0.125
+            ],
+            "status": "ok"
+          }
+        ],
+        "verification": {
+          "matched": true,
+          "readback_available": true
+        },
+        "timeout_confirmation": {
+          "confirmed": false,
+          "setter_timeout": false
+        },
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [
+          "The activity reader cannot prove workspace-wide Audition state; keep Audition disabled."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "Workspace Settings setter completed and fresh readback matched the requested value."
+      },
+      "change_setters": [
+        {
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/general/minGoTime",
+          "args": [
+            0.125
+          ],
+          "ensure_always_reply": true,
+          "allow_empty_data": true
+        }
+      ],
+      "restore_plan": {
+        "ok": true,
+        "status": "dry_run",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "general.minGoTime",
+        "dry_run": true,
+        "requested_value": 0,
+        "baseline": 0.125,
+        "readback": null,
+        "planned_operations": [
+          {
+            "operation": "set_workspace_setting",
+            "property": "general.minGoTime",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/general/minGoTime",
+            "args": [
+              0
+            ],
+            "mode": "saved",
+            "risk_tier": "tier2",
+            "real_write_enabled": true
+          }
+        ],
+        "executed_operations": [],
+        "verification": null,
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [
+          "The activity reader cannot prove workspace-wide Audition state; keep Audition disabled."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "Dry run succeeded; review the planned setter and use its fresh confirm_token to execute once."
+      },
+      "restore": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "general.minGoTime",
+        "dry_run": false,
+        "requested_value": 0,
+        "baseline": 0.125,
+        "readback": 0,
+        "planned_operations": [
+          {
+            "operation": "set_workspace_setting",
+            "property": "general.minGoTime",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/general/minGoTime",
+            "args": [
+              0
+            ],
+            "mode": "saved",
+            "risk_tier": "tier2",
+            "real_write_enabled": true
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "set_workspace_setting",
+            "property": "general.minGoTime",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/general/minGoTime",
+            "args": [
+              0
+            ],
+            "status": "ok"
+          }
+        ],
+        "verification": {
+          "matched": true,
+          "readback_available": true
+        },
+        "timeout_confirmation": {
+          "confirmed": false,
+          "setter_timeout": false
+        },
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [
+          "The activity reader cannot prove workspace-wide Audition state; keep Audition disabled."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "Workspace Settings setter completed and fresh readback matched the requested value."
+      },
+      "restore_setters": [
+        {
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/general/minGoTime",
+          "args": [
+            0
+          ],
+          "ensure_always_reply": true,
+          "allow_empty_data": true
+        }
+      ]
+    },
+    {
+      "tool": "qlab_edit_audio_output_patch",
+      "ids": {
+        "patch_id": "42852B2A-3A48-525D-BB84-51A6B299D49C"
+      },
+      "plan": {
+        "ok": true,
+        "status": "dry_run",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "name",
+        "dry_run": true,
+        "requested_value": "MCP audit temporary patch",
+        "baseline": "Patch 1",
+        "readback": null,
+        "planned_operations": [
+          {
+            "operation": "name",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/audio/patchID/42852B2A-3A48-525D-BB84-51A6B299D49C/name",
+            "args": [
+              "MCP audit temporary patch"
+            ]
+          }
+        ],
+        "executed_operations": [],
+        "verification": null,
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "dry_run"
+      },
+      "change": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "name",
+        "dry_run": false,
+        "requested_value": "MCP audit temporary patch",
+        "baseline": "Patch 1",
+        "readback": "MCP audit temporary patch",
+        "planned_operations": [
+          {
+            "operation": "name",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/audio/patchID/42852B2A-3A48-525D-BB84-51A6B299D49C/name",
+            "args": [
+              "MCP audit temporary patch"
+            ]
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "name",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/audio/patchID/42852B2A-3A48-525D-BB84-51A6B299D49C/name",
+            "args": [
+              "MCP audit temporary patch"
+            ],
+            "status": "ok"
+          }
+        ],
+        "verification": {
+          "matched": true,
+          "readback_available": true
+        },
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "updated"
+      },
+      "change_setters": [
+        {
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/audio/patchID/42852B2A-3A48-525D-BB84-51A6B299D49C/name",
+          "args": [
+            "MCP audit temporary patch"
+          ],
+          "ensure_always_reply": true,
+          "allow_empty_data": true
+        }
+      ],
+      "restore_plan": {
+        "ok": true,
+        "status": "dry_run",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "name",
+        "dry_run": true,
+        "requested_value": "Patch 1",
+        "baseline": "MCP audit temporary patch",
+        "readback": null,
+        "planned_operations": [
+          {
+            "operation": "name",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/audio/patchID/42852B2A-3A48-525D-BB84-51A6B299D49C/name",
+            "args": [
+              "Patch 1"
+            ]
+          }
+        ],
+        "executed_operations": [],
+        "verification": null,
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "dry_run"
+      },
+      "restore": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "name",
+        "dry_run": false,
+        "requested_value": "Patch 1",
+        "baseline": "MCP audit temporary patch",
+        "readback": "Patch 1",
+        "planned_operations": [
+          {
+            "operation": "name",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/audio/patchID/42852B2A-3A48-525D-BB84-51A6B299D49C/name",
+            "args": [
+              "Patch 1"
+            ]
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "name",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/audio/patchID/42852B2A-3A48-525D-BB84-51A6B299D49C/name",
+            "args": [
+              "Patch 1"
+            ],
+            "status": "ok"
+          }
+        ],
+        "verification": {
+          "matched": true,
+          "readback_available": true
+        },
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "updated"
+      },
+      "restore_setters": [
+        {
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/audio/patchID/42852B2A-3A48-525D-BB84-51A6B299D49C/name",
+          "args": [
+            "Patch 1"
+          ],
+          "ensure_always_reply": true,
+          "allow_empty_data": true
+        }
+      ]
+    },
+    {
+      "tool": "qlab_edit_video_output_route",
+      "ids": {
+        "route_id": "347F747D-2ABB-5B0D-9FE8-3EBE1FA25DED"
+      },
+      "plan": {
+        "ok": true,
+        "status": "dry_run",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "enableGuides",
+        "dry_run": true,
+        "requested_value": true,
+        "baseline": false,
+        "readback": null,
+        "planned_operations": [
+          {
+            "operation": "enableGuides",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/routeID/347F747D-2ABB-5B0D-9FE8-3EBE1FA25DED/enableGuides",
+            "args": [
+              true
+            ]
+          }
+        ],
+        "executed_operations": [],
+        "verification": null,
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "dry_run"
+      },
+      "change": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "enableGuides",
+        "dry_run": false,
+        "requested_value": true,
+        "baseline": false,
+        "readback": true,
+        "planned_operations": [
+          {
+            "operation": "enableGuides",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/routeID/347F747D-2ABB-5B0D-9FE8-3EBE1FA25DED/enableGuides",
+            "args": [
+              true
+            ]
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "enableGuides",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/routeID/347F747D-2ABB-5B0D-9FE8-3EBE1FA25DED/enableGuides",
+            "args": [
+              true
+            ],
+            "status": "ok"
+          }
+        ],
+        "verification": {
+          "matched": true,
+          "readback_available": true
+        },
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "updated"
+      },
+      "change_setters": [
+        {
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/routeID/347F747D-2ABB-5B0D-9FE8-3EBE1FA25DED/enableGuides",
+          "args": [
+            true
+          ],
+          "ensure_always_reply": true,
+          "allow_empty_data": true
+        }
+      ],
+      "restore_plan": {
+        "ok": true,
+        "status": "dry_run",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "enableGuides",
+        "dry_run": true,
+        "requested_value": false,
+        "baseline": true,
+        "readback": null,
+        "planned_operations": [
+          {
+            "operation": "enableGuides",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/routeID/347F747D-2ABB-5B0D-9FE8-3EBE1FA25DED/enableGuides",
+            "args": [
+              false
+            ]
+          }
+        ],
+        "executed_operations": [],
+        "verification": null,
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "dry_run"
+      },
+      "restore": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "enableGuides",
+        "dry_run": false,
+        "requested_value": false,
+        "baseline": true,
+        "readback": false,
+        "planned_operations": [
+          {
+            "operation": "enableGuides",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/routeID/347F747D-2ABB-5B0D-9FE8-3EBE1FA25DED/enableGuides",
+            "args": [
+              false
+            ]
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "enableGuides",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/routeID/347F747D-2ABB-5B0D-9FE8-3EBE1FA25DED/enableGuides",
+            "args": [
+              false
+            ],
+            "status": "ok"
+          }
+        ],
+        "verification": {
+          "matched": true,
+          "readback_available": true
+        },
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "updated"
+      },
+      "restore_setters": [
+        {
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/routeID/347F747D-2ABB-5B0D-9FE8-3EBE1FA25DED/enableGuides",
+          "args": [
+            false
+          ],
+          "ensure_always_reply": true,
+          "allow_empty_data": true
+        }
+      ]
+    },
+    {
+      "tool": "qlab_edit_video_stage",
+      "ids": {
+        "stage_id": "A41F907E-3E01-570E-A4BC-0B86C6A1922E"
+      },
+      "plan": {
+        "ok": true,
+        "status": "dry_run",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "name",
+        "dry_run": true,
+        "requested_value": "MCP audit temporary stage",
+        "baseline": "Cuadro Superior",
+        "readback": null,
+        "planned_operations": [
+          {
+            "operation": "name",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/name",
+            "args": [
+              "MCP audit temporary stage"
+            ]
+          }
+        ],
+        "executed_operations": [],
+        "verification": null,
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "dry_run"
+      },
+      "change": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "name",
+        "dry_run": false,
+        "requested_value": "MCP audit temporary stage",
+        "baseline": "Cuadro Superior",
+        "readback": "MCP audit temporary stage",
+        "planned_operations": [
+          {
+            "operation": "name",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/name",
+            "args": [
+              "MCP audit temporary stage"
+            ]
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "name",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/name",
+            "args": [
+              "MCP audit temporary stage"
+            ],
+            "status": "ok"
+          }
+        ],
+        "verification": {
+          "matched": true,
+          "readback_available": true
+        },
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "updated"
+      },
+      "change_setters": [
+        {
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/name",
+          "args": [
+            "MCP audit temporary stage"
+          ],
+          "ensure_always_reply": true,
+          "allow_empty_data": true
+        }
+      ],
+      "restore_plan": {
+        "ok": true,
+        "status": "dry_run",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "name",
+        "dry_run": true,
+        "requested_value": "Cuadro Superior",
+        "baseline": "MCP audit temporary stage",
+        "readback": null,
+        "planned_operations": [
+          {
+            "operation": "name",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/name",
+            "args": [
+              "Cuadro Superior"
+            ]
+          }
+        ],
+        "executed_operations": [],
+        "verification": null,
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "dry_run"
+      },
+      "restore": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "name",
+        "dry_run": false,
+        "requested_value": "Cuadro Superior",
+        "baseline": "MCP audit temporary stage",
+        "readback": "Cuadro Superior",
+        "planned_operations": [
+          {
+            "operation": "name",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/name",
+            "args": [
+              "Cuadro Superior"
+            ]
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "name",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/name",
+            "args": [
+              "Cuadro Superior"
+            ],
+            "status": "ok"
+          }
+        ],
+        "verification": {
+          "matched": true,
+          "readback_available": true
+        },
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "updated"
+      },
+      "restore_setters": [
+        {
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/name",
+          "args": [
+            "Cuadro Superior"
+          ],
+          "ensure_always_reply": true,
+          "allow_empty_data": true
+        }
+      ]
+    },
+    {
+      "tool": "qlab_edit_video_region",
+      "ids": {
+        "stage_id": "A41F907E-3E01-570E-A4BC-0B86C6A1922E",
+        "region_id": "8BBA6421-9F0E-5B2B-95F9-A99A99059A71"
+      },
+      "plan": {
+        "ok": true,
+        "status": "dry_run",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "enableGrid",
+        "dry_run": true,
+        "requested_value": true,
+        "baseline": false,
+        "readback": null,
+        "planned_operations": [
+          {
+            "operation": "enableGrid",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/regionID/8BBA6421-9F0E-5B2B-95F9-A99A99059A71/enableGrid",
+            "args": [
+              true
+            ]
+          }
+        ],
+        "executed_operations": [],
+        "verification": null,
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "dry_run"
+      },
+      "change": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "enableGrid",
+        "dry_run": false,
+        "requested_value": true,
+        "baseline": false,
+        "readback": true,
+        "planned_operations": [
+          {
+            "operation": "enableGrid",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/regionID/8BBA6421-9F0E-5B2B-95F9-A99A99059A71/enableGrid",
+            "args": [
+              true
+            ]
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "enableGrid",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/regionID/8BBA6421-9F0E-5B2B-95F9-A99A99059A71/enableGrid",
+            "args": [
+              true
+            ],
+            "status": "ok"
+          }
+        ],
+        "verification": {
+          "matched": true,
+          "readback_available": true
+        },
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "updated"
+      },
+      "change_setters": [
+        {
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/regionID/8BBA6421-9F0E-5B2B-95F9-A99A99059A71/enableGrid",
+          "args": [
+            true
+          ],
+          "ensure_always_reply": true,
+          "allow_empty_data": true
+        }
+      ],
+      "restore_plan": {
+        "ok": true,
+        "status": "dry_run",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "enableGrid",
+        "dry_run": true,
+        "requested_value": false,
+        "baseline": true,
+        "readback": null,
+        "planned_operations": [
+          {
+            "operation": "enableGrid",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/regionID/8BBA6421-9F0E-5B2B-95F9-A99A99059A71/enableGrid",
+            "args": [
+              false
+            ]
+          }
+        ],
+        "executed_operations": [],
+        "verification": null,
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "dry_run"
+      },
+      "restore": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "operation": "enableGrid",
+        "dry_run": false,
+        "requested_value": false,
+        "baseline": true,
+        "readback": false,
+        "planned_operations": [
+          {
+            "operation": "enableGrid",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/regionID/8BBA6421-9F0E-5B2B-95F9-A99A99059A71/enableGrid",
+            "args": [
+              false
+            ]
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "enableGrid",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/regionID/8BBA6421-9F0E-5B2B-95F9-A99A99059A71/enableGrid",
+            "args": [
+              false
+            ],
+            "status": "ok"
+          }
+        ],
+        "verification": {
+          "matched": true,
+          "readback_available": true
+        },
+        "timeout_confirmation": null,
+        "retry_unsafe": false,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "updated"
+      },
+      "restore_setters": [
+        {
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/settings/video/stageID/A41F907E-3E01-570E-A4BC-0B86C6A1922E/regionID/8BBA6421-9F0E-5B2B-95F9-A99A99059A71/enableGrid",
+          "args": [
+            false
+          ],
+          "ensure_always_reply": true,
+          "allow_empty_data": true
+        }
+      ]
+    }
+  ],
+  "decimal_point_read": {
+    "ok": true,
+    "status": "ok",
+    "partial": false,
+    "workspace_id": "9D9FDE61-4388-5E9D-B5E2-D28840C882DD",
+    "domain": "video",
+    "coverage": "partial",
+    "profile": "safe",
+    "view": "region",
+    "ref": "3962D468-5D63-5E3E-9FB7-F90A6F216DEE",
+    "choices": [],
+    "redactions": [],
+    "warnings": [],
+    "errors": null,
+    "error_code": null,
+    "suggested_action": null,
+    "message": null,
+    "received": null,
+    "allowed": null,
+    "data": {
+      "detail": {
+        "uniqueID": "3962D468-5D63-5E3E-9FB7-F90A6F216DEE",
+        "name": "A",
+        "index": 0,
+        "boundsOnStage": {
+          "width": 3024.0,
+          "height": 1964.0,
+          "x": 0.0,
+          "y": 0.0
+        },
+        "meshWidth": 1,
+        "meshHeight": 1,
+        "warpType": 3,
+        "autoEdgeBlends": true,
+        "edgeBlendTopPixels": 0.0,
+        "edgeBlendRightPixels": 0.0,
+        "edgeBlendBottomPixels": 0.0,
+        "edgeBlendLeftPixels": 0.0,
+        "edgeBlendPower": 2.0,
+        "edgeBlendGamma": 0.800000011920929,
+        "route": {
+          "uniqueID": "2ECA9732-E340-5039-BA10-1630C0B8AA90",
+          "name": "Output 1",
+          "connected": false,
+          "destination_type": "Display",
+          "device": {
+            "present": true,
+            "name": "EPSON PJ",
+            "type": "Display",
+            "connected": null
+          },
+          "destination_present": true,
+          "enableGuides": null,
+          "rotationDegrees": null,
+          "scalingMode": null,
+          "naturalSize": null,
+          "partialScreen": null,
+          "rear": null,
+          "guides_present": false,
+          "attention": {
+            "status": "disconnected",
+            "message": "Video route is configured but QLab reports it is not connected."
+          },
+          "editable_operations": [
+            "enableGuides"
+          ]
+        },
+        "control_point_count": 4,
+        "shadow_control_point_count": 0,
+        "mesh_subregion_count": 1
+      },
+      "bounds": {
+        "width": 3024.0,
+        "height": 1964.0,
+        "x": 0.0,
+        "y": 0.0
+      },
+      "enableGrid": false,
+      "enableGuide": false,
+      "control_point": {
+        "x": 948.9149903942621,
+        "y": 217.85067072331196
+      },
+      "editable_operations": [
+        "bounds",
+        "origin",
+        "size",
+        "x",
+        "y",
+        "width",
+        "height",
+        "controlPoint",
+        "enableGrid",
+        "enableGuide"
+      ]
+    }
+  },
+  "read_checks": {
+    "qlab_get_text_cue_details": {
+      "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+      "cue_id": "3F11DC3A-7BC7-5A58-917F-78A6108E07FD",
+      "status": "ok",
+      "errors": {},
+      "ltc": null
+    },
+    "qlab_get_timecode_cue_details": {
+      "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+      "cue_id": "FE1D267E-B24D-5511-AC94-AC4E4BEEAC2B",
+      "status": "ok",
+      "errors": {},
+      "ltc": {
+        "audioOutputPatchID": "42852B2A-3A48-525D-BB84-51A6B299D49C",
+        "audioOutputPatchName": "Patch 1",
+        "audioOutputPatchNumber": 1,
+        "ltcChannel": 0
+      }
+    }
+  },
+  "automated_validation": {
+    "tests_passed": 3241,
+    "subtests_passed": 61,
+    "registered_tools": 56,
+    "schema_change": "Only qlab_get_timecode_cue_details output schema changes: ltcChannel minimum 1 to 0."
+  },
+  "post_restart_connected_mcp": {
+    "registry": {
+      "specialized_edits": [
+        "qlab_edit_workspace_general_settings",
+        "qlab_edit_audio_output_patch",
+        "qlab_edit_video_output_route",
+        "qlab_edit_video_stage",
+        "qlab_edit_video_region"
+      ],
+      "qlab_get_video_region": true,
+      "generic_edit_present": false
+    },
+    "workspace_readiness": {
+      "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+      "qlab_version": "5.5.10",
+      "mode": "edit",
+      "write_ready": true
+    },
+    "live_operations": [
+      {
+        "family": "General",
+        "baseline": 0,
+        "requested": 0.125,
+        "setter": "ok",
+        "restored": 0
+      },
+      {
+        "family": "Audio patch name",
+        "baseline": "Patch 1",
+        "requested": "Patch 1 · MCP verification",
+        "setter": "ok",
+        "restored": "Patch 1"
+      },
+      {
+        "family": "Video route enableGuides",
+        "baseline": false,
+        "requested": true,
+        "setter": "ok",
+        "restored": false
+      },
+      {
+        "family": "Video stage name",
+        "baseline": "Stage 9",
+        "requested": "Stage 9 · MCP verification",
+        "setter": "ok",
+        "restored": "Stage 9"
+      },
+      {
+        "family": "Video region enableGrid",
+        "baseline": false,
+        "requested": true,
+        "setter": "timeout_pending_verification",
+        "readback_confirmed": true,
+        "retry_sent": false,
+        "restored": false
+      }
+    ],
+    "computer_use_comparison": {
+      "general": {
+        "minimum_go_time_seconds": 0,
+        "lock_playhead_to_selection": true
+      },
+      "audio": {
+        "patch_name": "Patch 1",
+        "device": "System Output - Altavoces del MacBook Air - (2 Out)",
+        "maximum_db": 12,
+        "minimum_db": -60
+      },
+      "video_stage": {
+        "name": "Stage 9",
+        "size": [
+          2940,
+          1912
+        ],
+        "region_grid": "off"
+      },
+      "video_route": {
+        "name": "22B1W",
+        "guides": "off"
+      }
+    },
+    "post_restore_reads": {
+      "general": {
+        "minGoTime": 0,
+        "selectionIsPlayhead": true
+      },
+      "audio_patch_name": "Patch 1",
+      "route_enableGuides": false,
+      "stage_name": "Stage 9",
+      "region_enableGrid": false
+    },
+    "cues_executed": 0,
+    "active_cues_after_checks": 0
+  }
+}

@@ -568,3 +568,22 @@ def test_workspace_settings_readable_mismatch_is_verification_failed(monkeypatch
     assert result.status == "verification_failed"
     assert result.retry_unsafe is False
     assert result.executed_operations and len(result.executed_operations) == 1
+
+
+def test_general_preparation_failure_has_no_executed_operations(monkeypatch):
+    import qlab_mcp.settings.write_operations as writes
+    from qlab_mcp.errors import OscPreparationError
+    monkeypatch.setattr(writes, 'check_write_readiness', lambda *_: {'ok': True})
+    monkeypatch.setattr(writes, 'ensure_write_ready', lambda *_: WORKSPACE_ID)
+    reader = _SettingsFakeReader()
+    plan = reader.edit_general_settings(WORKSPACE_ID, 'minGoTime', 0.4, dry_run=True)
+    original = reader._request
+    def request(address, *args, **kwargs):
+        if kwargs.get('ensure_always_reply'):
+            assert kwargs['allow_empty_data']
+            raise OscPreparationError('setter not sent')
+        return original(address, *args, **kwargs)
+    reader._request = request
+    done = reader.edit_general_settings(WORKSPACE_ID, 'minGoTime', 0.4, dry_run=False, confirm_token=plan.confirm_token)
+    assert done.status == 'preflight_failed' and done.executed_operations == []
+    assert not reader.setter_done

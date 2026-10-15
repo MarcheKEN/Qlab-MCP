@@ -119,7 +119,7 @@ class CueListContents(BaseModel):
 
 
 class CueListCoverage(BaseModel):
-    source: Literal["documented_osc"] = "documented_osc"
+    source: Literal["documented_osc", "documented_osc_and_applescript"] = "documented_osc"
     unavailable_via_osc: list[str] = Field(default_factory=list)
     unavailable_fields: list[str] = Field(default_factory=list)
     failed_routes: list[str] = Field(default_factory=list)

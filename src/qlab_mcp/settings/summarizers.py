@@ -126,6 +126,14 @@ def _count_nested(value: Any, names: tuple[str, ...]) -> int | None:
 def _summarize_audio_patch(item: Any) -> dict[str, Any]:
     summary = _basic_item_summary(item)
     if isinstance(item, dict):
+        device_presence_known = "device_present" in item or _contains_any_key(
+            item, {"device", "deviceid", "devicename"}
+        )
+        device_present = (
+            bool(item["device_present"])
+            if "device_present" in item
+            else True if device_presence_known else None
+        )
         cue_outputs = _first_present(item, ("cueOutputChannels", "cueOutputCount", "outputs", "outputChannels"))
         if cue_outputs is not None:
             if isinstance(cue_outputs, (list, dict)):
@@ -135,20 +143,18 @@ def _summarize_audio_patch(item: Any) -> dict[str, Any]:
         routing = item.get("routing")
         if isinstance(routing, (list, dict)):
             routing_items = _collection_items(routing)
-            summary["routing"] = routing_items
-            summary["routing_present"] = bool(routing_items)
-            summary["routing_count"] = len(routing_items)
+            if not routing_items and device_present is not True:
+                summary["routing"] = None
+                summary["routing_present"] = None
+                summary["routing_count"] = None
+            else:
+                summary["routing"] = routing_items
+                summary["routing_present"] = bool(routing_items)
+                summary["routing_count"] = len(routing_items)
         elif routing is not None:
             summary["routing_present"] = bool(routing)
-        device_presence_known = "device_present" in item or _contains_any_key(
-            item, {"device", "deviceid", "devicename"}
-        )
         summary["device_presence_known"] = device_presence_known
-        summary["device_present"] = (
-            bool(item["device_present"])
-            if "device_present" in item
-            else True if device_presence_known else None
-        )
+        summary["device_present"] = device_present
     return summary
 
 
@@ -373,8 +379,8 @@ def _summarize_network_patch(item: Any) -> dict[str, Any]:
         destination_count = _count_nested(item, ("destinations", "outputs", "addresses"))
         if destination_count is not None:
             summary["destination_count"] = destination_count
-        summary["destination_present"] = _contains_any_key(item, SAFE_NETWORK_REDACT_KEYS)
-        summary["passcode_present"] = _contains_any_key(item, {"passcode", "passcodes"})
+        summary["destination_present"] = True if _contains_any_key(item, SAFE_NETWORK_REDACT_KEYS) else None
+        summary["passcode_present"] = True if _contains_any_key(item, {"passcode", "passcodes"}) else None
     return summary
 
 

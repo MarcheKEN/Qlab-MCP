@@ -1,5 +1,12 @@
 # Video Phase 8B - Video Embedded Audio Time & Loops
 
+Current note (2026-10-07): Video has a family-specific editor; the generic cue
+editor is retired. The selected embedded-audio timing and Integrated Fade
+runtime checks remain open in [Workorder 029](029_video_audio_runtime_validation.md).
+The phase-specific statements below retain their original evidence date.
+
+## Historical phase specification
+
 Status: implemented locally; runtime validation pending. This workorder records
 Phase 8B implementation and runtime-safety scope; no new runtime probe is part
 of the 0.3.0 preparation.

@@ -160,7 +160,7 @@ def test_public_tools_each_callable(monkeypatch):
     async def run():
         async with Client(server.mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-            assert len(tools) == 48
+            assert len(tools) == 79
             for family, kind in [("fade", "Fade"), ("network", "Network"), ("midi", "MIDI"), ("timecode", "Timecode"), ("script", "Script")]:
                 osc = control_fixture(kind)
                 osc.cell_values[FIRST].update(messageType=1, outputType=0, fadeType=1, targetMode=1)
@@ -172,3 +172,19 @@ def test_public_tools_each_callable(monkeypatch):
                     result = await client.call_tool(name, {"workspace_id": WS, **args})
                     assert result.structured_content["ok"], result.structured_content
     asyncio.run(run())
+
+
+def test_ltc_zero_is_observed_not_discarded():
+    osc = control_fixture('Timecode')
+    osc.cell_values[FIRST].update(outputType=1, ltcChannel=0, isBroken=True)
+    result = QLabReader(osc).get_timecode_cue_details(WS, FIRST)
+    assert result.ltc.ltcChannel == 0 and result.state.isBroken
+    assert 'ltcChannel' not in result.errors
+
+
+@pytest.mark.parametrize('channel', [-1, True, 1.5, '1'])
+def test_invalid_ltc_channel_remains_an_error(channel):
+    osc = control_fixture('Timecode')
+    osc.cell_values[FIRST].update(outputType=1, ltcChannel=channel)
+    result = QLabReader(osc).get_timecode_cue_details(WS, FIRST)
+    assert 'ltcChannel' in result.errors and result.partial

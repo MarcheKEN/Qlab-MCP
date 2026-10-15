@@ -139,7 +139,8 @@ def test_secondary_timeout_is_partial_without_retry(monkeypatch):
     monkeypatch.setattr(reader, "read_cue_values", fail_second)
     result = reader.get_audio_cue_details(WS, AUDIO)
     assert result.partial and result.identity.uniqueID == AUDIO
-    assert "valuesForKeys:audio" in result.errors and len(calls) == 2
+    assert "valuesForKeys:audio" in result.errors and len(calls) == 3
+    assert calls[2][2] == ["uniqueID", "type"]  # fresh identity guard, no retry of failed secondary read
 
 
 def test_identity_change_during_detail_is_error(monkeypatch):

@@ -10,7 +10,7 @@ import threading
 import time
 from typing import Any
 
-from ..errors import OscTimeoutError, QLabReplyError
+from ..errors import OscPreparationError, OscTimeoutError, QLabReplyError
 from ..models import WorkspaceSettingsEditRequest, WorkspaceSettingsEditResult
 from ..osc.addressing import _workspace_address
 from ..write.comparison import SETTINGS_NUMERIC_MATCH_REL_TOLERANCE, numeric_values_match
@@ -313,10 +313,19 @@ class WorkspaceSettingsWriteMixin:
                 value,
                 workspace_id=workspace,
                 request_timeout=setter_reply_timeout(self, 1),
+                ensure_always_reply=True, allow_empty_data=True,
             )
             if getattr(reply, "status", "ok") != "ok":
                 raise QLabReplyError(getattr(reply, "status", "error"), getattr(reply, "data", None), setter_address)
             executed[0]["status"] = "ok"
+        except OscPreparationError as exc:
+            return self._settings_result(
+                request, workspace, False, fresh_baseline, None, planned, [], readiness=readiness,
+                activity=fresh_activity, warnings=warnings, status="preflight_failed",
+                errors={"always_reply": str(exc)}, error_code="QLAB_SETTINGS_PREFLIGHT_FAILED",
+                suggested_action="Run a fresh dry-run; no setter was sent.",
+                message="Workspace Settings preparation failed before the setter.",
+            )
         except OscTimeoutError as exc:
             setter_error = str(exc)
             setter_timeout = True

@@ -2,6 +2,243 @@
 
 ## Unreleased
 
+- Evidence capture now redacts confirmation tokens embedded in JSON-quoted
+  strings as well as structured responses.
+- Workspace document operations now require an explicit native send acknowledgement
+  before readback can report success. A confirmed no-send response blocks without
+  counting a mutation; a missing acknowledgement remains uncertain even if the
+  document already matches the requested state.
+- QLab 5.5.10 copy validation changed and restored Group Second Trigger,
+  existing LinearKey contrast, DropShadow distance, and Text1 font size through
+  their typed editors. Text2's inspector initially showed a stale 1.6 while its
+  field was disabled; focusing its text editor refreshed the field to 1.0,
+  matching OSC. Text2 was not edited. All tested values were restored, with 0
+  active cues; the workspace was not saved.
+- Add a paginated Video FX documentation catalogue with parameter types, enums,
+  bands and per-effect keys. Extend selected FX reads with native enabled state
+  and parameter metadata. Indexed Gets may discover the native type when omitted;
+  ambiguous identity remains blocked. Documentation metadata does not bypass
+  baseline, duplicate-instance or structural-write gates.
+- Add workspace document inventory, open, save and clean-close tools through a
+  fixed local AppleScript bridge. Open requires an empty workspace inventory;
+  save is bound to the existing path and saves all changes; close refuses dirty
+  documents. All operations use single-use confirmations and fresh readback.
+- Fix the native workspace inventory's AppleScript variable collision and
+  verify its read-only Get against the open QLab workspace.
+- Record remaining Text selector and shadow limits, and extend regression
+  coverage for signed cue-owned Audio/Mic object edits and unsupported metadata
+  cases. No new cue writes are inferred from missing OSC readback.
+
+- Extend typed Text word selectors to Latin letters and verified whitespace,
+  guillemet/curly-quote/em-dash delimiters. Color-only fragment edits also accept
+  verified NBSP/guillemet/curly-quote/em-dash characters, with complete format verification retained.
+  Emoji and non-Latin selections remain blocked: a live color-only experiment
+  also triggered font fallback. Shadows still require readable attributes;
+  no defaults or new tools are added.
+
+- Avoid redundant identity-only visual editor reads that QLab 5.5.10 can
+  suppress, blocking native Trigger edits before their setter. Fresh identity
+  validation and final checks after property reads remain in place.
+
+- Added optional fixed local AppleScript Trigger reads (`include_native_triggers`)
+  and signed edits in the existing cue-family tools: MIDI command/channel/bytes,
+  comparator strings, Wall Clock time, Timecode activation/display and trigger
+  disable state. A full native/safety snapshot guards every setter and detects
+  neighboring changes. Configuration requires disabled triggers; activation is
+  separate and requires disarmed, no continuation and no skip-if-disarmed.
+  Hotkey activation remains blocked without readable key/modifier identity;
+  key assignment, Wall Clock weekdays and capture remain unavailable. No new
+  tools, dependencies, playback or global input override changes.
+
+- Added fixed local AppleScript reads and signed edits for Load `loadTime` and
+  Target `assignedNumber` through the existing Control tools. No new tool or
+  dependency. Plans identify the transport; whole-batch preflight, five-minute
+  single-use tokens, identity/dependency guards and fresh readback remain required.
+  Negative Load times and clearing assigned numbers are supported. Automation
+  errors preserve OSC read data and block the native property. Remote OSC,
+  arbitrary scripts and cue execution remain excluded.
+
+- Added a canonical workspace review/authoring guide and a project-local
+  `qlab-workspace-authoring` skill. They reuse existing MCP tools for bounded
+  reviews, staged dependency changes, free-number renumbering, selected-property
+  copies and relative adjustments. No tool API or runtime writer changed.
+
+- Video FX deletion reconstruction now tolerates native, undocumented attributes
+  only when they match the recorded QLab 5.5.10 creation default. It sends setters
+  only for documented parameters; mismatching attributes still block deletion.
+  Automated regressions pass; live structural verification remains pending.
+
+- Accepts the QLab 5.5.10 native DropShadow color key `Color` in typed FX reads
+  and edits, using the documented `inputColor` RGBA bounds. Exact wire keys and
+  native attributes are preserved; conflicting aliases are rejected. User-created
+  LinearKey/DropShadow instances passed reversible OSC edits with UI contrast.
+  Their acknowledged-but-ineffective OSC creation routes remain blocked.
+  The shared writer now labels an explicit QLab `status=error` plus unchanged
+  fresh readback as `verification_failed`, not inconclusive, and never retries.
+
+- Records the QLab 5.5.10 add/insert diagnostic for LinearKey and DropShadow:
+  the QLab log reports `unrecognized video effect name` despite the UI tooltip
+  and OSC dictionary specifying the same names. MCP creation remains blocked;
+  existing instances remain readable and editable.
+
+- Removes the two-effect Video FX creation ceiling: isolated MCP probes record
+  QLab 5.5.10 creation defaults for 58 effects. Native named getters verify
+  runtime key differences without guessing aliases or filling missing values.
+  Unknown defaults remain blocked;
+  LinearKey/DropShadow creation is blocked after add/insert returned empty stacks.
+  Vector/boolean parameters use internally generated JSON setters and native
+  aggregate reads, avoiding unreliable scalar routes. Live checks cover all
+  58 enabled flags, 55 delete/insert restorations and seven parameter samples.
+  Existing confirmation, full-stack checks and reconstruction gates remain.
+
+- Adds `qlab_get_fonts` (application-wide names/families over TCP), bringing the
+  source catalogue to 74 tools. Extends typed Text formatting with UTF-16 Latin
+  ranges, nearest percentages, simple ASCII words and observed font mappings.
+  Native named FX getters prove unique indexed identity; complete stack checks
+  enable verified Gamma/Exposure structure in QLab 5.5.10. Ambiguous identities,
+  unvalidated defaults, non-Latin fallback and partial shadows remain blocked.
+  Live source MCP tests were contrasted with QLab UI and restored.
+
+
+- Fixes shared Video/Camera/Text quaternion planning, confirmation binding and
+  verification to preserve all four components. Accepts native OSC integer 0/1
+  for `infiniteLoop` reads and visual write verification while keeping write
+  inputs strictly boolean. QLab 5.5.10 image/movie reads and reversible Video
+  rotation were verified through the updated source MCP and contrasted with UI.
+
+- Caches the static tool catalogue with FastMCP's existing middleware, while
+  explicitly excluding tool execution, resource and prompt results. Read-cache
+  expiry sweeps run only when an entry can expire; TTL, invalidation and fresh
+  writer reads are preserved. Post-restart live timings and comparative
+  discovery/cache measurements are recorded in the performance report.
+
+- Reuses bounded compiled field validators across cue-family and Cue List
+  reads, preserving fresh OSC observations and strict validation. TCP reply
+  decoding avoids a Python byte loop and copy for unescaped SLIP frames.
+  Focused before/after measurements and unchanged request traces are recorded
+  in the 2026-10-08 MCP performance report; no public API changes.
+
+- Aligns current architecture, tool catalogue, user workflows, security and
+  status documentation with the 73-tool registry, optional indexed reads,
+  current FileTarget access policy and retired generic cue editor. Dated
+  validation reports remain historical.
+
+- Adds read-only `qlab_analyze_audio_file`: strict local paths, source metadata,
+  100 ms numeric tuples, channel-safe RMS/peaks, frequency bands, silence and
+  estimated onsets/beats. Explicit paging preserves detail in 30-minute files;
+  canonical blocks, scoped loudness/rhythm, stat identity, bounded cache and
+  cancellation avoid whole-file arrays. No OSC, playback or media changes.
+- Adds optional `audio` dependencies (NumPy/librosa); FFmpeg and ffprobe must
+  be in the MCP process PATH. Base server imports remain independent of this
+  extra. Package version and release are unchanged.
+
+
+- Removes the `QLAB_ALLOWED_FILE_ROOTS` gate. The agent asks the person for file
+  access in conversation; search then scans the MCP user's home folder. Enables
+  signed Audio, Video and MIDI File `fileTarget` edits with existing-file checks
+  and fresh QLab verification.
+- Video file assignment now requires fresh `isBroken=false` as well as matching
+  path before reporting a verified change.
+
+- QLab 5.5.10 runtime checks verified/restored Group Triggers, signed Cue List
+  Basics/Timecode and ASCII Text ranges/color/spacing against Computer Use.
+  FX identity is absent in native inventory; emoji formatting additionally
+  changes font companions, so those operations retain explicit blocks.
+- API change: removes public `qlab_edit_cues`. Use exact UUIDs and the existing
+  family editors; split mixed-family batches. Also removes the obsolete Python
+  `QLabReader.edit_cues()` and `QLabReader.update_cue()` adapters and their
+  phase-specific writer modules and result helper. Create, Move and Delete
+  remain on the reader.
+- Rejects excluded/unverified operations before legacy gates; tokens no longer
+  bypass documented write authorization. Group Triggers and Cue List Basics/
+  Timecode use signed five-minute single-use confirmations and fresh dependencies.
+- Adds typed Video/Camera/Text FX selectors and operations, a 60-effect/262-key
+  documentary catalogue, and typed Text fragment operations with complete saved
+  snapshots and effective-interval verification. Runtime limits remain explicit;
+  no inferred FX identity, invented Text defaults, execution or AppleScript.
+
+- Completes the nine typed Audio, Mic, Light, Fade, Network, MIDI, MIDI File,
+  Timecode and Script editors with one common signed five-minute, single-use
+  confirmation flow, 1–50 cue batches and up to 50 typed indexed operations per
+  cue. Basics/Triggers and verified family settings can share a batch; empty,
+  ambiguous and conflicting requests fail before setters. Generic editor subsequently removed in this Unreleased entry.
+- Fixes generic setters to prepare `/alwaysReply` on the same UDP/TCP connection;
+  failed preparation sends no setter. Known setters accept empty acknowledgements,
+  queries remain strict, and fresh readback/stop-on-uncertainty never retries writes.
+- Adds bounded typed detail inspections, exact family dependency snapshots,
+  cumulative slice verification and honest blocked/pending/OSC-unavailable
+  capabilities. Enforces MIDI modes/ranges, MIDI Type 0/1 headers, Timecode/drop-frame,
+  cue-owned objects and Fade target/activation requirements. Timecode frame-rate
+  verification accounts for QLab preserving duration and normalizing end time.
+- Records QLab 5.5.10 reversible family tests and Computer Use comparisons.
+  Missing fixtures, boolean Fade & Stop scope, Mic input capacity, MSC/Device
+  Definition metadata and low-level Fade quantization retain explicit limits.
+  Script source remains read-only; Audio Maps, /live and execution are excluded.
+  No dependency, package version or release change.
+
+- Adds `qlab_edit_group_cues` for typed Basics on 1–50 Group, Cue List, Cue Cart
+  or Cart UUIDs, plus one-at-a-time Group mode and canonical Playlist changes.
+  It reuses the existing child-snapshot-bound, single-use Group confirmation
+  flow. Group details now advertise mode-dependent edit capabilities.
+
+- Fixes visual editor readback normalization for OSC crop lists and integer
+  preservePitch values without relaxing public input types. Timecode edits read
+  the containing List/Cart format through identity-checked valuesForKeys and
+  avoid duplicate immediate format queries. Warning recovery permits only
+  removing confirmed mutes/solos from inactive, unbroken cues. Scale restoration
+  precedes enabling Preserve Aspect Ratio; conflicting scale requests fail
+  before writing. Unavailable slice inventories now block advertised edits.
+  QLab 5.5.10 slice absence and media-end acknowledgement limits remain documented.
+
+- Adds `qlab_edit_video_cues`, `qlab_edit_camera_cues` and `qlab_edit_text_cues`
+  for 1–50 exact UUIDs with typed saved inspector properties, Basics and OSC
+  Triggers. Reuses the shared sequential writer, signed five-minute single-use
+  confirmations, same-connection acknowledgements and fresh verification.
+- Adds Triggers and editing capabilities to visual detail reads. Missing or
+  mixed Text style baselines, unknown channel bounds and boolean Fade & Stop
+  scopes block writes. Generic cue editing subsequently removed in this Unreleased entry.
+
+- Fixes Control Triggers detail mapping so `timecodeTriggerText` is returned,
+  and validates the resulting Devamp Start Next/Stop Target combination before
+  planning setters.
+- Adds `qlab_edit_devamp_cues` and `qlab_edit_target_cues`, each for 1–50 exact
+  cue UUIDs with typed Basics, OSC Triggers and targets. They share the Control
+  writer and tool-bound signed five-minute confirmations. Devamp adds its three
+  documented Settings; Target excludes the Cue Number tab unavailable via OSC.
+  Control details advertise both tools. Generic editing remains compatible.
+
+- Adds `qlab_edit_control_cues` for 1–50 mixed control cue UUIDs with typed
+  Basics, OSC Triggers and cue/Reset patch targets. Signed five-minute single-use
+  confirmations bind baseline and dependencies; batches stop on uncertain
+  readback without retry or rollback. Generic cue editing remains available.
+- Extends Control details with Triggers and per-type editing capabilities.
+  Reads Fade & Stop scope from its scalar endpoint because QLab 5.5.10 bulk reads
+  collapse it to boolean. Reset changes target mode before target assignment.
+- Corrects shared Fade & Stop (0–3), Second Trigger Playlist (6–7), and Timecode
+  syntax/component/SMPTE validation; rejects read-only aggregate Timecode writes.
+
+- Preserves finite decimal Video control-point readings and unassigned LTC channel
+  zero, while retaining strict setter inputs. Text optional style summaries now
+  come from format fragments; absent or mixed attributes do not cause partial errors.
+- Enables `/alwaysReply` on the same connection immediately before Workspace
+  Settings setters and accepts their status-only acknowledgements. Preparation
+  failure sends no setter; uncertain writes still require fresh readback without retry.
+
+- Extends Audio Output Patch level Get/Edit selectors to include Main `(0,0)`,
+  input gains `(input,0)`, and output gains `(0,output)`, validated on QLab 5.5.10.
+  Mute/solo still require positive output channels.
+
+- Fixes Audio `-inf` requests being skipped when OSC only reports the numeric
+  volume floor. Rejects malformed OSC geometry in Video Region reads and edits.
+
+- Replaces `qlab_edit_workspace_settings` with five object-specific Workspace
+  Settings Edit tools for General, Audio output patches, Video routes, stages,
+  and regions. Adds `qlab_get_video_region` and exact-property token-gated
+  readback. Audio Maps and `/live` remain excluded. Network destination and
+  passcode presence are unknown when OSC omits evidence; input patch reads do
+  not advertise output-only edit operations. This is a breaking
+  public tool name change; package version is unchanged.
+
 - Fixes Delete preflight rejecting documented status-only `/alwaysReply` and
   `delete_id` acknowledgements on UDP/TCP. Read replies still require `data`.
   Child-structure reads bypass the shared cache so deletion verification and

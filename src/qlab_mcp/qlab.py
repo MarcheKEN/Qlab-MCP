@@ -1,6 +1,6 @@
 """QLab workspace inspection facade plus gated write-mode entry points.
 
-This module remains the public compatibility facade. Implementation lives in
+This module provides the composed reader facade. Implementation lives in
 focused modules for overview, query, cue details, workspace settings, redaction,
 short-lived read caching, and the disabled-by-default write-mode preface.
 """
@@ -38,6 +38,7 @@ from .cues.query import CueQueryMixin
 from .runtime.read_cache import cache_profile_is_safe, client_cache_namespace, shared_read_cache
 from .settings.workspace import WorkspaceSettingsMixin
 from .settings.write_operations import WorkspaceSettingsWriteMixin
+from .settings.object_writes import ObjectSettingsWriteMixin
 from .write import QLabWriteMixin
 
 
@@ -53,6 +54,7 @@ class QLabReader(
     CueOverviewMixin,
     WorkspaceSettingsMixin,
     WorkspaceSettingsWriteMixin,
+    ObjectSettingsWriteMixin,
     WorkspaceStatusMixin,
     CueQueryMixin,
     CueDetailsMixin,
@@ -98,8 +100,11 @@ class QLabReader(
             return None if timeout is None else float(timeout)
         return remaining if timeout is None else min(float(timeout), remaining)
 
-    def _request(self, address: str, *args: Any, workspace_id: str | None = None, request_timeout: float | None = None) -> Any:
+    def _request(self, address: str, *args: Any, workspace_id: str | None = None, request_timeout: float | None = None, ensure_always_reply: bool = False, allow_empty_data: bool = False) -> Any:
         timeout = self._bounded_read_timeout(request_timeout)
+        if ensure_always_reply or allow_empty_data:
+            return self.client.request(address, *args, workspace_id=workspace_id, reply_timeout=timeout,
+                                       ensure_always_reply=ensure_always_reply, allow_empty_data=allow_empty_data)
         if request_timeout is None and self._read_deadline is None:
             return self.client.request(address, *args, workspace_id=workspace_id)
         return self.client.request(address, *args, workspace_id=workspace_id, reply_timeout=timeout)

@@ -1,6 +1,87 @@
-# Active Roadmap
+# Roadmap — 2026-10-14
 
-## Delete validation — 2026-09-26
+## Current scope
+
+All cue families have specialized editors. The nine Audio/Mic/Light/Fade/Network/
+MIDI/MIDI File/Timecode/Script tools now share signed Control confirmations,
+whole-batch preflight, typed indexed operations and immediate verification.
+Public `qlab_edit_cues` has been removed. Missing runtime fixtures and unreadable
+metadata retain explicit limits; see the [completion inventory](../development/research/2026-10-05-remaining-cue-completion.md)
+and [live coverage](../development/runtime-validation/2026-10-05-remaining-cue-completion.md).
+
+The 2026-10-09 follow-up enabled unique native FX identity proof and recorded
+creation defaults for 58 effects in QLab 5.5.10, with all enabled flags and 55
+delete/insert restorations verified. LinearKey/DropShadow creation is blocked
+after native add/insert did not change their stacks; native key differences
+retain additional parameter/deletion limits. See the
+[creation report](../development/runtime-validation/2026-10-09-fx-empty-stack-creation.md).
+Text now supports UTF-16 Latin
+ranges, percentages, bounded Latin words with verified delimiters and font mappings already observed in
+the cue; color-only edits also accept verified NBSP/guillemet/curly-quote/em-dash characters.
+The [2026-10-11 follow-up](../development/runtime-validation/2026-10-11-text-selections.md)
+verified accented words, quotes, em dash, NBSP, tabs and newlines. Emoji still
+triggered font fallback even for color. `qlab_get_fonts` lists exact available names. Remaining work is other
+word selection, non-Latin fallback, partial shadows, all-parameter FX validation
+and repeated FX identity. See the
+[runtime report](../development/runtime-validation/2026-10-09-osc-text-fonts-video-fx.md).
+The source now exposes a paginated documentary FX catalogue and selected native
+enabled/parameter metadata; it does not certify every native key or write.
+Remaining unverified native keys and the Text shadow gates are listed in the
+[2026-10-14 closeout](../development/runtime-validation/2026-10-14-editor-completion.md).
+Two fixed local AppleScript fields now extend the existing Control tools:
+Load Time and Target assigned number. They share signed confirmations and fresh
+readback; the connected MCP has verified these fields after restart.
+See the [implementation and runtime report](../development/runtime-validation/2026-10-10-control-applescript.md).
+Native Triggers now extend existing cue family tools with opt-in reads and signed
+MIDI/Wall Clock/Timecode configuration. Hotkey enabling remains blocked without
+key/modifier readback; weekday selection and capture remain unavailable. See
+the [native Triggers report](../development/runtime-validation/2026-10-10-native-triggers.md).
+Limited workspace-document lifecycle tools are now in source: exact local
+inventory, open an existing document only with no workspace open, save to its
+existing path, and close only when clean. The source Get now matches the open
+workspace and Computer Use; Open/Save/Close events remain untested. Audio Maps,
+broader AppleScript editing, `/live` and cue execution remain outside the public
+contract. Audio analysis is read-only and does not classify lyrics.
+
+## Priorities from the authoring audit
+
+The two reader/writer defects were corrected on 2026-10-09. Shared visual
+quaternion planning retains all components, and native infiniteLoop integer 0/1
+reads are normalized narrowly. Reversible Video rotation and image/movie reads
+passed in QLab 5.5.10 using the updated source MCP; Camera/Text have automated
+quaternion coverage. After the MCP restart, the public tool repeated the Video
+write/readback and restoration against Computer Use. See the follow-up in the
+audit report.
+
+The [staged authoring guide](../user/workspace-authoring.md) and project skill
+now document media repair, targets, activation flags, destination values,
+explicit Light RGB state and static timing, plus renumbering, selected-property
+copies and relative adjustments. They reuse the public tools and default to a
+read-only review. Schema and runtime evidence are recorded in the
+[workflow validation report](../development/runtime-validation/2026-10-10-workspace-authoring-workflow.md).
+
+The existing tools built the tested scene. New broad editors are not justified
+by this audit; see the [runtime evidence](../development/runtime-validation/2026-10-08-workspace-authoring-audit.md).
+
+# Historical roadmap records
+
+## Historical development milestones — 2026-10-02
+
+- The source exposes 63 tools: 44 reads and 19 gated writes. Workspace Settings
+  edits are implemented and validated on a disposable QLab 5.5.10 copy; the
+  active MCP process still needs reloading to pick up the final reader fixes.
+  Root Cue List/Cart
+  creation, typed editing, and reordering are implemented. Root deletion remains
+  deferred because QLab requires a graphical confirmation.
+- Group cue editing is implemented locally through `qlab_edit_group_cues`; its
+  wrapper has verified Basics, mode conversion and Loop against QLab 5.5.10
+  and Computer Use, with baseline restoration. Reconcile the uncommitted
+  cue-editing branch before packaging or publishing. Workspace Settings Edit
+  excludes Audio Maps, `/live`, Light, Network, MIDI, and UI-only fields.
+- Keep the five [active workorders](workorders/README.md) at their stated runtime
+  validation gates.
+
+## Delete validation snapshot — 2026-09-26
 
 - Delete acknowledgement validation and cached child readback are corrected in
   the cue-editing branch, with live Group/leaf validation and full-suite checks.
@@ -8,7 +89,7 @@
 - Reload the installed MCP to load the correction. Move shallow-health validation
   remains pending. The closeout snapshot below predates these Delete fixes.
 
-## Read-tools closeout — 2026-09-26
+## Read-tools closeout snapshot — 2026-09-26
 
 - Align active documentation with 48 tools (43 reads, 5 gated writes) and prefer
   family-specific UUID details for known cue types.
@@ -159,7 +240,7 @@ QLab runtime probe is part of these gates.
   setter for the candidate and one for rollback, timeout-confirmed fresh
   readback for both setters, baseline restored, and final
   running/paused/auditioning `0/0/0`.
-- Group safe editing through existing `qlab_edit_cues` / `group_basic`:
+- Historical Group editing via the former generic editor (now `qlab_edit_group_cues`):
   QLab 5.5 runtime validation covers modes `1`, `2`, `3`, `4`, and `6`; canonical
   Playlist `doLoop`, `doShuffle`, `doCrossfade`, and crossfade duration; common
   Basics `notes`, `flagged`, `preWait`, `postWait`, and `continueMode`
@@ -356,7 +437,7 @@ Devamp saved configuration (implemented locally; runtime validation pending):
 - fresh baseline/readback and fresh-token rollback are required for closure;
   no new runtime evidence is claimed here. Slices and actions remain blocked.
 
-Network OSC Message (planned-only pending runtime evidence):
+Network OSC Message (historical phase limits; superseded for the nine family tools by the 2026-10-05 completion above):
 
 - saved `customString` remains planned-only: source/tests can build the
   `confirm:networkOscMessage:v1:` candidate, but no current runtime evidence
@@ -402,7 +483,7 @@ Video Phase 7F — Smooth Geometry:
 
 Cue I/O Phase 8A — Edit Cues and cue-level I/O selection:
 
-- local implementation exposes `qlab_edit_cues` as the only public cue-edit tool
+- historical implementation exposed `qlab_edit_cues`; current public API uses family editors
 - adds saved ID-only I/O real-write candidates using `confirm:videoIO:v1:`
 - `Video`: `stageID`, `audioOutputPatchID`
 - `Camera`: `stageID`, `audioOutputPatchID`, `videoInputPatchID`,
@@ -708,7 +789,8 @@ Keep blocked:
   behind `confirm:videoGeometry:v3:`, Phase 7E promotes only `resetRotation`
   behind `confirm:videoGeometryReset:v1:`, and Phase 7F promotes only `smooth`
   behind `confirm:videoGeometry:v4:`.
-- `fileTarget` and camera/video-input patch writes outside Phase 8A
+- camera/video-input patch writes remain outside Phase 8A; Audio, Video and
+  MIDI File `fileTarget` use the signed file-target editor flow
 - Audio/Camera slice marker real writes, combined slice marker updates,
   last-slice routes, vamps/devamps, and slice marker `/live` writes outside
   Phase 8C
@@ -721,4 +803,4 @@ does not authorize `inputPower`, `Choose_Effect`, any other parameter,
 Camera/Text FX, name targeting, enabled/disabled, add/delete/move/reorder,
 aggregate params, color/structured/string/enum/list/dict values, cue-number real
 writes, batch/multi-property, `/live`, Workspace Video, stages/routes/surfaces,
-patches, `fileTarget`, warping/control points, or playback/show-control.
+patches, warping/control points, or playback/show-control.

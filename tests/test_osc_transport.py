@@ -949,3 +949,97 @@ def _unescape_slip(frame: bytes) -> bytes:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_settings_preparation_shares_udp_socket():
+    client = QLabOscClient(QLabConfig(host='127.0.0.1'))
+    sock = MagicMock()
+    sock.__enter__.return_value = sock
+    with patch('socket.socket', return_value=sock), patch.object(client, '_prepare_udp_socket'), patch.object(client, '_send_with_reply_on_socket', return_value=type('Reply', (), {'status': 'ok'})()) as send:
+        client.request('/workspace/ws/settings/general/minGoTime', 1, ensure_always_reply=True, allow_empty_data=True)
+    assert [call.args[1] for call in send.call_args_list] == ['/alwaysReply', '/workspace/ws/settings/general/minGoTime']
+    assert all(call.args[0] is sock for call in send.call_args_list)
+    assert send.call_args_list[-1].kwargs['allow_empty_data'] is True
+
+
+def test_settings_preparation_failure_never_sends_setter():
+    from qlab_mcp.errors import OscPreparationError
+    client = QLabOscClient(QLabConfig(host='127.0.0.1'))
+    sock = MagicMock()
+    sock.__enter__.return_value = sock
+    with patch('socket.socket', return_value=sock), patch.object(client, '_prepare_udp_socket'), patch.object(client, '_send_with_reply_on_socket', side_effect=OscTimeoutError('prepare')) as send:
+        try:
+            client.request('/workspace/ws/settings/general/minGoTime', 1, ensure_always_reply=True, allow_empty_data=True)
+        except OscPreparationError:
+            pass
+        else:
+            raise AssertionError('preparation must fail closed')
+    assert send.call_count == 1
+
+
+def test_settings_preparation_shares_tcp_session_and_failure_discards_it():
+    from qlab_mcp.errors import OscPreparationError
+    client = QLabOscClient(QLabConfig(host='127.0.0.1', passcode='secret'))
+    sock = MagicMock()
+    with patch('socket.create_connection', return_value=sock), patch.object(client, '_send_with_reply_on_tcp_socket', return_value=type('Reply', (), {'status': 'ok'})()) as send:
+        client.request('/workspace/ws/settings/general/minGoTime', 1, ensure_always_reply=True, allow_empty_data=True)
+    assert [call.args[1] for call in send.call_args_list] == ['/workspace/ws/connect', '/alwaysReply', '/workspace/ws/settings/general/minGoTime']
+    assert all(call.args[0] is sock for call in send.call_args_list)
+    with patch.object(client, '_send_with_reply_on_tcp_socket', side_effect=OscTimeoutError('prepare')) as send:
+        try:
+            client.request('/workspace/ws/settings/general/minGoTime', 2, ensure_always_reply=True, allow_empty_data=True)
+        except OscPreparationError:
+            pass
+        else:
+            raise AssertionError('preparation must fail closed')
+    assert send.call_count == 1 and client._tcp_socket is None
+
+
+def test_settings_status_only_ack_and_missing_read_data_both_transports():
+    address = '/workspace/ws/settings/audio/patchID/patch/mute/clear'
+    client = QLabOscClient(QLabConfig(host='127.0.0.1'))
+    packet = encode_message('/reply' + address, json.dumps({'status': 'ok'}))
+    for tcp in (False, True):
+        sock = MagicMock()
+        sock.recvfrom.return_value = (packet, ('127.0.0.1', 53000))
+        sock.recv.return_value = _slip_encode(packet)
+        send = client._send_with_reply_on_tcp_socket if tcp else client._send_with_reply_on_socket
+        assert send(sock, address, allow_empty_data=True).status == 'ok'
+        try:
+            send(sock, address)
+        except OscProtocolError as exc:
+            assert 'missing data' in str(exc)
+        else:
+            raise AssertionError('read reply must have data')
+
+
+def test_settings_setter_timeout_never_resends_both_transports():
+    for tcp in (False, True):
+        client = QLabOscClient(QLabConfig(host='127.0.0.1', passcode='secret' if tcp else None))
+        sock = MagicMock()
+        sock.__enter__.return_value = sock
+        if tcp:
+            client._tcp_socket = sock
+            client._tcp_connected_workspaces.add('ws')
+        reply = type('Reply', (), {'status': 'ok'})()
+        method = '_send_with_reply_on_tcp_socket' if tcp else '_send_with_reply_on_socket'
+        with patch('socket.socket', return_value=sock), patch.object(client, '_prepare_udp_socket'), patch.object(client, method, side_effect=[reply, OscTimeoutError('setter')]) as send:
+            try:
+                client.request('/workspace/ws/settings/general/minGoTime', 1, ensure_always_reply=True, allow_empty_data=True)
+            except OscTimeoutError:
+                pass
+            else:
+                raise AssertionError('setter should time out')
+        assert send.call_count == 2
+
+
+def test_settings_connection_failure_is_preparation_not_uncertain_setter():
+    from qlab_mcp.errors import OscPreparationError
+    client = QLabOscClient(QLabConfig(host='127.0.0.1', passcode='secret'))
+    with patch('socket.create_connection', side_effect=OSError('connection unavailable')):
+        try:
+            client.request('/workspace/ws/settings/general/minGoTime', 1, ensure_always_reply=True, allow_empty_data=True)
+        except OscPreparationError:
+            pass
+        else:
+            raise AssertionError('no setter was sent')

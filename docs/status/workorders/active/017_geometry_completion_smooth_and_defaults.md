@@ -1,5 +1,14 @@
 # Workorder 017 - Geometry Completion: Smooth and Defaults
 
+Current note (2026-10-17 source/document review): Video `smooth` was changed and
+restored with inspector contrast in the [October 1 report](../../../development/runtime-validation/2026-10-01-visual-cues.md).
+Camera/Text smooth and additional geometry actions retain their individual
+runtime gaps. Current family editors use `confirm:controlCue:v1:` and typed
+batches; legacy token families and dry-run-only aggregate claims below describe
+the retired motor. Relative rotate and shutter remain outside the public model.
+
+## Historical phase specification
+
 Status: implemented locally; QLab runtime validation pending. This workorder
 records the local `smooth` implementation; no new runtime probe is part of the
 0.3.0 preparation.

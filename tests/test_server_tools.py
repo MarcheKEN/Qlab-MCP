@@ -46,586 +46,808 @@ from qlab_mcp.server_responses import overview_success_payload
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_NOISE_KEYS: frozenset[str] = frozenset()
-EXPECTED_FASTMCP_TOOL_CONTRACTS = {
-    "qlab_get_fade_cue_details": {
-        "title": "Get QLab Fade Cue Details",
-        "timeout": 20,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "details",
-            "fade",
-            "qlab",
-            "safe-read"
-        ],
-        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
-        "output_schema_hash": "c6e114cc16172c2dd757b176114186a268603120ff15818d8c93610cd5da5c85"
-    },
-    "qlab_get_fade_cues": {
-        "title": "Get QLab Fade Cues",
-        "timeout": 60,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "fade",
-            "inventory",
-            "qlab",
-            "safe-read"
-        ],
-        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
-        "output_schema_hash": "85de5ae3dd4fcaf4b5df7badbd4550ebd953266e92ddc2c55167fb68ac0c9dd8"
-    },
-    "qlab_get_midi_cue_details": {
-        "title": "Get QLab MIDI Cue Details",
-        "timeout": 20,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "details",
-            "midi",
-            "qlab",
-            "safe-read"
-        ],
-        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
-        "output_schema_hash": "8b93af1bf558e53f14a326ce3c282682b696f27914dd87de8fd6e7bdc4205f9c"
-    },
-    "qlab_get_midi_cues": {
-        "title": "Get QLab MIDI Cues",
-        "timeout": 60,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "inventory",
-            "midi",
-            "qlab",
-            "safe-read"
-        ],
-        "input_schema_hash": "40e3b50a6091cb04e48143d9083895bd39bd19afea7d194384deab085f303795",
-        "output_schema_hash": "2602974bbf1673e3b1e035c57fbc130ffcb5244f19aa8f6bdc666e64726c36a0"
-    },
-    "qlab_get_network_cue_details": {
-        "title": "Get QLab Network Cue Details",
-        "timeout": 20,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "details",
-            "network",
-            "qlab",
-            "safe-read"
-        ],
-        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
-        "output_schema_hash": "846827822b8629f0a041f8a282b0b421ab5f1058f6632d9b27e6b602798eac37"
-    },
-    "qlab_get_network_cues": {
-        "title": "Get QLab Network Cues",
-        "timeout": 60,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "inventory",
-            "network",
-            "qlab",
-            "safe-read"
-        ],
-        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
-        "output_schema_hash": "dd04cd1245ff7e1764508f7af2086ee8130e8f769bff8fb39b75617cf4670ac2"
-    },
-    "qlab_get_script_cue_details": {
-        "title": "Get QLab Script Cue Details",
-        "timeout": 20,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "details",
-            "qlab",
-            "safe-read",
-            "script"
-        ],
-        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
-        "output_schema_hash": "0b767ee39f2a38350541b86439846f877c00cf50a6d3bddee1409b8d3da3c497"
-    },
-    "qlab_get_script_cues": {
-        "title": "Get QLab Script Cues",
-        "timeout": 60,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "inventory",
-            "qlab",
-            "safe-read",
-            "script"
-        ],
-        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
-        "output_schema_hash": "a322aa7517155fcad972562cce337bee3007d8b7954d817081c5093fcc8757b3"
-    },
-    "qlab_get_timecode_cue_details": {
-        "title": "Get QLab Timecode Cue Details",
-        "timeout": 20,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "details",
-            "qlab",
-            "safe-read",
-            "timecode"
-        ],
-        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
-        "output_schema_hash": "c9ccdf3af588031d80f199edbc511aa1b611f21428b3a5ff4f2f95c2af702605"
-    },
-    "qlab_get_timecode_cues": {
-        "title": "Get QLab Timecode Cues",
-        "timeout": 60,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "inventory",
-            "qlab",
-            "safe-read",
-            "timecode"
-        ],
-        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
-        "output_schema_hash": "a4581fb7f0253a07efef82cf1bf28f4ddc460c153a5f5aa4d8ab83a874595e97"
-    },
-    "qlab_get_control_cue_details": {
-        "title": "Get QLab Control Cue Details", "timeout": 20.0,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["control", "details", "qlab", "safe-read"],
-        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
-        "output_schema_hash": "dc59e5ae8b1df04003bf25576a04ceadeefdc00f604e010511c40fecfb93b787",
-    },
-    "qlab_get_control_cues": {
-        "title": "Get QLab Control Cues", "timeout": 60.0,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["control", "inventory", "qlab", "safe-read"],
-        "input_schema_hash": "75d6d6aad4041afdee76b5ef37fd2d28ce55b561381606fe85257cb68f8dfdc1",
-        "output_schema_hash": "65795d54165d04f47a3adc7929825671d17e1c1342be4cedbb479129e571e46b",
-    },
-'qlab_get_group_cue_details': {'title': 'Get QLab Group Cue Details',
-                                'timeout': 20.0,
-                                'annotations': {'readOnlyHint': True,
-                                                'destructiveHint': False,
+EXPECTED_FASTMCP_TOOL_CONTRACTS = {'qlab_get_fonts': {
+    'title': 'Get QLab Fonts', 'timeout': 20.0,
+    'annotations': {'readOnlyHint': True, 'destructiveHint': False, 'idempotentHint': True, 'openWorldHint': True},
+    'tags': ['inventory', 'qlab', 'safe-read', 'text'],
+    'input_schema_hash': 'c6bb5fac6574ff867aa6177017ff6d973966fb08778a28b6859f282ad5ed4d46',
+    'output_schema_hash': '927ec460a5c728ff3f27b0ae47a844cc49dea30afb734be0b993b5db4e27b4a2'}, 'qlab_analyze_audio_file': {
+    'title': 'Analyze QLab Audio File', 'timeout': 300.0,
+    'annotations': {'readOnlyHint': True, 'destructiveHint': False, 'idempotentHint': True, 'openWorldHint': True},
+    'tags': ['audio', 'media', 'qlab', 'safe-read'],
+    'input_schema_hash': 'b81c1228edc65d68ce2df3e9a5745304b1b6f6999fa9e7056bd56c5bd1e41b98',
+    'output_schema_hash': 'd640e14de321928e12a8a1d0e83a25cc082c2d9c089363012b498a3feded90a9'}, 'qlab_search_media_files': {'annotations': {'destructiveHint': False,
+                 'idempotentHint': True,
+                 'openWorldHint': True,
+                 'readOnlyHint': True},
+ 'input_schema_hash': '03550e79d743be6f9f0bb7eece2d966c01a4bdee3649f603ea7965ac2d33f780',
+ 'output_schema_hash': '82ef96cebaf5fbe16269fd18b0240d78f5b9b90a4155a17eb797115b09148ecf',
+ 'tags': ['media', 'qlab', 'safe-read'],
+ 'timeout': 6.0,
+ 'title': 'Search QLab Media Files'},
+'qlab_check_connection': {'annotations': {'destructiveHint': False,
+                                           'idempotentHint': True,
+                                           'openWorldHint': True,
+                                           'readOnlyHint': True},
+                           'input_schema_hash': 'c8967eca6cd7a45b2f08cc835ff932aea3551d133cc6fd5c8388ffc177e44b83',
+                           'output_schema_hash': 'abf13920f210805507d32c24c3166d28c8dd6fdbfe04b50678924063d4508e56',
+                           'tags': ['diagnostics', 'orientation', 'qlab', 'safe-read'],
+                           'timeout': 6.0,
+                           'title': 'Check QLab Connection'},
+ 'qlab_check_write_readiness': {'annotations': {'destructiveHint': False,
                                                 'idempotentHint': True,
-                                                'openWorldHint': True},
-                                'tags': ['details',
-                                         'group',
-                                         'qlab',
-                                         'safe-read'],
-                                'input_schema_hash': '615c3da475f0580740ef4cc5767820e039c7ef2ebc0d28c34a4451bfc72cdf4d',
-                                'output_schema_hash': '962bf4e497238a234a7d2cb3cd2ceac22135a1ddf9f0eae3192b6885112bbc6b'},
- 'qlab_get_group_cues': {'title': 'Get QLab Group Cues',
-                         'timeout': 60.0,
-                         'annotations': {'readOnlyHint': True,
-                                         'destructiveHint': False,
+                                                'openWorldHint': True,
+                                                'readOnlyHint': True},
+                                'input_schema_hash': 'a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578',
+                                'output_schema_hash': '0f27f2df78299a76f441eeb8d81064c38cda1bdf763bddb1f5ae79b67451de26',
+                                'tags': ['diagnostics', 'qlab', 'safe-read', 'write-mode'],
+                                'timeout': 6.0,
+                                'title': 'Check QLab Write Readiness'},
+ 'qlab_create_cue_lists': {'annotations': {'destructiveHint': False,
+                                           'idempotentHint': False,
+                                           'openWorldHint': True,
+                                           'readOnlyHint': False},
+                           'input_schema_hash': '90bbee12d7a6bab355ea760376f920567635f753f6e19542b84569779f57f6bd',
+                           'output_schema_hash': 'c6592509ce436e5c44598a12d349ff905e8bc82aa4681d5a07cc48b2d017d6a2',
+                           'tags': ['batch-create',
+                                    'cue-list-create',
+                                    'gated-write',
+                                    'qlab',
+                                    'write-mode'],
+                           'timeout': 180.0,
+                           'title': 'Create QLab Cue Lists'},
+ 'qlab_create_cues': {'annotations': {'destructiveHint': False,
+                                      'idempotentHint': False,
+                                      'openWorldHint': True,
+                                      'readOnlyHint': False},
+                      'input_schema_hash': '8061059f52cb97fb1010a76d393ca1c3453df54e0bb73acc834a195bfeb0d31c',
+                      'output_schema_hash': 'd87db629f7d801ce945ea30019b2f64dfb35a00d1a5cd54ec92db9c1f94d26dc',
+                      'tags': ['batch-create', 'cue-create', 'gated-write', 'qlab', 'write-mode'],
+                      'timeout': 300.0,
+                      'title': 'Create QLab Cues'},
+ 'qlab_delete_cues': {'annotations': {'destructiveHint': True,
+                                      'idempotentHint': False,
+                                      'openWorldHint': True,
+                                      'readOnlyHint': False},
+                      'input_schema_hash': 'b099773e8b5bbdfb6fa19ddcebcdf8d128e50c49145b96a52334d9acaef27ee7',
+                      'output_schema_hash': '9f3062beefe3ed6e8b398b47c875e5ce478e424faa893f08a10ce21ebd604ba7',
+                      'tags': ['cue-delete', 'gated-write', 'qlab', 'write-mode'],
+                      'timeout': 180.0,
+                      'title': 'Delete QLab Cues'},
+ 'qlab_edit_audio_cues': {'annotations': {'destructiveHint': True,
+                                          'idempotentHint': False,
+                                          'openWorldHint': True,
+                                          'readOnlyHint': False},
+                          'input_schema_hash': 'dfd145869ade3ae3f7f30ba77405b0744b192cdc585cbffeeb334d35e8302c59',
+                          'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                          'tags': ['audio',
+                                   'batch-edit',
+                                   'cue-edit',
+                                   'gated-write',
+                                   'qlab',
+                                   'write-mode'],
+                          'timeout': 180.0,
+                          'title': 'Edit QLab Audio Cues'},
+ 'qlab_edit_audio_output_patch': {'annotations': {'destructiveHint': True,
+                                                  'idempotentHint': False,
+                                                  'openWorldHint': True,
+                                                  'readOnlyHint': False},
+                                  'input_schema_hash': 'cc68b39dd9b8d55f94f0e67836bdec6574e3b56d33c1055894605a7bb6bcb3f9',
+                                  'output_schema_hash': '12573ab3c34f0974c9245594b5dbc752ac1717003946758cb6baadb4c15909b7',
+                                  'tags': ['audio', 'gated-write', 'qlab', 'settings'],
+                                  'timeout': 60.0,
+                                  'title': 'Edit QLab Audio Output Patch'},
+ 'qlab_edit_camera_cues': {'annotations': {'destructiveHint': True,
+                                           'idempotentHint': False,
+                                           'openWorldHint': True,
+                                           'readOnlyHint': False},
+                           'input_schema_hash': '2257483f89e61f90c08ce374726d690ff61d0c3e13e2e593847ad75a9aeffe53',
+                           'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                           'tags': ['batch-edit',
+                                    'camera',
+                                    'cue-edit',
+                                    'gated-write',
+                                    'qlab',
+                                    'write-mode'],
+                           'timeout': 180.0,
+                           'title': 'Edit QLab Camera Cues'},
+ 'qlab_edit_control_cues': {'annotations': {'destructiveHint': True,
+                                            'idempotentHint': False,
+                                            'openWorldHint': True,
+                                            'readOnlyHint': False},
+                            'input_schema_hash': 'ebf241f71874f386518cd57c007ee01ac252eb98c4dfb007aa56f9fa52619b51',
+                            'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                            'tags': ['batch-edit',
+                                     'control',
+                                     'cue-edit',
+                                     'gated-write',
+                                     'qlab',
+                                     'write-mode'],
+                            'timeout': 180.0,
+                            'title': 'Edit QLab Control Cues'},
+ 'qlab_edit_cue_lists': {'annotations': {'destructiveHint': True,
+                                         'idempotentHint': False,
+                                         'openWorldHint': True,
+                                         'readOnlyHint': False},
+                         'input_schema_hash': '9f4b55e29b6e5838e6273397351ef4dcf6cf78d306e1bd4dd7912c110b844163',
+                         'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                         'tags': ['batch-edit',
+                                  'cue-list-edit',
+                                  'gated-write',
+                                  'qlab',
+                                  'write-mode'],
+                         'timeout': 180.0,
+                         'title': 'Edit QLab Cue Lists'},
+ 'qlab_edit_devamp_cues': {'annotations': {'destructiveHint': True,
+                                           'idempotentHint': False,
+                                           'openWorldHint': True,
+                                           'readOnlyHint': False},
+                           'input_schema_hash': '0049417b7d274dd16e5918c6f9866b6bbc7178e075e535164a2fe8686ddb72fd',
+                           'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                           'tags': ['batch-edit',
+                                    'cue-edit',
+                                    'devamp',
+                                    'gated-write',
+                                    'qlab',
+                                    'write-mode'],
+                           'timeout': 180.0,
+                           'title': 'Edit QLab Devamp Cues'},
+ 'qlab_edit_fade_cues': {'annotations': {'destructiveHint': True,
+                                         'idempotentHint': False,
+                                         'openWorldHint': True,
+                                         'readOnlyHint': False},
+                         'input_schema_hash': 'f884797bc9e3381ffd6b3f8b4da953d3512d4b66cfadfce089ecb6ad46ae6854',
+                         'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                         'tags': ['batch-edit',
+                                  'cue-edit',
+                                  'fade',
+                                  'gated-write',
+                                  'qlab',
+                                  'write-mode'],
+                         'timeout': 180.0,
+                         'title': 'Edit QLab Fade Cues'},
+ 'qlab_edit_group_cues': {'annotations': {'destructiveHint': True,
+                                          'idempotentHint': False,
+                                          'openWorldHint': True,
+                                          'readOnlyHint': False},
+                          'input_schema_hash': '863cf0c68287060f5ce394eb59acfdf5da44e7f206b6c3e8484c247c8df32785',
+                          'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                          'tags': ['batch-edit',
+                                   'cue-edit',
+                                   'gated-write',
+                                   'group',
+                                   'qlab',
+                                   'write-mode'],
+                          'timeout': 180.0,
+                          'title': 'Edit QLab Group Cues'},
+ 'qlab_edit_light_cues': {'annotations': {'destructiveHint': True,
+                                          'idempotentHint': False,
+                                          'openWorldHint': True,
+                                          'readOnlyHint': False},
+                          'input_schema_hash': '1ee03b202afa21390c2bb019e0c29fb27c2e95224f8ee1cf938fe402b02c0d85',
+                          'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                          'tags': ['batch-edit',
+                                   'cue-edit',
+                                   'gated-write',
+                                   'light',
+                                   'qlab',
+                                   'write-mode'],
+                          'timeout': 180.0,
+                          'title': 'Edit QLab Light Cues'},
+ 'qlab_edit_mic_cues': {'annotations': {'destructiveHint': True,
+                                        'idempotentHint': False,
+                                        'openWorldHint': True,
+                                        'readOnlyHint': False},
+                        'input_schema_hash': 'bd917803b0daf142230f0da1dcc7b90bfecb327a91f2d14bd3ddf5d5bf2001ca',
+                        'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                        'tags': ['batch-edit',
+                                 'cue-edit',
+                                 'gated-write',
+                                 'mic',
+                                 'qlab',
+                                 'write-mode'],
+                        'timeout': 180.0,
+                        'title': 'Edit QLab Mic Cues'},
+ 'qlab_edit_midi_cues': {'annotations': {'destructiveHint': True,
+                                         'idempotentHint': False,
+                                         'openWorldHint': True,
+                                         'readOnlyHint': False},
+                         'input_schema_hash': '6e2882cde0fb6e5b7d52adf72637966989a6a25a54fe0e0d8991a02b2a797c8d',
+                         'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                         'tags': ['batch-edit',
+                                  'cue-edit',
+                                  'gated-write',
+                                  'midi',
+                                  'qlab',
+                                  'write-mode'],
+                         'timeout': 180.0,
+                         'title': 'Edit QLab MIDI Cues'},
+ 'qlab_edit_midi_file_cues': {'annotations': {'destructiveHint': True,
+                                              'idempotentHint': False,
+                                              'openWorldHint': True,
+                                              'readOnlyHint': False},
+                              'input_schema_hash': '6fa3c840b131701cdd17bb011f8b4b8516ebd7c3d7d9559913f9add942c26758',
+                              'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                              'tags': ['batch-edit',
+                                       'cue-edit',
+                                       'gated-write',
+                                       'midi_file',
+                                       'qlab',
+                                       'write-mode'],
+                              'timeout': 180.0,
+                              'title': 'Edit QLab MIDI File Cues'},
+ 'qlab_edit_network_cues': {'annotations': {'destructiveHint': True,
+                                            'idempotentHint': False,
+                                            'openWorldHint': True,
+                                            'readOnlyHint': False},
+                            'input_schema_hash': '296a30e0eb8aadbe4704bdbd2a5af7a362d5ddfc878d66c16d3a5fc942bb8ffe',
+                            'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                            'tags': ['batch-edit',
+                                     'cue-edit',
+                                     'gated-write',
+                                     'network',
+                                     'qlab',
+                                     'write-mode'],
+                            'timeout': 180.0,
+                            'title': 'Edit QLab Network Cues'},
+ 'qlab_edit_script_cues': {'annotations': {'destructiveHint': True,
+                                           'idempotentHint': False,
+                                           'openWorldHint': True,
+                                           'readOnlyHint': False},
+                           'input_schema_hash': '62765019e6eb004265ca6bd7aa184546e43498f1a1fe7d63b5cbb6576a420e96',
+                           'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                           'tags': ['batch-edit',
+                                    'cue-edit',
+                                    'gated-write',
+                                    'qlab',
+                                    'script',
+                                    'write-mode'],
+                           'timeout': 180.0,
+                           'title': 'Edit QLab Script Cues'},
+ 'qlab_edit_target_cues': {'annotations': {'destructiveHint': True,
+                                           'idempotentHint': False,
+                                           'openWorldHint': True,
+                                           'readOnlyHint': False},
+                           'input_schema_hash': 'ae546bfc4a4377b3385f41a56784f6a6e521ac91e798c7f5e3d8a5baf5fe50bc',
+                           'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                           'tags': ['batch-edit',
+                                    'cue-edit',
+                                    'gated-write',
+                                    'qlab',
+                                    'target',
+                                    'write-mode'],
+                           'timeout': 180.0,
+                           'title': 'Edit QLab Target Cues'},
+ 'qlab_edit_text_cues': {'annotations': {'destructiveHint': True,
+                                         'idempotentHint': False,
+                                         'openWorldHint': True,
+                                         'readOnlyHint': False},
+                         'input_schema_hash': '5bced2a50232628a5678146ad29a9957a6bddf71874a232da3723c7acb800724',
+                         'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                         'tags': ['batch-edit',
+                                  'cue-edit',
+                                  'gated-write',
+                                  'qlab',
+                                  'text',
+                                  'write-mode'],
+                         'timeout': 180.0,
+                         'title': 'Edit QLab Text Cues'},
+ 'qlab_edit_timecode_cues': {'annotations': {'destructiveHint': True,
+                                             'idempotentHint': False,
+                                             'openWorldHint': True,
+                                             'readOnlyHint': False},
+                             'input_schema_hash': 'a73248e231cab8a9907b773eb49045308776b6af94487a58b96c161d6b888c6b',
+                             'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                             'tags': ['batch-edit',
+                                      'cue-edit',
+                                      'gated-write',
+                                      'qlab',
+                                      'timecode',
+                                      'write-mode'],
+                             'timeout': 180.0,
+                             'title': 'Edit QLab Timecode Cues'},
+ 'qlab_edit_video_cues': {'annotations': {'destructiveHint': True,
+                                          'idempotentHint': False,
+                                          'openWorldHint': True,
+                                          'readOnlyHint': False},
+                          'input_schema_hash': 'f8eea067a29d9eba028b0d45c84a9a07f9ab590d43908859434a6a4094aed9a1',
+                          'output_schema_hash': '016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d',
+                          'tags': ['batch-edit',
+                                   'cue-edit',
+                                   'gated-write',
+                                   'qlab',
+                                   'video',
+                                   'write-mode'],
+                          'timeout': 180.0,
+                          'title': 'Edit QLab Video Cues'},
+ 'qlab_edit_video_output_route': {'annotations': {'destructiveHint': True,
+                                                  'idempotentHint': False,
+                                                  'openWorldHint': True,
+                                                  'readOnlyHint': False},
+                                  'input_schema_hash': '87941f4b1504645a27f2332e7791d83c1091c894fe52af26c1dbf55229fb267c',
+                                  'output_schema_hash': '12573ab3c34f0974c9245594b5dbc752ac1717003946758cb6baadb4c15909b7',
+                                  'tags': ['gated-write', 'qlab', 'settings', 'video'],
+                                  'timeout': 60.0,
+                                  'title': 'Edit QLab Video Output Route'},
+ 'qlab_edit_video_region': {'annotations': {'destructiveHint': True,
+                                            'idempotentHint': False,
+                                            'openWorldHint': True,
+                                            'readOnlyHint': False},
+                            'input_schema_hash': '78905b42fc5b37514397b3520e2b716ae294fec14cb0d8231e8ffaad3edd9fad',
+                            'output_schema_hash': '12573ab3c34f0974c9245594b5dbc752ac1717003946758cb6baadb4c15909b7',
+                            'tags': ['gated-write', 'qlab', 'settings', 'video'],
+                            'timeout': 60.0,
+                            'title': 'Edit QLab Video Region'},
+ 'qlab_edit_video_stage': {'annotations': {'destructiveHint': True,
+                                           'idempotentHint': False,
+                                           'openWorldHint': True,
+                                           'readOnlyHint': False},
+                           'input_schema_hash': '7080c6576d7a4fb92f6dfb248b3c17590fbb2a374dd4b70a594d07b6364e059d',
+                           'output_schema_hash': '12573ab3c34f0974c9245594b5dbc752ac1717003946758cb6baadb4c15909b7',
+                           'tags': ['gated-write', 'qlab', 'settings', 'video'],
+                           'timeout': 60.0,
+                           'title': 'Edit QLab Video Stage'},
+ 'qlab_edit_workspace_general_settings': {'annotations': {'destructiveHint': True,
+                                                          'idempotentHint': False,
+                                                          'openWorldHint': True,
+                                                          'readOnlyHint': False},
+                                          'input_schema_hash': '93882d40189796d64c1b69d301dc63caeaa883d34fe19b4a45bc6b9804bc4fcc',
+                                          'output_schema_hash': '12573ab3c34f0974c9245594b5dbc752ac1717003946758cb6baadb4c15909b7',
+                                          'tags': ['gated-write',
+                                                   'general-settings',
+                                                   'qlab',
+                                                   'settings',
+                                                   'write-mode'],
+                                          'timeout': 60.0,
+                                          'title': 'Edit QLab Workspace General Settings'},
+ 'qlab_get_audio_cue_details': {'annotations': {'destructiveHint': False,
+                                                'idempotentHint': True,
+                                                'openWorldHint': True,
+                                                'readOnlyHint': True},
+                                'input_schema_hash': '5acbfc5f33a8dba51ba87a12a3c4778395128c071cfcd0b3b6cf5abc44e6c871',
+                                'output_schema_hash': 'c9eb177b86c5ffce8d64f163312f66ed694b6d6c69c098189070e02cf7e8ea47',
+                                'tags': ['audio', 'details', 'qlab', 'safe-read'],
+                                'timeout': 20.0,
+                                'title': 'Get QLab Audio Cue Details'},
+ 'qlab_get_audio_cues': {'annotations': {'destructiveHint': False,
                                          'idempotentHint': True,
-                                         'openWorldHint': True},
+                                         'openWorldHint': True,
+                                         'readOnlyHint': True},
+                         'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
+                         'output_schema_hash': '39b70303e81f6529a72342a0feb325b1f0d3893c7ff8f7b6e69e0da43d6f0e54',
+                         'tags': ['audio', 'inventory', 'qlab', 'safe-read'],
+                         'timeout': 60.0,
+                         'title': 'Get QLab Audio Cues'},
+ 'qlab_get_camera_cue_details': {'annotations': {'destructiveHint': False,
+                                                 'idempotentHint': True,
+                                                 'openWorldHint': True,
+                                                 'readOnlyHint': True},
+                                  'input_schema_hash': '2734838d3ecd4fe7a5d412e08777007dbe199ecc318f119cfe86999b266920ae',
+                                 'output_schema_hash': '8e682fee65b79ff2581c17a03fd6c6183ff7143dbfb9e5f6785de42250a0fd9e',
+                                 'tags': ['camera', 'details', 'qlab', 'safe-read'],
+                                 'timeout': 20.0,
+                                 'title': 'Get QLab Camera Cue Details'},
+ 'qlab_get_camera_cues': {'annotations': {'destructiveHint': False,
+                                          'idempotentHint': True,
+                                          'openWorldHint': True,
+                                          'readOnlyHint': True},
+                          'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
+                          'output_schema_hash': '7d4d5b1fa1ea4e6d9d3559891103b8043eb13460b5843414570ae729323b642e',
+                          'tags': ['camera', 'inventory', 'qlab', 'safe-read'],
+                          'timeout': 60.0,
+                          'title': 'Get QLab Camera Cues'},
+ 'qlab_get_control_cue_details': {'annotations': {'destructiveHint': False,
+                                                  'idempotentHint': True,
+                                                  'openWorldHint': True,
+                                                  'readOnlyHint': True},
+                                  'input_schema_hash': '2881d9ee264949335aa89758f1bbb3d5086157942e6c1cabe03f574c21895a15',
+                                  'output_schema_hash': '669d580671db6790fc74a342ff26d0a22523150b8723748caa7bfc370a3d1216',
+                                  'tags': ['control', 'details', 'qlab', 'safe-read'],
+                                  'timeout': 20.0,
+                                  'title': 'Get QLab Control Cue Details'},
+ 'qlab_get_control_cues': {'annotations': {'destructiveHint': False,
+                                           'idempotentHint': True,
+                                           'openWorldHint': True,
+                                           'readOnlyHint': True},
+                           'input_schema_hash': '75d6d6aad4041afdee76b5ef37fd2d28ce55b561381606fe85257cb68f8dfdc1',
+                           'output_schema_hash': 'fb0ddd27a803a7b1565d05105656706cf0e6447546305cf3e0faacd5533297d7',
+                           'tags': ['control', 'inventory', 'qlab', 'safe-read'],
+                           'timeout': 60.0,
+                           'title': 'Get QLab Control Cues'},
+ 'qlab_get_cue_cart_details': {'annotations': {'destructiveHint': False,
+                                               'idempotentHint': True,
+                                               'openWorldHint': True,
+                                               'readOnlyHint': True},
+                               'input_schema_hash': '5d384b1bc7b5a4c5e36ae75a006d97e7547ae710b00cd2e744d3186f7a067f25',
+                               'output_schema_hash': '80af7427b2300773f012ed1ef0687ed300107e0d02868379b7ff4ff97d54c96a',
+                               'tags': ['cue-carts', 'details', 'qlab', 'safe-read'],
+                               'timeout': 45.0,
+                               'title': 'Get QLab Cue Cart Details'},
+ 'qlab_get_cue_details': {'annotations': {'destructiveHint': False,
+                                          'idempotentHint': True,
+                                          'openWorldHint': True,
+                                          'readOnlyHint': True},
+                          'input_schema_hash': 'fc0207668042fa9e62480000c05f575ecccd5cbf2d06b5556661aee43147641c',
+                          'output_schema_hash': 'f5d340a970b906607ed9c3a2015c17a8da6f3eee5d70b36971c26920aa14da72',
+                          'tags': ['details', 'diagnostics', 'qlab', 'safe-read'],
+                          'timeout': 20.0,
+                          'title': 'Get QLab Cue Details'},
+ 'qlab_get_cue_list_details': {'annotations': {'destructiveHint': False,
+                                               'idempotentHint': True,
+                                               'openWorldHint': True,
+                                               'readOnlyHint': True},
+                               'input_schema_hash': '68b54234cee80c21538edc3dbf02ab6a83c78959a9b1135044e00dec8a26862b',
+                               'output_schema_hash': 'f5cfccd4772f9770e2a0e452132189b41a8b97a97a6bdab78bdea465dbdf05fc',
+                               'tags': ['cue-lists', 'details', 'qlab', 'safe-read'],
+                               'timeout': 45.0,
+                               'title': 'Get QLab Cue List Details'},
+ 'qlab_get_cue_lists': {'annotations': {'destructiveHint': False,
+                                        'idempotentHint': True,
+                                        'openWorldHint': True,
+                                        'readOnlyHint': True},
+                        'input_schema_hash': 'a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578',
+                        'output_schema_hash': 'b7487f193df9f9526fb523e78dabb86ddf7a0e43babf8f9a1338848382523262',
+                        'tags': ['cue-lists', 'inventory', 'qlab', 'safe-read'],
+                        'timeout': 20.0,
+                        'title': 'Get QLab Cue Lists'},
+ 'qlab_get_fade_cue_details': {'annotations': {'destructiveHint': False,
+                                               'idempotentHint': True,
+                                               'openWorldHint': True,
+                                               'readOnlyHint': True},
+                               'input_schema_hash': '41fc52d498a749c3938a6e440a4473261991b42abe70b01a34d557c74c5fe54c',
+                               'output_schema_hash': '0a7f338d05dcf640bc44acb79fc941ea83b6545e0ae7cebe6cbd2c1dbd94e0f4',
+                               'tags': ['details', 'fade', 'qlab', 'safe-read'],
+                               'timeout': 20.0,
+                               'title': 'Get QLab Fade Cue Details'},
+ 'qlab_get_fade_cues': {'annotations': {'destructiveHint': False,
+                                        'idempotentHint': True,
+                                        'openWorldHint': True,
+                                        'readOnlyHint': True},
+                        'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
+                        'output_schema_hash': 'a0f5daf5b9b9d33ae9589c004852f03de2b6baaa46d3ec73a912a1e676e63e5f',
+                        'tags': ['fade', 'inventory', 'qlab', 'safe-read'],
+                        'timeout': 60.0,
+                        'title': 'Get QLab Fade Cues'},
+ 'qlab_get_group_cue_details': {'annotations': {'destructiveHint': False,
+                                                'idempotentHint': True,
+                                                'openWorldHint': True,
+                                                'readOnlyHint': True},
+                                'input_schema_hash': 'ad523aa095115828702227d4e3cdd07569082dad9c1b55525746d1bd8a74f6e7',
+                                'output_schema_hash': '53ba5d831de3cbebb784029c2b9505774a3dd09962ac501e8943e4bee10296eb',
+                                'tags': ['details', 'group', 'qlab', 'safe-read'],
+                                'timeout': 20.0,
+                                'title': 'Get QLab Group Cue Details'},
+ 'qlab_get_group_cues': {'annotations': {'destructiveHint': False,
+                                         'idempotentHint': True,
+                                         'openWorldHint': True,
+                                         'readOnlyHint': True},
+                         'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
+                         'output_schema_hash': '4497a7eb0f64f64210bf107fd995a412ce975f15fb7a4fafae16a77fa4548e38',
                          'tags': ['group', 'inventory', 'qlab', 'safe-read'],
-                         'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
-                         'output_schema_hash': 'a9e4fd7553afc64a4a3be98ffcfad3ef1229ad01f24a5d24fba51e2d81be2639'},
- 'qlab_get_light_cue_details': {'title': 'Get QLab Light Cue Details',
-                                'timeout': 20.0,
-                                'annotations': {'readOnlyHint': True,
-                                                'destructiveHint': False,
-                                                'idempotentHint': True,
-                                                'openWorldHint': True},
-                                'tags': ['details',
-                                         'light',
-                                         'qlab',
-                                         'safe-read'],
-                                'input_schema_hash': 'c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb',
-                                'output_schema_hash': '3a293706067f77afb4f4bc9e6b1519bab9711b3c21e34585c9a51f7791614b5f'},
- 'qlab_get_light_cues': {'title': 'Get QLab Light Cues',
                          'timeout': 60.0,
-                         'annotations': {'readOnlyHint': True,
-                                         'destructiveHint': False,
+                         'title': 'Get QLab Group Cues'},
+ 'qlab_get_light_cue_details': {'annotations': {'destructiveHint': False,
+                                                'idempotentHint': True,
+                                                'openWorldHint': True,
+                                                'readOnlyHint': True},
+                                'input_schema_hash': '7cc4a31b024156fd175127df7ab00976bac24f1bac335360075ad7633fbd82d6',
+                                'output_schema_hash': '0119314af7aa0d80c0c5d14a1a01002ba8187d9714faba2c41c89755a9a7ea8f',
+                                'tags': ['details', 'light', 'qlab', 'safe-read'],
+                                'timeout': 20.0,
+                                'title': 'Get QLab Light Cue Details'},
+ 'qlab_get_light_cues': {'annotations': {'destructiveHint': False,
                                          'idempotentHint': True,
-                                         'openWorldHint': True},
-                         'tags': ['inventory', 'light', 'qlab', 'safe-read'],
+                                         'openWorldHint': True,
+                                         'readOnlyHint': True},
                          'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
-                         'output_schema_hash': 'b81d56a7d869c323d4feec748abfcf115dece77d0150a9434be4e681f7caafb5'},
-    "qlab_get_camera_cue_details": {
-        "title": "Get QLab Camera Cue Details",
-        "timeout": 20,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "camera",
-            "details",
-            "qlab",
-            "safe-read"
-        ],
-        "input_schema_hash": "0af60c735e03d5135243f9b087e8c38c82ff0debb04ced39f4a5716bd27f2e06",
-        "output_schema_hash": "fc6afb41a86b3343dc410e75a85914497d11ed6190aaf163f432b2d1c3235418"
-    },
-    "qlab_get_camera_cues": {
-        "title": "Get QLab Camera Cues",
-        "timeout": 60,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "camera",
-            "inventory",
-            "qlab",
-            "safe-read"
-        ],
-        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
-        "output_schema_hash": "0c27a1cbdca0d9b51e4a2b0bf393009b194d8af28e00ef5e07c5441bad1df8d1"
-    },
-    "qlab_get_text_cue_details": {
-        "title": "Get QLab Text Cue Details",
-        "timeout": 20,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "details",
-            "qlab",
-            "safe-read",
-            "text"
-        ],
-        "input_schema_hash": "c199c737465a8e33d7536d87221b85c961f56743444941a5d1d1b303730bb4fb",
-        "output_schema_hash": "f727278211899669de5105a35e6de4562106b8fc86e555efc233eed4c14628df"
-    },
-    "qlab_get_text_cues": {
-        "title": "Get QLab Text Cues",
-        "timeout": 60,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "inventory",
-            "qlab",
-            "safe-read",
-            "text"
-        ],
-        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
-        "output_schema_hash": "151f435770ed59118ee17430a4879c272407ec50204fa2bebceb65a1008bb75e"
-    },
-    "qlab_get_video_cue_details": {
-        "title": "Get QLab Video Cue Details",
-        "timeout": 20,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "details",
-            "qlab",
-            "safe-read",
-            "video"
-        ],
-        "input_schema_hash": "0af60c735e03d5135243f9b087e8c38c82ff0debb04ced39f4a5716bd27f2e06",
-        "output_schema_hash": "03f85129047f197dde90196b686696074a8b6c7cc3aea6c6604a09b644ed63ac"
-    },
-    "qlab_get_video_cues": {
-        "title": "Get QLab Video Cues",
-        "timeout": 60,
-        "annotations": {
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True
-        },
-        "tags": [
-            "inventory",
-            "qlab",
-            "safe-read",
-            "video"
-        ],
-        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
-        "output_schema_hash": "3ba3c1885314d31725092327b2a39fec5de9def57fef8ed32c22886405fa9905"
-    },
-    "qlab_get_mic_cues": {
-        "title": "Get QLab Mic Cues",
-        "timeout": QUERY_CUES_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["inventory", "mic", "qlab", "safe-read"],
-        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
-        "output_schema_hash": "4999a65f8e6421f85eed8d4ce5a75609a0c44a2e22775f814de74fb47413f469",
-    },
-    "qlab_get_mic_cue_details": {
-        "title": "Get QLab Mic Cue Details",
-        "timeout": CUE_DETAILS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["details", "mic", "qlab", "safe-read"],
-        "input_schema_hash": "0af60c735e03d5135243f9b087e8c38c82ff0debb04ced39f4a5716bd27f2e06",
-        "output_schema_hash": "bb8b82701b8812b16b430d7f1451f6f4ef3230ead95c0d3794bd7997d4b0cf77",
-    },
-    "qlab_get_audio_cues": {
-        "title": "Get QLab Audio Cues",
-        "timeout": QUERY_CUES_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["audio", "inventory", "qlab", "safe-read"],
-        "input_schema_hash": "fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa",
-        "output_schema_hash": "7099b3a92ba4d13b656236111c2812f17f4a062bfff20f8c5e5f88a5f3e48caa",
-    },
-    "qlab_get_audio_cue_details": {
-        "title": "Get QLab Audio Cue Details",
-        "timeout": CUE_DETAILS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["audio", "details", "qlab", "safe-read"],
-        "input_schema_hash": "0af60c735e03d5135243f9b087e8c38c82ff0debb04ced39f4a5716bd27f2e06",
-        "output_schema_hash": "6b3087a0dada6e39539f98c3deb54e9b5989be0693d644181ee91bd70f7b6820",
-    },
-    "qlab_get_cue_lists": {
-        "title": "Get QLab Cue Lists",
-        "timeout": CUE_DETAILS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["cue-lists", "inventory", "qlab", "safe-read"],
-        "input_schema_hash": "a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578",
-        "output_schema_hash": "72329cf1fd3194ec46570ff7a7a6fdde33bc2d5862106ced9392407d35f23f83",
-    },
-    "qlab_get_cue_list_details": {
-        "title": "Get QLab Cue List Details",
-        "timeout": WORKSPACE_OVERVIEW_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["cue-lists", "details", "qlab", "safe-read"],
-        "input_schema_hash": "68b54234cee80c21538edc3dbf02ab6a83c78959a9b1135044e00dec8a26862b",
-        "output_schema_hash": "2d11a59e3d4d0501a083a1a75ba0fa32af0d4729828e1c522928c47c5f96f982",
-    },
-    "qlab_get_cue_cart_details": {
-        "title": "Get QLab Cue Cart Details",
-        "timeout": WORKSPACE_OVERVIEW_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["cue-carts", "details", "qlab", "safe-read"],
-        "input_schema_hash": "5d384b1bc7b5a4c5e36ae75a006d97e7547ae710b00cd2e744d3186f7a067f25",
-        "output_schema_hash": "9153624690036f77b78b5c022f3280530962c6e9bc73b5bac42df574fa6b7539",
-    },
-    "qlab_check_connection": {
-        "title": "Check QLab Connection",
-        "timeout": CHECK_CONNECTION_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["diagnostics", "orientation", "qlab", "safe-read"],
-        "input_schema_hash": "c8967eca6cd7a45b2f08cc835ff932aea3551d133cc6fd5c8388ffc177e44b83",
-        "output_schema_hash": "abf13920f210805507d32c24c3166d28c8dd6fdbfe04b50678924063d4508e56",
-    },
-    "qlab_check_write_readiness": {
-        "title": "Check QLab Write Readiness",
-        "timeout": WRITE_READINESS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["diagnostics", "qlab", "safe-read", "write-mode"],
-        "input_schema_hash": "a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578",
-        "output_schema_hash": "0f27f2df78299a76f441eeb8d81064c38cda1bdf763bddb1f5ae79b67451de26",
-    },
-    "qlab_create_cues": {
-        "title": "Create QLab Cues",
-        "timeout": CREATE_CUES_TIMEOUT,
-        "annotations": {
-            "readOnlyHint": False,
-            "destructiveHint": False,
-            "idempotentHint": False,
-            "openWorldHint": True,
-        },
-        "tags": ["batch-create", "cue-create", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "71e0f0d8d009beac57efeae2ed6d15ab969688aca0d95973d23fcabf9a82d589",
-        "output_schema_hash": "a8c7028294707104a1afd9286b650e94b8e5f28f31deca017f01ea5f9939c183",
-    },
-    "qlab_get_cue_details": {
-        "title": "Get QLab Cue Details",
-        "timeout": CUE_DETAILS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["details", "diagnostics", "qlab", "safe-read"],
-        "input_schema_hash": "698f6c66f96d127a8f480e868663ad49382c31ae1373420077e2be13aa9499ed",
-        "output_schema_hash": "f5d340a970b906607ed9c3a2015c17a8da6f3eee5d70b36971c26920aa14da72",
-    },
-    "qlab_get_workspace_overview": {
-        "title": "Get QLab Workspace Overview",
-        "timeout": WORKSPACE_OVERVIEW_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["orientation", "qlab", "safe-read", "structure"],
-        "input_schema_hash": "fddc30b27b0b2a8ca4fa5f9601004eaa565c724a5c9b145bcea65cb5be1317f1",
-        "output_schema_hash": "dcf4a4fc455bb3ebc3e62b0ca04e3cbc75bd91fc7e19fdb978283796f3f50454",
-    },
-    "qlab_get_workspace_audio_settings": {
-        "title": "Get QLab Workspace Audio Settings",
-        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["audio", "patches", "qlab", "routing", "safe-read", "settings"],
-        "input_schema_hash": "778accc3d890828923b8bd71f2babc30482c825a1f3f5602a054f5b3456e97e5",
-        "output_schema_hash": "036b2a4a566ea9b4401b1b2081ac2e956e4f32f529ae41f52d4071c7ed4d4083",
-    },
-    "qlab_get_workspace_general_settings": {
-        "title": "Get QLab Workspace General Settings",
-        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["general", "qlab", "safe-read", "settings"],
-        "input_schema_hash": "a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578",
-        "output_schema_hash": "0a581c8c1c98d61315b2d5d327070551bedd58fc5cd1533efa0141531316ce5f",
-    },
-    "qlab_get_workspace_light_settings": {
-        "title": "Get QLab Workspace Light Settings",
-        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["light", "patches", "qlab", "safe-read", "settings"],
-        "input_schema_hash": "cfd70c189348699a8f4f7e24a2dd2c81fc85b3aeeda35d9ff8ac4e00f607a495",
-        "output_schema_hash": "93e4e2e0895dd0c773398ac9771cf0a32fef26a54bfc06e9ee10a9ff5e8319b9",
-    },
-    "qlab_get_workspace_midi_settings": {
-        "title": "Get QLab Workspace MIDI Settings",
-        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["midi", "patches", "qlab", "safe-read", "settings"],
-        "input_schema_hash": "eaaf315895e69c71d1110546fa037ae8bea54384d8eac79583a07207a2c9b86f",
-        "output_schema_hash": "a1246ab669e39937ba01a4f2865289a72a1354c022a1536f1aec11652dd08f9e",
-    },
-    "qlab_get_workspace_network_settings": {
-        "title": "Get QLab Workspace Network Settings",
-        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["network", "patches", "qlab", "safe-read", "settings"],
-        "input_schema_hash": "eaaf315895e69c71d1110546fa037ae8bea54384d8eac79583a07207a2c9b86f",
-        "output_schema_hash": "048f6d873b4a6a4c5ba97f5e076e1a0d431250d04448fc90934c31cb5aff745f",
-    },
-    "qlab_get_workspace_video_settings": {
-        "title": "Get QLab Workspace Video Settings",
-        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["patches", "qlab", "routing", "safe-read", "settings", "video"],
-        "input_schema_hash": "a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578",
-        "output_schema_hash": "2bd14258702379f541a6942b3ff15e4011fa5184ab6dab34db3c3512a1434fb6",
-    },
-    "qlab_get_video_stage": {
-        "title": "Get QLab Video Stage",
-        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["qlab", "safe-read", "settings", "stages", "video"],
-        "input_schema_hash": "a6bfcb9c9e86f1d3b384f14dd3cff7b47db7a60e6847776690627b9209c4d2bc",
-        "output_schema_hash": "72445d77a981af018e106077a7b37a5bdf0b4cfef9c635177927a47cb6f41c5e",
-    },
-    "qlab_get_video_output_route": {
-        "title": "Get QLab Video Output Route",
-        "timeout": WORKSPACE_SETTINGS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["qlab", "routing", "safe-read", "settings", "video"],
-        "input_schema_hash": "fa883e96fc21221c758cbdff15858a326aa8826e4c835960574d70437863f4ad",
-        "output_schema_hash": "cec321cbeac30e023f9c1d71d3b5ce9f73fe4f70584d2fc8017820a40bdf8195",
-    },
-    "qlab_get_workspace_status": {
-        "title": "Get QLab Workspace Status",
-        "timeout": WORKSPACE_STATUS_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["diagnostics", "qlab", "safe-read", "status", "timecode"],
-        "input_schema_hash": "a85c42414b1b3a1c4405349720920ac5983f1c8933422013adaf9957e84ed45d",
-        "output_schema_hash": "ccb2ea4d8bc34c308ddcc35e416d418d96efa6bfda67d2fc2cd4e61aa0ed949c",
-    },
-    "qlab_query_cues": {
-        "title": "Query QLab Cues",
-        "timeout": QUERY_CUES_TIMEOUT,
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-        "tags": ["details", "inventory", "qlab", "query", "safe-read"],
-        "input_schema_hash": "d06af63d14c70324eb62b16f81c07fd3967a39cc4eebd5c3fe0a9e7e8b6dcdf9",
-        "output_schema_hash": "16613ad3378154e2b01bb1dabe40ba6d56ff1394ffea2ad960ae14cd775549a5",
-    },
-    "qlab_edit_cues": {
-        "title": "Edit QLab Cues",
-        "timeout": UPDATE_CUES_TIMEOUT,
-        "annotations": {
-            "readOnlyHint": False,
-            "destructiveHint": True,
-            "idempotentHint": False,
-            "openWorldHint": True,
-        },
-        "tags": ["batch-edit", "cue-edit", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "ed9ba9bbfec6d77e87994f66680f65dcf2399f17e963c226f1daaf6c8b62f7df",
-        "output_schema_hash": "016e4e99ca9dbd11824e3180016b6d4612b3a53721d23db0d842e262cda7f34d",
-    },
-    "qlab_edit_workspace_settings": {
-        "title": "Edit QLab Workspace Settings",
-        "timeout": 60.0,
-        "annotations": {
-            "readOnlyHint": False,
-            "destructiveHint": True,
-            "idempotentHint": False,
-            "openWorldHint": True,
-        },
-        "tags": ["gated-write", "general-settings", "qlab", "settings", "write-mode"],
-        "input_schema_hash": "982bfde04442b4bd399b7c43344a8094346ff35ea18408427adba9cdd9a578a5",
-        "output_schema_hash": "68b12c38b49fc5e0a676863f13242de8b4645022952f527a14fbfe8916f967b2",
-    },
-    "qlab_move_cues": {
-        "title": "Move QLab Cues",
-        "timeout": UPDATE_CUES_TIMEOUT,
-        "annotations": {
-            "readOnlyHint": False,
-            "destructiveHint": True,
-            "idempotentHint": False,
-            "openWorldHint": True,
-        },
-        "tags": ["cue-move", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "7d9c474bd71d9d98541ba143dc189a3c3ff6a8e3c6cb9d4a4346a250da33f80d",
-        "output_schema_hash": "1338128f239451d8d5d14fe5847888f657b4f5864972c221b5466606fa90f33a",
-    },
-    "qlab_delete_cues": {
-        "title": "Delete QLab Cues",
-        "timeout": 180.0,
-        "annotations": {
-            "readOnlyHint": False,
-            "destructiveHint": True,
-            "idempotentHint": False,
-            "openWorldHint": True,
-        },
-        "tags": ["cue-delete", "gated-write", "qlab", "write-mode"],
-        "input_schema_hash": "f3b0e3825a3db87c44c44243b5bd635e4588155e0e8ba8a703cc7ffb53cc990b",
-        "output_schema_hash": "8b8a38d3937174d9e74a828201c56c5ebcc9c77482eb7f11be303423d8eb7132",
-    },
+                         'output_schema_hash': 'e41a584376deb04c1f858dd1e5914bf7f0a3222422b9212c698abc6630985cb3',
+                         'tags': ['inventory', 'light', 'qlab', 'safe-read'],
+                         'timeout': 60.0,
+                         'title': 'Get QLab Light Cues'},
+ 'qlab_get_mic_cue_details': {'annotations': {'destructiveHint': False,
+                                              'idempotentHint': True,
+                                              'openWorldHint': True,
+                                              'readOnlyHint': True},
+                              'input_schema_hash': '972aee57491c2c5543cf1eaf4e1ea4f87baa55ebacdd959c3674fe0eb0c33313',
+                              'output_schema_hash': '5be423f6016b89906b25d8496183b3139fd762465a2e4190fc91562d06be0292',
+                              'tags': ['details', 'mic', 'qlab', 'safe-read'],
+                              'timeout': 20.0,
+                              'title': 'Get QLab Mic Cue Details'},
+ 'qlab_get_mic_cues': {'annotations': {'destructiveHint': False,
+                                       'idempotentHint': True,
+                                       'openWorldHint': True,
+                                       'readOnlyHint': True},
+                       'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
+                       'output_schema_hash': '68223c0f34044ca515d17b8869a12eb22a1b91c2d9d31c7390819bd925a9acfe',
+                       'tags': ['inventory', 'mic', 'qlab', 'safe-read'],
+                       'timeout': 60.0,
+                       'title': 'Get QLab Mic Cues'},
+ 'qlab_get_midi_cue_details': {'annotations': {'destructiveHint': False,
+                                               'idempotentHint': True,
+                                               'openWorldHint': True,
+                                               'readOnlyHint': True},
+                               'input_schema_hash': '57259aae1bb0b6a6bd624dd52cbb73c214891b86017c8844328a9c0ffbffb3b1',
+                               'output_schema_hash': '6260de5108a197a0152e75e3d75a67575302d41a57ba1d84a61785534a6e993c',
+                               'tags': ['details', 'midi', 'qlab', 'safe-read'],
+                               'timeout': 20.0,
+                               'title': 'Get QLab MIDI Cue Details'},
+ 'qlab_get_midi_cues': {'annotations': {'destructiveHint': False,
+                                        'idempotentHint': True,
+                                        'openWorldHint': True,
+                                        'readOnlyHint': True},
+                        'input_schema_hash': '40e3b50a6091cb04e48143d9083895bd39bd19afea7d194384deab085f303795',
+                        'output_schema_hash': 'd02bfda19290045caee0a4831e718e73e7ca6e1f695d5c47adb58244052a5304',
+                        'tags': ['inventory', 'midi', 'qlab', 'safe-read'],
+                        'timeout': 60.0,
+                        'title': 'Get QLab MIDI Cues'},
+ 'qlab_get_network_cue_details': {'annotations': {'destructiveHint': False,
+                                                  'idempotentHint': True,
+                                                  'openWorldHint': True,
+                                                  'readOnlyHint': True},
+                                  'input_schema_hash': 'b256789d94ca79dc1e44010edf63d1aa3e0eb91f6066add27698de463b43b3c8',
+                                  'output_schema_hash': '5156aaf4c3354a8ca2d63d8e826b27f517abc77a3745dc46ebcc627ba97efee8',
+                                  'tags': ['details', 'network', 'qlab', 'safe-read'],
+                                  'timeout': 20.0,
+                                  'title': 'Get QLab Network Cue Details'},
+ 'qlab_get_network_cues': {'annotations': {'destructiveHint': False,
+                                           'idempotentHint': True,
+                                           'openWorldHint': True,
+                                           'readOnlyHint': True},
+                           'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
+                           'output_schema_hash': 'cfa1d5efb830be16e84d77832ba61262043852c012f0e28a4e28908deb738573',
+                           'tags': ['inventory', 'network', 'qlab', 'safe-read'],
+                           'timeout': 60.0,
+                           'title': 'Get QLab Network Cues'},
+ 'qlab_get_script_cue_details': {'annotations': {'destructiveHint': False,
+                                                 'idempotentHint': True,
+                                                 'openWorldHint': True,
+                                                 'readOnlyHint': True},
+                                 'input_schema_hash': '1745121f99ffbb029890d4ec42614f62bb9ce82f6f9fce10f6f62e6eb96ff295',
+                                 'output_schema_hash': 'b4cac6f85463cd18c1c616c93f6943d05c8fa904813ed2ca52eea6fece2d66b8',
+                                 'tags': ['details', 'qlab', 'safe-read', 'script'],
+                                 'timeout': 20.0,
+                                 'title': 'Get QLab Script Cue Details'},
+ 'qlab_get_script_cues': {'annotations': {'destructiveHint': False,
+                                          'idempotentHint': True,
+                                          'openWorldHint': True,
+                                          'readOnlyHint': True},
+                          'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
+                          'output_schema_hash': 'dc5c05e00596f9a6d4d92c06088b221a77fb471fd781450c82186f6dec376d6e',
+                          'tags': ['inventory', 'qlab', 'safe-read', 'script'],
+                          'timeout': 60.0,
+                          'title': 'Get QLab Script Cues'},
+ 'qlab_get_text_cue_details': {'annotations': {'destructiveHint': False,
+                                               'idempotentHint': True,
+                                               'openWorldHint': True,
+                                               'readOnlyHint': True},
+                               'input_schema_hash': '98fe1a0ea512317c417efa63e169f42688348a970d36c15485234ef82078d88f',
+                               'output_schema_hash': '18d53dfe9fb674400bbf94d0f57050544be2cdc3e669caf9b592b2ab90be7332',
+                               'tags': ['details', 'qlab', 'safe-read', 'text'],
+                               'timeout': 20.0,
+                               'title': 'Get QLab Text Cue Details'},
+ 'qlab_get_text_cues': {'annotations': {'destructiveHint': False,
+                                        'idempotentHint': True,
+                                        'openWorldHint': True,
+                                        'readOnlyHint': True},
+                        'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
+                        'output_schema_hash': '5bf7b9823d164ae7112ef82b1f31735e0648012cca17d4d527b08f1ecd755461',
+                        'tags': ['inventory', 'qlab', 'safe-read', 'text'],
+                        'timeout': 60.0,
+                        'title': 'Get QLab Text Cues'},
+ 'qlab_get_timecode_cue_details': {'annotations': {'destructiveHint': False,
+                                                   'idempotentHint': True,
+                                                   'openWorldHint': True,
+                                                   'readOnlyHint': True},
+                                   'input_schema_hash': '76e33807d0eeab59030a857b8a048cb3c4ea36bab6f171d8be2c618f9ff14865',
+                                   'output_schema_hash': 'd3c423c65c8aa24db5fe3162be58e0f3a4cdcec1ebe606254db0d1aad6ed428e',
+                                   'tags': ['details', 'qlab', 'safe-read', 'timecode'],
+                                   'timeout': 20.0,
+                                   'title': 'Get QLab Timecode Cue Details'},
+ 'qlab_get_timecode_cues': {'annotations': {'destructiveHint': False,
+                                            'idempotentHint': True,
+                                            'openWorldHint': True,
+                                            'readOnlyHint': True},
+                            'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
+                            'output_schema_hash': '31a3c9b1aa213e9379bc057080ecf7aaeccccc93a378e65467b7c6ea126a26ac',
+                            'tags': ['inventory', 'qlab', 'safe-read', 'timecode'],
+                            'timeout': 60.0,
+                            'title': 'Get QLab Timecode Cues'},
+ 'qlab_get_video_cue_details': {'annotations': {'destructiveHint': False,
+                                                'idempotentHint': True,
+                                                'openWorldHint': True,
+                                                'readOnlyHint': True},
+                               'input_schema_hash': '2734838d3ecd4fe7a5d412e08777007dbe199ecc318f119cfe86999b266920ae',
+                                'output_schema_hash': 'ed65196d4e43c7b5902e21c9abebf8d621c8baded2f6850ee243db5ee622c935',
+                                'tags': ['details', 'qlab', 'safe-read', 'video'],
+                                'timeout': 20.0,
+                                'title': 'Get QLab Video Cue Details'},
+ 'qlab_get_video_cues': {'annotations': {'destructiveHint': False,
+                                         'idempotentHint': True,
+                                         'openWorldHint': True,
+                                         'readOnlyHint': True},
+                         'input_schema_hash': 'fb28972171d049ee9d9f38a37e3085371c8082aa1889df4a2b4f8a3d0371defa',
+                         'output_schema_hash': '9c415d55780ad6c06b598cdf41940cd49c896bc87721581f435e2126f78f7bd5',
+                         'tags': ['inventory', 'qlab', 'safe-read', 'video'],
+                         'timeout': 60.0,
+                         'title': 'Get QLab Video Cues'},
+ 'qlab_get_video_output_route': {'annotations': {'destructiveHint': False,
+                                                 'idempotentHint': True,
+                                                 'openWorldHint': True,
+                                                 'readOnlyHint': True},
+                                 'input_schema_hash': 'fa883e96fc21221c758cbdff15858a326aa8826e4c835960574d70437863f4ad',
+                                 'output_schema_hash': '832f53b4052ea3a5f9cb913531fb8385c991934af03a08be55e1f99b1fa4fc3d',
+                                 'tags': ['qlab', 'routing', 'safe-read', 'settings', 'video'],
+                                 'timeout': 60.0,
+                                 'title': 'Get QLab Video Output Route'},
+ 'qlab_get_video_region': {'annotations': {'destructiveHint': False,
+                                           'idempotentHint': True,
+                                           'openWorldHint': True,
+                                           'readOnlyHint': True},
+                           'input_schema_hash': '0fe19d0e4558304d80ad5547aee1ef965d3134edbe8985e84e9736328bf46798',
+                           'output_schema_hash': '938f6ea9b0bb9553b1dcf48655f23c6ebe21e241cd2adbdf5ed62755b94a0295',
+                           'tags': ['qlab', 'regions', 'safe-read', 'settings', 'video'],
+                           'timeout': 60.0,
+                           'title': 'Get QLab Video Region'},
+ 'qlab_get_video_stage': {'annotations': {'destructiveHint': False,
+                                          'idempotentHint': True,
+                                          'openWorldHint': True,
+                                          'readOnlyHint': True},
+                          'input_schema_hash': 'a6bfcb9c9e86f1d3b384f14dd3cff7b47db7a60e6847776690627b9209c4d2bc',
+                          'output_schema_hash': 'a30f6de759094ba7ea62c4d3add5bb42815d064b9169e1504a94babe525a9637',
+                          'tags': ['qlab', 'safe-read', 'settings', 'stages', 'video'],
+                          'timeout': 60.0,
+                          'title': 'Get QLab Video Stage'},
+ 'qlab_get_workspace_audio_settings': {'annotations': {'destructiveHint': False,
+                                                       'idempotentHint': True,
+                                                       'openWorldHint': True,
+                                                       'readOnlyHint': True},
+                                       'input_schema_hash': '3174667dc67bf2a6a827e2f7e1c7da40725b55f8d72b7b5cb1a025679b25ffaf',
+                                       'output_schema_hash': '43b34ba9cabec1a16d44ba3ba2f39c5d98469850192fce6de43b8c8f5ff55ff1',
+                                       'tags': ['audio',
+                                                'patches',
+                                                'qlab',
+                                                'routing',
+                                                'safe-read',
+                                                'settings'],
+                                       'timeout': 60.0,
+                                       'title': 'Get QLab Workspace Audio Settings'},
+ 'qlab_get_workspace_general_settings': {'annotations': {'destructiveHint': False,
+                                                         'idempotentHint': True,
+                                                         'openWorldHint': True,
+                                                         'readOnlyHint': True},
+                                         'input_schema_hash': 'a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578',
+                                         'output_schema_hash': '3f0b8b906ca4f7a676cf90f44ca911fcb5976f9dc908ba81779313663707135f',
+                                         'tags': ['general', 'qlab', 'safe-read', 'settings'],
+                                         'timeout': 60.0,
+                                         'title': 'Get QLab Workspace General Settings'},
+ 'qlab_get_workspace_light_settings': {'annotations': {'destructiveHint': False,
+                                                       'idempotentHint': True,
+                                                       'openWorldHint': True,
+                                                       'readOnlyHint': True},
+                                       'input_schema_hash': 'cfd70c189348699a8f4f7e24a2dd2c81fc85b3aeeda35d9ff8ac4e00f607a495',
+                                       'output_schema_hash': '93e4e2e0895dd0c773398ac9771cf0a32fef26a54bfc06e9ee10a9ff5e8319b9',
+                                       'tags': ['light',
+                                                'patches',
+                                                'qlab',
+                                                'safe-read',
+                                                'settings'],
+                                       'timeout': 60.0,
+                                       'title': 'Get QLab Workspace Light Settings'},
+ 'qlab_get_workspace_midi_settings': {'annotations': {'destructiveHint': False,
+                                                      'idempotentHint': True,
+                                                      'openWorldHint': True,
+                                                      'readOnlyHint': True},
+                                      'input_schema_hash': 'eaaf315895e69c71d1110546fa037ae8bea54384d8eac79583a07207a2c9b86f',
+                                      'output_schema_hash': 'a1246ab669e39937ba01a4f2865289a72a1354c022a1536f1aec11652dd08f9e',
+                                      'tags': ['midi', 'patches', 'qlab', 'safe-read', 'settings'],
+                                      'timeout': 60.0,
+                                      'title': 'Get QLab Workspace MIDI Settings'},
+ 'qlab_get_workspace_network_settings': {'annotations': {'destructiveHint': False,
+                                                         'idempotentHint': True,
+                                                         'openWorldHint': True,
+                                                         'readOnlyHint': True},
+                                         'input_schema_hash': 'eaaf315895e69c71d1110546fa037ae8bea54384d8eac79583a07207a2c9b86f',
+                                         'output_schema_hash': '048f6d873b4a6a4c5ba97f5e076e1a0d431250d04448fc90934c31cb5aff745f',
+                                         'tags': ['network',
+                                                  'patches',
+                                                  'qlab',
+                                                  'safe-read',
+                                                  'settings'],
+                                         'timeout': 60.0,
+                                         'title': 'Get QLab Workspace Network Settings'},
+ 'qlab_get_workspace_overview': {'annotations': {'destructiveHint': False,
+                                                 'idempotentHint': True,
+                                                 'openWorldHint': True,
+                                                 'readOnlyHint': True},
+                                 'input_schema_hash': 'fddc30b27b0b2a8ca4fa5f9601004eaa565c724a5c9b145bcea65cb5be1317f1',
+                                 'output_schema_hash': 'dcf4a4fc455bb3ebc3e62b0ca04e3cbc75bd91fc7e19fdb978283796f3f50454',
+                                 'tags': ['orientation', 'qlab', 'safe-read', 'structure'],
+                                 'timeout': 45.0,
+                                 'title': 'Get QLab Workspace Overview'},
+ 'qlab_get_workspace_status': {'annotations': {'destructiveHint': False,
+                                               'idempotentHint': True,
+                                               'openWorldHint': True,
+                                               'readOnlyHint': True},
+                               'input_schema_hash': 'a85c42414b1b3a1c4405349720920ac5983f1c8933422013adaf9957e84ed45d',
+                               'output_schema_hash': 'ccb2ea4d8bc34c308ddcc35e416d418d96efa6bfda67d2fc2cd4e61aa0ed949c',
+                               'tags': ['diagnostics', 'qlab', 'safe-read', 'status', 'timecode'],
+                               'timeout': 60.0,
+                               'title': 'Get QLab Workspace Status'},
+ 'qlab_get_workspace_video_settings': {'annotations': {'destructiveHint': False,
+                                                       'idempotentHint': True,
+                                                       'openWorldHint': True,
+                                                       'readOnlyHint': True},
+                                       'input_schema_hash': 'a100d2c71d8a6573be48039f083c85ed16c495c4b69cc2a248b81336bb589578',
+                                       'output_schema_hash': '5a23a3b35e20fcfc88e21c64eae3095ab09082d1d9f1de94170cc0bbd0acbe37',
+                                       'tags': ['patches',
+                                                'qlab',
+                                                'routing',
+                                                'safe-read',
+                                                'settings',
+                                                'video'],
+                                       'timeout': 60.0,
+                                       'title': 'Get QLab Workspace Video Settings'},
+ 'qlab_move_cue_lists': {'annotations': {'destructiveHint': True,
+                                         'idempotentHint': False,
+                                         'openWorldHint': True,
+                                         'readOnlyHint': False},
+                         'input_schema_hash': '91aeeabcf60ad5f868c5a1e59f8d203d73c85e77c8516d4e4a6c1f11232d39db',
+                         'output_schema_hash': '1197e3de730b0fcb1d3f068942d9b0cedc796042e29697c5536fb7a570cac32d',
+                         'tags': ['cue-list-move', 'gated-write', 'qlab', 'write-mode'],
+                         'timeout': 180.0,
+                         'title': 'Move QLab Cue Lists'},
+ 'qlab_move_cues': {'annotations': {'destructiveHint': True,
+                                    'idempotentHint': False,
+                                    'openWorldHint': True,
+                                    'readOnlyHint': False},
+                    'input_schema_hash': '00fe59bde570539237878a5ad71151a664fe84445384a3cdd84ea7c00e03499d',
+                    'output_schema_hash': '1197e3de730b0fcb1d3f068942d9b0cedc796042e29697c5536fb7a570cac32d',
+                    'tags': ['cue-move', 'gated-write', 'qlab', 'write-mode'],
+                    'timeout': 180.0,
+                    'title': 'Move QLab Cues'},
+ 'qlab_query_cues': {'annotations': {'destructiveHint': False,
+                                     'idempotentHint': True,
+                                     'openWorldHint': True,
+                                     'readOnlyHint': True},
+                     'input_schema_hash': 'd06af63d14c70324eb62b16f81c07fd3967a39cc4eebd5c3fe0a9e7e8b6dcdf9',
+                     'output_schema_hash': '16613ad3378154e2b01bb1dabe40ba6d56ff1394ffea2ad960ae14cd775549a5',
+                     'tags': ['details', 'inventory', 'qlab', 'query', 'safe-read'],
+                     'timeout': 60.0,
+                     'title': 'Query QLab Cues'}}
+ADDED_TOOL_NAMES = {
+    "qlab_get_video_effect_catalogue", "qlab_get_workspace_document",
+    "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace",
 }
-EXPECTED_TOOL_CONCEPTS = {
+EXPECTED_TOOL_NAMES = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) | ADDED_TOOL_NAMES
+
+EXPECTED_TOOL_CONCEPTS = {"qlab_get_fonts": ("PostScript", "TCP", "family/style"),
+    "qlab_get_video_effect_catalogue": ("documented FX names", "paged static catalogue", "never grants permission"),
+    "qlab_get_workspace_document": ("local", "workspace UUID", "dirty"),
+    "qlab_open_workspace": ("empty inventory", "single-use", "Do not retry"),
+    "qlab_save_workspace": ("existing path", "unsaved", "single-use"),
+    "qlab_close_workspace": ("no unsaved changes", "saving no", "single-use"),
+    "qlab_analyze_audio_file": ("100 ms", "source file", "512 KiB", "FFmpeg"),
+    "qlab_search_media_files": ("home folder", "fileTarget", "truncated", "dry-run"),
+    "qlab_edit_audio_cues": ("1–50", "dry_run", "confirm_gates", "single-use", "non-atomic", "Never retry"),
+    "qlab_edit_mic_cues": ("1–50", "dry_run", "confirm_gates", "single-use", "non-atomic", "Never retry"),
+    "qlab_edit_light_cues": ("1–50", "dry_run", "confirm_gates", "single-use", "non-atomic", "Never retry"),
+    "qlab_edit_fade_cues": ("1–50", "dry_run", "confirm_gates", "single-use", "non-atomic", "Never retry"),
+    "qlab_edit_network_cues": ("1–50", "dry_run", "confirm_gates", "single-use", "non-atomic", "Never retry"),
+    "qlab_edit_midi_cues": ("1–50", "dry_run", "confirm_gates", "single-use", "non-atomic", "Never retry"),
+    "qlab_edit_midi_file_cues": ("1–50", "dry_run", "confirm_gates", "single-use", "non-atomic", "Never retry"),
+    "qlab_edit_timecode_cues": ("1–50", "dry_run", "confirm_gates", "single-use", "non-atomic", "Never retry"),
+    "qlab_edit_script_cues": ("1–50", "dry_run", "confirm_gates", "single-use", "non-atomic", "Never retry"),
+
+    "qlab_edit_video_cues": ("1–50", "non-atomic", "fresh readback", "single-use"),
+    "qlab_edit_camera_cues": ("1–50", "non-atomic", "fresh readback", "single-use"),
+    "qlab_edit_text_cues": ("1–50", "non-atomic", "fresh readback", "single-use"),
+    "qlab_edit_devamp_cues": ("non-atomic", "uuid", "five minutes", "never retried"),
+    "qlab_edit_target_cues": ("non-atomic", "uuid", "assignedNumber", "never retried"),
+    "qlab_edit_control_cues": ("non-atomic", "uuid", "five minutes", "never retried"),
+    "qlab_edit_group_cues": ("one cue and one property", "Playlist setters require mode 6", "five minutes", "non-atomic"),
+    "qlab_create_cue_lists": ("empty root cue lists", "cue carts", "no rollback", "current container", "qlab_move_cue_lists"),
+    "qlab_edit_cue_lists": ("exact root uuids", "incoming-timecode", "excludes playhead", "unavailable through osc"),
+    "qlab_move_cue_lists": ("root cue lists", "cue carts", "zero-based", "confirm:movecuelists:v1", "non-atomic"),
     "qlab_get_fade_cue_details": ("exact fade cue", "partial errors"),
     "qlab_get_fade_cues": ("exact Cue List", "Carts are rejected"),
     "qlab_get_midi_cue_details": ("exact midi cue", "partial errors"),
@@ -670,10 +892,14 @@ EXPECTED_TOOL_CONCEPTS = {
     "qlab_get_cue_details": ("editable for update capability discovery", "exhaustive only for deep audits", "qlab_query_cues"),
     "qlab_check_write_readiness": ("without sending any mutating osc commands", "edit mode", "read-only preflight"),
     "qlab_create_cues": ("one verified /new per item", "without automatic rollback", "confirm:createcues:v2", "mcp sends no cue number", "do not predict it from the setting or template", "do not retry"),
-    "qlab_edit_cues": ("dry-run planning never sends mutating osc", "high-risk profiles", "exact cue uuid", "per-operation confirm gates", "non-atomic", "fresh readback", "do not retry"),
-    "qlab_edit_workspace_settings": ("general.minGoTime", "fresh", "single-use token", "one setter", "readback", "Audition"),
+    "qlab_edit_workspace_general_settings": ("minGoTime", "selectionIsPlayhead", "single-use token"),
+    "qlab_edit_audio_output_patch": ("patch property", "mutes/solos", "single-use token"),
+    "qlab_edit_video_output_route": ("enableGuides", "output route"),
+    "qlab_edit_video_stage": ("Video stage", "Rename"),
+    "qlab_edit_video_region": ("OSC-coordinate", "exact indices"),
+    "qlab_get_video_region": ("OSC bounds", "control point"),
     "qlab_move_cues": ("sequential qlab cue moves", "never claims atomicity", "uuid-only", "confirm:movecues:v1", "fresh parent/order readback"),
-    "qlab_delete_cues": ("sequential deletions", "not atomic", "confirm:deletecues:v1", "deepest-first", "no automatic rollback", "verify disappearance", "preservation of the root", "empty group"),
+    "qlab_delete_cues": ("sequential deletions", "not atomic", "confirm:deletecues:v1", "deepest-first", "no automatic rollback", "verify disappearance", "preservation", "empty group"),
 }
 
 
@@ -760,7 +986,7 @@ def test_fastmcp_initialization_reports_project_version_and_universal_guidance()
             return client.initialize_result
 
     initialize_result = asyncio.run(initialize())
-    assert initialize_result.serverInfo.version == "0.3.0"
+    assert initialize_result.serverInfo.version == "0.4.0"
     instructions = initialize_result.instructions
     assert instructions
     for phrase in (
@@ -780,7 +1006,9 @@ def test_fastmcp_initialization_reports_project_version_and_universal_guidance()
 
 
 def test_fastmcp_tool_contract_snapshot_matches_current_public_surface() -> None:
-    assert asyncio.run(_tool_contract_snapshot()) == EXPECTED_FASTMCP_TOOL_CONTRACTS
+    actual = asyncio.run(_tool_contract_snapshot())
+    assert {name: actual[name] for name in EXPECTED_FASTMCP_TOOL_CONTRACTS} == EXPECTED_FASTMCP_TOOL_CONTRACTS
+    assert set(actual) == EXPECTED_TOOL_NAMES
 
 
 def test_fastmcp_metadata_has_nonempty_titles_and_semantic_tags() -> None:
@@ -827,7 +1055,7 @@ def test_fastmcp_tool_context_size_report_is_deterministic() -> None:
 
     tools, instructions = asyncio.run(list_tools_and_instructions())
     report = _tool_context_size_report(tools, instructions)
-    assert list(report["tools"]) == sorted(EXPECTED_FASTMCP_TOOL_CONTRACTS)
+    assert list(report["tools"]) == sorted(EXPECTED_TOOL_NAMES)
     assert report["server_instructions_bytes"] > 0
     for sizes in report["tools"].values():
         assert sizes["description_bytes"] > 0
@@ -839,17 +1067,17 @@ def test_fastmcp_tool_context_size_report_is_deterministic() -> None:
 def test_read_tool_call_shapes_remain_explicit() -> None:
     expected = {
         "qlab_get_control_cues": {"workspace_id", "cue_list_id", "limit", "offset", "max_cues_scanned", "cue_type"},
-        "qlab_get_control_cue_details": {"workspace_id", "cue_id", "profile"},
+        "qlab_get_control_cue_details": {"workspace_id", "cue_id", "profile", "include_native_triggers"},
         "qlab_get_audio_cues": {"workspace_id", "cue_list_id", "limit", "offset", "max_cues_scanned"},
         "qlab_get_video_cues": {"workspace_id", "cue_list_id", "limit", "offset", "max_cues_scanned"},
-        "qlab_get_video_cue_details": {"workspace_id", "cue_id", "profile", "input_channel", "output_channel"},
+        "qlab_get_video_cue_details": {"workspace_id", "cue_id", "profile", "input_channel", "output_channel", "video_effects", "include_native_triggers"},
         "qlab_get_text_cues": {"workspace_id", "cue_list_id", "limit", "offset", "max_cues_scanned"},
-        "qlab_get_text_cue_details": {"workspace_id", "cue_id", "profile"},
+        "qlab_get_text_cue_details": {"workspace_id", "cue_id", "profile", "video_effects", "include_native_triggers"},
         "qlab_get_camera_cues": {"workspace_id", "cue_list_id", "limit", "offset", "max_cues_scanned"},
-        "qlab_get_camera_cue_details": {"workspace_id", "cue_id", "profile", "input_channel", "output_channel"},
+        "qlab_get_camera_cue_details": {"workspace_id", "cue_id", "profile", "input_channel", "output_channel", "video_effects", "include_native_triggers"},
         "qlab_get_mic_cues": {"workspace_id", "cue_list_id", "limit", "offset", "max_cues_scanned"},
-        "qlab_get_mic_cue_details": {"workspace_id", "cue_id", "profile", "input_channel", "output_channel"},
-        "qlab_get_audio_cue_details": {"workspace_id", "cue_id", "profile", "input_channel", "output_channel"},
+        "qlab_get_mic_cue_details": {"workspace_id", "cue_id", "profile", "input_channel", "output_channel", "inspections", "include_native_triggers"},
+        "qlab_get_audio_cue_details": {"workspace_id", "cue_id", "profile", "input_channel", "output_channel", "inspections", "include_native_triggers"},
         "qlab_get_cue_lists": {"workspace_id"},
         "qlab_get_cue_list_details": {"workspace_id", "cue_list_id", "profile", "max_depth", "max_cues"},
         "qlab_get_cue_cart_details": {"workspace_id", "cue_cart_id", "profile", "max_cues"},
@@ -937,8 +1165,8 @@ def test_readme_tool_inventory_matches_current_public_surface() -> None:
         if line.startswith("| `qlab_")
     ]
 
-    assert len(documented_tools) == len(EXPECTED_FASTMCP_TOOL_CONTRACTS)
-    assert set(documented_tools) == set(EXPECTED_FASTMCP_TOOL_CONTRACTS)
+    assert len(documented_tools) == len(EXPECTED_TOOL_NAMES)
+    assert set(documented_tools) == EXPECTED_TOOL_NAMES
 
 
 def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None:
@@ -949,8 +1177,8 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
     tools = asyncio.run(list_tools())
     tool_names = {tool.name for tool in tools}
 
-    assert len(tools) == 48
-    assert tool_names == set(EXPECTED_FASTMCP_TOOL_CONTRACTS)
+    assert len(tools) == 79
+    assert tool_names == EXPECTED_TOOL_NAMES
     assert "qlab_create_cue" not in tool_names
     forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
     assert all(
@@ -1019,7 +1247,7 @@ def test_move_cues_fastmcp_schema_limits_and_nested_model() -> None:
     moves = schema["properties"]["moves"]
 
     assert moves["minItems"] == 1
-    assert moves["maxItems"] == 10
+    assert moves["maxItems"] == 50
     assert moves["items"]["required"] == ["cue_id"]
     assert moves["items"]["properties"]["cue_id"]["format"] == "uuid"
 
@@ -1119,7 +1347,7 @@ def test_create_cues_fastmcp_forwards_ordered_types_and_destination(monkeypatch)
     assert result.structured_content["confirm_token"].startswith("confirm:createCues:v2:")
 
 
-def test_create_cues_fastmcp_accepts_one_and_fifty_but_rejects_out_of_range(monkeypatch) -> None:
+def test_create_cues_fastmcp_accepts_one_fifty_and_hundred_but_rejects_out_of_range(monkeypatch) -> None:
     observed: list[list[str]] = []
 
     class FakeReader:
@@ -1139,15 +1367,15 @@ def test_create_cues_fastmcp_accepts_one_and_fifty_but_rejects_out_of_range(monk
 
     async def run() -> None:
         async with Client(mcp) as client:
-            for types in (["audio"], ["video"] * 30 + ["audio"] * 20):
+            for types in (["audio"], ["video"] * 30 + ["audio"] * 20, ["wait"] * 100):
                 result = await client.call_tool("qlab_create_cues", {**base, "cue_types": types})
                 assert result.structured_content["requested_count"] == len(types)
-            for types in ([], ["audio"] * 51, ["script"]):
+            for types in ([], ["audio"] * 101, ["script"]):
                 with pytest.raises(Exception):
                     await client.call_tool("qlab_create_cues", {**base, "cue_types": types})
 
     asyncio.run(run())
-    assert [len(types) for types in observed] == [1, 50]
+    assert [len(types) for types in observed] == [1, 50, 100]
     assert observed[1] == ["video"] * 30 + ["audio"] * 20
 
 
@@ -1161,14 +1389,14 @@ def test_delete_cues_fastmcp_schema_limits_and_nested_uuid_model() -> None:
     cue_ids = schema["properties"]["cue_ids"]["anyOf"][0]
 
     assert cue_ids["minItems"] == 0
-    assert cue_ids["maxItems"] == 10
+    assert cue_ids["maxItems"] == 50
     assert cue_ids["items"]["format"] == "uuid"
     assert "confirm_token" in schema["properties"]
 
 
 def test_delete_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
     class FakeReader:
-        def delete_cues(self, workspace_id, cue_ids, dry_run, confirm_token, container_id=None, recursive=False):
+        def delete_cues(self, workspace_id, cue_ids, dry_run, confirm_token, container_id=None, recursive=False, delete_container=False):
             assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
             assert cue_ids == ["11111111-1111-4111-8111-111111111111"]
             assert dry_run is True
@@ -1212,9 +1440,9 @@ def test_delete_cues_fastmcp_returns_structured_plan(monkeypatch) -> None:
 
 def test_delete_cues_fastmcp_forwards_recursive_container(monkeypatch) -> None:
     class FakeReader:
-        def delete_cues(self, workspace_id, cue_ids, dry_run, confirm_token, container_id=None, recursive=False):
+        def delete_cues(self, workspace_id, cue_ids, dry_run, confirm_token, container_id=None, recursive=False, delete_container=False):
             assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-            assert cue_ids == []
+            assert cue_ids is None
             assert dry_run is True
             assert confirm_token is None
             assert container_id == "22222222-2222-4222-8222-222222222222"
@@ -1278,8 +1506,8 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    write_tools = {"qlab_create_cues", "qlab_edit_cues", "qlab_edit_workspace_settings", "qlab_move_cues", "qlab_delete_cues"}
-    read_only_tools = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) - write_tools
+    write_tools = {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_create_cue_lists", "qlab_edit_cue_lists", "qlab_create_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace"}
+    read_only_tools = EXPECTED_TOOL_NAMES - write_tools
 
     for tool_name in read_only_tools:
         assert tools[tool_name].annotations.readOnlyHint is True, f"{tool_name} lost readOnlyHint"
@@ -1289,7 +1517,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
 
     for tool_name in write_tools:
         assert tools[tool_name].annotations.readOnlyHint is False, f"{tool_name} was marked read-only"
-        if tool_name in {"qlab_edit_cues", "qlab_edit_workspace_settings", "qlab_move_cues", "qlab_delete_cues"}:
+        if tool_name in {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_cue_lists", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_save_workspace", "qlab_close_workspace"}:
             assert tools[tool_name].annotations.destructiveHint is True
         else:
             assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
@@ -1303,19 +1531,21 @@ def test_edit_cues_fastmcp_schema_keeps_batch_contract() -> None:
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    update_schema = tools["qlab_edit_cues"].inputSchema
+    update_schema = tools["qlab_edit_control_cues"].inputSchema
     update_properties = update_schema["properties"]
     update_items = update_properties["updates"]["items"]
     update_item_properties = update_items["properties"]
-    update_output = tools["qlab_edit_cues"].outputSchema
+    update_output = tools["qlab_edit_control_cues"].outputSchema
 
     assert update_schema["required"] == ["workspace_id", "updates"]
     assert set(update_properties) == {"workspace_id", "updates", "dry_run"}
     assert update_properties["updates"]["minItems"] == 1
     assert update_properties["updates"]["maxItems"] == 50
-    assert update_items["required"] == ["cue_ref"]
-    assert set(update_item_properties) == {"cue_ref", "profile", "properties", "operations", "confirm_gates"}
-    assert "enum" not in update_item_properties["profile"]
+    assert update_items["required"] == ["cue_id", "properties"]
+    assert set(update_item_properties) == {"cue_id", "properties", "confirm_gates"}
+    assert "profile" not in update_item_properties
+    assert "qlab_edit_cues" not in tools
+    assert not hasattr(server_module, "qlab_edit_cues")
     assert update_output["required"] == [
         "ok",
         "status",
@@ -1333,12 +1563,12 @@ def test_edit_cues_fastmcp_schema_keeps_batch_contract() -> None:
     assert "updateq_plan" in update_output["properties"]["results"]["items"]["properties"]
 
 
-def test_qlab_edit_cues_fastmcp_response_keeps_fade_basic_token(monkeypatch) -> None:
-    token = "confirm:fadeBasic:v1:test-payload:test-signature"
+def test_qlab_edit_fade_cues_fastmcp_response_keeps_fade_basic_token(monkeypatch) -> None:
+    token = "confirm:controlCue:v1:test-payload:test-signature"
     calls = []
 
     class FakeReader:
-        def edit_cues(self, workspace_id, updates, dry_run):
+        def edit_result(self, workspace_id, updates, dry_run):
             calls.append((workspace_id, updates, dry_run))
             assert workspace_id == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
             assert dry_run is True
@@ -1383,16 +1613,22 @@ def test_qlab_edit_cues_fastmcp_response_keeps_fade_basic_token(monkeypatch) -> 
 
     monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
 
+    monkeypatch.setattr(server_module, "edit_remaining_cues", lambda reader, ws, updates, dry, **kwargs:
+        reader.edit_result(workspace_id=ws, updates=[{
+            "cue_ref": str(item.cue_id), "profile": "fade_basic",
+            "properties": item.properties.model_dump(by_alias=True, exclude_unset=True),
+            "operations": None, "confirm_gates": None,
+        } for item in updates], dry_run=dry))
+
     async def call_tool():
         async with Client(mcp) as client:
             return await client.call_tool(
-                "qlab_edit_cues",
+                "qlab_edit_fade_cues",
                 {
                     "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
                     "updates": [
                         {
-                            "cue_ref": "11111111-1111-4111-8111-111111111111",
-                            "profile": "fade_basic",
+                            "cue_id": "11111111-1111-4111-8111-111111111111",
                             "properties": {"name": "Renamed Fade"},
                         }
                     ],
@@ -1408,21 +1644,20 @@ def test_qlab_edit_cues_fastmcp_response_keeps_fade_basic_token(monkeypatch) -> 
     assert result.structured_content["dry_run"] is True
     assert result.structured_content["planned_count"] == 1
     assert result.structured_content["updated_count"] == 0
-    assert planned[0]["confirm_token"].startswith("confirm:fadeBasic:v1:")
+    assert planned[0]["confirm_token"].startswith("confirm:controlCue:v1:")
     assert result.structured_content["results"][0]["executed_operations"] == []
 
 
-def test_qlab_edit_cues_fastmcp_response_keeps_structured_group_failure(monkeypatch) -> None:
+def test_qlab_edit_group_cues_fastmcp_response_keeps_structured_group_failure(monkeypatch) -> None:
     workspace_uuid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     cue_id = "11111111-1111-4111-8111-111111111111"
     update = {
-        "cue_ref": cue_id,
-        "profile": "group_basic",
+        "cue_id": cue_id,
         "properties": {"mode": 6},
     }
 
     class FakeReader:
-        def edit_cues(self, *, workspace_id: str, updates, dry_run):
+        def edit_result(self, *, workspace_id: str, updates, dry_run):
             assert workspace_id == workspace_uuid
             assert dry_run is False
             assert updates[0]["properties"] == {"mode": 6}
@@ -1464,10 +1699,17 @@ def test_qlab_edit_cues_fastmcp_response_keeps_structured_group_failure(monkeypa
 
     monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
 
+    monkeypatch.setattr(server_module, "edit_group_cues", lambda reader, ws, updates, dry:
+        reader.edit_result(workspace_id=ws, updates=[{
+            "cue_ref": str(item.cue_id), "profile": "group_basic",
+            "properties": item.properties.model_dump(by_alias=True, exclude_unset=True),
+            "operations": None, "confirm_gates": None,
+        } for item in updates], dry_run=dry))
+
     async def call_tool():
         async with Client(mcp) as client:
             return await client.call_tool(
-                "qlab_edit_cues",
+                "qlab_edit_group_cues",
                 {"workspace_id": workspace_uuid, "updates": [update], "dry_run": False},
             )
 
@@ -1490,6 +1732,31 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
     assert set(tools) == {
+        "qlab_get_fonts",
+        "qlab_analyze_audio_file",
+        "qlab_search_media_files",
+        "qlab_get_video_effect_catalogue",
+        "qlab_get_workspace_document",
+        "qlab_open_workspace",
+        "qlab_save_workspace",
+        "qlab_close_workspace",
+        "qlab_edit_audio_cues",
+        "qlab_edit_mic_cues",
+        "qlab_edit_light_cues",
+        "qlab_edit_fade_cues",
+        "qlab_edit_network_cues",
+        "qlab_edit_midi_cues",
+        "qlab_edit_midi_file_cues",
+        "qlab_edit_timecode_cues",
+        "qlab_edit_script_cues",
+
+        "qlab_edit_video_cues",
+        "qlab_edit_camera_cues",
+        "qlab_edit_text_cues",
+        "qlab_edit_control_cues",
+        "qlab_edit_group_cues",
+        "qlab_edit_devamp_cues",
+        "qlab_edit_target_cues",
         "qlab_get_fade_cue_details",
         "qlab_get_fade_cues",
         "qlab_get_midi_cue_details",
@@ -1527,6 +1794,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_get_workspace_video_settings",
         "qlab_get_video_stage",
         "qlab_get_video_output_route",
+        "qlab_get_video_region",
         "qlab_get_workspace_light_settings",
         "qlab_get_workspace_network_settings",
         "qlab_get_workspace_midi_settings",
@@ -1534,9 +1802,15 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_get_cue_details",
         "qlab_check_write_readiness",
         "qlab_create_cues",
-        "qlab_edit_cues",
-        "qlab_edit_workspace_settings",
+        "qlab_create_cue_lists",
+        "qlab_edit_cue_lists",
+        "qlab_edit_workspace_general_settings",
+        "qlab_edit_audio_output_patch",
+        "qlab_edit_video_output_route",
+        "qlab_edit_video_stage",
+        "qlab_edit_video_region",
         "qlab_move_cues",
+        "qlab_move_cue_lists",
         "qlab_delete_cues",
     }
 
@@ -1720,14 +1994,9 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "destination" in create.outputSchema["properties"]
     assert "results" in create.outputSchema["properties"]
 
-    edit = tools["qlab_edit_cues"]
-    assert edit.title == "Edit QLab Cues"
-    assert "Dry-run planning" in edit.description
-    assert "batch-edit" in edit.meta["fastmcp"]["tags"]
-
-    edit = tools["qlab_edit_cues"]
-    assert edit.title == "Edit QLab Cues"
-    assert "Dry-run planning" in edit.description
+    edit = tools["qlab_edit_control_cues"]
+    assert edit.title == "Edit QLab Control Cues"
+    assert "Tokens expire after five minutes" in edit.description
     assert "batch-edit" in edit.meta["fastmcp"]["tags"]
     assert edit.annotations.readOnlyHint is False
     assert edit.annotations.destructiveHint is True
@@ -1738,10 +2007,8 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert edit.inputSchema["properties"]["updates"]["minItems"] == 1
     assert edit.inputSchema["properties"]["updates"]["maxItems"] == 50
     edit_item = edit.inputSchema["properties"]["updates"]["items"]["properties"]
-    assert edit_item["cue_ref"]["minLength"] == 1
-    assert "Ambiguous refs" in edit_item["cue_ref"]["description"]
-    assert "qlab_get_cue_details" in edit_item["profile"]["description"]
-    assert "enum" not in edit_item["profile"]
+    assert edit_item["cue_id"]["format"] == "uuid"
+    assert "profile" not in edit_item
     assert "updated_with_confirmed_timeouts" in edit.outputSchema["properties"]["status"]["enum"]
     assert "workspace_not_found" in edit.outputSchema["properties"]["status"]["enum"]
     assert "workspace_ambiguous" in edit.outputSchema["properties"]["status"]["enum"]
@@ -1766,7 +2033,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert delete.annotations.idempotentHint is False
     delete_cue_ids_schema = delete.inputSchema["properties"]["cue_ids"]["anyOf"][0]
     assert delete_cue_ids_schema["minItems"] == 0
-    assert delete_cue_ids_schema["maxItems"] == 10
+    assert delete_cue_ids_schema["maxItems"] == 50
     assert delete_cue_ids_schema["items"]["format"] == "uuid"
     assert "container_id" in delete.inputSchema["properties"]
     assert "recursive" in delete.inputSchema["properties"]
@@ -1781,18 +2048,20 @@ def test_workspace_settings_tool_schema_and_annotations_are_conservative() -> No
         async with Client(mcp) as client:
             return await client.list_tools()
 
-    tool = next(tool for tool in asyncio.run(list_tools()) if tool.name == "qlab_edit_workspace_settings")
+    tool = next(tool for tool in asyncio.run(list_tools()) if tool.name == "qlab_edit_workspace_general_settings")
     schema = tool.inputSchema
     assert schema["properties"]["workspace_id"]["format"] == "uuid"
     operation_schema = schema["properties"]["operation"]
-    assert operation_schema["properties"]["kind"]["const"] == "general.minGoTime"
-    value_schema = operation_schema["properties"]["value"]
+    assert len(operation_schema["anyOf"]) == 2
+    numeric_operation = operation_schema["anyOf"][0]
+    assert numeric_operation["properties"]["kind"]["const"] == "general.minGoTime"
+    value_schema = numeric_operation["properties"]["value"]
     assert value_schema["anyOf"][0]["type"] == "integer"
     assert value_schema["anyOf"][1]["type"] == "number"
     assert value_schema["minimum"] == 0
     assert set(schema["properties"]) == {"workspace_id", "operation", "dry_run", "confirm_token"}
     assert "oneOf" not in schema["properties"]["operation"]
-    assert "selectionIsPlayhead" not in json.dumps(schema)
+    assert "selectionIsPlayhead" in json.dumps(schema)
     assert tool.annotations.readOnlyHint is False
     assert tool.annotations.destructiveHint is True
     assert tool.annotations.idempotentHint is False
@@ -1820,7 +2089,7 @@ def test_general_settings_tool_rejects_coercible_non_numeric_values_before_handl
     async def call_tool():
         async with Client(mcp) as client:
             return await client.call_tool(
-                "qlab_edit_workspace_settings",
+                "qlab_edit_workspace_general_settings",
                 {
                     "workspace_id": "11111111-1111-4111-8111-111111111111",
                     "operation": {"kind": "general.minGoTime", "value": value},
@@ -1828,7 +2097,7 @@ def test_general_settings_tool_rejects_coercible_non_numeric_values_before_handl
                 },
             )
 
-    with pytest.raises(ToolError, match=r"validation error(?:s)? for call\[qlab_edit_workspace_settings\]"):
+    with pytest.raises(ToolError, match=r"validation error(?:s)? for call\[qlab_edit_workspace_general_settings\]"):
         asyncio.run(call_tool())
     assert called is False
 
@@ -1849,15 +2118,15 @@ def test_workspace_settings_tool_rejects_non_enabled_operation_before_handler(
     async def call_tool():
         async with Client(mcp) as client:
             return await client.call_tool(
-                "qlab_edit_workspace_settings",
+                "qlab_edit_workspace_general_settings",
                 {
                     "workspace_id": "11111111-1111-4111-8111-111111111111",
-                    "operation": {"kind": "general.selectionIsPlayhead", "value": True},
+                    "operation": {"kind": "general.unknown", "value": True},
                     "dry_run": True,
                 },
             )
 
-    with pytest.raises(ToolError, match=r"validation error(?:s)? for call\[qlab_edit_workspace_settings\]"):
+    with pytest.raises(ToolError, match=r"validation error(?:s)? for call\[qlab_edit_workspace_general_settings\]"):
         asyncio.run(call_tool())
     assert called is False
 
@@ -1887,7 +2156,7 @@ def test_workspace_settings_tool_rejects_non_canonical_uuid_before_handler(
     async def call_tool():
         async with Client(mcp) as client:
             return await client.call_tool(
-                "qlab_edit_workspace_settings",
+                "qlab_edit_workspace_general_settings",
                 {
                     "workspace_id": workspace_id,
                     "operation": {"kind": "general.minGoTime", "value": 0.4},
@@ -1895,7 +2164,7 @@ def test_workspace_settings_tool_rejects_non_canonical_uuid_before_handler(
                 },
             )
 
-    with pytest.raises(ToolError, match=r"validation error(?:s)? for call\[qlab_edit_workspace_settings\]"):
+    with pytest.raises(ToolError, match=r"validation error(?:s)? for call\[qlab_edit_workspace_general_settings\]"):
         asyncio.run(call_tool())
     assert called is False
 
@@ -1934,7 +2203,7 @@ def test_workspace_settings_tool_forwards_typed_request_to_reader(monkeypatch: p
             return None
 
     monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
-    result = server_module.qlab_edit_workspace_settings(
+    result = server_module.qlab_edit_workspace_general_settings(
         UUID("11111111-1111-4111-8111-111111111111"),
         {"kind": "general.minGoTime", "value": 0.4},
         True,
@@ -1992,8 +2261,8 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
                 "qlab_get_cue_details",
                 "qlab_check_write_readiness",
                 "qlab_create_cues",
-                "qlab_edit_cues",
-            )
+                "qlab_edit_control_cues",
+                    )
         }
 
     assert mcp._mask_error_details is True
@@ -2011,7 +2280,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
         "qlab_get_cue_details": CUE_DETAILS_TIMEOUT,
         "qlab_check_write_readiness": WRITE_READINESS_TIMEOUT,
         "qlab_create_cues": CREATE_CUES_TIMEOUT,
-        "qlab_edit_cues": UPDATE_CUES_TIMEOUT,
+        "qlab_edit_control_cues": UPDATE_CUES_TIMEOUT,
     }
 
 
@@ -2075,7 +2344,7 @@ def test_write_tool_wrappers_do_not_pass_outer_reader_deadlines(monkeypatch) -> 
 
     monkeypatch.setattr(server_module, "_run_tool", capture)
 
-    assert server_module.qlab_edit_cues("ws-1", [], dry_run=True) == "ok"
+    assert server_module.qlab_edit_control_cues("00000000-0000-0000-0000-000000000001", [], dry_run=True) == "ok"
     assert server_module.qlab_move_cues("ws-1", [], dry_run=True) == "ok"
     assert server_module.qlab_delete_cues("ws-1", [], dry_run=True) == "ok"
     assert calls == [{}, {}, {}]
@@ -2566,3 +2835,67 @@ def test_query_public_tool_preserves_completeness_fields(monkeypatch) -> None:
     assert payload["omitted_branches"][0]["number"] == "TEKNO"
     assert payload["partial_branches"][0]["child_count"] == 545
     assert "metadata available" in payload["warnings"][0]
+
+
+def test_move_delete_capture_records_full_mcp_envelopes_and_redacts_secrets(monkeypatch):
+    import runpy
+
+    capture = runpy.run_path(str(PROJECT_ROOT / "scripts" / "capture_move_delete.py"))
+    root_id = "22222222-2222-4222-8222-222222222222"
+    secret = "confirm:deleteCues:v1:private:signature"
+
+    class FakeReader:
+        def delete_cues(self, **kwargs):
+            assert kwargs["delete_container"] is True
+            assert kwargs["cue_ids"] is None
+            assert kwargs["recursive"] is True
+            return dict(ok=False, status="partial_failed", workspace_id=kwargs["workspace_id"],
+                dry_run=False, requested_count=1, planned_count=2, deleted_count=1, failed_count=1,
+                results=[{"cue_id": root_id, "status": "partial_failed"}],
+                pending_cue_ids=[root_id], uncertain_cue_ids=[], delete_container=True,
+                container_id=root_id, recursive=True, preserved_container_id=None,
+                message="synthetic failure", confirm_token=secret,
+                errors={"test": f"synthetic error {secret}"})
+
+    monkeypatch.setattr(server_module, "_reader", lambda: FakeReader())
+    request = {"tool": "qlab_delete_cues", "arguments": {
+        "workspace_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "container_id": root_id,
+        "recursive": True, "delete_container": True, "dry_run": False, "confirm_token": secret}}
+
+    async def calls():
+        async with Client(mcp) as client:
+            tools = {tool.name: tool for tool in await client.list_tools()}
+            assert len(tools) == 79
+            assert tools["qlab_delete_cues"].inputSchema["properties"]["delete_container"]["default"] is False
+            for name in ("qlab_move_cues", "qlab_delete_cues"):
+                assert {"pending_cue_ids", "uncertain_cue_ids"} <= tools[name].outputSchema["properties"].keys()
+            result = await capture["capture_call"](client, request)
+            request["arguments"]["container_id"] = "invalid uuid"
+            error = await capture["capture_call"](client, request)
+        return result, error
+
+    result, error = asyncio.run(calls())
+    envelope = result["response"]
+    assert envelope["isError"] is False  # application partial failure is structured
+    assert envelope["content"] and envelope["structuredContent"]["pending_cue_ids"] == [root_id]
+    assert envelope["structuredContent"]["delete_container"] is True
+    assert envelope["structuredContent"]["preserved_container_id"] is None
+    assert error["response"]["isError"] is True
+    assert error["response"]["content"]
+    assert secret not in json.dumps([result, error])
+    assert "[redacted]" in json.dumps(result)
+    assert capture["redact"]({"passcode": "secret", "notes": "private", "fileTarget": "/private/media"}) == {
+        "passcode": "[redacted]", "notes": "[redacted]", "fileTarget": "[redacted]"}
+
+
+def test_move_delete_capture_preserves_transport_exception():
+    import runpy
+    capture = runpy.run_path(str(PROJECT_ROOT / "scripts" / "capture_move_delete.py"))
+
+    class BrokenClient:
+        async def call_tool_mcp(self, *a):
+            raise OscTimeoutError("synthetic transport timeout")
+
+    result = asyncio.run(capture["capture_call"](BrokenClient(), {"tool": "qlab_move_cues", "arguments": {}}))
+    assert result["response"]["exception_type"] == "OscTimeoutError"
+    assert result["response"]["error"] == "synthetic transport timeout"

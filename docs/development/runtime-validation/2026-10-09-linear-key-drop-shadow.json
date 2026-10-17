@@ -1,0 +1,59 @@
+{
+  "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+  "qlab_version": "5.5.10",
+  "user_created_instances": true,
+  "ui_writes_by_agent": false,
+  "no_playback": true,
+  "tests": [
+    {
+      "type": "LinearKey",
+      "key": "inputCutoff",
+      "before": 3,
+      "requested": 2.5,
+      "value": 2.5,
+      "ok": true,
+      "status": "updated",
+      "setter_count": 1,
+      "restored": {
+        "value": 3,
+        "status": "updated",
+        "setter_count": 1
+      }
+    },
+    {
+      "type": "DropShadow",
+      "key": "Distance",
+      "before": 0,
+      "requested": 25,
+      "value": 25,
+      "ok": true,
+      "status": "updated",
+      "setter_count": 1,
+      "restored": {
+        "value": 0,
+        "status": "updated",
+        "setter_count": 1
+      }
+    }
+  ],
+  "ui_observed": {
+    "LinearKey": {
+      "name": "LinearKey",
+      "inputCutoff": 2.5,
+      "inputContrast": 4.7,
+      "key_color": "Green"
+    },
+    "DropShadow": {
+      "name": "DropShadow",
+      "Distance": 25,
+      "color_key": "Color",
+      "Color": [
+        0.2,
+        0.3,
+        0.4,
+        1
+      ]
+    }
+  },
+  "color_evidence": "2026-10-09-linear-key-drop-shadow-color.json"
+}

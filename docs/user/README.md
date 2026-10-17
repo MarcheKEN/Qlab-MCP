@@ -1,20 +1,24 @@
 # User Guide
 
-QLab MCP 0.3.0 inspects QLab 5 and provides narrowly gated structural writes.
+QLab MCP 0.4.0 inspects QLab 5 and provides gated cue, settings and local
+document changes.
 It does not expose playback or raw OSC.
 
 ## Start
 
 ```bash
-uv sync --no-editable --python 3.11 --extra dev
-uv run qlab-mcp
+uv sync --locked --no-editable --python 3.11 --extra dev
+.venv/bin/python -m qlab_mcp.server
 ```
 
 Inspect the MCP contract without connecting to QLab:
 
 ```bash
-uv run fastmcp inspect fastmcp.json
+uv run --locked --no-editable --extra dev fastmcp inspect fastmcp.json --skip-env
 ```
+
+For client configuration, timeouts, optional media dependencies and startup
+failures, use [Setup and troubleshooting](setup-and-troubleshooting.md).
 
 ## Safe orientation
 
@@ -29,6 +33,15 @@ uv run fastmcp inspect fastmcp.json
 Use compact profiles for normal work. Technical, sensitive, and exhaustive
 profiles can expose larger or more sensitive show data.
 
+For reviewing dependencies, planning a scene, renumbering, copying selected
+properties or calculating relative changes, follow
+[Workspace review and authoring](workspace-authoring.md). Reviews stay read-only
+unless the user authorizes the changes. A project skill links to the same guide;
+it is not installed by the Python package.
+
+For document lifecycle, use the local inventory and gated open/save/clean-close
+tools only after reviewing the [workspace document workflow](agent-workflows.md#workspace-documents).
+
 ## Writes
 
 Writes default to dry-run. The complete multi-tool sequences and good/invalid
@@ -37,19 +50,21 @@ examples live in the [agent workflow guide](agent-workflows.md).
 ### Preflight
 
 Use `qlab_check_write_readiness` before every real Create, Edit, Move, Delete,
-or Workspace Settings write.
+or Workspace Settings write to an existing workspace. Document opening instead
+uses its own empty-inventory native preflight and document token.
 It is a read-only preflight, not a confirmation token.
 
 ### Create
 
-Use [`qlab_create_cues`](agent-workflows.md#create-cues) for one to 50 ordered
+Use [`qlab_create_cues`](agent-workflows.md#create-cues) for one to 100 ordered
 template-backed cues in an exact Cue List, Group, or empty Cue Cart. Creation verifies structure and placement;
 it does not configure initial setters or claim GO readiness.
 
 ### Edit
 
-[`qlab_edit_cues`](agent-workflows.md#edit-existing-cues) resolves exact cues
-and uses per-operation confirmation gates. Batches are non-atomic.
+Family-specific cue editors resolve exact UUIDs and apply typed saved properties
+with signed per-operation confirmation. See [cue editing](agent-workflows.md#edit-existing-cues).
+The public generic editor has been removed.
 
 ### Move
 
@@ -59,8 +74,9 @@ one placement form, sequential execution, and fresh parent/order readback.
 ### Delete
 
 [`qlab_delete_cues`](agent-workflows.md#delete-cues) deletes explicit leaves,
-one exact empty Group, or empties one container deepest-first while preserving
-its root.
+one exact empty Group, or empties one container deepest-first. Recursive mode
+preserves its root by default; `delete_container=true` can explicitly remove a
+Group root after its descendants. Cue List/Cart root deletion remains blocked.
 
 ## Evidence boundary
 
@@ -75,4 +91,4 @@ planned structure
 See the [public tool catalogue](tools.md),
 [security policy](../../SECURITY.md), and
 [Create checklist](../development/runtime-validation/create-cues.md) and
-[Edit checklist](../development/runtime-validation/edit-cues.md).
+[Cue editor runtime checklist](../development/runtime-validation/edit-cues.md).

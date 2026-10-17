@@ -1,9 +1,9 @@
 [project]
 name = "qlab-mcp"
-version = "0.3.0"
+version = "0.4.0"
 license = "MIT"
 license-files = ["LICENSE", "NOTICE"]
-description = "FastMCP server for QLab 5 inspection and gated cue creation, editing, movement, and leaf deletion over OSC."
+description = "FastMCP server for QLab 5 inspection and gated cue and workspace-settings writes over OSC."
 requires-python = ">=3.11"
 dependencies = [
     "fastmcp>=3.3,<4",
@@ -11,6 +11,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+audio = [
+    "numpy>=1.26,<3",
+    "librosa>=0.11,<0.12",
+]
 dev = [
     "pytest>=8.0",
 ]

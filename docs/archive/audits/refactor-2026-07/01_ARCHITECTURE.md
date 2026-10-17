@@ -1,5 +1,11 @@
 # 01 — Real Architecture
 
+> Historical evidence or dated plan. Use the [current tools](../../../user/tools.md) and
+> [roadmap](../../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 ## Verdict
 
 The read side is layered, bounded, and understandable. The write safety policy is strong, but the edit implementation is no longer an economical extension point: `write/operations.py` is 12,063 lines and its central `update_cues()` spans lines 695–2718 before another 9,000+ lines of family-specific helpers.

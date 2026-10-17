@@ -1,8 +1,14 @@
 # Workspace Settings Write Foundation + `minGoTime` Implementation Plan
 
-> Superseded plan. The implemented public contract is now
-> `qlab_edit_workspace_settings`; this dated plan retains the original
-> branch-local name and Wave 1 design history.
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
+> Superseded plan. Both the original branch-local name and later generic
+> `qlab_edit_workspace_settings` are retired. Current public settings edits use
+> the five scoped General/Audio/Video editors; this record retains Wave 1 history.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 

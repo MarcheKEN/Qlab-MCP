@@ -7,7 +7,7 @@ import struct
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BeforeValidator, BaseModel, ConfigDict, Field, JsonValue, StrictFloat, StrictInt, field_validator
+from pydantic import BeforeValidator, BaseModel, ConfigDict, Field, JsonValue, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator, model_validator
 from typing_extensions import TypedDict
 
 
@@ -87,7 +87,7 @@ UpdateCuesStatus = Literal[
     "workspace_ambiguous",
     "workspace_unavailable",
 ]
-WorkspaceSettingsOperationId = Literal["general.minGoTime"]
+WorkspaceSettingsOperationId = str
 WorkspaceSettingsWriteStatus = Literal[
     "dry_run",
     "dry_run_preflight_failed",
@@ -134,10 +134,11 @@ def _canonical_workspace_uuid(value: object) -> object:
 
 
 CanonicalWorkspaceUUID = Annotated[UUID, BeforeValidator(_canonical_workspace_uuid)]
+OSCInt = Annotated[StrictInt, Field(ge=-2_147_483_648, le=2_147_483_647)]
 
 
 class GeneralMinGoTimeOperation(BaseModel):
-    """The only executable Workspace Settings operation in Wave 1."""
+    """Minimum GO time for the existing internal Workspace Settings writer."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -164,6 +165,106 @@ class GeneralMinGoTimeOperation(BaseModel):
 # in FastMCP's JSON Schema. Add the next typed operation and promote this alias
 # to an Annotated discriminated union in that operation's implementation wave.
 WorkspaceSettingsOperation = GeneralMinGoTimeOperation
+
+
+class AudioBoolOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["mute", "solo"]
+    value: StrictBool
+    output_channel: Annotated[StrictInt, Field(ge=1, le=128)]
+
+
+class VideoRouteGuidesOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["enableGuides"]
+    value: StrictBool
+
+
+class VideoRegionBoolOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["enableGrid", "enableGuide"]
+    value: StrictBool
+
+
+class SettingNameOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["name"]
+    value: Annotated[str, Field(min_length=1, max_length=255)]
+
+
+class AudioCueOutputsOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["cueOutputChannels"]
+    value: Annotated[StrictInt, Field(ge=1, le=128)]
+
+
+class AudioLevelOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["level"]
+    input_channel: Annotated[StrictInt, Field(ge=0, le=128)]
+    output_channel: Annotated[StrictInt, Field(ge=0, le=128)]
+    value: StrictInt | StrictFloat | Literal["-inf"]
+
+    @field_validator("value")
+    @classmethod
+    def finite_level(cls, value: int | float | str) -> int | float | str:
+        if value != "-inf":
+            try:
+                struct.pack(">i" if isinstance(value, int) else ">f", value)
+            except (OverflowError, struct.error):
+                raise ValueError("level must fit an OSC int32 or float32") from None
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ValueError("level must be finite or the literal -inf")
+        return value
+
+
+class AudioClearOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["muteClear", "soloClear"]
+
+
+class VideoBoundsOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["bounds", "origin", "size", "controlPoint"]
+    x: OSCInt | None = None
+    y: OSCInt | None = None
+    width: OSCInt | None = None
+    height: OSCInt | None = None
+    subregion_index: Annotated[StrictInt, Field(ge=0)] | None = None
+    control_point_index: Annotated[StrictInt, Field(ge=0)] | None = None
+
+    @model_validator(mode="after")
+    def exactly_one_geometry_operation(self) -> "VideoBoundsOperation":
+        required = {
+            "bounds": {"x", "y", "width", "height"},
+            "origin": {"x", "y"},
+            "size": {"width", "height"},
+            "controlPoint": {"x", "y", "subregion_index", "control_point_index"},
+        }[self.kind]
+        provided = {key for key in ("x", "y", "width", "height", "subregion_index", "control_point_index")
+                    if getattr(self, key) is not None}
+        if provided != required:
+            raise ValueError(f"{self.kind} requires exactly {', '.join(sorted(required))}")
+        return self
+
+
+class VideoComponentOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["x", "y", "width", "height"]
+    value: OSCInt
+
+
+class GeneralSelectionOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["general.selectionIsPlayhead"]
+    value: StrictBool
+
+
+GeneralSettingsOperation = GeneralMinGoTimeOperation | GeneralSelectionOperation
+AudioOutputPatchOperation = AudioCueOutputsOperation | AudioLevelOperation | AudioBoolOperation | AudioClearOperation | SettingNameOperation
+VideoRouteOperation = VideoRouteGuidesOperation
+VideoStageOperation = SettingNameOperation
+VideoRegionOperation = VideoBoundsOperation | VideoComponentOperation | VideoRegionBoolOperation
 
 
 class QlabConnectionCheckResult(BaseModel):
@@ -259,6 +360,7 @@ class WorkspaceDomainSettingsResult(BaseModel):
 class WorkspaceGeneralSettingsData(BaseModel):
     minGoTime: Annotated[StrictInt | StrictFloat, Field(ge=0, allow_inf_nan=False)] | None = None
     selectionIsPlayhead: bool | None = None
+    editable_operations: list[str] = Field(default_factory=lambda: ["general.minGoTime", "general.selectionIsPlayhead"])
 
 
 class SettingsInventoryEmpty(BaseModel):
@@ -273,8 +375,8 @@ class AudioOutputChannelName(BaseModel):
 
 
 class AudioPatchLevel(BaseModel):
-    input_channel: Annotated[StrictInt, Field(ge=1, le=128)]
-    output_channel: Annotated[StrictInt, Field(ge=1)]
+    input_channel: Annotated[StrictInt, Field(ge=0, le=128)]
+    output_channel: Annotated[StrictInt, Field(ge=0)]
     decibels: Annotated[StrictInt | StrictFloat, Field(allow_inf_nan=False)] | Literal["-inf"]
 
 
@@ -290,9 +392,14 @@ class AudioPatchSummary(SettingsItemIdentity):
 
 
 class AudioOutputPatchDetail(AudioPatchSummary):
+    # Required so the detail union cannot parse an input patch as an output patch.
+    name_property: str | None
     mute_channels: list[Annotated[StrictInt, Field(ge=1)]] = Field(default_factory=list)
     solo_channels: list[Annotated[StrictInt, Field(ge=1)]] = Field(default_factory=list)
     level: AudioPatchLevel | None = None
+    editable_operations: list[str] = Field(default_factory=lambda: [
+        "name", "cueOutputChannels", "level", "mute", "solo", "muteClear", "soloClear",
+    ])
 
 
 class AudioInputPatchDetail(AudioPatchSummary):
@@ -354,6 +461,7 @@ class VideoRouteSummary(VideoItemSummary):
     rear: bool | None = None
     guides_present: bool | None = None
     attention: VideoRouteAttention | None = None
+    editable_operations: list[str] = Field(default_factory=lambda: ["enableGuides"])
 
 
 class VideoRegionSummary(VideoItemSummary):
@@ -383,6 +491,7 @@ class VideoStageSummary(VideoItemSummary):
 class VideoStageDetail(VideoStageSummary):
     regions: list[VideoRegionSummary] | None = None
     multi_output: bool | None = None
+    editable_operations: list[str] = Field(default_factory=lambda: ["name"])
 
 
 class VideoInputPatchSummary(VideoItemSummary):
@@ -414,6 +523,22 @@ class VideoStageData(BaseModel):
 class VideoOutputRouteData(BaseModel):
     detail: VideoRouteSummary | None = None
     technical_payload: JsonValue | None = None
+
+
+class VideoRegionData(BaseModel):
+    detail: VideoRegionSummary | None = None
+    bounds: VideoBounds | None = None
+    enableGrid: bool | None = None
+    enableGuide: bool | None = None
+    control_point: JsonValue | None = None
+    editable_operations: list[str] = Field(default_factory=lambda: [
+        "bounds", "origin", "size", "x", "y", "width", "height", "controlPoint", "enableGrid", "enableGuide",
+    ])
+
+
+class VideoRegionResult(WorkspaceDomainSettingsResult):
+    domain: Literal["video"] = "video"
+    data: VideoRegionData | None = None
 
 
 class LightPatchSummary(BaseModel):
@@ -573,9 +698,9 @@ class WorkspaceSettingsEditResult(BaseModel):
     workspace_id: str
     operation: WorkspaceSettingsOperationId
     dry_run: bool
-    requested_value: int | float
-    baseline: int | float | None = None
-    readback: int | float | None = None
+    requested_value: JsonValue | None = None
+    baseline: JsonValue | None = None
+    readback: JsonValue | None = None
     planned_operations: list[dict[str, Any]] = Field(default_factory=list)
     executed_operations: list[dict[str, Any]] = Field(default_factory=list)
     confirm_token: str | None = None
@@ -935,6 +1060,9 @@ class CreateCuesResult(BaseModel):
         ),
     )
     created_count: int = 0
+    pending_indices: list[StrictInt] = Field(default_factory=list, description="Zero-based requested item indices not attempted before the batch stopped.")
+    uncertain_indices: list[StrictInt] = Field(default_factory=list, description="Zero-based indices whose /new may have been sent but creation was not verified.")
+    batch_verified: bool = Field(default=False, description="True only after the complete final batch structure and inactive state are verified.")
     destination: CreateCuesDestination | None = None
     results: list[CreateCuesItemResult] = Field(default_factory=list)
     planned_operations: list[dict[str, Any]] = Field(default_factory=list)
@@ -948,6 +1076,68 @@ class CreateCuesResult(BaseModel):
     errors: dict[str, str] | None = None
     warnings: list[str] = Field(default_factory=list)
     message: str
+
+
+class CreateCueListItemResult(BaseModel):
+    index: StrictInt
+    container_type: Literal["cue_list", "cue_cart"]
+    created_cue_list_id: str | None = None
+    qlab_type: str | None = None
+    status: Literal["planned", "created", "failed", "verification_failed"]
+    verified: bool = False
+    errors: dict[str, str] | None = None
+
+
+class CreateCueListsResult(BaseModel):
+    ok: bool
+    status: Literal["dry_run", "created", "preflight_failed", "partial_failed", "verification_failed"]
+    workspace_id: str
+    dry_run: bool
+    requested_count: int
+    planned_count: int = 0
+    created_count: int = 0
+    pending_indices: list[StrictInt] = Field(default_factory=list)
+    uncertain_indices: list[StrictInt] = Field(default_factory=list)
+    batch_verified: bool = False
+    results: list[CreateCueListItemResult] = Field(default_factory=list)
+    planned_operations: list[dict[str, Any]] = Field(default_factory=list)
+    executed_operations: list[dict[str, Any]] = Field(default_factory=list)
+    confirm_token: str | None = None
+    errors: dict[str, str] | None = None
+    warnings: list[str] = Field(default_factory=list)
+    message: str
+
+
+class CueListEditProperties(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = None
+    number: str | None = None
+    notes: str | None = None
+    armed: bool | None = None
+    flagged: bool | None = None
+    color_name: str | None = None
+    second_color_name: str | None = None
+    use_second_color: bool | None = None
+    auto_load: bool | None = None
+    skip_if_disarmed: bool | None = None
+    timecode_sync_mode: Literal["mtc", "ltc"] | None = None
+    smpte_format: Literal["24_fps", "25_fps", "30_fps_drop", "30_fps"] | None = None
+    start_behavior: Literal[
+        "ignore_earlier", "start_within_last_minute", "start_within_last_hour",
+        "start_within_lookback", "start_all_earlier",
+    ] | None = None
+    stop_behavior: Literal["do_nothing", "pause_triggered", "stop_triggered"] | None = None
+    freewheel_seconds: Annotated[float, Field(strict=True, ge=0, le=2)] | None = None
+    lookback_seconds: Annotated[float, Field(strict=True, ge=0)] | None = None
+
+
+class CueListEditInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cue_list_id: UUID
+    properties: CueListEditProperties
+    confirm_gates: list[StrictStr] = Field(default_factory=list)
 
 
 class UpdateCueResult(BaseModel):
@@ -1108,7 +1298,7 @@ DeleteCuesStatus = Literal[
 
 
 class DeleteCuesResult(BaseModel):
-    """Result for explicit leaves, one empty Group, or recursive container emptying."""
+    """Result for explicit leaves, empty Groups, or recursive deletion with an optional Group root."""
 
     ok: bool
     status: DeleteCuesStatus
@@ -1120,9 +1310,12 @@ class DeleteCuesResult(BaseModel):
     failed_count: int
     timeout_confirmed_count: int = 0
     results: list[dict[str, Any]] = Field(default_factory=list)
+    pending_cue_ids: list[str] = Field(default_factory=list)
+    uncertain_cue_ids: list[str] = Field(default_factory=list)
     confirm_token: str | None = None
     container_id: str | None = None
     recursive: bool = False
+    delete_container: bool = False
     preserved_container_id: str | None = None
     expanded_count: int = 0
     errors: dict[str, str] | None = None
@@ -1143,6 +1336,17 @@ MoveCueStatus = Literal[
     "rollback_failed",
     "preflight_failed",
 ]
+
+
+class MoveCueListInput(BaseModel):
+    """One root Cue List or Cue Cart placement in sidebar order."""
+
+    model_config = ConfigDict(extra="forbid")
+    cue_id: UUID = Field(description="Exact root Cue List or Cue Cart UUID.")
+    destination_index: StrictInt | None = Field(default=None, ge=0, description="Zero-based insertion index after removing the source; exactly one placement field.")
+    before_cue_id: UUID | None = Field(default=None, description="Root UUID to place before.")
+    after_cue_id: UUID | None = Field(default=None, description="Root UUID to place after.")
+    position: Literal["first", "last"] | None = None
 
 
 class MoveCueInput(BaseModel):
@@ -1194,6 +1398,8 @@ class MoveCuesResult(BaseModel):
     failed_count: int
     timeout_confirmed_count: int = 0
     results: list[dict[str, Any]] = Field(default_factory=list)
+    pending_cue_ids: list[str] = Field(default_factory=list)
+    uncertain_cue_ids: list[str] = Field(default_factory=list)
     confirm_token: str | None = None
     rollback: dict[str, Any] | None = None
     errors: dict[str, str] | None = None

@@ -1,0 +1,2217 @@
+{
+  "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+  "workspace_path": "<redacted-local-path-851cab375f>.qlab5",
+  "cue_id": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+  "qlab_version": "5.5.10",
+  "runtime": "source-loaded FastMCP Client(mcp), authenticated TCP; installed MCP requires restart",
+  "cases": [
+    {
+      "case": "fix_apply",
+      "plan_ok": true,
+      "operations": [],
+      "log": [
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 0
+        },
+        {
+          "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+          "raw_values": {
+            "timecodeSMPTEFormat": 3
+          },
+          "present": [
+            "timecodeSMPTEFormat"
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 0
+        },
+        {
+          "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+          "raw_values": {
+            "timecodeSMPTEFormat": 3
+          },
+          "present": [
+            "timecodeSMPTEFormat"
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 0
+        },
+        {
+          "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+          "raw_values": {
+            "timecodeSMPTEFormat": 3
+          },
+          "present": [
+            "timecodeSMPTEFormat"
+          ]
+        },
+        {
+          "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+          "raw_values": {
+            "timecodeSMPTEFormat": 3
+          },
+          "present": [
+            "timecodeSMPTEFormat"
+          ]
+        },
+        {
+          "error": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/70A6B610-7094-5939-A9FC-D7AAD7C3379C/valuesForKeys",
+          "message": "Timed out waiting for QLab TCP reply to /workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/70A6B610-7094-5939-A9FC-D7AAD7C3379C/valuesForKeys"
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "timecodeTrigger/text": {
+            "before": "1:00:00:00",
+            "requested": "1:02:03:04"
+          },
+          "crop": {
+            "before": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            },
+            "requested": {
+              "top": 12,
+              "bottom": 8,
+              "left": 16,
+              "right": 4
+            }
+          },
+          "preservePitch": {
+            "before": false,
+            "requested": true
+          }
+        }
+      ],
+      "ok": false,
+      "status": "preflight_failed",
+      "after": [
+        null
+      ],
+      "execution_errors": [
+        {
+          "timecodeTrigger/text": "Fresh cue identity could not be verified."
+        }
+      ]
+    },
+    {
+      "case": "fix_apply2",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "timecodeTrigger/text",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/timecodeTrigger/text",
+          "args": [
+            "1:02:03:04"
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "crop",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [
+            12,
+            8,
+            16,
+            4
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "preservePitch",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [
+            true
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "log": [
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 0
+        },
+        {
+          "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+          "raw_values": {
+            "timecodeSMPTEFormat": 3
+          },
+          "present": [
+            "timecodeSMPTEFormat"
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 0
+        },
+        {
+          "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+          "raw_values": {
+            "timecodeSMPTEFormat": 3
+          },
+          "present": [
+            "timecodeSMPTEFormat"
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 0
+        },
+        {
+          "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+          "raw_values": {
+            "timecodeSMPTEFormat": 3
+          },
+          "present": [
+            "timecodeSMPTEFormat"
+          ]
+        },
+        {
+          "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+          "raw_values": {
+            "timecodeSMPTEFormat": 3
+          },
+          "present": [
+            "timecodeSMPTEFormat"
+          ]
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/timecodeTrigger/text",
+          "args": [
+            "1:02:03:04"
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [
+            12,
+            8,
+            16,
+            4
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [
+            12,
+            8,
+            16,
+            4
+          ],
+          "data": null
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            12,
+            8,
+            16,
+            4
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 0
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [
+            true
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [
+            true
+          ],
+          "data": null
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 1
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "timecodeTrigger/text": {
+            "before": "1:00:00:00",
+            "requested": "1:02:03:04"
+          },
+          "crop": {
+            "before": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            },
+            "requested": {
+              "top": 12,
+              "bottom": 8,
+              "left": 16,
+              "right": 4
+            }
+          },
+          "preservePitch": {
+            "before": false,
+            "requested": true
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "timecodeTrigger/text": "1:02:03:04",
+          "crop": {
+            "top": 12,
+            "bottom": 8,
+            "left": 16,
+            "right": 4
+          },
+          "preservePitch": true
+        }
+      ]
+    },
+    {
+      "case": "geometry_apply",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "fillStage",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/fillStage",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "preserveAspectRatio",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preserveAspectRatio",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "scale",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/scale",
+          "args": [
+            1.25,
+            0.75
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "log": [
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/fillStage",
+          "args": [
+            false
+          ]
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preserveAspectRatio",
+          "args": [
+            false
+          ]
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/scale",
+          "args": [
+            1.25,
+            0.75
+          ]
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "fillStage": {
+            "before": true,
+            "requested": false
+          },
+          "preserveAspectRatio": {
+            "before": true,
+            "requested": false
+          },
+          "scale": {
+            "before": {
+              "x": 1,
+              "y": 1
+            },
+            "requested": {
+              "x": 1.25,
+              "y": 0.75
+            }
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "fillStage": false,
+          "preserveAspectRatio": false,
+          "scale": {
+            "x": 1.25,
+            "y": 0.75
+          }
+        }
+      ]
+    },
+    {
+      "case": "geometry_restore_result",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "fillStage",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/fillStage",
+          "args": [
+            true
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "scale",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/scale",
+          "args": [
+            1,
+            1
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "preserveAspectRatio",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preserveAspectRatio",
+          "args": [
+            true
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "log": [
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/fillStage",
+          "args": [
+            true
+          ]
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/scale",
+          "args": [
+            1,
+            1
+          ]
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preserveAspectRatio",
+          "args": [
+            true
+          ]
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "fillStage": {
+            "before": false,
+            "requested": true
+          },
+          "preserveAspectRatio": {
+            "before": false,
+            "requested": true
+          },
+          "scale": {
+            "before": {
+              "x": 1.25,
+              "y": 0.75
+            },
+            "requested": {
+              "x": 1,
+              "y": 1
+            }
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "fillStage": true,
+          "scale": {
+            "x": 1,
+            "y": 1
+          },
+          "preserveAspectRatio": true
+        }
+      ]
+    },
+    {
+      "case": "scale_component_apply",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "scale/x",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/scale/x",
+          "args": [
+            1.1
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "log": [
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/scale/x",
+          "args": [
+            1.1
+          ]
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "scale/x": {
+            "before": 1,
+            "requested": 1.1
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "scale/x": 1.100000023841858
+        }
+      ]
+    },
+    {
+      "case": "scale_component_restore",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "scale",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/scale",
+          "args": [
+            1,
+            1
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "log": [
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/scale",
+          "args": [
+            1,
+            1
+          ]
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "scale": {
+            "before": {
+              "x": 1.100000023841858,
+              "y": 1.100000023841858
+            },
+            "requested": {
+              "x": 1,
+              "y": 1
+            }
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "scale": {
+            "x": 1,
+            "y": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "mute_apply",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "mute/channel",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/mute/channel/2",
+          "args": [
+            true
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "log": [
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/mute/channel/2",
+          "args": [
+            true
+          ]
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "mute/channel": {
+            "before": {
+              "output": 2,
+              "value": false
+            },
+            "requested": {
+              "output": 2,
+              "value": true
+            }
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "mute/channel": {
+            "output": 2,
+            "value": true
+          }
+        }
+      ]
+    },
+    {
+      "case": "unmute_restore",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "mute/channel",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/mute/channel/2",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "log": [
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/mute/channel/2",
+          "args": [
+            false
+          ]
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "mute/channel": {
+            "before": {
+              "output": 2,
+              "value": true
+            },
+            "requested": {
+              "output": 2,
+              "value": false
+            }
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "mute/channel": {
+            "output": 2,
+            "value": false
+          }
+        }
+      ]
+    },
+    {
+      "case": "clear_setup",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "mute/channel",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/mute/channel/2",
+          "args": [
+            true
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "log": [
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/mute/channel/2",
+          "args": [
+            true
+          ]
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "mute/channel": {
+            "before": {
+              "output": 2,
+              "value": false
+            },
+            "requested": {
+              "output": 2,
+              "value": true
+            }
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "mute/channel": {
+            "output": 2,
+            "value": true
+          }
+        }
+      ]
+    },
+    {
+      "case": "clear_mute_restore",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "mute/channel/clear",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/mute/channel/clear",
+          "args": [],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "log": [
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "mute/channel/clear": {
+            "before": [
+              2
+            ],
+            "requested": true
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "mute/channel/clear": []
+        }
+      ]
+    },
+    {
+      "case": "core_restore_result",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "timecodeTrigger/text",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/timecodeTrigger/text",
+          "args": [
+            "1:00:00:00"
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "crop",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "preservePitch",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "log": [
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            12,
+            8,
+            16,
+            4
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 1
+        },
+        {
+          "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+          "raw_values": {
+            "timecodeSMPTEFormat": 3
+          },
+          "present": [
+            "timecodeSMPTEFormat"
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            12,
+            8,
+            16,
+            4
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 1
+        },
+        {
+          "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+          "raw_values": {
+            "timecodeSMPTEFormat": 3
+          },
+          "present": [
+            "timecodeSMPTEFormat"
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            12,
+            8,
+            16,
+            4
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 1
+        },
+        {
+          "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+          "raw_values": {
+            "timecodeSMPTEFormat": 3
+          },
+          "present": [
+            "timecodeSMPTEFormat"
+          ]
+        },
+        {
+          "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+          "raw_values": {
+            "timecodeSMPTEFormat": 3
+          },
+          "present": [
+            "timecodeSMPTEFormat"
+          ]
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/timecodeTrigger/text",
+          "args": [
+            "1:00:00:00"
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            12,
+            8,
+            16,
+            4
+          ]
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "data": null
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/crop",
+          "args": [],
+          "data": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 1
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [
+            false
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [
+            false
+          ],
+          "data": null
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/preservePitch",
+          "args": [],
+          "data": 0
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "timecodeTrigger/text": {
+            "before": "1:02:03:04",
+            "requested": "1:00:00:00"
+          },
+          "crop": {
+            "before": {
+              "top": 12,
+              "bottom": 8,
+              "left": 16,
+              "right": 4
+            },
+            "requested": {
+              "top": 0,
+              "bottom": 0,
+              "left": 0,
+              "right": 0
+            }
+          },
+          "preservePitch": {
+            "before": true,
+            "requested": false
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "timecodeTrigger/text": "1:00:00:00",
+          "crop": {
+            "top": 0,
+            "bottom": 0,
+            "left": 0,
+            "right": 0
+          },
+          "preservePitch": false
+        }
+      ]
+    },
+    {
+      "case": "double_end2",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "endTime",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            80.86666666666666
+          ],
+          "status": "sent",
+          "reply_error": "Timed out waiting for QLab TCP reply to /workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        }
+      ],
+      "log": [
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            80.86666666666666
+          ]
+        },
+        {
+          "error": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "message": "Timed out waiting for QLab TCP reply to /workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "endTime": {
+            "before": 80.86666666666666,
+            "requested": 80.86666666666666
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated_with_confirmed_timeouts",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "endTime": 80.86666666666666
+        }
+      ]
+    },
+    {
+      "case": "double_change",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "endTime",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            75.5
+          ],
+          "status": "sent",
+          "reply_error": "Timed out waiting for QLab TCP reply to /workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        }
+      ],
+      "log": [
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            75.5
+          ]
+        },
+        {
+          "error": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "message": "Timed out waiting for QLab TCP reply to /workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "endTime": {
+            "before": 80.86666666666666,
+            "requested": 75.5
+          }
+        }
+      ],
+      "ok": false,
+      "status": "partial_failed",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "endTime": 80.86666666666666
+        }
+      ],
+      "execution_errors": [
+        {
+          "endTime": "Setter verification failed; no retry was sent."
+        }
+      ]
+    },
+    {
+      "case": "float_change",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "endTime",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            75.5
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "log": [
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            75.5
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            75.5
+          ],
+          "data": null
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 75.5
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "endTime": {
+            "before": 80.86666666666666,
+            "requested": 75.5
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "endTime": 75.5
+        }
+      ]
+    },
+    {
+      "case": "float_end_restore",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "endTime",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            80.86666666666666
+          ],
+          "status": "sent",
+          "reply_error": "QLab reply status='error' for workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        }
+      ],
+      "log": [
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 75.5
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 75.5
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 75.5
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 75.5
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 75.5
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 75.5
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 75.5
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 75.5
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 75.5
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 75.5
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            80.86666666666666
+          ]
+        },
+        {
+          "error": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "message": "QLab reply status='error' for workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "endTime": {
+            "before": 75.5,
+            "requested": 80.86666666666666
+          }
+        }
+      ],
+      "ok": false,
+      "status": "partial_failed",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "endTime": 80.86666666666666
+        }
+      ],
+      "execution_errors": [
+        {
+          "endTime": "Setter returned an error despite matching readback: QLab reply status='error' for workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        }
+      ]
+    },
+    {
+      "case": "float_end_lower",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "endTime",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            80.86666107177734
+          ],
+          "status": "sent",
+          "reply_error": "QLab reply status='error' for workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        }
+      ],
+      "log": [
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            80.86666107177734
+          ]
+        },
+        {
+          "error": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "message": "QLab reply status='error' for workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "endTime": {
+            "before": 80.86666666666666,
+            "requested": 80.86666107177734
+          }
+        }
+      ],
+      "ok": false,
+      "status": "partial_failed",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "endTime": 80.86666666666666
+        }
+      ],
+      "execution_errors": [
+        {
+          "endTime": "Setter returned an error despite matching readback: QLab reply status='error' for workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        }
+      ]
+    },
+    {
+      "case": "float_end_near",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "endTime",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            80.86
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "log": [
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            80.86
+          ]
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            80.86
+          ],
+          "data": null
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86000061035156
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "endTime": {
+            "before": 80.86666666666666,
+            "requested": 80.86
+          }
+        }
+      ],
+      "ok": true,
+      "status": "updated",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "endTime": 80.86000061035156
+        }
+      ]
+    },
+    {
+      "case": "final_end_restore",
+      "plan_ok": true,
+      "operations": [
+        {
+          "operation": "set_property",
+          "property": "endTime",
+          "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            80.86666666666666
+          ],
+          "status": "sent",
+          "reply_error": "QLab reply status='error' for workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        }
+      ],
+      "log": [
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86000061035156
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86000061035156
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86000061035156
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86000061035156
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86000061035156
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86000061035156
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86000061035156
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86000061035156
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86000061035156
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86000061035156
+        },
+        {
+          "setter": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [
+            80.86666666666666
+          ]
+        },
+        {
+          "error": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "message": "QLab reply status='error' for workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        },
+        {
+          "readback": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime",
+          "args": [],
+          "data": 80.86666666666666
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {
+          "endTime": {
+            "before": 80.86000061035156,
+            "requested": 80.86666666666666
+          }
+        }
+      ],
+      "ok": false,
+      "status": "partial_failed",
+      "after": [
+        {
+          "type": "Video",
+          "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "endTime": 80.86666666666666
+        }
+      ],
+      "execution_errors": [
+        {
+          "endTime": "Setter returned an error despite matching readback: QLab reply status='error' for workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/endTime"
+        }
+      ]
+    },
+    {
+      "case": "slice_blocked",
+      "plan_ok": false,
+      "operations": [],
+      "log": [
+        {
+          "error": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/sliceMarkers",
+          "message": "QLab reply status='error' for workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/sliceMarkers"
+        },
+        {
+          "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+          "raw_values": {
+            "sliceMarkers": null
+          },
+          "present": []
+        }
+      ],
+      "diff": [
+        {}
+      ],
+      "plan_errors": [
+        {
+          "preflight": "QLab reply status='error' for workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/4CC5ADC7-D124-58A3-B8CE-95A42CEADC50/sliceMarkers"
+        }
+      ]
+    }
+  ],
+  "final": {
+    "identity": {
+      "uniqueID": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+      "type": "Video",
+      "number": "4",
+      "name": "VIDEO_VALID",
+      "displayName": "VIDEO_VALID",
+      "parent_id": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+      "cue_list_id": null,
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false
+    },
+    "state": {
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": null,
+      "isChildFlagged": null,
+      "isPanicking": false,
+      "isTailingOut": false
+    },
+    "timing": {
+      "preWait": 0.0,
+      "duration": 80.866,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "startTime": 0.0,
+      "endTime": 80.86666666666666,
+      "rate": 1.0,
+      "preservePitch": false,
+      "playCount": 1,
+      "infiniteLoop": false,
+      "lastSlicePlayCount": 1,
+      "lastSliceInfiniteLoop": false,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "doFade": false,
+      "lockFadeToCue": false,
+      "holdLastFrame": false,
+      "clockType": "video"
+    },
+    "video": {
+      "stageID": "A0CA9B3F-A783-54BF-9B36-25572F3C93EF",
+      "stageName": "Stage 9",
+      "stageNumber": 9,
+      "cueSize": {
+        "width": 1920.0,
+        "height": 1080.0
+      },
+      "anchor": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "translation": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "scale": {
+        "x": 1.0,
+        "y": 1.0
+      },
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cropTop": 0.0,
+      "cropBottom": 0.0,
+      "cropLeft": 0.0,
+      "cropRight": 0.0,
+      "opacity": 1.0,
+      "layer": 1000,
+      "blendMode": "Normal",
+      "fillStage": true,
+      "fillStyle": 0,
+      "preserveAspectRatio": true,
+      "smooth": true,
+      "videoEffects": []
+    },
+    "muteChannels": [],
+    "soloChannels": [],
+    "sliceMarkers": null,
+    "triggers": {
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": 0.0,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "timecodeTriggerText": "1:00:00:00"
+    },
+    "edit_capabilities": {
+      "tool": "qlab_edit_video_cues",
+      "allowed_properties": [
+        "anchor",
+        "anchor/x",
+        "anchor/y",
+        "armed",
+        "audioOutputPatchID",
+        "autoLoad",
+        "blendMode",
+        "clockType",
+        "colorName",
+        "continueMode",
+        "crop",
+        "cropBottom",
+        "cropLeft",
+        "cropRight",
+        "cropTop",
+        "doFade",
+        "duckLevel",
+        "duckOthers",
+        "duckTime",
+        "endTime",
+        "fadeAndStopOthersTime",
+        "fileTarget",
+        "fillStage",
+        "fillStyle",
+        "flagged",
+        "gang",
+        "holdLastFrame",
+        "infiniteLoop",
+        "inputChannelName",
+        "layer",
+        "level",
+        "lockFadeToCue",
+        "mute/channel",
+        "mute/channel/clear",
+        "name",
+        "notes",
+        "number",
+        "opacity",
+        "origin",
+        "origin/x",
+        "origin/y",
+        "playCount",
+        "postWait",
+        "preWait",
+        "preserveAspectRatio",
+        "preservePitch",
+        "quaternion",
+        "rate",
+        "resetRotation",
+        "scale",
+        "scale/x",
+        "scale/y",
+        "secondColorName",
+        "secondTriggerAction",
+        "secondTriggerOnRelease",
+        "skipIfDisarmed",
+        "sliderLevel",
+        "smooth",
+        "solo/channel",
+        "solo/channel/clear",
+        "stageID",
+        "startTime",
+        "timecodeTrigger/bits",
+        "timecodeTrigger/frames",
+        "timecodeTrigger/hours",
+        "timecodeTrigger/minutes",
+        "timecodeTrigger/seconds",
+        "timecodeTrigger/text",
+        "translation",
+        "translation/x",
+        "translation/y",
+        "useSecondColor",
+        "videoEffectIndex/enabled"
+      ],
+      "blocked_properties": {
+        "duration": "Cue reports no editable duration or capability is unknown.",
+        "fadeAndStopOthers": "Scope readback must be an integer, not boolean.",
+        "addSliceMarker": "OSC slice inventory is unavailable; absence does not prove an empty list.",
+        "deleteSliceMarker": "OSC slice inventory is unavailable; absence does not prove an empty list.",
+        "deleteSliceMarkers": "OSC slice inventory is unavailable; absence does not prove an empty list.",
+        "sliceMarker/time": "OSC slice inventory is unavailable; absence does not prove an empty list.",
+        "sliceMarker/playCount": "OSC slice inventory is unavailable; absence does not prove an empty list.",
+        "lastSlicePlayCount": "OSC slice inventory is unavailable; absence does not prove an empty list."
+      },
+      "requires_fresh_preflight": true,
+      "unavailable_via_osc": [
+        "Hotkey/MIDI/Wall Clock setup",
+        "Timecode activation/display"
+      ],
+      "excluded": [
+        "Audio Maps",
+        "/live",
+        "cue execution",
+        "workspace stage/region edits"
+      ],
+      "pending_validation": [
+        "effect creation/deletion/reordering and parameters",
+        "Audio FX",
+        "Text fragment formatting",
+        "Camera input channel bounds"
+      ],
+      "blocked_operations": [
+        "setDefaultLevels",
+        "setSilentLevels"
+      ]
+    },
+    "raw_read_log": [
+      {
+        "read": "4CC5ADC7-D124-58A3-B8CE-95A42CEADC50",
+        "raw_values": {
+          "sliceMarkers": null
+        },
+        "present": []
+      },
+      {
+        "read": "70A6B610-7094-5939-A9FC-D7AAD7C3379C",
+        "raw_values": {
+          "timecodeSMPTEFormat": 3
+        },
+        "present": [
+          "timecodeSMPTEFormat"
+        ]
+      }
+    ]
+  },
+  "computer_use": {
+    "modified_crop": {
+      "top": 12,
+      "bottom": 8,
+      "left": 16,
+      "right": 4
+    },
+    "modified_scale": {
+      "x": 1.25,
+      "y": 0.75
+    },
+    "modified_preserve_pitch": "on",
+    "final_preserve_pitch": "off",
+    "final_start_time": "00:00.000",
+    "final_end_time": "01:20.867",
+    "final_play_count": 1,
+    "final_clear_mutes": "disabled",
+    "final_active_cues": 0,
+    "timecode_trigger_enabled": false,
+    "timecode_display": "blank while disabled; not activated for testing"
+  },
+  "automated": {
+    "full_tests": 3393,
+    "subtests": 61,
+    "tool_count": 62,
+    "batch_bounds": [
+      1,
+      50
+    ]
+  }
+}

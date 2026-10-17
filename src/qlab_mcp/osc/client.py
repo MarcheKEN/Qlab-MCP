@@ -10,7 +10,7 @@ import time
 from typing import Any
 
 from ..config import QLabConfig
-from ..errors import OscProtocolError, OscTimeoutError, QLabReplyError
+from ..errors import OscPreparationError, OscProtocolError, OscTimeoutError, QLabReplyError
 from .messages import decode_message, encode_message
 
 
@@ -34,6 +34,8 @@ def _slip_encode(packet: bytes) -> bytes:
 
 
 def _slip_decode(frame: bytes) -> bytes:
+    if SLIP_ESC not in frame:
+        return frame
     packet = bytearray()
     index = 0
     while index < len(frame):
@@ -87,6 +89,15 @@ class QLabReply:
         }
 
 
+def _allows_empty_ack(address: str, args: tuple[Any, ...]) -> bool:
+    parts = address.split("/")
+    return (
+        (address == "/alwaysReply" and bool(args))
+        or (len(parts) == 5 and parts[1] == "workspace" and bool(parts[2]) and bool(parts[4])
+            and (parts[3] in {"delete_id", "currentCueListID"} or (parts[3] == "move" and bool(args))))
+    )
+
+
 class QLabOscClient:
     """Send one OSC message to QLab and wait for its JSON reply."""
 
@@ -116,6 +127,8 @@ class QLabOscClient:
         *args: Any,
         workspace_id: str | None = None,
         reply_timeout: float | None = None,
+        allow_empty_data: bool = False,
+        ensure_always_reply: bool = False,
     ) -> QLabReply:
         address_workspace = _workspace_from_address(address)
         if workspace_id and address_workspace and workspace_id != address_workspace:
@@ -130,6 +143,7 @@ class QLabOscClient:
                 else time.monotonic() + max(0.001, float(reply_timeout))
             )
             with self._tcp_lock:
+                setter_attempted = False
                 try:
                     if self._tcp_socket is None:
                         connect_timeout = self._remaining_tcp_timeout(reply_deadline, address)
@@ -158,6 +172,15 @@ class QLabOscClient:
                             reply_deadline=reply_deadline,
                         )
                         self._tcp_connected_workspaces.add(workspace_id)
+                    if ensure_always_reply:
+                        try:
+                            self._send_with_reply_on_tcp_socket(
+                                self._tcp_socket, "/alwaysReply", 1,
+                                buffer=self._tcp_buffer, reply_deadline=reply_deadline,
+                            )
+                        except Exception as exc:
+                            raise OscPreparationError(f"QLab alwaysReply preparation failed; setter not sent: {exc}") from exc
+                    setter_attempted = True
                     reply = self._send_with_reply_on_tcp_socket(
                         self._tcp_socket,
                         address,
@@ -165,12 +188,15 @@ class QLabOscClient:
                         reply_timeout=reply_timeout,
                         buffer=self._tcp_buffer,
                         reply_deadline=reply_deadline,
+                        allow_empty_data=allow_empty_data,
                     )
                     if direct_connect and workspace_id is not None and reply.status == "ok":
                         self._tcp_connected_workspaces.add(workspace_id)
                     return reply
-                except (OscTimeoutError, OscProtocolError, QLabReplyError, OSError):
+                except (OscPreparationError, OscTimeoutError, OscProtocolError, QLabReplyError, OSError) as exc:
                     self._discard_tcp_session()
+                    if ensure_always_reply and not setter_attempted and not isinstance(exc, OscPreparationError):
+                        raise OscPreparationError(f"QLab preparation failed; setter not sent: {exc}") from exc
                     raise
 
         with self._lock:
@@ -183,7 +209,15 @@ class QLabOscClient:
                         self.config.passcode,
                     )
                     self._remember_connected_workspace(workspace_id, "udp")
-                reply = self._send_with_reply_on_socket(sock, address, *args, reply_timeout=reply_timeout)
+                if ensure_always_reply:
+                    try:
+                        self._send_with_reply_on_socket(sock, "/alwaysReply", 1, reply_timeout=reply_timeout)
+                    except Exception as exc:
+                        raise OscPreparationError(f"QLab alwaysReply preparation failed; setter not sent: {exc}") from exc
+                reply = self._send_with_reply_on_socket(
+                    sock, address, *args, reply_timeout=reply_timeout,
+                    allow_empty_data=allow_empty_data,
+                )
                 self._remember_connect_reply(address, reply, "udp")
                 return reply
 
@@ -300,6 +334,7 @@ class QLabOscClient:
         address: str,
         *args: Any,
         reply_timeout: float | None = None,
+        allow_empty_data: bool = False,
     ) -> QLabReply:
         packet = encode_message(address, *args)
         timeout = self.config.timeout if reply_timeout is None else max(0.001, float(reply_timeout))
@@ -320,7 +355,10 @@ class QLabOscClient:
 
             if not self._reply_sender_matches(reply_addr):
                 continue
-            reply = self._parse_reply(data, expected_address=address, ignore_unrelated=True)
+            reply = self._parse_reply(
+                data, expected_address=address, ignore_unrelated=True,
+                allow_empty_data=allow_empty_data or _allows_empty_ack(address, args),
+            )
             if reply is None:
                 continue
             if self._reply_matches(reply, address):
@@ -336,6 +374,7 @@ class QLabOscClient:
         reply_timeout: float | None = None,
         buffer: bytearray | None = None,
         reply_deadline: float | None = None,
+        allow_empty_data: bool = False,
     ) -> QLabReply:
         packet = encode_message(address, *args)
         if reply_deadline is None:
@@ -366,6 +405,7 @@ class QLabOscClient:
                     _slip_decode(frame),
                     expected_address=address,
                     ignore_unrelated=True,
+                    allow_empty_data=allow_empty_data or _allows_empty_ack(address, args),
                 )
                 if reply is None:
                     continue
@@ -430,6 +470,7 @@ class QLabOscClient:
         packet: bytes,
         expected_address: str | None = None,
         ignore_unrelated: bool = False,
+        allow_empty_data: bool = False,
     ) -> QLabReply | None:
         message = decode_message(packet)
         if not message.address.startswith("/reply/"):
@@ -463,7 +504,8 @@ class QLabOscClient:
             raise OscProtocolError("QLab reply JSON missing string status")
         if status not in {"ok", "error", "denied"}:
             raise OscProtocolError("QLab reply JSON has unknown status", error_code="osc_reply_invalid")
-        if status == "ok" and "data" not in payload:
+        # QLab's alwaysReply acknowledgements omit data; read replies still require it.
+        if status == "ok" and "data" not in payload and not allow_empty_data:
             raise OscProtocolError("QLab successful reply JSON missing data", error_code="osc_reply_invalid")
 
         workspace_id = payload.get("workspace_id")
@@ -490,5 +532,3 @@ class QLabOscClient:
             data=payload.get("data"),
             workspace_id=workspace_id,
         )
-
-

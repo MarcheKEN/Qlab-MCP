@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, JsonValue, StrictBool, StrictInt, StrictS
 
 from .audio import AudioCueSummary, AudioCuesResult
 from .control import ControlBasics, ControlState, ControlTiming, ControlTarget
-from .family import Level, _fail
+from .family import ControlTriggers, Level, _fail
 from .list_models import CueListReadResult, FiniteNumber
 from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES, serialized_payload_bytes
 from ..sanitizer import sanitize_exception_message
@@ -65,11 +65,14 @@ class ScriptCuesResult(AudioCuesResult):
 
 
 class RemainingDetails(CueListReadResult):
+    inspection_values: dict[str, JsonValue] = Field(default_factory=dict)
     cue_id: str
     profile: Literal["safe", "technical"] = "safe"
     basics: ControlBasics | None = None
     state: ControlState | None = None
     timing: ControlTiming | None = None
+    triggers: ControlTriggers | None = None
+    edit_capabilities: dict[str, JsonValue] = Field(default_factory=dict)
     technical_payload: JsonValue = None
     redactions: list[dict[str, str]] = Field(default_factory=list)
 
@@ -199,6 +202,9 @@ class MidiSysEx(BaseModel):
 
 
 class MidiFileSettings(BaseModel):
+    startTime: FiniteNumber | None = None
+    endTime: FiniteNumber | None = None
+    playCount: Annotated[StrictInt, Field(ge=1)] | None = None
     rate: FiniteNumber | None = None
     fileTarget: StrictStr | None = None
 
@@ -243,7 +249,7 @@ class LTCPatch(BaseModel):
     audioOutputPatchID: StrictStr | None = None
     audioOutputPatchName: StrictStr | None = None
     audioOutputPatchNumber: Annotated[StrictInt, Field(ge=0)] | None = None
-    ltcChannel: Annotated[StrictInt, Field(ge=1)] | None = None
+    ltcChannel: Annotated[StrictInt, Field(ge=0)] | None = None
 
 
 class TimecodeCueDetailsResult(RemainingDetails):
@@ -350,10 +356,10 @@ class RemainingCuesMixin:
     def get_script_cues(self, workspace_id, cue_list_id, limit=100, offset=0, max_cues_scanned=5000):
         return self._get_family_cues(workspace_id, cue_list_id, limit, offset, max_cues_scanned, ScriptCuesResult, ScriptCueSummary)
 
-    def _remaining_details(self, workspace_id, cue_id, profile, result_model, summary_model, models, accepted_types=None):
+    def _remaining_details(self, workspace_id, cue_id, profile, result_model, summary_model, models, accepted_types=None, include_native_triggers=False):
         internal_model = _MidiIntermediateResult if result_model is MidiCueDetailsResult else result_model
         result = self._get_family_details(workspace_id, cue_id, profile, None, None, internal_model,
-            summary_model, models, accepted_types=accepted_types, conditional_models=_conditional)
+            summary_model, models, accepted_types=accepted_types, conditional_models=_conditional, include_native_triggers=include_native_triggers)
         if not result.ok or result.identity is None:
             return MidiCueDetailsResult.model_validate(result.model_dump(mode="python")) if internal_model is _MidiIntermediateResult else result
         if isinstance(result, _MidiIntermediateResult):
@@ -374,22 +380,22 @@ class RemainingCuesMixin:
                 "cue_payload_too_large", "Complete cue detail exceeds response byte budget")
         return MidiCueDetailsResult.model_validate(result.model_dump(mode="python")) if internal_model is _MidiIntermediateResult else result
 
-    def get_fade_cue_details(self, workspace_id, cue_id, profile="safe"):
+    def get_fade_cue_details(self, workspace_id, cue_id, profile="safe", include_native_triggers=False):
         return self._remaining_details(workspace_id, cue_id, profile, FadeCueDetailsResult, FadeCueSummary,
-            {**COMMON, "fade": FadeSettings, "target": ControlTarget})
+            {**COMMON, "fade": FadeSettings, "target": ControlTarget}, include_native_triggers=include_native_triggers)
 
-    def get_network_cue_details(self, workspace_id, cue_id, profile="safe"):
+    def get_network_cue_details(self, workspace_id, cue_id, profile="safe", include_native_triggers=False):
         return self._remaining_details(workspace_id, cue_id, profile, NetworkCueDetailsResult, NetworkCueSummary,
-            {**COMMON, "network": NetworkSettings})
+            {**COMMON, "network": NetworkSettings}, include_native_triggers=include_native_triggers)
 
-    def get_midi_cue_details(self, workspace_id, cue_id, profile="safe"):
+    def get_midi_cue_details(self, workspace_id, cue_id, profile="safe", include_native_triggers=False):
         return self._remaining_details(workspace_id, cue_id, profile, MidiCueDetailsResult, MidiCueSummary,
             lambda kind: {**COMMON, "patch": MidiPatch, **({"file": MidiFileSettings} if kind == "MIDI File" else {"midi_selector": MidiSelector})},
-            accepted_types=("MIDI", "MIDI File"))
+            accepted_types=("MIDI", "MIDI File"), include_native_triggers=include_native_triggers)
 
-    def get_timecode_cue_details(self, workspace_id, cue_id, profile="safe"):
+    def get_timecode_cue_details(self, workspace_id, cue_id, profile="safe", include_native_triggers=False):
         return self._remaining_details(workspace_id, cue_id, profile, TimecodeCueDetailsResult, TimecodeCueSummary,
-            {**COMMON, "timecode": TimecodeSettings})
+            {**COMMON, "timecode": TimecodeSettings}, include_native_triggers=include_native_triggers)
 
-    def get_script_cue_details(self, workspace_id, cue_id, profile="safe"):
-        return self._remaining_details(workspace_id, cue_id, profile, ScriptCueDetailsResult, ScriptCueSummary, COMMON)
+    def get_script_cue_details(self, workspace_id, cue_id, profile="safe", include_native_triggers=False):
+        return self._remaining_details(workspace_id, cue_id, profile, ScriptCueDetailsResult, ScriptCueSummary, COMMON, include_native_triggers=include_native_triggers)

@@ -11,11 +11,9 @@ from ..errors import OscTimeoutError, QLabReplyError
 from ..sanitizer import sanitize_exception_message
 from .redaction import _record_redactions, _redact_payload
 from .summarizers import (
-    _basic_item_summary,
     _collection_items,
     _first_present,
     _select_setting_item,
-    _summarize_audio_map,
     _summarize_audio_map_detail,
     _summarize_audio_patch,
     _summarize_light_patch,
@@ -25,6 +23,7 @@ from .summarizers import (
     _summarize_setting_detail_item,
     _summarize_video_input_patch,
     _summarize_video_route,
+    _summarize_video_region,
     _summarize_video_stage,
     _summarize_video_stage_detail,
     _video_settings_problems,
@@ -99,6 +98,27 @@ def _valid_positive_setting_int_list(value: Any) -> bool:
     return isinstance(value, list) and all(_valid_positive_setting_int(item) for item in value)
 
 
+def _osc_geometry_values(value: Any, kind: str) -> list[int | float]:
+    keys = ("x", "y", "width", "height") if kind == "bounds" else (
+        ("width", "height") if kind == "size" else ("x", "y")
+    )
+    if isinstance(value, dict) and all(key in value for key in keys):
+        values = [value[key] for key in keys]
+    elif kind != "bounds" and isinstance(value, list) and len(value) == len(keys):
+        values = value
+    else:
+        raise ValueError(f"Expected OSC {kind} coordinates")
+    if kind == "controlPoint":
+        if not all(isinstance(item, (int, float)) and not isinstance(item, bool)
+                   and math.isfinite(item) for item in values):
+            raise ValueError("OSC controlPoint coordinates must be finite numbers")
+        return values
+    if not all(isinstance(item, int) and not isinstance(item, bool)
+               and -2_147_483_648 <= item <= 2_147_483_647 for item in values):
+        raise ValueError(f"OSC {kind} coordinates must be int32 integers")
+    return values
+
+
 def _validate_workspace_setting_payload(command: str, data: Any) -> bool:
     if command in _SETTING_COLLECTION_COMMANDS:
         valid = isinstance(data, list) and all(
@@ -121,6 +141,8 @@ def _validate_workspace_setting_payload(command: str, data: Any) -> bool:
     if command in {"audio/cueOutputChannelCounts", "audio/outputChannelNames"}:
         return isinstance(data, (list, dict))
     if command.startswith("audio/patchID/"):
+        if command.endswith("/name"):
+            return isinstance(data, str) and bool(data)
         if command.endswith("/cueOutputChannels"):
             return _valid_positive_setting_int(data, maximum=128)
         if command.endswith(("/muteChannels", "/soloChannels")):
@@ -339,10 +361,10 @@ def _normalize_detail_request(raw_request: Any) -> dict[str, Any]:
     if input_channel is not None:
         if section != "audio" or kind != "output_patch":
             raise ValueError("channel selectors are only valid for an audio output_patch")
-        if not _valid_positive_setting_int(input_channel, maximum=128):
-            raise ValueError("input_channel must be a strict integer from 1 through 128")
-        if not _valid_positive_setting_int(output_channel):
-            raise ValueError("output_channel must be a strict positive integer")
+        if type(input_channel) is not int or not 0 <= input_channel <= 128:
+            raise ValueError("input_channel must be a strict integer from 0 through 128")
+        if type(output_channel) is not int or output_channel < 0:
+            raise ValueError("output_channel must be a strict nonnegative integer")
     return {
         "section": section,
         "kind": kind,
@@ -360,6 +382,42 @@ def _profile_warnings(profile: str) -> list[str]:
 
 
 class WorkspaceSettingsMixin:
+    def get_video_region(
+        self, workspace_id: str, stage_id: str, region_id: str,
+        subregion_index: int | None = None, control_point_index: int | None = None,
+    ) -> dict[str, Any]:
+        """Read one region by identity and its exact editable OSC properties."""
+        workspace_id = self._resolve_workspace_id_strict(workspace_id)
+        stage_id, region_id = str(UUID(stage_id)).upper(), str(UUID(region_id)).upper()
+        stage_path = f"video/stageID/{stage_id}"
+        region_path = f"{stage_path}/regionID/{region_id}"
+
+        def read(path: str) -> Any:
+            return self._request(_workspace_address(workspace_id, "settings/" + path), workspace_id=workspace_id).data
+
+        stage, region = read(stage_path), read(region_path)
+        if not isinstance(stage, dict) or str(stage.get("uniqueID", "")).casefold() != stage_id.casefold():
+            raise ValueError("Video stage identity mismatch")
+        if not isinstance(region, dict) or str(region.get("uniqueID", "")).casefold() != region_id.casefold():
+            raise ValueError("Video region identity mismatch")
+        bounds = read(region_path + "/bounds")
+        grid, guide = read(region_path + "/enableGrid"), read(region_path + "/enableGuide")
+        _osc_geometry_values(bounds, "bounds")
+        if not isinstance(grid, bool) or not isinstance(guide, bool):
+            raise ValueError("Video region visibility readback unavailable")
+        point = None
+        if subregion_index is not None and control_point_index is not None:
+            point = read(region_path + f"/subregionIndex/{subregion_index}/controlPointIndex/{control_point_index}")
+            _osc_geometry_values(point, "controlPoint")
+        return {
+            "ok": True, "status": "ok", "partial": False, "workspace_id": workspace_id,
+            "domain": "video", "view": "region", "ref": region_id,
+            "data": {
+                "detail": _summarize_video_region(region, 0), "bounds": bounds,
+                "enableGrid": grid, "enableGuide": guide, "control_point": point,
+            },
+        }
+
     def get_video_setting(
         self, workspace_id: str, *, kind: str, ref: str, profile: str = "safe",
     ) -> dict[str, Any]:
@@ -500,10 +558,10 @@ class WorkspaceSettingsMixin:
         address = _workspace_address(workspace_id, "settings/light/patch")
         try:
             return self._request(address, workspace_id=workspace_id).data, "udp"
-        except OscTimeoutError as udp_exc:
+        except OscTimeoutError:
             try:
                 return self._request_tcp(address, workspace_id=workspace_id).data, "tcp_fallback"
-            except Exception as tcp_exc:
+            except Exception:
                 errors["light.patch"] = "Light patch read timed out over UDP; TCP fallback also failed."
                 return None, None
         except Exception as exc:
@@ -1055,6 +1113,9 @@ class WorkspaceSettingsMixin:
         cue_output_count = self._read_workspace_setting(
             workspace_id, f"{command}/cueOutputChannels", errors, f"audio.patchID.{patch_id}.cueOutputChannels",
         )
+        name_property = self._read_workspace_setting(
+            workspace_id, f"{command}/name", errors, f"audio.patchID.{patch_id}.name",
+        )
         output_names = self._read_workspace_setting(
             workspace_id, "audio/outputChannelNames", errors, "audio.outputChannelNames",
         )
@@ -1081,6 +1142,7 @@ class WorkspaceSettingsMixin:
 
         detail = _summarize_audio_patch(patch)
         detail.update(
+            name_property=name_property,
             cue_output_count=cue_output_count,
             output_channel_names=_normalize_output_channel_names(output_names, patch_id),
             mute_channels=mute_channels or [],
@@ -1089,6 +1151,7 @@ class WorkspaceSettingsMixin:
         )
         raw = {
             "patch": patch,
+            "name_property": name_property,
             "cue_output_count": cue_output_count,
             "output_channel_names": output_names,
             "mute_channels": mute_channels,
@@ -1264,24 +1327,11 @@ class WorkspaceSettingsMixin:
             )
 
         if normalized_section == "video":
-            if normalized_kind == "route":
-                items = self._read_workspace_setting(resolved_workspace_id, "video/routes", errors, "video.routes")
-                return self._setting_details_from_collection(
-                    resolved_workspace_id,
-                    normalized_section,
-                    normalized_kind,
-                    ref,
-                    normalized_profile,
-                    items,
-                    redactions,
-                    errors,
-                )
-            if normalized_kind == "video_input_patch":
+            if normalized_kind in {"route", "video_input_patch"}:
+                command = "video/routes" if normalized_kind == "route" else "video/inputPatchList"
+                error_key = "video.routes" if normalized_kind == "route" else "video.inputPatchList"
                 items = self._read_workspace_setting(
-                    resolved_workspace_id,
-                    "video/inputPatchList",
-                    errors,
-                    "video.inputPatchList",
+                    resolved_workspace_id, command, errors, error_key,
                 )
                 return self._setting_details_from_collection(
                     resolved_workspace_id,
@@ -1425,19 +1475,7 @@ class WorkspaceSettingsMixin:
             )
 
         if normalized_section == "general":
-            if normalized_kind != "all":
-                raise ValueError("General details support only kind all")
-            details = self._workspace_settings_general(resolved_workspace_id, errors)
-            return self._settings_details_result(
-                resolved_workspace_id,
-                normalized_section,
-                normalized_kind,
-                ref,
-                normalized_profile,
-                details=details,
-                redactions=redactions,
-                errors=errors,
-            )
+            raise ValueError("General details support only kind all")
 
     def _get_workspace_settings_details_batch(
         self,

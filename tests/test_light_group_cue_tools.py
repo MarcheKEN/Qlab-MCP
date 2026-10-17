@@ -67,6 +67,8 @@ def test_group_modes_and_conditional_playlist(mode):
     assert result.ok and result.group.mode == mode and result.mode_label
     assert result.contents.children[0].uniqueID == SECOND
     assert bool(result.playlist) == (mode == 6)
+    assert result.edit_capabilities["tool"] == "qlab_edit_group_cues"
+    assert ("playlist/doLoop" in result.edit_capabilities["allowed_properties"]) == (mode == 6)
     assert any("/playlist/" in address for address, _ in osc.calls) == (mode == 6)
     if mode == 6:
         assert result.playlist.crossfadeDuration == 2.5
@@ -121,7 +123,7 @@ def test_new_tools_public_schemas():
     async def run():
         async with Client(mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-        assert len(tools) == 48
+        assert len(tools) == 79
         for family in ("light", "group"):
             for suffix in ("cues", "cue_details"):
                 tool = tools[f"qlab_get_{family}_{suffix}"]

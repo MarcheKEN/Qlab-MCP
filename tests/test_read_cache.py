@@ -42,6 +42,28 @@ class ReadCacheTests(unittest.TestCase):
 
         self.assertNotIn("expired", cache._entries)
 
+    def test_unexpired_hits_and_misses_do_not_rescan_the_cache(self) -> None:
+        class Entries(dict):
+            scans = 0
+
+            def items(self):
+                self.scans += 1
+                return super().items()
+
+        cache = ReadCache()
+        cache._entries = Entries()
+        with patch("qlab_mcp.runtime.read_cache.time.monotonic", return_value=1.0):
+            for key in range(100):
+                self.assertEqual(cache.get_or_set(key, 10, lambda: key), key)
+            for key in range(100):
+                self.assertEqual(cache.get_or_set(key, 10, lambda: "unexpected"), key)
+        self.assertEqual(cache._entries.scans, 1)
+
+        with patch("qlab_mcp.runtime.read_cache.time.monotonic", return_value=11.0):
+            self.assertEqual(cache.get_or_set(0, 10, lambda: "fresh"), "fresh")
+        self.assertEqual(cache._entries.scans, 2)
+        self.assertEqual(list(cache._entries), [0])
+
     def test_waiter_timeout_does_not_start_second_factory(self) -> None:
         cache = ReadCache()
         started = threading.Event()
@@ -69,6 +91,22 @@ class ReadCacheTests(unittest.TestCase):
         self.assertFalse(owner.is_alive())
         self.assertEqual(owner_result, ["owner"])
         self.assertEqual(factory_calls, 1)
+
+    def test_later_short_ttl_is_pruned_before_an_earlier_long_ttl(self) -> None:
+        cache = ReadCache()
+        with patch("qlab_mcp.runtime.read_cache.time.monotonic", return_value=1.0):
+            self.assertEqual(cache.get_or_set("long", 20, lambda: "long value"), "long value")
+        with patch("qlab_mcp.runtime.read_cache.time.monotonic", return_value=2.0):
+            self.assertEqual(cache.get_or_set("short", 1, lambda: "old"), "old")
+        with patch("qlab_mcp.runtime.read_cache.time.monotonic", return_value=3.0):
+            self.assertEqual(cache.get_or_set("long", 20, lambda: "unexpected"), "long value")
+            self.assertNotIn("short", cache._entries)
+            self.assertEqual(cache.get_or_set("short", 1, lambda: "fresh"), "fresh")
+        cache.clear()
+        with patch("qlab_mcp.runtime.read_cache.time.monotonic", return_value=4.0):
+            self.assertEqual(cache.get_or_set("long", 1, lambda: "after clear"), "after clear")
+        with patch("qlab_mcp.runtime.read_cache.time.monotonic", return_value=5.0):
+            self.assertEqual(cache.get_or_set("long", 1, lambda: "expired again"), "expired again")
 
     def test_clear_does_not_allow_inflight_value_to_repopulate_cache(self) -> None:
         cache = ReadCache()

@@ -1,0 +1,1810 @@
+{
+  "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+  "version": "5.5.10",
+  "runs": [
+    {
+      "phase": "prepare healthy Start target",
+      "result": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "dry_run": false,
+        "requested_count": 1,
+        "planned_count": 1,
+        "updated_count": 1,
+        "failed_count": 0,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+            "cue_id": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+            "profile": "control_basic",
+            "status": "updated",
+            "properties": {
+              "name": "FAMILY TEST Start",
+              "cueTargetID": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68"
+            },
+            "operations": [
+              {
+                "operation": "set_property",
+                "property": "name",
+                "path": "name",
+                "mode": "saved",
+                "args": [
+                  "FAMILY TEST Start"
+                ],
+                "arg_values": {
+                  "value": "FAMILY TEST Start"
+                },
+                "read_key": "name",
+                "risk_tier": "safe",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "path": "cueTargetID",
+                "mode": "saved",
+                "args": [
+                  "F386521C-4C2E-5EF3-8ADF-5379E83B2C68"
+                ],
+                "arg_values": {
+                  "value": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68"
+                },
+                "read_key": "cueTargetID",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": [
+                  "target_ref_resolves"
+                ]
+              }
+            ],
+            "planned_operations": [
+              {
+                "operation": "set_property",
+                "property": "name",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD/name",
+                "args": [
+                  "FAMILY TEST Start"
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD/cueTargetID",
+                "args": [
+                  "F386521C-4C2E-5EF3-8ADF-5379E83B2C68"
+                ],
+                "status": "verified"
+              }
+            ],
+            "executed_operations": [
+              {
+                "operation": "set_property",
+                "property": "name",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD/name",
+                "args": [
+                  "FAMILY TEST Start"
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD/cueTargetID",
+                "args": [
+                  "F386521C-4C2E-5EF3-8ADF-5379E83B2C68"
+                ],
+                "status": "sent",
+                "reply_error": null
+              }
+            ],
+            "before": {
+              "isRunning": false,
+              "isPaused": false,
+              "cueTargetID": "",
+              "parent": "CB1A1111-A21C-5D10-9385-AD6754279EDD",
+              "type": "Start",
+              "isAuditioning": false,
+              "hasCueTargets": true,
+              "canHavePatchTargets": false,
+              "uniqueID": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+              "isWarning": false,
+              "allowsEditingDuration": false,
+              "isBroken": true,
+              "name": ""
+            },
+            "after": {
+              "cueTargetID": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68",
+              "type": "Start",
+              "uniqueID": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+              "name": "FAMILY TEST Start"
+            },
+            "errors": null,
+            "warnings": [],
+            "diff": {
+              "name": {
+                "before": "",
+                "requested": "FAMILY TEST Start"
+              },
+              "cueTargetID": {
+                "before": "",
+                "requested": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68"
+              }
+            }
+          }
+        ],
+        "errors": null,
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "message": "updated"
+      }
+    },
+    {
+      "phase": "Devamp all settings and shared triggers",
+      "result": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "dry_run": false,
+        "requested_count": 1,
+        "planned_count": 1,
+        "updated_count": 1,
+        "failed_count": 0,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "0020A329-40BB-5113-9B3D-E02CDCFC4D88",
+            "cue_id": "0020A329-40BB-5113-9B3D-E02CDCFC4D88",
+            "profile": "devamp_basic",
+            "status": "updated",
+            "properties": {
+              "name": "FAMILY TEST Devamp",
+              "cueTargetID": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68",
+              "duckOthers": true,
+              "duckLevel": -3,
+              "duckTime": 0.5,
+              "fadeAndStopOthersTime": 0.5,
+              "secondTriggerAction": 2,
+              "timecodeTrigger/text": "01:00:02:00",
+              "devampType": 2,
+              "startNextCueWhenSliceEnds": true,
+              "stopTargetWhenSliceEnds": true
+            },
+            "operations": [
+              {
+                "operation": "set_property",
+                "property": "name",
+                "path": "name",
+                "mode": "saved",
+                "args": [
+                  "FAMILY TEST Devamp"
+                ],
+                "arg_values": {
+                  "value": "FAMILY TEST Devamp"
+                },
+                "read_key": "name",
+                "risk_tier": "safe",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "path": "cueTargetID",
+                "mode": "saved",
+                "args": [
+                  "F386521C-4C2E-5EF3-8ADF-5379E83B2C68"
+                ],
+                "arg_values": {
+                  "value": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68"
+                },
+                "read_key": "cueTargetID",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": [
+                  "target_ref_resolves"
+                ]
+              },
+              {
+                "operation": "set_property",
+                "property": "duckOthers",
+                "path": "duckOthers",
+                "mode": "saved",
+                "args": [
+                  true
+                ],
+                "arg_values": {
+                  "value": true
+                },
+                "read_key": "duckOthers",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "duckLevel",
+                "path": "duckLevel",
+                "mode": "saved",
+                "args": [
+                  -3
+                ],
+                "arg_values": {
+                  "value": -3
+                },
+                "read_key": "duckLevel",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "duckTime",
+                "path": "duckTime",
+                "mode": "saved",
+                "args": [
+                  0.5
+                ],
+                "arg_values": {
+                  "value": 0.5
+                },
+                "read_key": "duckTime",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "fadeAndStopOthersTime",
+                "path": "fadeAndStopOthersTime",
+                "mode": "saved",
+                "args": [
+                  0.5
+                ],
+                "arg_values": {
+                  "value": 0.5
+                },
+                "read_key": "fadeAndStopOthersTime",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "secondTriggerAction",
+                "path": "secondTriggerAction",
+                "mode": "saved",
+                "args": [
+                  2
+                ],
+                "arg_values": {
+                  "value": 2
+                },
+                "read_key": "secondTriggerAction",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "timecodeTrigger/text",
+                "path": "timecodeTrigger/text",
+                "mode": "saved",
+                "args": [
+                  "01:00:02:00"
+                ],
+                "arg_values": {
+                  "value": "01:00:02:00"
+                },
+                "read_key": "timecodeTrigger/text",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "devampType",
+                "path": "devampType",
+                "mode": "saved",
+                "args": [
+                  2
+                ],
+                "arg_values": {
+                  "value": 2
+                },
+                "read_key": "devampType",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "devamp_settings_require_confirm_token",
+                "capability_gate": "target_resolution",
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "startNextCueWhenSliceEnds",
+                "path": "startNextCueWhenSliceEnds",
+                "mode": "saved",
+                "args": [
+                  true
+                ],
+                "arg_values": {
+                  "value": true
+                },
+                "read_key": "startNextCueWhenSliceEnds",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "devamp_settings_require_confirm_token",
+                "capability_gate": "target_resolution",
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "stopTargetWhenSliceEnds",
+                "path": "stopTargetWhenSliceEnds",
+                "mode": "saved",
+                "args": [
+                  true
+                ],
+                "arg_values": {
+                  "value": true
+                },
+                "read_key": "stopTargetWhenSliceEnds",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "devamp_settings_require_confirm_token",
+                "capability_gate": "target_resolution",
+                "readback": "value",
+                "contextual_requirements": []
+              }
+            ],
+            "planned_operations": [
+              {
+                "operation": "set_property",
+                "property": "name",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/name",
+                "args": [
+                  "FAMILY TEST Devamp"
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/cueTargetID",
+                "args": [
+                  "F386521C-4C2E-5EF3-8ADF-5379E83B2C68"
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "duckOthers",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/duckOthers",
+                "args": [
+                  true
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "duckLevel",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/duckLevel",
+                "args": [
+                  -3
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "duckTime",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/duckTime",
+                "args": [
+                  0.5
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "fadeAndStopOthersTime",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/fadeAndStopOthersTime",
+                "args": [
+                  0.5
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "secondTriggerAction",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/secondTriggerAction",
+                "args": [
+                  2
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "timecodeTrigger/text",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/timecodeTrigger/text",
+                "args": [
+                  "01:00:02:00"
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "devampType",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/devampType",
+                "args": [
+                  2
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "startNextCueWhenSliceEnds",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/startNextCueWhenSliceEnds",
+                "args": [
+                  true
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "stopTargetWhenSliceEnds",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/stopTargetWhenSliceEnds",
+                "args": [
+                  true
+                ],
+                "status": "verified"
+              }
+            ],
+            "executed_operations": [
+              {
+                "operation": "set_property",
+                "property": "name",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/name",
+                "args": [
+                  "FAMILY TEST Devamp"
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/cueTargetID",
+                "args": [
+                  "F386521C-4C2E-5EF3-8ADF-5379E83B2C68"
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "duckOthers",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/duckOthers",
+                "args": [
+                  true
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "duckLevel",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/duckLevel",
+                "args": [
+                  -3
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "duckTime",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/duckTime",
+                "args": [
+                  0.5
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "fadeAndStopOthersTime",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/fadeAndStopOthersTime",
+                "args": [
+                  0.5
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "secondTriggerAction",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/secondTriggerAction",
+                "args": [
+                  2
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "timecodeTrigger/text",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/timecodeTrigger/text",
+                "args": [
+                  "01:00:02:00"
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "devampType",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/devampType",
+                "args": [
+                  2
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "startNextCueWhenSliceEnds",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/startNextCueWhenSliceEnds",
+                "args": [
+                  true
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "stopTargetWhenSliceEnds",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/stopTargetWhenSliceEnds",
+                "args": [
+                  true
+                ],
+                "status": "sent",
+                "reply_error": null
+              }
+            ],
+            "before": {
+              "duckTime": 1,
+              "allowsEditingDuration": false,
+              "startNextCueWhenSliceEnds": false,
+              "uniqueID": "0020A329-40BB-5113-9B3D-E02CDCFC4D88",
+              "isAuditioning": false,
+              "devampType": 1,
+              "canHavePatchTargets": false,
+              "cueTargetID": "",
+              "stopTargetWhenSliceEnds": false,
+              "secondTriggerAction": 0,
+              "isWarning": false,
+              "name": "",
+              "isPaused": false,
+              "parent": "CB1A1111-A21C-5D10-9385-AD6754279EDD",
+              "type": "Devamp",
+              "timecodeTrigger/text": "1:00:00:00",
+              "isRunning": false,
+              "duckLevel": 0,
+              "duckOthers": false,
+              "hasCueTargets": true,
+              "isBroken": true,
+              "fadeAndStopOthersTime": 1
+            },
+            "after": {
+              "name": "FAMILY TEST Devamp",
+              "devampType": 2,
+              "timecodeTrigger/text": "1:00:02:00",
+              "cueTargetID": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68",
+              "duckLevel": -3,
+              "duckOthers": true,
+              "stopTargetWhenSliceEnds": true,
+              "type": "Devamp",
+              "fadeAndStopOthersTime": 0.5,
+              "secondTriggerAction": 2,
+              "uniqueID": "0020A329-40BB-5113-9B3D-E02CDCFC4D88",
+              "duckTime": 0.5,
+              "startNextCueWhenSliceEnds": true
+            },
+            "errors": null,
+            "warnings": [],
+            "diff": {
+              "name": {
+                "before": "",
+                "requested": "FAMILY TEST Devamp"
+              },
+              "cueTargetID": {
+                "before": "",
+                "requested": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68"
+              },
+              "duckOthers": {
+                "before": false,
+                "requested": true
+              },
+              "duckLevel": {
+                "before": 0,
+                "requested": -3
+              },
+              "duckTime": {
+                "before": 1,
+                "requested": 0.5
+              },
+              "fadeAndStopOthersTime": {
+                "before": 1,
+                "requested": 0.5
+              },
+              "secondTriggerAction": {
+                "before": 0,
+                "requested": 2
+              },
+              "timecodeTrigger/text": {
+                "before": "1:00:00:00",
+                "requested": "01:00:02:00"
+              },
+              "devampType": {
+                "before": 1,
+                "requested": 2
+              },
+              "startNextCueWhenSliceEnds": {
+                "before": false,
+                "requested": true
+              },
+              "stopTargetWhenSliceEnds": {
+                "before": false,
+                "requested": true
+              }
+            }
+          }
+        ],
+        "errors": null,
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "message": "updated"
+      }
+    },
+    {
+      "phase": "Target basics, target and shared triggers",
+      "result": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "dry_run": false,
+        "requested_count": 1,
+        "planned_count": 1,
+        "updated_count": 1,
+        "failed_count": 0,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "FF64330A-E752-5E1A-99D9-4EC105BA8E28",
+            "cue_id": "FF64330A-E752-5E1A-99D9-4EC105BA8E28",
+            "profile": "target_basic",
+            "status": "updated",
+            "properties": {
+              "name": "FAMILY TEST Target",
+              "notes": "OSC fields only; assignedNumber excluded",
+              "cueTargetID": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+              "fadeAndStopOthersTime": 0.5,
+              "secondTriggerAction": 1,
+              "secondTriggerOnRelease": true,
+              "timecodeTrigger/text": "01:00:03:00"
+            },
+            "operations": [
+              {
+                "operation": "set_property",
+                "property": "name",
+                "path": "name",
+                "mode": "saved",
+                "args": [
+                  "FAMILY TEST Target"
+                ],
+                "arg_values": {
+                  "value": "FAMILY TEST Target"
+                },
+                "read_key": "name",
+                "risk_tier": "safe",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "notes",
+                "path": "notes",
+                "mode": "saved",
+                "args": [
+                  "OSC fields only; assignedNumber excluded"
+                ],
+                "arg_values": {
+                  "value": "OSC fields only; assignedNumber excluded"
+                },
+                "read_key": "notes",
+                "risk_tier": "safe",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "path": "cueTargetID",
+                "mode": "saved",
+                "args": [
+                  "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD"
+                ],
+                "arg_values": {
+                  "value": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD"
+                },
+                "read_key": "cueTargetID",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": [
+                  "target_ref_resolves"
+                ]
+              },
+              {
+                "operation": "set_property",
+                "property": "fadeAndStopOthersTime",
+                "path": "fadeAndStopOthersTime",
+                "mode": "saved",
+                "args": [
+                  0.5
+                ],
+                "arg_values": {
+                  "value": 0.5
+                },
+                "read_key": "fadeAndStopOthersTime",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "secondTriggerAction",
+                "path": "secondTriggerAction",
+                "mode": "saved",
+                "args": [
+                  1
+                ],
+                "arg_values": {
+                  "value": 1
+                },
+                "read_key": "secondTriggerAction",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "secondTriggerOnRelease",
+                "path": "secondTriggerOnRelease",
+                "mode": "saved",
+                "args": [
+                  true
+                ],
+                "arg_values": {
+                  "value": true
+                },
+                "read_key": "secondTriggerOnRelease",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              },
+              {
+                "operation": "set_property",
+                "property": "timecodeTrigger/text",
+                "path": "timecodeTrigger/text",
+                "mode": "saved",
+                "args": [
+                  "01:00:03:00"
+                ],
+                "arg_values": {
+                  "value": "01:00:03:00"
+                },
+                "read_key": "timecodeTrigger/text",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              }
+            ],
+            "planned_operations": [
+              {
+                "operation": "set_property",
+                "property": "name",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/name",
+                "args": [
+                  "FAMILY TEST Target"
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "notes",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/notes",
+                "args": [
+                  "OSC fields only; assignedNumber excluded"
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/cueTargetID",
+                "args": [
+                  "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD"
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "fadeAndStopOthersTime",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/fadeAndStopOthersTime",
+                "args": [
+                  0.5
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "secondTriggerAction",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/secondTriggerAction",
+                "args": [
+                  1
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "secondTriggerOnRelease",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/secondTriggerOnRelease",
+                "args": [
+                  true
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "timecodeTrigger/text",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/timecodeTrigger/text",
+                "args": [
+                  "01:00:03:00"
+                ],
+                "status": "verified"
+              }
+            ],
+            "executed_operations": [
+              {
+                "operation": "set_property",
+                "property": "name",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/name",
+                "args": [
+                  "FAMILY TEST Target"
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "notes",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/notes",
+                "args": [
+                  "OSC fields only; assignedNumber excluded"
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/cueTargetID",
+                "args": [
+                  "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD"
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "fadeAndStopOthersTime",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/fadeAndStopOthersTime",
+                "args": [
+                  0.5
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "secondTriggerAction",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/secondTriggerAction",
+                "args": [
+                  1
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "secondTriggerOnRelease",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/secondTriggerOnRelease",
+                "args": [
+                  true
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "timecodeTrigger/text",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/timecodeTrigger/text",
+                "args": [
+                  "01:00:03:00"
+                ],
+                "status": "sent",
+                "reply_error": null
+              }
+            ],
+            "before": {
+              "isRunning": false,
+              "isPaused": false,
+              "cueTargetID": "",
+              "timecodeTrigger/text": "1:00:00:00",
+              "parent": "CB1A1111-A21C-5D10-9385-AD6754279EDD",
+              "type": "Target",
+              "isAuditioning": false,
+              "hasCueTargets": true,
+              "canHavePatchTargets": false,
+              "notes": "",
+              "fadeAndStopOthersTime": 1,
+              "uniqueID": "FF64330A-E752-5E1A-99D9-4EC105BA8E28",
+              "isWarning": false,
+              "secondTriggerAction": 0,
+              "allowsEditingDuration": false,
+              "isBroken": true,
+              "name": "",
+              "secondTriggerOnRelease": false
+            },
+            "after": {
+              "fadeAndStopOthersTime": 0.5,
+              "uniqueID": "FF64330A-E752-5E1A-99D9-4EC105BA8E28",
+              "notes": "OSC fields only; assignedNumber excluded",
+              "cueTargetID": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+              "timecodeTrigger/text": "1:00:03:00",
+              "secondTriggerOnRelease": true,
+              "type": "Target",
+              "name": "FAMILY TEST Target",
+              "secondTriggerAction": 1
+            },
+            "errors": null,
+            "warnings": [],
+            "diff": {
+              "name": {
+                "before": "",
+                "requested": "FAMILY TEST Target"
+              },
+              "notes": {
+                "before": "",
+                "requested": "OSC fields only; assignedNumber excluded"
+              },
+              "cueTargetID": {
+                "before": "",
+                "requested": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD"
+              },
+              "fadeAndStopOthersTime": {
+                "before": 1,
+                "requested": 0.5
+              },
+              "secondTriggerAction": {
+                "before": 0,
+                "requested": 1
+              },
+              "secondTriggerOnRelease": {
+                "before": false,
+                "requested": true
+              },
+              "timecodeTrigger/text": {
+                "before": "1:00:00:00",
+                "requested": "01:00:03:00"
+              }
+            }
+          }
+        ],
+        "errors": null,
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "message": "updated"
+      }
+    },
+    {
+      "phase": "Get specialized capabilities",
+      "details": {
+        "ok": true,
+        "status": "ok",
+        "partial": false,
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "error_code": null,
+        "message": null,
+        "suggested_action": null,
+        "coverage": {
+          "source": "documented_osc",
+          "unavailable_via_osc": [
+            "Hotkey trigger configuration",
+            "MIDI trigger configuration",
+            "Wall Clock trigger configuration",
+            "Timecode trigger enabled state",
+            "Timecode trigger display format"
+          ],
+          "unavailable_fields": [],
+          "failed_routes": [],
+          "notes": [
+            "Containing Cue List context comes from qlab_get_control_cues; detail reads the immediate parent.",
+            "Read-only cue configuration; no live output is calculated or queried.",
+            "Audio Maps are excluded. Patch references do not expand Workspace Settings.",
+            "OSC coverage is not the entire inspector: Load load time and Target assigned number have no documented OSC read.",
+            "Memo notes are included in safe; other notes require technical. No cue action is executed."
+          ]
+        },
+        "warnings": [
+          "Technical notes and paths may contain sensitive free text."
+        ],
+        "errors": {},
+        "cue_id": "0020A329-40BB-5113-9B3D-E02CDCFC4D88",
+        "profile": "technical",
+        "identity": {
+          "uniqueID": "0020A329-40BB-5113-9B3D-E02CDCFC4D88",
+          "type": "Devamp",
+          "number": "38.97",
+          "name": "FAMILY TEST Devamp",
+          "displayName": "FAMILY TEST Devamp",
+          "parent_id": "CB1A1111-A21C-5D10-9385-AD6754279EDD",
+          "cue_list_id": null,
+          "armed": true,
+          "flagged": false,
+          "isBroken": false,
+          "isWarning": false
+        },
+        "basics": {
+          "colorName": "none",
+          "autoLoad": false,
+          "skipIfDisarmed": false,
+          "notes": "",
+          "defaultName": "devamp negro.mp4",
+          "listName": "FAMILY TEST Devamp",
+          "secondColorName": "none",
+          "useSecondColor": false,
+          "cartPosition": [
+            0,
+            0
+          ],
+          "allowsEditingDuration": false,
+          "hasCueTargets": true,
+          "hasFileTargets": false,
+          "canHavePatchTargets": false,
+          "secondTriggerAction": 2,
+          "secondTriggerOnRelease": false,
+          "duckOthers": true,
+          "duckLevel": -3.0,
+          "duckTime": 0.5,
+          "fadeAndStopOthers": false,
+          "fadeAndStopOthersTime": 0.5
+        },
+        "state": {
+          "armed": true,
+          "flagged": false,
+          "isBroken": false,
+          "isWarning": false,
+          "isRunning": false,
+          "isPaused": false,
+          "isLoaded": false,
+          "isActionRunning": false,
+          "isAuditioning": false,
+          "isOverridden": false,
+          "isPanicking": false,
+          "isTailingOut": false,
+          "isCrossfadingOut": false,
+          "isNextInPlaylist": false
+        },
+        "timing": {
+          "preWait": 0.0,
+          "duration": 0.0,
+          "postWait": 0.0,
+          "continueMode": 0,
+          "timecodeTrigger": {
+            "hours": 1,
+            "minutes": 0,
+            "seconds": 2,
+            "frames": 0,
+            "bits": 0
+          },
+          "currentDuration": 0.0,
+          "tempDuration": 0.0,
+          "actionElapsed": 0.0,
+          "percentActionElapsed": 0.0,
+          "preWaitElapsed": 0.0,
+          "percentPreWaitElapsed": 0.0,
+          "postWaitElapsed": 0.0,
+          "percentPostWaitElapsed": 0.0,
+          "maxTimeInCueSequence": 0.0,
+          "timecodeTriggerText": "1:00:02:00"
+        },
+        "target": {
+          "cueTargetID": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68",
+          "cueTargetNumber": "29",
+          "tempCueTargetID": "",
+          "tempCueTargetNumber": "",
+          "currentCueTargetID": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68",
+          "currentCueTargetNumber": "29"
+        },
+        "reset": null,
+        "devamp": {
+          "devampType": 2,
+          "startNextCueWhenSliceEnds": true,
+          "stopTargetWhenSliceEnds": true
+        },
+        "triggers": {
+          "secondTriggerAction": 2,
+          "secondTriggerOnRelease": false,
+          "duckOthers": true,
+          "duckLevel": -3.0,
+          "duckTime": 0.5,
+          "fadeAndStopOthers": false,
+          "fadeAndStopOthersTime": 0.5,
+          "timecodeTrigger": {
+            "hours": 1,
+            "minutes": 0,
+            "seconds": 2,
+            "frames": 0,
+            "bits": 0
+          },
+          "timecodeTriggerText": null
+        },
+        "edit_capabilities": {
+          "tool": "qlab_edit_devamp_cues",
+          "allowed_properties": [
+            "armed",
+            "autoLoad",
+            "colorName",
+            "continueMode",
+            "cueTargetID",
+            "devampType",
+            "duckLevel",
+            "duckOthers",
+            "duckTime",
+            "fadeAndStopOthersTime",
+            "flagged",
+            "name",
+            "notes",
+            "number",
+            "postWait",
+            "preWait",
+            "secondColorName",
+            "secondTriggerAction",
+            "secondTriggerOnRelease",
+            "skipIfDisarmed",
+            "startNextCueWhenSliceEnds",
+            "stopTargetWhenSliceEnds",
+            "timecodeTrigger/bits",
+            "timecodeTrigger/frames",
+            "timecodeTrigger/hours",
+            "timecodeTrigger/minutes",
+            "timecodeTrigger/seconds",
+            "timecodeTrigger/text",
+            "useSecondColor"
+          ],
+          "blocked_properties": {
+            "fadeAndStopOthers": "Requires integer scope readback; boolean cannot identify scope."
+          },
+          "requires_fresh_preflight": true,
+          "unavailable_via_osc": [
+            "Load Time",
+            "Hotkey/MIDI/Wall Clock setup",
+            "Timecode activation/display"
+          ],
+          "pending_validation": []
+        },
+        "technical_payload": {
+          "colorName": "none",
+          "autoLoad": false,
+          "skipIfDisarmed": false,
+          "notes": "",
+          "defaultName": "devamp negro.mp4",
+          "listName": "FAMILY TEST Devamp",
+          "secondColorName": "none",
+          "useSecondColor": false,
+          "cartPosition": [
+            0,
+            0
+          ],
+          "allowsEditingDuration": false,
+          "hasCueTargets": true,
+          "hasFileTargets": false,
+          "canHavePatchTargets": false,
+          "secondTriggerAction": 2,
+          "secondTriggerOnRelease": false,
+          "duckOthers": true,
+          "duckLevel": -3.0,
+          "duckTime": 0.5,
+          "fadeAndStopOthers": false,
+          "fadeAndStopOthersTime": 0.5,
+          "armed": true,
+          "flagged": false,
+          "isBroken": false,
+          "isWarning": false,
+          "isRunning": false,
+          "isPaused": false,
+          "isLoaded": false,
+          "isActionRunning": false,
+          "isAuditioning": false,
+          "isOverridden": false,
+          "isPanicking": false,
+          "isTailingOut": false,
+          "isCrossfadingOut": false,
+          "isNextInPlaylist": false,
+          "preWait": 0.0,
+          "duration": 0.0,
+          "postWait": 0.0,
+          "continueMode": 0,
+          "timecodeTrigger": {
+            "hours": 1,
+            "minutes": 0,
+            "seconds": 2,
+            "frames": 0,
+            "bits": 0
+          },
+          "currentDuration": 0.0,
+          "tempDuration": 0.0,
+          "actionElapsed": 0.0,
+          "percentActionElapsed": 0.0,
+          "preWaitElapsed": 0.0,
+          "percentPreWaitElapsed": 0.0,
+          "postWaitElapsed": 0.0,
+          "percentPostWaitElapsed": 0.0,
+          "maxTimeInCueSequence": 0.0,
+          "timecodeTriggerText": "1:00:02:00",
+          "cueTargetID": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68",
+          "cueTargetNumber": "29",
+          "tempCueTargetID": "",
+          "tempCueTargetNumber": "",
+          "currentCueTargetID": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68",
+          "currentCueTargetNumber": "29",
+          "devampType": 2,
+          "startNextCueWhenSliceEnds": true,
+          "stopTargetWhenSliceEnds": true
+        },
+        "redactions": []
+      }
+    },
+    {
+      "phase": "Get specialized capabilities",
+      "details": {
+        "ok": true,
+        "status": "ok",
+        "partial": false,
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "error_code": null,
+        "message": null,
+        "suggested_action": null,
+        "coverage": {
+          "source": "documented_osc",
+          "unavailable_via_osc": [
+            "Hotkey trigger configuration",
+            "MIDI trigger configuration",
+            "Wall Clock trigger configuration",
+            "Timecode trigger enabled state",
+            "Timecode trigger display format",
+            "Target cue assigned number"
+          ],
+          "unavailable_fields": [],
+          "failed_routes": [],
+          "notes": [
+            "Containing Cue List context comes from qlab_get_control_cues; detail reads the immediate parent.",
+            "Read-only cue configuration; no live output is calculated or queried.",
+            "Audio Maps are excluded. Patch references do not expand Workspace Settings.",
+            "OSC coverage is not the entire inspector: Load load time and Target assigned number have no documented OSC read.",
+            "Memo notes are included in safe; other notes require technical. No cue action is executed."
+          ]
+        },
+        "warnings": [
+          "Technical notes and paths may contain sensitive free text."
+        ],
+        "errors": {},
+        "cue_id": "FF64330A-E752-5E1A-99D9-4EC105BA8E28",
+        "profile": "technical",
+        "identity": {
+          "uniqueID": "FF64330A-E752-5E1A-99D9-4EC105BA8E28",
+          "type": "Target",
+          "number": "38.98",
+          "name": "FAMILY TEST Target",
+          "displayName": "FAMILY TEST Target",
+          "parent_id": "CB1A1111-A21C-5D10-9385-AD6754279EDD",
+          "cue_list_id": null,
+          "armed": true,
+          "flagged": false,
+          "isBroken": true,
+          "isWarning": false
+        },
+        "basics": {
+          "colorName": "none",
+          "autoLoad": false,
+          "skipIfDisarmed": false,
+          "notes": "OSC fields only; assignedNumber excluded",
+          "defaultName": "target FAMILY TEST Start",
+          "listName": "FAMILY TEST Target",
+          "secondColorName": "none",
+          "useSecondColor": false,
+          "cartPosition": [
+            0,
+            0
+          ],
+          "allowsEditingDuration": false,
+          "hasCueTargets": true,
+          "hasFileTargets": false,
+          "canHavePatchTargets": false,
+          "secondTriggerAction": 1,
+          "secondTriggerOnRelease": true,
+          "duckOthers": false,
+          "duckLevel": 0.0,
+          "duckTime": 1.0,
+          "fadeAndStopOthers": false,
+          "fadeAndStopOthersTime": 0.5
+        },
+        "state": {
+          "armed": true,
+          "flagged": false,
+          "isBroken": true,
+          "isWarning": false,
+          "isRunning": false,
+          "isPaused": false,
+          "isLoaded": false,
+          "isActionRunning": false,
+          "isAuditioning": false,
+          "isOverridden": false,
+          "isPanicking": false,
+          "isTailingOut": false,
+          "isCrossfadingOut": false,
+          "isNextInPlaylist": false
+        },
+        "timing": {
+          "preWait": 0.0,
+          "duration": 0.0,
+          "postWait": 0.0,
+          "continueMode": 0,
+          "timecodeTrigger": {
+            "hours": 1,
+            "minutes": 0,
+            "seconds": 3,
+            "frames": 0,
+            "bits": 0
+          },
+          "currentDuration": 0.0,
+          "tempDuration": 0.0,
+          "actionElapsed": 0.0,
+          "percentActionElapsed": 0.0,
+          "preWaitElapsed": 0.0,
+          "percentPreWaitElapsed": 0.0,
+          "postWaitElapsed": 0.0,
+          "percentPostWaitElapsed": 0.0,
+          "maxTimeInCueSequence": 0.0,
+          "timecodeTriggerText": "1:00:03:00"
+        },
+        "target": {
+          "cueTargetID": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+          "cueTargetNumber": "38.96",
+          "tempCueTargetID": "",
+          "tempCueTargetNumber": "",
+          "currentCueTargetID": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+          "currentCueTargetNumber": "38.96"
+        },
+        "reset": null,
+        "devamp": null,
+        "triggers": {
+          "secondTriggerAction": 1,
+          "secondTriggerOnRelease": true,
+          "duckOthers": false,
+          "duckLevel": 0.0,
+          "duckTime": 1.0,
+          "fadeAndStopOthers": false,
+          "fadeAndStopOthersTime": 0.5,
+          "timecodeTrigger": {
+            "hours": 1,
+            "minutes": 0,
+            "seconds": 3,
+            "frames": 0,
+            "bits": 0
+          },
+          "timecodeTriggerText": null
+        },
+        "edit_capabilities": {
+          "tool": "qlab_edit_target_cues",
+          "allowed_properties": [
+            "armed",
+            "autoLoad",
+            "colorName",
+            "continueMode",
+            "cueTargetID",
+            "duckLevel",
+            "duckOthers",
+            "duckTime",
+            "fadeAndStopOthersTime",
+            "flagged",
+            "name",
+            "notes",
+            "number",
+            "postWait",
+            "preWait",
+            "secondColorName",
+            "secondTriggerAction",
+            "secondTriggerOnRelease",
+            "skipIfDisarmed",
+            "timecodeTrigger/bits",
+            "timecodeTrigger/frames",
+            "timecodeTrigger/hours",
+            "timecodeTrigger/minutes",
+            "timecodeTrigger/seconds",
+            "timecodeTrigger/text",
+            "useSecondColor"
+          ],
+          "blocked_properties": {
+            "fadeAndStopOthers": "Requires integer scope readback; boolean cannot identify scope."
+          },
+          "requires_fresh_preflight": true,
+          "unavailable_via_osc": [
+            "Load Time",
+            "Hotkey/MIDI/Wall Clock setup",
+            "Timecode activation/display",
+            "Target Cue Number (assignedNumber)"
+          ],
+          "pending_validation": []
+        },
+        "technical_payload": {
+          "colorName": "none",
+          "autoLoad": false,
+          "skipIfDisarmed": false,
+          "notes": "OSC fields only; assignedNumber excluded",
+          "defaultName": "target FAMILY TEST Start",
+          "listName": "FAMILY TEST Target",
+          "secondColorName": "none",
+          "useSecondColor": false,
+          "cartPosition": [
+            0,
+            0
+          ],
+          "allowsEditingDuration": false,
+          "hasCueTargets": true,
+          "hasFileTargets": false,
+          "canHavePatchTargets": false,
+          "secondTriggerAction": 1,
+          "secondTriggerOnRelease": true,
+          "duckOthers": false,
+          "duckLevel": 0.0,
+          "duckTime": 1.0,
+          "fadeAndStopOthers": false,
+          "fadeAndStopOthersTime": 0.5,
+          "armed": true,
+          "flagged": false,
+          "isBroken": true,
+          "isWarning": false,
+          "isRunning": false,
+          "isPaused": false,
+          "isLoaded": false,
+          "isActionRunning": false,
+          "isAuditioning": false,
+          "isOverridden": false,
+          "isPanicking": false,
+          "isTailingOut": false,
+          "isCrossfadingOut": false,
+          "isNextInPlaylist": false,
+          "preWait": 0.0,
+          "duration": 0.0,
+          "postWait": 0.0,
+          "continueMode": 0,
+          "timecodeTrigger": {
+            "hours": 1,
+            "minutes": 0,
+            "seconds": 3,
+            "frames": 0,
+            "bits": 0
+          },
+          "currentDuration": 0.0,
+          "tempDuration": 0.0,
+          "actionElapsed": 0.0,
+          "percentActionElapsed": 0.0,
+          "preWaitElapsed": 0.0,
+          "percentPreWaitElapsed": 0.0,
+          "postWaitElapsed": 0.0,
+          "percentPostWaitElapsed": 0.0,
+          "maxTimeInCueSequence": 0.0,
+          "timecodeTriggerText": "1:00:03:00",
+          "cueTargetID": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+          "cueTargetNumber": "38.96",
+          "tempCueTargetID": "",
+          "tempCueTargetNumber": "",
+          "currentCueTargetID": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+          "currentCueTargetNumber": "38.96"
+        },
+        "redactions": []
+      }
+    },
+    {
+      "phase": "Target clear target",
+      "result": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "dry_run": false,
+        "requested_count": 1,
+        "planned_count": 1,
+        "updated_count": 1,
+        "failed_count": 0,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "FF64330A-E752-5E1A-99D9-4EC105BA8E28",
+            "cue_id": "FF64330A-E752-5E1A-99D9-4EC105BA8E28",
+            "profile": "target_basic",
+            "status": "updated",
+            "properties": {
+              "cueTargetID": ""
+            },
+            "operations": [
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "path": "cueTargetID",
+                "mode": "saved",
+                "args": [
+                  ""
+                ],
+                "arg_values": {
+                  "value": ""
+                },
+                "read_key": "cueTargetID",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": [
+                  "target_ref_resolves"
+                ],
+                "confirm_token": "confirm:cueTargetID:3b35598b09bfe5e6"
+              }
+            ],
+            "planned_operations": [
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/cueTargetID",
+                "args": [
+                  ""
+                ],
+                "status": "verified"
+              }
+            ],
+            "executed_operations": [
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF64330A-E752-5E1A-99D9-4EC105BA8E28/cueTargetID",
+                "args": [
+                  ""
+                ],
+                "status": "sent",
+                "reply_error": null
+              }
+            ],
+            "before": {
+              "isRunning": false,
+              "isPaused": false,
+              "cueTargetID": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+              "parent": "CB1A1111-A21C-5D10-9385-AD6754279EDD",
+              "type": "Target",
+              "isAuditioning": false,
+              "hasCueTargets": true,
+              "canHavePatchTargets": false,
+              "uniqueID": "FF64330A-E752-5E1A-99D9-4EC105BA8E28",
+              "isWarning": false,
+              "allowsEditingDuration": false,
+              "isBroken": true
+            },
+            "after": {
+              "type": "Target",
+              "uniqueID": "FF64330A-E752-5E1A-99D9-4EC105BA8E28",
+              "cueTargetID": ""
+            },
+            "errors": null,
+            "warnings": [],
+            "diff": {
+              "cueTargetID": {
+                "before": "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+                "requested": ""
+              }
+            }
+          }
+        ],
+        "errors": null,
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "message": "updated"
+      }
+    },
+    {
+      "phase": "Devamp clear target",
+      "result": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+        "dry_run": false,
+        "requested_count": 1,
+        "planned_count": 1,
+        "updated_count": 1,
+        "failed_count": 0,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "0020A329-40BB-5113-9B3D-E02CDCFC4D88",
+            "cue_id": "0020A329-40BB-5113-9B3D-E02CDCFC4D88",
+            "profile": "devamp_basic",
+            "status": "updated",
+            "properties": {
+              "cueTargetID": ""
+            },
+            "operations": [
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "path": "cueTargetID",
+                "mode": "saved",
+                "args": [
+                  ""
+                ],
+                "arg_values": {
+                  "value": ""
+                },
+                "read_key": "cueTargetID",
+                "risk_tier": "high",
+                "real_write_enabled": false,
+                "planned_only_reason": "requires_control_cue_writer",
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": [
+                  "target_ref_resolves"
+                ],
+                "confirm_token": "confirm:cueTargetID:3b35598b09bfe5e6"
+              }
+            ],
+            "planned_operations": [
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/cueTargetID",
+                "args": [
+                  ""
+                ],
+                "status": "verified"
+              }
+            ],
+            "executed_operations": [
+              {
+                "operation": "set_property",
+                "property": "cueTargetID",
+                "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/0020A329-40BB-5113-9B3D-E02CDCFC4D88/cueTargetID",
+                "args": [
+                  ""
+                ],
+                "status": "sent",
+                "reply_error": null
+              }
+            ],
+            "before": {
+              "isRunning": false,
+              "devampType": 2,
+              "isPaused": false,
+              "cueTargetID": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68",
+              "parent": "CB1A1111-A21C-5D10-9385-AD6754279EDD",
+              "stopTargetWhenSliceEnds": true,
+              "type": "Devamp",
+              "isAuditioning": false,
+              "hasCueTargets": true,
+              "canHavePatchTargets": false,
+              "uniqueID": "0020A329-40BB-5113-9B3D-E02CDCFC4D88",
+              "isWarning": false,
+              "allowsEditingDuration": false,
+              "isBroken": false,
+              "startNextCueWhenSliceEnds": true
+            },
+            "after": {
+              "type": "Devamp",
+              "uniqueID": "0020A329-40BB-5113-9B3D-E02CDCFC4D88",
+              "cueTargetID": ""
+            },
+            "errors": null,
+            "warnings": [],
+            "diff": {
+              "cueTargetID": {
+                "before": "F386521C-4C2E-5EF3-8ADF-5379E83B2C68",
+                "requested": ""
+              }
+            }
+          }
+        ],
+        "errors": null,
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "message": "updated"
+      }
+    }
+  ],
+  "fixtures": [
+    "EF0EB5EA-00FE-5D86-8B25-C476C29D5DFD",
+    "0020A329-40BB-5113-9B3D-E02CDCFC4D88",
+    "FF64330A-E752-5E1A-99D9-4EC105BA8E28"
+  ],
+  "cleanup": {
+    "ok": true,
+    "status": "deleted_immediately"
+  }
+}

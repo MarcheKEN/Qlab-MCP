@@ -1,0 +1,2808 @@
+{
+  "baseline": {
+    "ok": true,
+    "status": "ok",
+    "partial": false,
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "error_code": null,
+    "message": null,
+    "suggested_action": null,
+    "coverage": {
+      "source": "documented_osc",
+      "unavailable_via_osc": [],
+      "unavailable_fields": [
+        "isChildAuditioning",
+        "isChildFlagged",
+        "text/format/backgroundColor",
+        "text/format/shadowColor",
+        "text/format/shadowBlurRadius",
+        "text/format/shadowOffset",
+        "text/format/strikethroughColor",
+        "text/format/underlineColor",
+        "text/format/strikethroughStyle",
+        "text/format/underlineStyle"
+      ],
+      "failed_routes": [],
+      "notes": [
+        "Audio Maps, Audio Objects, live metrics and indexed effect reads are excluded.",
+        "Containing Cue List context comes from qlab_get_text_cues; detail reads only the immediate parent.",
+        "Stage/input references do not expand patches, stages, regions or routes."
+      ]
+    },
+    "warnings": [
+      "Technical notes and paths may contain sensitive free text."
+    ],
+    "errors": {},
+    "cue_id": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+    "profile": "technical",
+    "basics": {
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "allowsEditingDuration": true,
+      "colorName": "none",
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "notes": ""
+    },
+    "state": {
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": null,
+      "isChildFlagged": null,
+      "isPanicking": false,
+      "isTailingOut": false
+    },
+    "timing": {
+      "preWait": 0.0,
+      "duration": 0.0,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      }
+    },
+    "video": {
+      "stageID": "A0CA9B3F-A783-54BF-9B36-25572F3C93EF",
+      "stageName": "Stage 9",
+      "stageNumber": 9,
+      "cueSize": {
+        "width": 507.0,
+        "height": 152.0
+      },
+      "anchor": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "translation": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "scale": {
+        "x": 1.0,
+        "y": 1.0
+      },
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cropTop": 0.0,
+      "cropBottom": 0.0,
+      "cropLeft": 0.0,
+      "cropRight": 0.0,
+      "opacity": 1.0,
+      "layer": 1000,
+      "blendMode": "Normal",
+      "fillStage": false,
+      "fillStyle": 0,
+      "preserveAspectRatio": true,
+      "smooth": true,
+      "videoEffects": []
+    },
+    "triggers": {
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": 0.0,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "timecodeTriggerText": "1:00:00:00"
+    },
+    "edit_capabilities": {
+      "tool": "qlab_edit_text_cues",
+      "allowed_properties": [
+        "anchor",
+        "anchor/x",
+        "anchor/y",
+        "armed",
+        "autoLoad",
+        "blendMode",
+        "colorName",
+        "continueMode",
+        "crop",
+        "cropBottom",
+        "cropLeft",
+        "cropRight",
+        "cropTop",
+        "duckLevel",
+        "duckOthers",
+        "duckTime",
+        "duration",
+        "fadeAndStopOthersTime",
+        "fillStage",
+        "fillStyle",
+        "fixedWidth",
+        "flagged",
+        "layer",
+        "name",
+        "notes",
+        "number",
+        "opacity",
+        "origin",
+        "origin/x",
+        "origin/y",
+        "postWait",
+        "preWait",
+        "preserveAspectRatio",
+        "quaternion",
+        "resetRotation",
+        "scale",
+        "scale/x",
+        "scale/y",
+        "secondColorName",
+        "secondTriggerAction",
+        "secondTriggerOnRelease",
+        "skipIfDisarmed",
+        "smooth",
+        "stageID",
+        "text",
+        "text/format/alignment",
+        "text/format/color",
+        "text/format/fontFamilyAndStyle",
+        "text/format/fontName",
+        "text/format/fontSize",
+        "text/format/lineSpacing",
+        "timecodeTrigger/bits",
+        "timecodeTrigger/frames",
+        "timecodeTrigger/hours",
+        "timecodeTrigger/minutes",
+        "timecodeTrigger/seconds",
+        "timecodeTrigger/text",
+        "translation",
+        "translation/x",
+        "translation/y",
+        "useSecondColor"
+      ],
+      "video_fx": {
+        "allowed_operations": [],
+        "schema_operations": [
+          "videoEffectIndex/enabled",
+          "videoEffectIndex/parameter",
+          "videoEffectIndex/parameters",
+          "videoEffectIndex/delete",
+          "videoEffectIndex/move",
+          "videoEffects/add",
+          "videoEffects/insert"
+        ],
+        "blocked_operations": {
+          "videoEffectIndex/enabled": "No existing effect with verifiable native type identity.",
+          "videoEffectIndex/parameter": "No existing effect with verifiable native type identity.",
+          "videoEffectIndex/parameters": "No existing effect with verifiable native type identity."
+        },
+        "catalogue_effect_count": 60,
+        "catalogue_parameter_count": 262,
+        "range_policy": "Conservative published bands; QLab can allow values outside them.",
+        "pending_validation": [
+          "videoEffectIndex/delete",
+          "videoEffectIndex/move",
+          "videoEffects/add",
+          "videoEffects/insert"
+        ],
+        "requires_explicit_effect_type": true,
+        "requires_full_stack_preflight": true,
+        "excluded": [
+          "Fade FX flags",
+          "/live",
+          "effect-name write addressing"
+        ]
+      },
+      "text_format": {
+        "property": "text/format",
+        "selectors": [
+          "full",
+          "range",
+          "word"
+        ],
+        "requires_complete_text_and_runs": true,
+        "pending_validation": [
+          "word tokenization",
+          "percentage rounding",
+          "font resolution",
+          "partial shadow line scope"
+        ],
+        "native_index_unit": "utf16",
+        "ranges_verified": true,
+        "unicode_formatting_pending": false,
+        "validated_json_attributes": [
+          "color",
+          "fontSize",
+          "lineSpacing"
+        ]
+      },
+      "blocked_properties": {
+        "videoEffectIndex/enabled": "Native effect type identity is unavailable; parameter keys cannot prove identity.",
+        "fadeAndStopOthers": "Scope readback must be an integer, not boolean.",
+        "text/format/shadowOffset/width": "Format fragments omit this attribute or have mixed values.",
+        "text/format/backgroundColor": "Format fragments omit this attribute or have mixed values.",
+        "text/format/shadowOffset/height": "Format fragments omit this attribute or have mixed values.",
+        "text/format/strikethroughStyle": "Format fragments omit this attribute or have mixed values.",
+        "text/format/underlineStyle": "Format fragments omit this attribute or have mixed values.",
+        "text/format/underlineColor": "Format fragments omit this attribute or have mixed values.",
+        "text/format/shadowColor": "Format fragments omit this attribute or have mixed values.",
+        "text/format/shadowOffset": "Format fragments omit this attribute or have mixed values.",
+        "text/format/strikethroughColor": "Format fragments omit this attribute or have mixed values.",
+        "text/format/shadowBlurRadius": "Format fragments omit this attribute or have mixed values."
+      },
+      "requires_fresh_preflight": true,
+      "unavailable_via_osc": [
+        "Hotkey/MIDI/Wall Clock setup",
+        "Timecode activation/display"
+      ],
+      "excluded": [
+        "Audio Maps",
+        "/live",
+        "cue execution",
+        "workspace stage/region edits"
+      ],
+      "pending_validation": [
+        "effect creation/deletion/reordering and parameters",
+        "Audio FX",
+        "Text fragment formatting",
+        "Camera input channel bounds"
+      ],
+      "blocked_operations": [
+        "setDefaultLevels",
+        "setSilentLevels"
+      ]
+    },
+    "selected_video_effects": [],
+    "technical_payload": {
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": 0.0,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "timecodeTriggerText": "1:00:00:00",
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "allowsEditingDuration": true,
+      "colorName": "none",
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "notes": "",
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isPanicking": false,
+      "isTailingOut": false,
+      "preWait": 0.0,
+      "duration": 0.0,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "stageID": "A0CA9B3F-A783-54BF-9B36-25572F3C93EF",
+      "stageName": "Stage 9",
+      "stageNumber": 9,
+      "cueSize": {
+        "width": 507.0,
+        "height": 152.0
+      },
+      "anchor": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "translation": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "scale": {
+        "x": 1.0,
+        "y": 1.0
+      },
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cropTop": 0.0,
+      "cropBottom": 0.0,
+      "cropLeft": 0.0,
+      "cropRight": 0.0,
+      "opacity": 1.0,
+      "layer": 1000,
+      "blendMode": "Normal",
+      "fillStage": false,
+      "fillStyle": 0,
+      "preserveAspectRatio": true,
+      "smooth": true,
+      "videoEffects": [],
+      "text": "Mcp video text",
+      "fixedWidth": 0.0,
+      "outputSize": {
+        "width": 507.0,
+        "height": 152.0
+      },
+      "fragments": [
+        {
+          "range": [
+            0,
+            14
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.6,
+          "color": [
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "alignment": "center"
+        }
+      ],
+      "alignment": "center",
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold",
+      "fontFamilyAndStyle": {
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold"
+      },
+      "fontName": "HelveticaNeue-Bold",
+      "fontSize": 72.0,
+      "lineSpacing": 1.6,
+      "color": [
+        1.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "text/format": [
+        {
+          "fontSize": 72,
+          "color": [
+            1,
+            0,
+            0,
+            1
+          ],
+          "fontName": "HelveticaNeue-Bold",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "alignment": "center",
+          "range": [
+            0,
+            14
+          ],
+          "lineSpacing": 1.6
+        }
+      ]
+    },
+    "redactions": [],
+    "identity": {
+      "uniqueID": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+      "type": "Text",
+      "number": "v1",
+      "name": "Text1",
+      "displayName": "Text1",
+      "parent_id": "A7009EC9-EE49-5C3F-AFBF-8AB9B4159E13",
+      "cue_list_id": null,
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false
+    },
+    "text": {
+      "text": "Mcp video text",
+      "fixedWidth": 0.0,
+      "outputSize": {
+        "width": 507.0,
+        "height": 152.0
+      },
+      "fragments": [
+        {
+          "range": [
+            0,
+            14
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.6,
+          "color": [
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "alignment": "center",
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      ],
+      "alignment": "center",
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold",
+      "fontFamilyAndStyle": {
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold"
+      },
+      "fontName": "HelveticaNeue-Bold",
+      "fontSize": 72.0,
+      "lineSpacing": 1.6,
+      "color": [
+        1.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "backgroundColor": null,
+      "shadowColor": null,
+      "shadowBlurRadius": null,
+      "shadowOffset": null,
+      "strikethroughColor": null,
+      "underlineColor": null,
+      "strikethroughStyle": null,
+      "underlineStyle": null
+    }
+  },
+  "ascii_multiple_to_end_dry": {
+    "ok": true,
+    "status": "dry_run",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": true,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 0,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+        "cue_id": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+        "profile": "text_basic",
+        "status": "dry_run",
+        "properties": {
+          "text/format@0": {
+            "selector": {
+              "kind": "range",
+              "index": 0,
+              "length": 3
+            },
+            "attributes": {
+              "fontSize": 48
+            }
+          },
+          "text/format@1": {
+            "selector": {
+              "kind": "range",
+              "index": 4,
+              "length": -1
+            },
+            "attributes": {
+              "fontSize": 60
+            }
+          }
+        },
+        "operations": [
+          {
+            "property": "text/format@0",
+            "path": "text/format",
+            "args": [
+              "{\"fontSize\":48,\"range\":[0,3]}"
+            ],
+            "arg_values": {
+              "selector": {
+                "kind": "range",
+                "index": 0,
+                "length": 3
+              },
+              "attributes": {
+                "fontSize": 48
+              }
+            },
+            "real_write_enabled": true,
+            "real_write_possible": true,
+            "requires_confirm_token": true
+          },
+          {
+            "property": "text/format@1",
+            "path": "text/format",
+            "args": [
+              "{\"fontSize\":60,\"range\":[4,10]}"
+            ],
+            "arg_values": {
+              "selector": {
+                "kind": "range",
+                "index": 4,
+                "length": -1
+              },
+              "attributes": {
+                "fontSize": 60
+              }
+            },
+            "real_write_enabled": true,
+            "real_write_possible": true,
+            "requires_confirm_token": true
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "parent": "A7009EC9-EE49-5C3F-AFBF-8AB9B4159E13",
+          "type": "Text",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+          "isWarning": false,
+          "allowsEditingDuration": true,
+          "isBroken": false,
+          "text/format@0": {
+            "text": "Mcp video text",
+            "runs": [
+              {
+                "fontSize": 72,
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ],
+                "fontName": "HelveticaNeue-Bold",
+                "fontFamily": "Helvetica Neue",
+                "fontStyle": "Bold",
+                "alignment": "center",
+                "range": [
+                  0,
+                  14
+                ],
+                "lineSpacing": 1.6
+              }
+            ]
+          },
+          "text/format@1": {
+            "text": "Mcp video text",
+            "runs": [
+              {
+                "fontSize": 72,
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ],
+                "fontName": "HelveticaNeue-Bold",
+                "fontFamily": "Helvetica Neue",
+                "fontStyle": "Bold",
+                "alignment": "center",
+                "range": [
+                  0,
+                  14
+                ],
+                "lineSpacing": 1.6
+              }
+            ]
+          }
+        },
+        "after": null,
+        "diff": {
+          "text/format@0": {
+            "before": {
+              "text": "Mcp video text",
+              "runs": [
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    14
+                  ],
+                  "lineSpacing": 1.6
+                }
+              ]
+            },
+            "requested": {
+              "selector": {
+                "kind": "range",
+                "index": 0,
+                "length": 3
+              },
+              "attributes": {
+                "fontSize": 48
+              }
+            }
+          },
+          "text/format@1": {
+            "before": {
+              "text": "Mcp video text",
+              "runs": [
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    14
+                  ],
+                  "lineSpacing": 1.6
+                }
+              ]
+            },
+            "requested": {
+              "selector": {
+                "kind": "range",
+                "index": 4,
+                "length": -1
+              },
+              "attributes": {
+                "fontSize": 60
+              }
+            }
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917/text/format",
+            "args": [
+              "{\"fontSize\":48,\"range\":[0,3]}"
+            ],
+            "status": "planned"
+          },
+          {
+            "operation": "set_property",
+            "property": "text/format@1",
+            "key": "text/format@1",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917/text/format",
+            "args": [
+              "{\"fontSize\":60,\"range\":[4,10]}"
+            ],
+            "status": "planned"
+          }
+        ],
+        "executed_operations": [],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "dry_run"
+  },
+  "ascii_multiple_to_end": {
+    "ok": true,
+    "status": "updated",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": false,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 1,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+        "cue_id": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+        "profile": "text_basic",
+        "status": "updated",
+        "properties": {
+          "text/format@0": {
+            "selector": {
+              "kind": "range",
+              "index": 0,
+              "length": 3
+            },
+            "attributes": {
+              "fontSize": 48
+            }
+          },
+          "text/format@1": {
+            "selector": {
+              "kind": "range",
+              "index": 4,
+              "length": -1
+            },
+            "attributes": {
+              "fontSize": 60
+            }
+          }
+        },
+        "operations": [
+          {
+            "property": "text/format@0",
+            "path": "text/format",
+            "args": [
+              "{\"fontSize\":48,\"range\":[0,3]}"
+            ],
+            "arg_values": {
+              "selector": {
+                "kind": "range",
+                "index": 0,
+                "length": 3
+              },
+              "attributes": {
+                "fontSize": 48
+              }
+            },
+            "real_write_enabled": true,
+            "real_write_possible": true,
+            "requires_confirm_token": true
+          },
+          {
+            "property": "text/format@1",
+            "path": "text/format",
+            "args": [
+              "{\"fontSize\":60,\"range\":[4,10]}"
+            ],
+            "arg_values": {
+              "selector": {
+                "kind": "range",
+                "index": 4,
+                "length": -1
+              },
+              "attributes": {
+                "fontSize": 60
+              }
+            },
+            "real_write_enabled": true,
+            "real_write_possible": true,
+            "requires_confirm_token": true
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "parent": "A7009EC9-EE49-5C3F-AFBF-8AB9B4159E13",
+          "type": "Text",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+          "isWarning": false,
+          "allowsEditingDuration": true,
+          "isBroken": false,
+          "text/format@0": {
+            "text": "Mcp video text",
+            "runs": [
+              {
+                "fontSize": 72,
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ],
+                "fontName": "HelveticaNeue-Bold",
+                "fontFamily": "Helvetica Neue",
+                "fontStyle": "Bold",
+                "alignment": "center",
+                "range": [
+                  0,
+                  14
+                ],
+                "lineSpacing": 1.6
+              }
+            ]
+          },
+          "text/format@1": {
+            "text": "Mcp video text",
+            "runs": [
+              {
+                "fontSize": 72,
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ],
+                "fontName": "HelveticaNeue-Bold",
+                "fontFamily": "Helvetica Neue",
+                "fontStyle": "Bold",
+                "alignment": "center",
+                "range": [
+                  0,
+                  14
+                ],
+                "lineSpacing": 1.6
+              }
+            ]
+          }
+        },
+        "after": {
+          "type": "Text",
+          "uniqueID": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+          "text/format@0": {
+            "text": "Mcp video text",
+            "runs": [
+              {
+                "fontSize": 48,
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ],
+                "fontName": "HelveticaNeue-Bold",
+                "fontFamily": "Helvetica Neue",
+                "fontStyle": "Bold",
+                "alignment": "center",
+                "range": [
+                  0,
+                  3
+                ],
+                "lineSpacing": 1.6
+              },
+              {
+                "fontSize": 72,
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ],
+                "fontName": "HelveticaNeue-Bold",
+                "fontFamily": "Helvetica Neue",
+                "fontStyle": "Bold",
+                "alignment": "center",
+                "range": [
+                  3,
+                  11
+                ],
+                "lineSpacing": 1.6
+              }
+            ]
+          },
+          "text/format@1": {
+            "text": "Mcp video text",
+            "runs": [
+              {
+                "fontSize": 48,
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ],
+                "fontName": "HelveticaNeue-Bold",
+                "fontFamily": "Helvetica Neue",
+                "fontStyle": "Bold",
+                "alignment": "center",
+                "range": [
+                  0,
+                  3
+                ],
+                "lineSpacing": 1.6
+              },
+              {
+                "fontSize": 72,
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ],
+                "fontName": "HelveticaNeue-Bold",
+                "fontFamily": "Helvetica Neue",
+                "fontStyle": "Bold",
+                "alignment": "center",
+                "range": [
+                  3,
+                  1
+                ],
+                "lineSpacing": 1.6
+              },
+              {
+                "fontSize": 60,
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ],
+                "fontName": "HelveticaNeue-Bold",
+                "fontFamily": "Helvetica Neue",
+                "fontStyle": "Bold",
+                "alignment": "center",
+                "range": [
+                  4,
+                  10
+                ],
+                "lineSpacing": 1.6
+              }
+            ]
+          }
+        },
+        "diff": {
+          "text/format@0": {
+            "before": {
+              "text": "Mcp video text",
+              "runs": [
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    14
+                  ],
+                  "lineSpacing": 1.6
+                }
+              ]
+            },
+            "requested": {
+              "selector": {
+                "kind": "range",
+                "index": 0,
+                "length": 3
+              },
+              "attributes": {
+                "fontSize": 48
+              }
+            }
+          },
+          "text/format@1": {
+            "before": {
+              "text": "Mcp video text",
+              "runs": [
+                {
+                  "fontSize": 72,
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    14
+                  ],
+                  "lineSpacing": 1.6
+                }
+              ]
+            },
+            "requested": {
+              "selector": {
+                "kind": "range",
+                "index": 4,
+                "length": -1
+              },
+              "attributes": {
+                "fontSize": 60
+              }
+            }
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917/text/format",
+            "args": [
+              "{\"fontSize\":48,\"range\":[0,3]}"
+            ],
+            "status": "verified"
+          },
+          {
+            "operation": "set_property",
+            "property": "text/format@1",
+            "key": "text/format@1",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917/text/format",
+            "args": [
+              "{\"fontSize\":60,\"range\":[4,10]}"
+            ],
+            "status": "verified"
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917/text/format",
+            "args": [
+              "{\"fontSize\":48,\"range\":[0,3]}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          },
+          {
+            "operation": "set_property",
+            "property": "text/format@1",
+            "key": "text/format@1",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917/text/format",
+            "args": [
+              "{\"fontSize\":60,\"range\":[4,10]}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "updated"
+  },
+  "ascii_readback": {
+    "ok": true,
+    "status": "ok",
+    "partial": false,
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "error_code": null,
+    "message": null,
+    "suggested_action": null,
+    "coverage": {
+      "source": "documented_osc",
+      "unavailable_via_osc": [],
+      "unavailable_fields": [
+        "isChildAuditioning",
+        "isChildFlagged",
+        "text/format/backgroundColor",
+        "text/format/shadowColor",
+        "text/format/shadowBlurRadius",
+        "text/format/shadowOffset",
+        "text/format/strikethroughColor",
+        "text/format/underlineColor",
+        "text/format/strikethroughStyle",
+        "text/format/underlineStyle"
+      ],
+      "failed_routes": [],
+      "notes": [
+        "Audio Maps, Audio Objects, live metrics and indexed effect reads are excluded.",
+        "Containing Cue List context comes from qlab_get_text_cues; detail reads only the immediate parent.",
+        "Stage/input references do not expand patches, stages, regions or routes."
+      ]
+    },
+    "warnings": [
+      "Technical notes and paths may contain sensitive free text."
+    ],
+    "errors": {},
+    "cue_id": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+    "profile": "technical",
+    "basics": {
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "allowsEditingDuration": true,
+      "colorName": "none",
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "notes": ""
+    },
+    "state": {
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": null,
+      "isChildFlagged": null,
+      "isPanicking": false,
+      "isTailingOut": false
+    },
+    "timing": {
+      "preWait": 0.0,
+      "duration": 0.0,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      }
+    },
+    "video": {
+      "stageID": "A0CA9B3F-A783-54BF-9B36-25572F3C93EF",
+      "stageName": "Stage 9",
+      "stageNumber": 9,
+      "cueSize": {
+        "width": 401.0,
+        "height": 147.0
+      },
+      "anchor": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "translation": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "scale": {
+        "x": 1.0,
+        "y": 1.0
+      },
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cropTop": 0.0,
+      "cropBottom": 0.0,
+      "cropLeft": 0.0,
+      "cropRight": 0.0,
+      "opacity": 1.0,
+      "layer": 1000,
+      "blendMode": "Normal",
+      "fillStage": false,
+      "fillStyle": 0,
+      "preserveAspectRatio": true,
+      "smooth": true,
+      "videoEffects": []
+    },
+    "triggers": {
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": 0.0,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "timecodeTriggerText": "1:00:00:00"
+    },
+    "edit_capabilities": {
+      "tool": "qlab_edit_text_cues",
+      "allowed_properties": [
+        "anchor",
+        "anchor/x",
+        "anchor/y",
+        "armed",
+        "autoLoad",
+        "blendMode",
+        "colorName",
+        "continueMode",
+        "crop",
+        "cropBottom",
+        "cropLeft",
+        "cropRight",
+        "cropTop",
+        "duckLevel",
+        "duckOthers",
+        "duckTime",
+        "duration",
+        "fadeAndStopOthersTime",
+        "fillStage",
+        "fillStyle",
+        "fixedWidth",
+        "flagged",
+        "layer",
+        "name",
+        "notes",
+        "number",
+        "opacity",
+        "origin",
+        "origin/x",
+        "origin/y",
+        "postWait",
+        "preWait",
+        "preserveAspectRatio",
+        "quaternion",
+        "resetRotation",
+        "scale",
+        "scale/x",
+        "scale/y",
+        "secondColorName",
+        "secondTriggerAction",
+        "secondTriggerOnRelease",
+        "skipIfDisarmed",
+        "smooth",
+        "stageID",
+        "text",
+        "text/format/alignment",
+        "text/format/color",
+        "text/format/fontFamilyAndStyle",
+        "text/format/fontName",
+        "text/format/lineSpacing",
+        "timecodeTrigger/bits",
+        "timecodeTrigger/frames",
+        "timecodeTrigger/hours",
+        "timecodeTrigger/minutes",
+        "timecodeTrigger/seconds",
+        "timecodeTrigger/text",
+        "translation",
+        "translation/x",
+        "translation/y",
+        "useSecondColor"
+      ],
+      "video_fx": {
+        "allowed_operations": [],
+        "schema_operations": [
+          "videoEffectIndex/enabled",
+          "videoEffectIndex/parameter",
+          "videoEffectIndex/parameters",
+          "videoEffectIndex/delete",
+          "videoEffectIndex/move",
+          "videoEffects/add",
+          "videoEffects/insert"
+        ],
+        "blocked_operations": {
+          "videoEffectIndex/enabled": "No existing effect with verifiable native type identity.",
+          "videoEffectIndex/parameter": "No existing effect with verifiable native type identity.",
+          "videoEffectIndex/parameters": "No existing effect with verifiable native type identity."
+        },
+        "catalogue_effect_count": 60,
+        "catalogue_parameter_count": 262,
+        "range_policy": "Conservative published bands; QLab can allow values outside them.",
+        "pending_validation": [
+          "videoEffectIndex/delete",
+          "videoEffectIndex/move",
+          "videoEffects/add",
+          "videoEffects/insert"
+        ],
+        "requires_explicit_effect_type": true,
+        "requires_full_stack_preflight": true,
+        "excluded": [
+          "Fade FX flags",
+          "/live",
+          "effect-name write addressing"
+        ]
+      },
+      "text_format": {
+        "property": "text/format",
+        "selectors": [
+          "full",
+          "range",
+          "word"
+        ],
+        "requires_complete_text_and_runs": true,
+        "pending_validation": [
+          "word tokenization",
+          "percentage rounding",
+          "font resolution",
+          "partial shadow line scope"
+        ],
+        "native_index_unit": "utf16",
+        "ranges_verified": true,
+        "unicode_formatting_pending": false,
+        "validated_json_attributes": [
+          "color",
+          "fontSize",
+          "lineSpacing"
+        ]
+      },
+      "blocked_properties": {
+        "videoEffectIndex/enabled": "Native effect type identity is unavailable; parameter keys cannot prove identity.",
+        "fadeAndStopOthers": "Scope readback must be an integer, not boolean.",
+        "text/format/shadowOffset/width": "Format fragments omit this attribute or have mixed values.",
+        "text/format/backgroundColor": "Format fragments omit this attribute or have mixed values.",
+        "text/format/shadowOffset/height": "Format fragments omit this attribute or have mixed values.",
+        "text/format/strikethroughStyle": "Format fragments omit this attribute or have mixed values.",
+        "text/format/underlineStyle": "Format fragments omit this attribute or have mixed values.",
+        "text/format/underlineColor": "Format fragments omit this attribute or have mixed values.",
+        "text/format/shadowColor": "Format fragments omit this attribute or have mixed values.",
+        "text/format/shadowOffset": "Format fragments omit this attribute or have mixed values.",
+        "text/format/strikethroughColor": "Format fragments omit this attribute or have mixed values.",
+        "text/format/shadowBlurRadius": "Format fragments omit this attribute or have mixed values.",
+        "text/format/fontSize": "Format fragments omit this attribute or have mixed values."
+      },
+      "requires_fresh_preflight": true,
+      "unavailable_via_osc": [
+        "Hotkey/MIDI/Wall Clock setup",
+        "Timecode activation/display"
+      ],
+      "excluded": [
+        "Audio Maps",
+        "/live",
+        "cue execution",
+        "workspace stage/region edits"
+      ],
+      "pending_validation": [
+        "effect creation/deletion/reordering and parameters",
+        "Audio FX",
+        "Text fragment formatting",
+        "Camera input channel bounds"
+      ],
+      "blocked_operations": [
+        "setDefaultLevels",
+        "setSilentLevels"
+      ]
+    },
+    "selected_video_effects": [],
+    "technical_payload": {
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": 0.0,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "timecodeTriggerText": "1:00:00:00",
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "allowsEditingDuration": true,
+      "colorName": "none",
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "notes": "",
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isPanicking": false,
+      "isTailingOut": false,
+      "preWait": 0.0,
+      "duration": 0.0,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "stageID": "A0CA9B3F-A783-54BF-9B36-25572F3C93EF",
+      "stageName": "Stage 9",
+      "stageNumber": 9,
+      "cueSize": {
+        "width": 401.0,
+        "height": 147.0
+      },
+      "anchor": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "translation": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "scale": {
+        "x": 1.0,
+        "y": 1.0
+      },
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cropTop": 0.0,
+      "cropBottom": 0.0,
+      "cropLeft": 0.0,
+      "cropRight": 0.0,
+      "opacity": 1.0,
+      "layer": 1000,
+      "blendMode": "Normal",
+      "fillStage": false,
+      "fillStyle": 0,
+      "preserveAspectRatio": true,
+      "smooth": true,
+      "videoEffects": [],
+      "text": "Mcp video text",
+      "fixedWidth": 0.0,
+      "outputSize": {
+        "width": 401.0,
+        "height": 147.0
+      },
+      "fragments": [
+        {
+          "range": [
+            0,
+            3
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 48.0,
+          "lineSpacing": 1.6,
+          "color": [
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "alignment": "center"
+        },
+        {
+          "range": [
+            3,
+            1
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.6,
+          "color": [
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "alignment": "center"
+        },
+        {
+          "range": [
+            4,
+            10
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 60.0,
+          "lineSpacing": 1.6,
+          "color": [
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "alignment": "center"
+        }
+      ],
+      "alignment": "center",
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold",
+      "fontFamilyAndStyle": {
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold"
+      },
+      "fontName": "HelveticaNeue-Bold",
+      "fontSize": 48.0,
+      "lineSpacing": 1.6,
+      "color": [
+        1.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "text/format": [
+        {
+          "fontSize": 48,
+          "color": [
+            1,
+            0,
+            0,
+            1
+          ],
+          "fontName": "HelveticaNeue-Bold",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "alignment": "center",
+          "range": [
+            0,
+            3
+          ],
+          "lineSpacing": 1.6
+        },
+        {
+          "fontSize": 72,
+          "color": [
+            1,
+            0,
+            0,
+            1
+          ],
+          "fontName": "HelveticaNeue-Bold",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "alignment": "center",
+          "range": [
+            3,
+            1
+          ],
+          "lineSpacing": 1.6
+        },
+        {
+          "fontSize": 60,
+          "color": [
+            1,
+            0,
+            0,
+            1
+          ],
+          "fontName": "HelveticaNeue-Bold",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "alignment": "center",
+          "range": [
+            4,
+            10
+          ],
+          "lineSpacing": 1.6
+        }
+      ]
+    },
+    "redactions": [],
+    "identity": {
+      "uniqueID": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+      "type": "Text",
+      "number": "v1",
+      "name": "Text1",
+      "displayName": "Text1",
+      "parent_id": "A7009EC9-EE49-5C3F-AFBF-8AB9B4159E13",
+      "cue_list_id": null,
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false
+    },
+    "text": {
+      "text": "Mcp video text",
+      "fixedWidth": 0.0,
+      "outputSize": {
+        "width": 401.0,
+        "height": 147.0
+      },
+      "fragments": [
+        {
+          "range": [
+            0,
+            3
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 48.0,
+          "lineSpacing": 1.6,
+          "color": [
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "alignment": "center",
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        },
+        {
+          "range": [
+            3,
+            1
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.6,
+          "color": [
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "alignment": "center",
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        },
+        {
+          "range": [
+            4,
+            10
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 60.0,
+          "lineSpacing": 1.6,
+          "color": [
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "alignment": "center",
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      ],
+      "alignment": "center",
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold",
+      "fontFamilyAndStyle": {
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold"
+      },
+      "fontName": "HelveticaNeue-Bold",
+      "fontSize": 48.0,
+      "lineSpacing": 1.6,
+      "color": [
+        1.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "backgroundColor": null,
+      "shadowColor": null,
+      "shadowBlurRadius": null,
+      "shadowOffset": null,
+      "strikethroughColor": null,
+      "underlineColor": null,
+      "strikethroughStyle": null,
+      "underlineStyle": null
+    }
+  },
+  "content_restored_dry": {
+    "ok": true,
+    "status": "dry_run",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": true,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 0,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+        "cue_id": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+        "profile": "text_basic",
+        "status": "dry_run",
+        "properties": {
+          "text": "Mcp video text"
+        },
+        "operations": [
+          {
+            "operation": "set_property",
+            "property": "text",
+            "path": "text",
+            "mode": "saved",
+            "args": [
+              "Mcp video text"
+            ],
+            "arg_values": {
+              "value": "Mcp video text"
+            },
+            "read_key": "text",
+            "risk_tier": "high",
+            "real_write_enabled": true,
+            "capability_gate": "video_visual",
+            "readback": "value",
+            "contextual_requirements": [],
+            "real_write_possible": true,
+            "requires_confirm_token": true
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "parent": "A7009EC9-EE49-5C3F-AFBF-8AB9B4159E13",
+          "type": "Text",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+          "isWarning": false,
+          "allowsEditingDuration": true,
+          "isBroken": false,
+          "text": "Mcp video text"
+        },
+        "after": null,
+        "diff": {
+          "text": {
+            "before": "Mcp video text",
+            "requested": "Mcp video text"
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "text",
+            "key": "text",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917/text",
+            "args": [
+              "Mcp video text"
+            ],
+            "status": "planned"
+          }
+        ],
+        "executed_operations": [],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "dry_run"
+  },
+  "content_restored": {
+    "ok": true,
+    "status": "updated",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": false,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 1,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+        "cue_id": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+        "profile": "text_basic",
+        "status": "updated",
+        "properties": {
+          "text": "Mcp video text"
+        },
+        "operations": [
+          {
+            "operation": "set_property",
+            "property": "text",
+            "path": "text",
+            "mode": "saved",
+            "args": [
+              "Mcp video text"
+            ],
+            "arg_values": {
+              "value": "Mcp video text"
+            },
+            "read_key": "text",
+            "risk_tier": "high",
+            "real_write_enabled": true,
+            "capability_gate": "video_visual",
+            "readback": "value",
+            "contextual_requirements": [],
+            "real_write_possible": true,
+            "requires_confirm_token": true
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "parent": "A7009EC9-EE49-5C3F-AFBF-8AB9B4159E13",
+          "type": "Text",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+          "isWarning": false,
+          "allowsEditingDuration": true,
+          "isBroken": false,
+          "text": "Mcp video text"
+        },
+        "after": {
+          "type": "Text",
+          "uniqueID": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+          "text": "Mcp video text"
+        },
+        "diff": {
+          "text": {
+            "before": "Mcp video text",
+            "requested": "Mcp video text"
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "text",
+            "key": "text",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917/text",
+            "args": [
+              "Mcp video text"
+            ],
+            "status": "verified"
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "set_property",
+            "property": "text",
+            "key": "text",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917/text",
+            "args": [
+              "Mcp video text"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "updated"
+  },
+  "format_restored_dry": {
+    "ok": true,
+    "status": "dry_run",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": true,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 0,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+        "cue_id": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+        "profile": "text_basic",
+        "status": "dry_run",
+        "properties": {
+          "text/format@0": {
+            "selector": {
+              "kind": "full"
+            },
+            "attributes": {
+              "fontSize": 72
+            }
+          }
+        },
+        "operations": [
+          {
+            "property": "text/format@0",
+            "path": "text/format",
+            "args": [
+              "{\"fontSize\":72}"
+            ],
+            "arg_values": {
+              "selector": {
+                "kind": "full"
+              },
+              "attributes": {
+                "fontSize": 72
+              }
+            },
+            "real_write_enabled": true,
+            "real_write_possible": true,
+            "requires_confirm_token": true
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "parent": "A7009EC9-EE49-5C3F-AFBF-8AB9B4159E13",
+          "type": "Text",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+          "isWarning": false,
+          "allowsEditingDuration": true,
+          "isBroken": false,
+          "text/format@0": {
+            "text": "Mcp video text",
+            "runs": [
+              {
+                "fontSize": 48,
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ],
+                "fontName": "HelveticaNeue-Bold",
+                "fontFamily": "Helvetica Neue",
+                "fontStyle": "Bold",
+                "alignment": "center",
+                "range": [
+                  0,
+                  14
+                ],
+                "lineSpacing": 1.6
+              }
+            ]
+          }
+        },
+        "after": null,
+        "diff": {
+          "text/format@0": {
+            "before": {
+              "text": "Mcp video text",
+              "runs": [
+                {
+                  "fontSize": 48,
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    14
+                  ],
+                  "lineSpacing": 1.6
+                }
+              ]
+            },
+            "requested": {
+              "selector": {
+                "kind": "full"
+              },
+              "attributes": {
+                "fontSize": 72
+              }
+            }
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917/text/format",
+            "args": [
+              "{\"fontSize\":72}"
+            ],
+            "status": "planned"
+          }
+        ],
+        "executed_operations": [],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "dry_run"
+  },
+  "format_restored": {
+    "ok": true,
+    "status": "updated",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": false,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 1,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+        "cue_id": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+        "profile": "text_basic",
+        "status": "updated",
+        "properties": {
+          "text/format@0": {
+            "selector": {
+              "kind": "full"
+            },
+            "attributes": {
+              "fontSize": 72
+            }
+          }
+        },
+        "operations": [
+          {
+            "property": "text/format@0",
+            "path": "text/format",
+            "args": [
+              "{\"fontSize\":72}"
+            ],
+            "arg_values": {
+              "selector": {
+                "kind": "full"
+              },
+              "attributes": {
+                "fontSize": 72
+              }
+            },
+            "real_write_enabled": true,
+            "real_write_possible": true,
+            "requires_confirm_token": true
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "parent": "A7009EC9-EE49-5C3F-AFBF-8AB9B4159E13",
+          "type": "Text",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "uniqueID": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+          "isWarning": false,
+          "allowsEditingDuration": true,
+          "isBroken": false,
+          "text/format@0": {
+            "text": "Mcp video text",
+            "runs": [
+              {
+                "fontSize": 48,
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ],
+                "fontName": "HelveticaNeue-Bold",
+                "fontFamily": "Helvetica Neue",
+                "fontStyle": "Bold",
+                "alignment": "center",
+                "range": [
+                  0,
+                  14
+                ],
+                "lineSpacing": 1.6
+              }
+            ]
+          }
+        },
+        "after": {
+          "type": "Text",
+          "uniqueID": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+          "text/format@0": {
+            "text": "Mcp video text",
+            "runs": [
+              {
+                "fontSize": 72,
+                "color": [
+                  1,
+                  0,
+                  0,
+                  1
+                ],
+                "fontName": "HelveticaNeue-Bold",
+                "fontFamily": "Helvetica Neue",
+                "fontStyle": "Bold",
+                "alignment": "center",
+                "range": [
+                  0,
+                  14
+                ],
+                "lineSpacing": 1.6
+              }
+            ]
+          }
+        },
+        "diff": {
+          "text/format@0": {
+            "before": {
+              "text": "Mcp video text",
+              "runs": [
+                {
+                  "fontSize": 48,
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "fontName": "HelveticaNeue-Bold",
+                  "fontFamily": "Helvetica Neue",
+                  "fontStyle": "Bold",
+                  "alignment": "center",
+                  "range": [
+                    0,
+                    14
+                  ],
+                  "lineSpacing": 1.6
+                }
+              ]
+            },
+            "requested": {
+              "selector": {
+                "kind": "full"
+              },
+              "attributes": {
+                "fontSize": 72
+              }
+            }
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917/text/format",
+            "args": [
+              "{\"fontSize\":72}"
+            ],
+            "status": "verified"
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "set_property",
+            "property": "text/format@0",
+            "key": "text/format@0",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917/text/format",
+            "args": [
+              "{\"fontSize\":72}"
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "updated"
+  },
+  "restored_readback": {
+    "ok": true,
+    "status": "ok",
+    "partial": false,
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "error_code": null,
+    "message": null,
+    "suggested_action": null,
+    "coverage": {
+      "source": "documented_osc",
+      "unavailable_via_osc": [],
+      "unavailable_fields": [
+        "isChildAuditioning",
+        "isChildFlagged",
+        "text/format/backgroundColor",
+        "text/format/shadowColor",
+        "text/format/shadowBlurRadius",
+        "text/format/shadowOffset",
+        "text/format/strikethroughColor",
+        "text/format/underlineColor",
+        "text/format/strikethroughStyle",
+        "text/format/underlineStyle"
+      ],
+      "failed_routes": [],
+      "notes": [
+        "Audio Maps, Audio Objects, live metrics and indexed effect reads are excluded.",
+        "Containing Cue List context comes from qlab_get_text_cues; detail reads only the immediate parent.",
+        "Stage/input references do not expand patches, stages, regions or routes."
+      ]
+    },
+    "warnings": [
+      "Technical notes and paths may contain sensitive free text."
+    ],
+    "errors": {},
+    "cue_id": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+    "profile": "technical",
+    "basics": {
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "allowsEditingDuration": true,
+      "colorName": "none",
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "notes": ""
+    },
+    "state": {
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": null,
+      "isChildFlagged": null,
+      "isPanicking": false,
+      "isTailingOut": false
+    },
+    "timing": {
+      "preWait": 0.0,
+      "duration": 0.0,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      }
+    },
+    "video": {
+      "stageID": "A0CA9B3F-A783-54BF-9B36-25572F3C93EF",
+      "stageName": "Stage 9",
+      "stageNumber": 9,
+      "cueSize": {
+        "width": 507.0,
+        "height": 152.0
+      },
+      "anchor": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "translation": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "scale": {
+        "x": 1.0,
+        "y": 1.0
+      },
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cropTop": 0.0,
+      "cropBottom": 0.0,
+      "cropLeft": 0.0,
+      "cropRight": 0.0,
+      "opacity": 1.0,
+      "layer": 1000,
+      "blendMode": "Normal",
+      "fillStage": false,
+      "fillStyle": 0,
+      "preserveAspectRatio": true,
+      "smooth": true,
+      "videoEffects": []
+    },
+    "triggers": {
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": 0.0,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "timecodeTriggerText": "1:00:00:00"
+    },
+    "edit_capabilities": {
+      "tool": "qlab_edit_text_cues",
+      "allowed_properties": [
+        "anchor",
+        "anchor/x",
+        "anchor/y",
+        "armed",
+        "autoLoad",
+        "blendMode",
+        "colorName",
+        "continueMode",
+        "crop",
+        "cropBottom",
+        "cropLeft",
+        "cropRight",
+        "cropTop",
+        "duckLevel",
+        "duckOthers",
+        "duckTime",
+        "duration",
+        "fadeAndStopOthersTime",
+        "fillStage",
+        "fillStyle",
+        "fixedWidth",
+        "flagged",
+        "layer",
+        "name",
+        "notes",
+        "number",
+        "opacity",
+        "origin",
+        "origin/x",
+        "origin/y",
+        "postWait",
+        "preWait",
+        "preserveAspectRatio",
+        "quaternion",
+        "resetRotation",
+        "scale",
+        "scale/x",
+        "scale/y",
+        "secondColorName",
+        "secondTriggerAction",
+        "secondTriggerOnRelease",
+        "skipIfDisarmed",
+        "smooth",
+        "stageID",
+        "text",
+        "text/format/alignment",
+        "text/format/color",
+        "text/format/fontFamilyAndStyle",
+        "text/format/fontName",
+        "text/format/fontSize",
+        "text/format/lineSpacing",
+        "timecodeTrigger/bits",
+        "timecodeTrigger/frames",
+        "timecodeTrigger/hours",
+        "timecodeTrigger/minutes",
+        "timecodeTrigger/seconds",
+        "timecodeTrigger/text",
+        "translation",
+        "translation/x",
+        "translation/y",
+        "useSecondColor"
+      ],
+      "video_fx": {
+        "allowed_operations": [],
+        "schema_operations": [
+          "videoEffectIndex/enabled",
+          "videoEffectIndex/parameter",
+          "videoEffectIndex/parameters",
+          "videoEffectIndex/delete",
+          "videoEffectIndex/move",
+          "videoEffects/add",
+          "videoEffects/insert"
+        ],
+        "blocked_operations": {
+          "videoEffectIndex/enabled": "No existing effect with verifiable native type identity.",
+          "videoEffectIndex/parameter": "No existing effect with verifiable native type identity.",
+          "videoEffectIndex/parameters": "No existing effect with verifiable native type identity."
+        },
+        "catalogue_effect_count": 60,
+        "catalogue_parameter_count": 262,
+        "range_policy": "Conservative published bands; QLab can allow values outside them.",
+        "pending_validation": [
+          "videoEffectIndex/delete",
+          "videoEffectIndex/move",
+          "videoEffects/add",
+          "videoEffects/insert"
+        ],
+        "requires_explicit_effect_type": true,
+        "requires_full_stack_preflight": true,
+        "excluded": [
+          "Fade FX flags",
+          "/live",
+          "effect-name write addressing"
+        ]
+      },
+      "text_format": {
+        "property": "text/format",
+        "selectors": [
+          "full",
+          "range",
+          "word"
+        ],
+        "requires_complete_text_and_runs": true,
+        "pending_validation": [
+          "word tokenization",
+          "percentage rounding",
+          "font resolution",
+          "partial shadow line scope"
+        ],
+        "native_index_unit": "utf16",
+        "ranges_verified": true,
+        "unicode_formatting_pending": false,
+        "validated_json_attributes": [
+          "color",
+          "fontSize",
+          "lineSpacing"
+        ]
+      },
+      "blocked_properties": {
+        "videoEffectIndex/enabled": "Native effect type identity is unavailable; parameter keys cannot prove identity.",
+        "fadeAndStopOthers": "Scope readback must be an integer, not boolean.",
+        "text/format/shadowOffset/width": "Format fragments omit this attribute or have mixed values.",
+        "text/format/backgroundColor": "Format fragments omit this attribute or have mixed values.",
+        "text/format/shadowOffset/height": "Format fragments omit this attribute or have mixed values.",
+        "text/format/strikethroughStyle": "Format fragments omit this attribute or have mixed values.",
+        "text/format/underlineStyle": "Format fragments omit this attribute or have mixed values.",
+        "text/format/underlineColor": "Format fragments omit this attribute or have mixed values.",
+        "text/format/shadowColor": "Format fragments omit this attribute or have mixed values.",
+        "text/format/shadowOffset": "Format fragments omit this attribute or have mixed values.",
+        "text/format/strikethroughColor": "Format fragments omit this attribute or have mixed values.",
+        "text/format/shadowBlurRadius": "Format fragments omit this attribute or have mixed values."
+      },
+      "requires_fresh_preflight": true,
+      "unavailable_via_osc": [
+        "Hotkey/MIDI/Wall Clock setup",
+        "Timecode activation/display"
+      ],
+      "excluded": [
+        "Audio Maps",
+        "/live",
+        "cue execution",
+        "workspace stage/region edits"
+      ],
+      "pending_validation": [
+        "effect creation/deletion/reordering and parameters",
+        "Audio FX",
+        "Text fragment formatting",
+        "Camera input channel bounds"
+      ],
+      "blocked_operations": [
+        "setDefaultLevels",
+        "setSilentLevels"
+      ]
+    },
+    "selected_video_effects": [],
+    "technical_payload": {
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": 0.0,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "timecodeTriggerText": "1:00:00:00",
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "allowsEditingDuration": true,
+      "colorName": "none",
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "notes": "",
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isPanicking": false,
+      "isTailingOut": false,
+      "preWait": 0.0,
+      "duration": 0.0,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "stageID": "A0CA9B3F-A783-54BF-9B36-25572F3C93EF",
+      "stageName": "Stage 9",
+      "stageNumber": 9,
+      "cueSize": {
+        "width": 507.0,
+        "height": 152.0
+      },
+      "anchor": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "translation": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "scale": {
+        "x": 1.0,
+        "y": 1.0
+      },
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "cropTop": 0.0,
+      "cropBottom": 0.0,
+      "cropLeft": 0.0,
+      "cropRight": 0.0,
+      "opacity": 1.0,
+      "layer": 1000,
+      "blendMode": "Normal",
+      "fillStage": false,
+      "fillStyle": 0,
+      "preserveAspectRatio": true,
+      "smooth": true,
+      "videoEffects": [],
+      "text": "Mcp video text",
+      "fixedWidth": 0.0,
+      "outputSize": {
+        "width": 507.0,
+        "height": 152.0
+      },
+      "fragments": [
+        {
+          "range": [
+            0,
+            14
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.6,
+          "color": [
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "alignment": "center"
+        }
+      ],
+      "alignment": "center",
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold",
+      "fontFamilyAndStyle": {
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold"
+      },
+      "fontName": "HelveticaNeue-Bold",
+      "fontSize": 72.0,
+      "lineSpacing": 1.6,
+      "color": [
+        1.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "text/format": [
+        {
+          "fontSize": 72,
+          "color": [
+            1,
+            0,
+            0,
+            1
+          ],
+          "fontName": "HelveticaNeue-Bold",
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "alignment": "center",
+          "range": [
+            0,
+            14
+          ],
+          "lineSpacing": 1.6
+        }
+      ]
+    },
+    "redactions": [],
+    "identity": {
+      "uniqueID": "AF8C54B5-8FEC-5C90-B2E0-E558B2A6C917",
+      "type": "Text",
+      "number": "v1",
+      "name": "Text1",
+      "displayName": "Text1",
+      "parent_id": "A7009EC9-EE49-5C3F-AFBF-8AB9B4159E13",
+      "cue_list_id": null,
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false
+    },
+    "text": {
+      "text": "Mcp video text",
+      "fixedWidth": 0.0,
+      "outputSize": {
+        "width": 507.0,
+        "height": 152.0
+      },
+      "fragments": [
+        {
+          "range": [
+            0,
+            14
+          ],
+          "fontFamily": "Helvetica Neue",
+          "fontStyle": "Bold",
+          "fontName": "HelveticaNeue-Bold",
+          "fontSize": 72.0,
+          "lineSpacing": 1.6,
+          "color": [
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "alignment": "center",
+          "backgroundColor": null,
+          "shadowColor": null,
+          "shadowBlurRadius": null,
+          "shadowOffset": null,
+          "strikethroughColor": null,
+          "underlineColor": null,
+          "strikethroughStyle": null,
+          "underlineStyle": null
+        }
+      ],
+      "alignment": "center",
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold",
+      "fontFamilyAndStyle": {
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold"
+      },
+      "fontName": "HelveticaNeue-Bold",
+      "fontSize": 72.0,
+      "lineSpacing": 1.6,
+      "color": [
+        1.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "backgroundColor": null,
+      "shadowColor": null,
+      "shadowBlurRadius": null,
+      "shadowOffset": null,
+      "strikethroughColor": null,
+      "underlineColor": null,
+      "strikethroughStyle": null,
+      "underlineStyle": null
+    }
+  }
+}

@@ -1,5 +1,11 @@
 # QLab MCP — Workspace Settings Write Surface Research
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 **Date:** 2026-08-15
 **Status:** Research-only. No production code, public MCP tool, QLab workspace, branch, PR, or version was changed.
 **Scope:** QLab 5.5 Workspace Settings writes, with the current QLab MCP OSC architecture as the constraint.

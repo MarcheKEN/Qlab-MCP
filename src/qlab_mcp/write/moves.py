@@ -17,12 +17,34 @@ from .safety import ensure_write_ready, resolve_dry_run
 
 
 LINEAR_PLACEMENT_FIELDS = ("destination_index", "before_cue_id", "after_cue_id", "position")
-MAX_BATCH_MOVES = 10
+MAX_BATCH_MOVES = 50
 MOVE_TOKEN_TTL_SECONDS = 300
 MOVE_CONVERGENCE_DEADLINES_SECONDS = (0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0, 8.0, 10.0)
 _MOVE_TOKEN_SECRET = secrets.token_bytes(32)
 _LINEAR_PARENT_TYPES = {"Cue List", "Group"}
 _CART_PARENT_TYPES = {"Cue Cart", "Cart"}
+
+
+def move_cue_lists(
+    reader: Any, workspace_id: str, moves: list[dict[str, Any]],
+    dry_run: bool | None = None, confirm_token: str | None = None,
+) -> dict[str, Any]:
+    """Reorder root Lists and Carts through the shared verified move executor."""
+    allowed = {"cue_id", *LINEAR_PLACEMENT_FIELDS}
+    if not isinstance(moves, list) or any(not isinstance(move, dict) or set(move) - allowed for move in moves):
+        raise UnsafeWriteOperationError("Root moves accept cue_id and linear placement fields only.")
+    result = move_cues(reader, workspace_id, moves, dry_run, confirm_token, _root_moves=True)
+    if not result["ok"] and not result["results"]:
+        pending = []
+        for move in moves:
+            try:
+                cue_id = _uuid_key(move.get("cue_id"), "cue_id")
+            except (TypeError, ValueError):
+                continue
+            if cue_id not in pending:
+                pending.append(cue_id)
+        result["pending_cue_ids"] = pending
+    return result
 
 
 def simulate_move_batch(
@@ -102,6 +124,8 @@ def move_cues(
     moves: list[dict[str, Any]],
     dry_run: bool | None = None,
     confirm_token: str | None = None,
+    *,
+    _root_moves: bool = False,
 ) -> dict[str, Any]:
     """Plan or execute a structurally safe batch; Cue Cart writes remain runtime-gated."""
     if not isinstance(moves, list) or not moves:
@@ -112,7 +136,7 @@ def move_cues(
     effective_dry_run = resolve_dry_run(reader, dry_run)
     workspace = _resolve_workspace(reader, workspace_id)
     try:
-        snapshot = _read_snapshot(reader, workspace)
+        snapshot = _read_snapshot(reader, workspace, root_moves=True) if _root_moves else _read_snapshot(reader, workspace)
     except Exception as exc:
         return _result(
             ok=False,
@@ -125,7 +149,29 @@ def move_cues(
             errors={"structure": str(exc)},
             message="Cue move preflight could not read a complete fresh workspace structure.",
         )
-    normalized, errors = _normalize_moves(snapshot, moves)
+    normalized, errors = _normalize_moves(snapshot, moves, allow_moved_references=_root_moves)
+    if _root_moves:
+        for index, move in enumerate(normalized):
+            if move["source_parent_id"] != "__root__" or move["destination_parent_id"] != "__root__":
+                errors[f"moves[{index}]"] = "Only root Cue Lists and Cue Carts may be reordered."
+    if not errors:
+        targets = {move[field] for move in normalized for field in ("cue_id", "destination_parent_id")}
+        for cue_id in sorted(targets):
+            if cue_id == "__root__":
+                continue
+            try:
+                cue = snapshot["nodes"][cue_id]
+                values = reader.read_cue_values(
+                    workspace, cue["uniqueID"], ["isBroken", "isWarning"], cacheable=False,
+                )["values"]
+                if not isinstance(values, dict) or any(
+                    type(values.get(key)) not in (bool, int) or values[key] not in (0, 1)
+                    for key in ("isBroken", "isWarning")
+                ):
+                    raise ValueError("QLab did not return complete boolean cue health.")
+                cue.update(values)
+            except Exception as exc:
+                errors[f"health.{cue_id}"] = str(exc)
     if errors:
         return _result(
             ok=False,
@@ -139,7 +185,15 @@ def move_cues(
             message="Cue move preflight failed; no mutating OSC commands were sent.",
         )
 
-    activity = _activity_snapshot(reader, workspace)
+    try:
+        activity = _activity_snapshot(reader, workspace)
+    except Exception as exc:
+        return _result(
+            ok=False, status="preflight_failed", workspace_id=workspace,
+            dry_run=effective_dry_run, requested_count=len(moves), failed_count=len(moves),
+            results=[], pending_cue_ids=[move["cue_id"] for move in normalized],
+            errors={"activity": str(exc)}, message="Cue move activity preflight could not be read.",
+        )
     if activity["active_count"]:
         return _result(
             ok=False,
@@ -154,7 +208,7 @@ def move_cues(
         )
 
     try:
-        simulated = simulate_move_batch(snapshot["children_by_parent"], normalized)
+        simulate_move_batch(snapshot["children_by_parent"], normalized)
     except ValueError as exc:
         return _result(
             ok=False,
@@ -170,7 +224,7 @@ def move_cues(
 
     plan = _build_plan(snapshot, normalized, activity)
     if effective_dry_run:
-        token = _encode_token(workspace, plan)
+        token = _encode_token(workspace, plan, family="moveCueLists" if _root_moves else "moveCues")
         return _result(
             ok=True,
             status="planned",
@@ -182,13 +236,22 @@ def move_cues(
             confirm_token=token,
             warnings=[
                 "Dry run only: no mutating OSC commands were sent to QLab.",
-                "Cue Cart execution remains runtime-blocked until disposable-workspace semantics are recorded.",
+                *([] if _root_moves else ["Cue Cart execution remains runtime-blocked until disposable-workspace semantics are recorded."]),
+                *_health_warnings(plan),
             ],
             message="Cue move batch planned; review the dedicated confirmation token before real execution.",
         )
 
-    ensure_write_ready(reader, workspace)
-    payload, token_error = _decode_token(confirm_token)
+    try:
+        ensure_write_ready(reader, workspace)
+    except Exception as exc:
+        return _result(
+            ok=False, status="preflight_failed", workspace_id=workspace, dry_run=False,
+            requested_count=len(plan), planned_count=len(plan), failed_count=len(plan),
+            results=plan, pending_cue_ids=[item["cue_id"] for item in plan],
+            errors={"readiness": str(exc)}, message="Cue move readiness preflight failed.",
+        )
+    payload, token_error = _decode_token(confirm_token, family="moveCueLists" if _root_moves else "moveCues")
     if token_error:
         return _result(
             ok=False,
@@ -238,38 +301,44 @@ def _execute_linear_batch(
 ) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     moved_count = 0
+    affected_parents = _affected_parents(initial_snapshot["children_by_parent"], moves)
+    root_moves = "__root__" in initial_snapshot["children_by_parent"]
     for index, item in enumerate(plan):
-        if _activity_snapshot(reader, workspace_id)["active_count"]:
-            return _execution_failure(
-                workspace_id,
-                plan,
-                results,
-                moved_count,
-                index,
-                item,
-                "Workspace activity changed before the structural setter was sent.",
-            )
         expected = simulate_move_batch(initial_snapshot["children_by_parent"], moves[: index + 1])["children_by_parent"]
+        before = simulate_move_batch(initial_snapshot["children_by_parent"], moves[:index])["children_by_parent"]
         try:
-            reply = reader.client.request(
-                item["address"].replace("{workspace_id}", workspace_id),
-                *item["args"],
+            if _activity_snapshot(reader, workspace_id)["active_count"]:
+                raise UnsafeWriteOperationError("Workspace activity changed before the structural setter was sent.")
+            current = _read_snapshot(reader, workspace_id, root_moves=True) if root_moves else _read_snapshot(reader, workspace_id)
+            if not _tree_matches(current, before, affected_parents):
+                raise UnsafeWriteOperationError("Affected container structure changed before the structural setter was sent.")
+        except Exception as exc:
+            return _execution_failure(
+                workspace_id, plan, results, moved_count, index, item, str(exc),
+                status="partial_failed" if moved_count else "preflight_failed",
             )
-            reply_data = getattr(reply, "data", None)
-            reply_status = getattr(reply, "status", "ok")
+        attempted = before != expected
+        try:
+            if not attempted:
+                reply_data = None
+                reply_status = "skipped_no_op"
+            else:
+                reply = reader.client.request(
+                    item["address"].replace("{workspace_id}", workspace_id), *item["args"],
+                )
+                reply_data = getattr(reply, "data", None)
+                reply_status = getattr(reply, "status", "ok")
+                if reply_status != "ok":
+                    raise QLabReplyError(reply_status, reply_data, item["address"])
         except OscTimeoutError as exc:
             reply_data = None
             reply_status = "timeout_pending_readback"
             reply_error = str(exc)
-        except (QLabReplyError, Exception) as exc:
+        except Exception as exc:
             return _execution_failure(
-                workspace_id,
-                plan,
-                results,
-                moved_count,
-                index,
-                item,
-                str(exc),
+                workspace_id, plan, results, moved_count, index, item, str(exc),
+                attempted=attempted, uncertain=not isinstance(exc, QLabReplyError),
+                status="partial_failed" if isinstance(exc, QLabReplyError) else "verification_inconclusive",
             )
 
         expected_children = expected[item["destination_parent_id"]]
@@ -279,6 +348,7 @@ def _execute_linear_batch(
             workspace_id,
             item["cue_id"],
             {"parent_id": item["destination_parent_id"], "index": expected_index},
+            expected_tree={parent: expected[parent] for parent in affected_parents},
         )
         if not verification["ok"]:
             return _execution_failure(
@@ -290,11 +360,13 @@ def _execute_linear_batch(
                 item,
                 verification["error"],
                 status="verification_inconclusive",
+                attempted=attempted, uncertain=attempted,
                 readback=verification["readback"],
                 reply_status=reply_status,
                 reply_data=reply_data,
                 verification_status=verification["verification_status"],
                 verification_elapsed_ms=verification["elapsed_ms"],
+                structure_readback=verification["structure_readback"],
             )
         results.append(
             {
@@ -304,6 +376,7 @@ def _execute_linear_batch(
                 "reply_data": reply_data,
                 "reply_data_status": "provisional",
                 "readback": verification["readback"],
+                "structure_readback": verification["structure_readback"],
                 "verification_status": verification["verification_status"],
                 "verification_elapsed_ms": verification["elapsed_ms"],
                 **({"reply_error": reply_error} if reply_status == "timeout_pending_readback" else {}),
@@ -311,16 +384,16 @@ def _execute_linear_batch(
         )
         moved_count += 1
 
-    if _activity_snapshot(reader, workspace_id)["active_count"]:
+    try:
+        if _activity_snapshot(reader, workspace_id)["active_count"]:
+            raise UnsafeWriteOperationError("Workspace activity changed after structural execution.")
+        final = _read_snapshot(reader, workspace_id, root_moves=True) if root_moves else _read_snapshot(reader, workspace_id)
+        if not _tree_matches(final, expected, affected_parents):
+            raise UnsafeWriteOperationError("Final affected container structure differs from the simulated batch.")
+    except Exception as exc:
         return _execution_failure(
-            workspace_id,
-            plan,
-            results,
-            moved_count,
-            len(plan) - 1,
-            plan[-1],
-            "Workspace activity changed after structural execution.",
-            status="verification_failed",
+            workspace_id, plan, results, moved_count, len(plan), plan[-1], str(exc),
+            status="verification_failed", final_audit=True,
         )
 
     timeout_confirmed_count = sum(item["status"] == "moved_with_confirmed_timeout" for item in results)
@@ -342,10 +415,30 @@ def _execute_linear_batch(
         planned_count=len(plan),
         moved_count=moved_count,
         results=results,
-        warnings=["Moves were executed sequentially and are not atomic."],
+        warnings=["Moves were executed sequentially and are not atomic.", *_health_warnings(plan)],
         message="Cue move batch completed with fresh structural readback after every move.",
         timeout_confirmed_count=timeout_confirmed_count,
     )
+
+
+def _affected_parents(tree: dict[str, list[str]], moves: list[dict[str, Any]]) -> set[str]:
+    affected = {move[field] for move in moves for field in ("source_parent_id", "destination_parent_id")}
+    # Preserve every container below a moved Group, including empty nested Groups.
+    pending = [move["cue_id"] for move in moves]
+    visited: set[str] = set()
+    while pending:
+        cue_id = pending.pop()
+        if cue_id in visited:
+            continue
+        visited.add(cue_id)
+        if cue_id in tree:
+            affected.add(cue_id)
+            pending.extend(tree[cue_id])
+    return affected
+
+
+def _tree_matches(snapshot: dict[str, Any], expected: dict[str, list[str]], parents: set[str]) -> bool:
+    return all(snapshot["children_by_parent"].get(parent) == expected[parent] for parent in parents)
 
 
 def _readback_position(snapshot: dict[str, Any], cue_id: str) -> dict[str, Any]:
@@ -360,9 +453,12 @@ def _poll_move_convergence(
     workspace_id: str,
     cue_id: str,
     expected: dict[str, Any],
+    *,
+    expected_tree: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     started = time.monotonic()
     last_readback: dict[str, Any] | None = None
+    structure_readback: dict[str, Any] | None = None
     last_error: str | None = None
     previous_deadline = 0.0
     for deadline in MOVE_CONVERGENCE_DEADLINES_SECONDS:
@@ -371,22 +467,26 @@ def _poll_move_convergence(
             time.sleep(delay)
         previous_deadline = deadline
         try:
-            after = _read_snapshot(reader, workspace_id)
+            after = (_read_snapshot(reader, workspace_id, root_moves=True)
+                     if expected.get("parent_id") == "__root__" else _read_snapshot(reader, workspace_id))
             last_readback = _readback_position(after, cue_id)
+            structure_readback = {parent: after["children_by_parent"].get(parent) for parent in expected_tree or {}}
             last_error = None
         except Exception as exc:
             last_error = str(exc)
             continue
-        if last_readback == expected:
+        if last_readback == expected and (expected_tree is None or _tree_matches(after, expected_tree, set(expected_tree))):
             return {
                 "ok": True,
                 "readback": last_readback,
+                "structure_readback": structure_readback,
                 "verification_status": "confirmed_immediately" if deadline == 0 else "confirmed_after_convergence",
                 "elapsed_ms": round((time.monotonic() - started) * 1000),
             }
     return {
         "ok": False,
         "readback": last_readback,
+        "structure_readback": structure_readback,
         "verification_status": "indeterminate",
         "elapsed_ms": round((time.monotonic() - started) * 1000),
         "error": last_error or "Fresh structural readback did not converge within 10 seconds.",
@@ -408,24 +508,32 @@ def _execution_failure(
     reply_data: Any = None,
     verification_status: str | None = None,
     verification_elapsed_ms: int | None = None,
+    structure_readback: dict[str, Any] | None = None,
+    attempted: bool = False,
+    uncertain: bool = False,
+    final_audit: bool = False,
 ) -> dict[str, Any]:
-    results.append(
-        {
-            **item,
-            "status": status,
-            "error": error,
-            **({"readback": readback} if readback else {}),
-            **({"reply_status": reply_status} if reply_status is not None else {}),
-            **({"reply_data": reply_data} if reply_status is not None else {}),
-            **({"reply_data_status": "provisional"} if reply_status is not None else {}),
-            **({"verification_status": verification_status} if verification_status is not None else {}),
-            **({"verification_elapsed_ms": verification_elapsed_ms} if verification_elapsed_ms is not None else {}),
-        }
-    )
+    if not final_audit:
+        results.append(
+            {
+                **item,
+                "status": status,
+                "error": error,
+                "operation_attempted": attempted,
+                **({"structure_readback": structure_readback} if structure_readback is not None else {}),
+                **({"readback": readback} if readback else {}),
+                **({"reply_status": reply_status} if reply_status is not None else {}),
+                **({"reply_data": reply_data} if reply_status is not None else {}),
+                **({"reply_data_status": "provisional"} if reply_status is not None else {}),
+                **({"verification_status": verification_status} if verification_status is not None else {}),
+                **({"verification_elapsed_ms": verification_elapsed_ms} if verification_elapsed_ms is not None else {}),
+            }
+        )
     inverse_moves = [
         {
             "cue_id": completed["cue_id"],
-            "destination_parent_id": completed["source_parent_id"],
+            **({"destination_parent_id": completed["source_parent_id"]}
+               if completed["source_parent_id"] != "__root__" else {}),
             "destination_index": completed["original_index"],
         }
         for completed in reversed(results[:moved_count])
@@ -447,7 +555,10 @@ def _execution_failure(
         }
         if inverse_moves
         else None,
-        errors={f"moves[{failed_index}]": error},
+        pending_cue_ids=[entry["cue_id"] for entry in plan[failed_index + int(attempted):]] if not final_audit else [],
+        uncertain_cue_ids=[item["cue_id"]] if uncertain and not final_audit else [],
+        timeout_confirmed_count=sum(entry.get("status") == "moved_with_confirmed_timeout" for entry in results),
+        errors={"final_audit" if final_audit else f"moves[{failed_index}]": error},
         warnings=["No automatic rollback was sent; successful earlier moves require a fresh confirmed inverse batch."],
         message="Cue move batch stopped after a failed move or unverifiable readback.",
     )
@@ -460,7 +571,7 @@ def _resolve_workspace(reader: Any, workspace_id: str) -> str:
     return str(resolver(workspace_id))
 
 
-def _read_snapshot(reader: Any, workspace_id: str) -> dict[str, Any]:
+def _read_snapshot(reader: Any, workspace_id: str, *, root_moves: bool = False) -> dict[str, Any]:
     nodes: dict[str, dict[str, Any]] = {}
     children_by_parent: dict[str, list[str]] = {}
     parent_by_child: dict[str, str | None] = {}
@@ -509,6 +620,13 @@ def _read_snapshot(reader: Any, workspace_id: str) -> dict[str, Any]:
 
     for root in roots:
         visit(root, None)
+    if root_moves:
+        root_ids = [_uuid_key(root.get("uniqueID"), "root uniqueID") for root in roots]
+        if any(nodes[cue_id]["type"] not in {"Cue List", "Cue Cart", "Cart"} for cue_id in root_ids):
+            raise UnsafeWriteOperationError("Root inventory contains an unsupported container type.")
+        children_by_parent["__root__"] = root_ids
+        nodes["__root__"] = {"uniqueID": "__root__", "type": "Cue List"}
+        parent_by_child.update({cue_id: "__root__" for cue_id in root_ids})
     return {
         "nodes": nodes,
         "children_by_parent": children_by_parent,
@@ -516,7 +634,9 @@ def _read_snapshot(reader: Any, workspace_id: str) -> dict[str, Any]:
     }
 
 
-def _normalize_moves(snapshot: dict[str, Any], moves: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, str]]:
+def _normalize_moves(
+    snapshot: dict[str, Any], moves: list[dict[str, Any]], *, allow_moved_references: bool = False
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
     nodes = snapshot["nodes"]
     parents = snapshot["parent_by_child"]
     normalized: list[dict[str, Any]] = []
@@ -543,8 +663,6 @@ def _normalize_moves(snapshot: dict[str, Any], moves: list[dict[str, Any]]) -> t
             destination = nodes.get(destination_parent)
             if destination is None:
                 raise ValueError("destination_parent_id does not resolve in this workspace.")
-            _validate_health(source, "source")
-            _validate_health(destination, "destination")
             if source.get("type") in CONTAINER_CUE_TYPES and _is_descendant(destination_parent, cue_id, parents):
                 raise ValueError("A Group, Cue List, or Cue Cart cannot move into itself or a descendant.")
 
@@ -596,7 +714,11 @@ def _normalize_moves(snapshot: dict[str, Any], moves: list[dict[str, Any]]) -> t
                     "cue_id": cue_id,
                     "source_parent_id": source_parent,
                     "destination_parent_id": destination_parent,
-                    **{field: raw_move.get(field) for field in LINEAR_PLACEMENT_FIELDS if raw_move.get(field) is not None},
+                    **{
+                        field: _uuid_key(raw_move[field], f"{key}.{field}")
+                        if field in ("before_cue_id", "after_cue_id") else raw_move[field]
+                        for field in LINEAR_PLACEMENT_FIELDS if raw_move.get(field) is not None
+                    },
                     "kind": "linear",
                 }
             )
@@ -604,18 +726,20 @@ def _normalize_moves(snapshot: dict[str, Any], moves: list[dict[str, Any]]) -> t
             errors[key] = str(exc)
     if not errors:
         try:
-            _validate_batch_dependencies(normalized, parents)
+            _validate_batch_dependencies(normalized, parents, allow_moved_references=allow_moved_references)
         except ValueError as exc:
             errors["batch"] = str(exc)
     return normalized, errors
 
 
-def _validate_batch_dependencies(moves: list[dict[str, Any]], parents: dict[str, str | None]) -> None:
+def _validate_batch_dependencies(
+    moves: list[dict[str, Any]], parents: dict[str, str | None], *, allow_moved_references: bool = False
+) -> None:
     sources = {move["cue_id"] for move in moves}
     for move in moves:
         for field in ("before_cue_id", "after_cue_id"):
             reference = move.get(field)
-            if reference in sources:
+            if reference in sources and not allow_moved_references:
                 raise ValueError(f"{field} cannot reference a cue moved in the same batch.")
         destination = move["destination_parent_id"]
         if destination in sources and destination != move["cue_id"]:
@@ -641,8 +765,16 @@ def _build_plan(
         destination_osc_id = nodes[destination_parent]["uniqueID"]
         entry = dict(move)
         entry["original_index"] = initial_tree[source_parent].index(move["cue_id"])
+        if source_parent == "__root__":
+            before = simulate_move_batch(initial_tree, moves[:move_index])["children_by_parent"]
+            entry["original_index"] = before[source_parent].index(move["cue_id"])
         entry["original_neighbors"] = _neighbors(initial_tree[source_parent], move["cue_id"])
         entry["source_parent_fingerprint"] = _fingerprint(initial_tree[source_parent])
+        if move["cue_id"] in initial_tree:
+            entry["source_subtree_fingerprint"] = _fingerprint([
+                json.dumps({parent: children for parent, children in initial_tree.items()
+                            if _is_descendant(parent, move["cue_id"], snapshot["parent_by_child"])}, sort_keys=True)
+            ])
         entry["source_health"] = _health_snapshot(nodes[move["cue_id"]])
         entry["destination_health"] = _health_snapshot(nodes[destination_parent])
         entry["activity_snapshot"] = activity or {"active_count": 0, "active_cue_ids": []}
@@ -672,9 +804,10 @@ def _activity_snapshot(reader: Any, workspace_id: str) -> dict[str, Any]:
     return {"active_count": len(cue_ids), "active_cue_ids": cue_ids}
 
 
-def _validate_health(cue: dict[str, Any], role: str) -> None:
-    if _qlab_bool(cue.get("isBroken")) or _qlab_bool(cue.get("isWarning")):
-        raise ValueError(f"{role} cue must be healthy and unflagged by QLab warnings.")
+def _health_warnings(plan: list[dict[str, Any]]) -> list[str]:
+    if any(any(item[field].values()) for item in plan for field in ("source_health", "destination_health")):
+        return ["Move target health reports broken or warning cues; structural success does not establish playback readiness."]
+    return []
 
 
 def _health_snapshot(cue: dict[str, Any]) -> dict[str, bool]:
@@ -736,22 +869,24 @@ def _token_binding(workspace_id: str, plan: list[dict[str, Any]]) -> dict[str, A
     }
 
 
-def _encode_token(workspace_id: str, plan: list[dict[str, Any]]) -> str:
+def _encode_token(workspace_id: str, plan: list[dict[str, Any]], *, family: str = "moveCues") -> str:
     payload = {
         "binding": _token_binding(workspace_id, plan),
         "expires_at": int(time.time()) + MOVE_TOKEN_TTL_SECONDS,
         "nonce": secrets.token_urlsafe(12),
     }
+    if family != "moveCues":
+        payload["family"] = family
     encoded = _encode_payload(payload)
     signature = hmac.new(_MOVE_TOKEN_SECRET, encoded.encode(), hashlib.sha256).hexdigest()
-    return f"confirm:moveCues:v1:{encoded}:{signature}"
+    return f"confirm:{family}:v1:{encoded}:{signature}"
 
 
-def _decode_token(token: str | None) -> tuple[dict[str, Any] | None, str | None]:
+def _decode_token(token: str | None, *, family: str = "moveCues") -> tuple[dict[str, Any] | None, str | None]:
     if not isinstance(token, str):
         return None, "move confirmation token is required."
     parts = token.split(":")
-    if len(parts) != 5 or parts[:3] != ["confirm", "moveCues", "v1"]:
+    if len(parts) != 5 or parts[:3] != ["confirm", family, "v1"]:
         return None, "move confirmation token is malformed or has an unsupported family."
     encoded, signature = parts[3:]
     expected = hmac.new(_MOVE_TOKEN_SECRET, encoded.encode(), hashlib.sha256).hexdigest()
@@ -763,6 +898,8 @@ def _decode_token(token: str | None) -> tuple[dict[str, Any] | None, str | None]
         return None, "move confirmation token payload is invalid."
     if not isinstance(payload, dict) or not isinstance(payload.get("expires_at"), int):
         return None, "move confirmation token payload is invalid."
+    if payload.get("family", "moveCues") != family:
+        return None, "move confirmation token family is invalid."
     if payload["expires_at"] < int(time.time()):
         return None, "move confirmation token has expired."
     return payload, None
@@ -787,6 +924,8 @@ def _result(
     results: list[dict[str, Any]],
     confirm_token: str | None = None,
     rollback: dict[str, Any] | None = None,
+    pending_cue_ids: list[str] | None = None,
+    uncertain_cue_ids: list[str] | None = None,
     errors: dict[str, str] | None = None,
     warnings: list[str] | None = None,
     message: str,
@@ -804,6 +943,8 @@ def _result(
         "results": results,
         "confirm_token": confirm_token,
         "rollback": rollback,
+        "pending_cue_ids": pending_cue_ids if pending_cue_ids is not None else [item["cue_id"] for item in results if not ok and "status" not in item],
+        "uncertain_cue_ids": uncertain_cue_ids or [],
         "errors": errors,
         "warnings": warnings or [],
         "message": message,

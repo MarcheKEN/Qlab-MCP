@@ -1,5 +1,11 @@
 # 07 — Code Improvements
 
+> Historical evidence or dated plan. Use the [current tools](../../../user/tools.md) and
+> [roadmap](../../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 ## Verdict
 
 The highest-value work is correctness at the OSC/cache boundary, then deletion of repeated write-family machinery. The project does not need a new framework, dependency, service layer or wholesale rewrite. A conservative simplification can remove roughly 875 non-overlapping lines while preserving schemas and safety behavior.

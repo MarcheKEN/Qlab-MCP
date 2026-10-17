@@ -12,12 +12,16 @@ from pydantic import ValidationError
 
 import qlab_mcp.server as server_module
 from qlab_mcp.models import (
+    AudioInputPatchDetail,
+    AudioOutputPatchDetail,
     AudioPatchLevel,
     WorkspaceAudioSettingsOverview,
+    WorkspaceAudioSettingsResult,
     WorkspaceGeneralSettingsData,
     WorkspaceVideoSettingsResult,
 )
 from qlab_mcp.server import mcp
+from qlab_mcp.settings.summarizers import _summarize_audio_patch, _summarize_network_patch
 
 
 def test_workspace_settings_tools_replace_generic_surface() -> None:
@@ -40,7 +44,47 @@ def test_workspace_settings_tools_replace_generic_surface() -> None:
     assert expected <= tool_names
     assert "qlab_get_workspace_settings" not in tool_names
     assert "qlab_get_workspace_setting_details" not in tool_names
-    assert len(tool_names) == 48
+    assert len(tool_names) == 79
+
+
+def test_network_destination_absence_is_unknown() -> None:
+    assert _summarize_network_patch({"name": "Patch", "uniqueID": "id"})["destination_present"] is None
+    assert _summarize_network_patch({"name": "Patch", "destination": "redacted"})["destination_present"] is True
+    assert _summarize_network_patch({"name": "Patch", "uniqueID": "id"})["passcode_present"] is None
+    assert _summarize_network_patch({"name": "Patch", "passcode": "redacted"})["passcode_present"] is True
+
+
+def test_audio_input_patch_details_do_not_advertise_output_patch_edits() -> None:
+    result = WorkspaceAudioSettingsResult.model_validate({
+        "ok": True,
+        "status": "ok",
+        "partial": False,
+        "workspace_id": "ws-1",
+        "view": "input_patch",
+        "data": {"detail": {"name": "Input", "uniqueID": "input-1"}},
+    })
+    assert isinstance(result.data.detail, AudioInputPatchDetail)
+    assert not hasattr(result.data.detail, "editable_operations")
+
+    output = WorkspaceAudioSettingsResult.model_validate({
+        "ok": True,
+        "status": "ok",
+        "partial": False,
+        "workspace_id": "ws-1",
+        "view": "output_patch",
+        "data": {
+            "detail": {
+                "name": "Output",
+                "uniqueID": "output-1",
+                "name_property": "Patch 1",
+                "mute_channels": [],
+                "solo_channels": [],
+                "level": None,
+            }
+        },
+    })
+    assert isinstance(output.data.detail, AudioOutputPatchDetail)
+    assert output.data.detail.editable_operations
 
 
 def test_legacy_workspace_settings_python_tools_are_removed() -> None:
@@ -103,8 +147,8 @@ def test_workspace_settings_tool_schemas_are_domain_specific() -> None:
 
     assert "overview" in tools["qlab_get_workspace_audio_settings"].inputSchema["properties"]["view"]["description"]
     audio_properties = tools["qlab_get_workspace_audio_settings"].inputSchema["properties"]
-    assert audio_properties["input_channel"]["anyOf"][0] == {"maximum": 128, "minimum": 1, "type": "integer"}
-    assert audio_properties["output_channel"]["anyOf"][0] == {"minimum": 1, "type": "integer"}
+    assert audio_properties["input_channel"]["anyOf"][0] == {"maximum": 128, "minimum": 0, "type": "integer"}
+    assert audio_properties["output_channel"]["anyOf"][0] == {"minimum": 0, "type": "integer"}
 
 
 def test_audio_overview_is_fixed_to_audio_and_normalized(monkeypatch) -> None:
@@ -189,7 +233,15 @@ def test_audio_patch_reports_unknown_device_presence() -> None:
 
     patch = overview.output_patches[0]
     assert patch.device_presence_known is False
-    assert patch.device_present is None
+
+
+def test_empty_audio_routing_is_unknown_without_known_device() -> None:
+    patch = _summarize_audio_patch({"name": "Disconnected patch", "routing": []})
+
+    assert patch["routing"] is None
+    assert patch["routing_present"] is None
+    assert patch["routing_count"] is None
+    assert patch["device_present"] is None
 
 
 @pytest.mark.parametrize("value", ["12", True, math.nan, math.inf, -1])
@@ -300,6 +352,7 @@ def test_audio_output_patch_forwards_one_level_query(monkeypatch) -> None:
                 "details": {
                     "name": "Main",
                     "uniqueID": "patch-1",
+                    "name_property": "Main",
                     "routing": [1, 2],
                     "cue_output_count": 2,
                     "output_channel_names": [{"channel": 1, "name": "Left"}],

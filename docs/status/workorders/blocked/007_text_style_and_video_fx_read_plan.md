@@ -1,5 +1,16 @@
 # Video Phase 3F + 4A/4B — Text Style and Video FX Planning
 
+Current note (2026-10-17): This phase is partly superseded by typed Text and FX
+operations. [October 11](../../../development/runtime-validation/2026-10-11-text-selections.md)
+records bounded Latin selectors and punctuation/color cases; [October 14](../../../development/runtime-validation/2026-10-14-editor-completion.md)
+records residual shadow/native-key gaps. Keep blocked only unreadable metadata,
+unsupported fallback/selectors, ambiguous FX identity, unverified reconstruction
+and LinearKey/DropShadow creation. Current typed underline/strikethrough cannot
+be declared globally unavailable from this original failed probe. Family tokens
+are `confirm:controlCue:v1:`; the old phase tokens/specification below are historical.
+
+## Historical phase specification
+
 Status: local implementation revised after runtime validation gaps.
 
 Source: `docs/references/qlab_osc_dictionary.md` for QLab 5.

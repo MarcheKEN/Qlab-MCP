@@ -1,0 +1,90 @@
+[
+  {
+    "phase": "change",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "cue_id": "89398546-0546-59C0-898F-C9557223D902",
+    "type": "DropShadow",
+    "key": "Color",
+    "before": {
+      "Color": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "BlurRadius": 10,
+      "Distance": 0,
+      "Angle": 0,
+      "Alpha": 1
+    },
+    "requested": [
+      0.2,
+      0.3,
+      0.4,
+      1
+    ],
+    "after": {
+      "Color": [
+        0.2,
+        0.3,
+        0.4,
+        1
+      ],
+      "BlurRadius": 10,
+      "Distance": 0,
+      "Angle": 0,
+      "Alpha": 1
+    },
+    "ok": true,
+    "status": "updated",
+    "setter_count": 1,
+    "setter_path": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/89398546-0546-59C0-898F-C9557223D902/videoEffectIndex/0/parameters",
+    "setter_args": [
+      "{\"Color\":[0.2,0.3,0.4,1]}"
+    ]
+  },
+  {
+    "phase": "restore",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "cue_id": "89398546-0546-59C0-898F-C9557223D902",
+    "type": "DropShadow",
+    "key": "Color",
+    "before": {
+      "Color": [
+        0.2,
+        0.3,
+        0.4,
+        1
+      ],
+      "BlurRadius": 10,
+      "Distance": 0,
+      "Angle": 0,
+      "Alpha": 1
+    },
+    "requested": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "after": {
+      "Color": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "BlurRadius": 10,
+      "Distance": 0,
+      "Angle": 0,
+      "Alpha": 1
+    },
+    "ok": true,
+    "status": "updated",
+    "setter_count": 1,
+    "setter_path": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/89398546-0546-59C0-898F-C9557223D902/videoEffectIndex/0/parameters",
+    "setter_args": [
+      "{\"Color\":[0,0,0,1]}"
+    ]
+  }
+]

@@ -1,0 +1,5859 @@
+{
+  "date": "2026-09-27",
+  "purpose": "UUID-case fix installed recheck after user restart",
+  "workspace": {
+    "W": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "L": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+    "G": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D"
+  },
+  "transport": "udp",
+  "qlab_version": "5.5.10",
+  "cue_types": [
+    "memo",
+    "group",
+    "wait",
+    "audio",
+    "mic",
+    "video",
+    "camera",
+    "text",
+    "light",
+    "fade",
+    "network",
+    "midi",
+    "midi_file",
+    "timecode",
+    "start",
+    "stop",
+    "pause",
+    "load",
+    "reset",
+    "devamp",
+    "goto",
+    "target",
+    "arm",
+    "disarm",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait",
+    "memo",
+    "wait"
+  ],
+  "dry_run_seconds": 4.369,
+  "create_seconds": 15.274,
+  "create_response": {
+    "ok": true,
+    "status": "created",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": false,
+    "requested_count": 100,
+    "planned_count": 301,
+    "created_count": 100,
+    "pending_indices": [],
+    "uncertain_indices": [],
+    "batch_verified": true,
+    "destination": {
+      "kind": "group",
+      "id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+      "after_cue_id": null,
+      "resolved_after_cue_id": null,
+      "insertion_index": 0,
+      "placement_mode": "empty_group"
+    },
+    "results": [
+      {
+        "index": 0,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "1F45A398-9262-5C42-A87B-33298143ED6B",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 0,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 1,
+        "cue_type": "Group",
+        "status": "created",
+        "created_cue_id": "D66157C3-6B9B-5F35-9C65-3BAE2D8A2E7A",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 1,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 2,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "858A7AF3-B909-5B23-B812-CCDA667A43C4",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 2,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 3,
+        "cue_type": "Audio",
+        "status": "created",
+        "created_cue_id": "20FDA395-91D9-5FAE-81CA-E2D0A4161B29",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 3,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 4,
+        "cue_type": "Mic",
+        "status": "created",
+        "created_cue_id": "B366B7DA-C54B-5A14-8AA4-1DD8B97B4A5F",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 4,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 5,
+        "cue_type": "Video",
+        "status": "created",
+        "created_cue_id": "6D55D4BF-D289-5690-AD44-44158889F24A",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 5,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 6,
+        "cue_type": "Camera",
+        "status": "created",
+        "created_cue_id": "B0FC57E7-3ED9-5A84-AC5C-CF0764E6FAC6",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 6,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 7,
+        "cue_type": "Text",
+        "status": "created",
+        "created_cue_id": "362E7920-F911-54A7-8452-138C5050A1E8",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 7,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 8,
+        "cue_type": "Light",
+        "status": "created",
+        "created_cue_id": "409F3425-FAA6-55C6-B92A-D8FCF8E04594",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 8,
+        "health_status": "warning",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports a warning."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 9,
+        "cue_type": "Fade",
+        "status": "created",
+        "created_cue_id": "EE9FAAA8-6998-5655-BD50-23D6194C3944",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 9,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 10,
+        "cue_type": "Network",
+        "status": "created",
+        "created_cue_id": "D1A75696-81B9-5BF7-9781-44255032BD42",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 10,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 11,
+        "cue_type": "MIDI",
+        "status": "created",
+        "created_cue_id": "E21098D4-B18F-51A5-A652-ACD7F251D466",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 11,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 12,
+        "cue_type": "MIDI File",
+        "status": "created",
+        "created_cue_id": "A150B385-B6ED-5944-9F3E-81E6D33698F6",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 12,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 13,
+        "cue_type": "Timecode",
+        "status": "created",
+        "created_cue_id": "80EA00C7-F1DD-56FF-AB71-B3DB44CE58CA",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 13,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 14,
+        "cue_type": "Start",
+        "status": "created",
+        "created_cue_id": "1686D3D7-39FF-530A-BDD7-87A0D0573354",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 14,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 15,
+        "cue_type": "Stop",
+        "status": "created",
+        "created_cue_id": "6C9397B9-0214-5423-A2C8-E2CCBA66643C",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 15,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 16,
+        "cue_type": "Pause",
+        "status": "created",
+        "created_cue_id": "E6E89EFE-4BFA-56F8-AC18-68633C7D2716",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 16,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 17,
+        "cue_type": "Load",
+        "status": "created",
+        "created_cue_id": "A5637B10-F9DE-5363-8F2B-EA09D7A6D5DC",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 17,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 18,
+        "cue_type": "Reset",
+        "status": "created",
+        "created_cue_id": "89C133C4-1A55-5CFA-B5E2-67B98935EBAC",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 18,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 19,
+        "cue_type": "Devamp",
+        "status": "created",
+        "created_cue_id": "BE564DCD-BF70-55CC-A787-75472AA8650C",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 19,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 20,
+        "cue_type": "GoTo",
+        "status": "created",
+        "created_cue_id": "1FB0630F-CE74-5412-91B8-AE23F209E33E",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 20,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 21,
+        "cue_type": "Target",
+        "status": "created",
+        "created_cue_id": "E792F962-3FA3-5667-B6C5-FBE315A9D6B0",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 21,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 22,
+        "cue_type": "Arm",
+        "status": "created",
+        "created_cue_id": "FBF68FA6-79CD-5939-9E88-6F947F4A8EBD",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 22,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 23,
+        "cue_type": "Disarm",
+        "status": "created",
+        "created_cue_id": "345C1087-E678-52AA-939F-DFE6901CD2EE",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 23,
+        "health_status": "broken",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [
+          "Cue was created and verified structurally, but QLab reports it broken."
+        ],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 24,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "77DA5EC7-ECFC-575D-9313-705D100AD0F3",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 24,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 25,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "85DA16A4-9A54-526C-96AF-1F7D7B78B720",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 25,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 26,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "5C30DFA2-B3E4-511F-B3D9-4567D36FF0FA",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 26,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 27,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "3D0A9A07-FF85-534E-90F8-FE6401B54F73",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 27,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 28,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "5DC8D0D8-60C5-5EAE-91CC-01FD74FE530D",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 28,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 29,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "30238024-A4B4-53BC-9DEB-A9EFAA9CA1BA",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 29,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 30,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "9D680ABA-ED85-5027-83B2-3759B514AEFA",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 30,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 31,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "F422B46B-0C47-580F-8018-A62B7F670E22",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 31,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 32,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "EAC35108-FC0A-5DDD-AF99-27F95F176E99",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 32,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 33,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "5557E0F5-77AB-58B8-86A8-4519151DCC0A",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 33,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 34,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "6F8AD168-2858-53C4-A9D5-1108B1C9ABFA",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 34,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 35,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "9A4FA3A0-50D1-535A-B852-0C5A96786010",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 35,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 36,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "2BF3A362-93F1-5697-921B-0D4B994B8FA3",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 36,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 37,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "759F7B35-ED74-50AF-9D7C-498237D7ED8A",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 37,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 38,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "361F8E3B-3114-599F-BE4F-8156EFD0E165",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 38,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 39,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "F0753D4D-FC79-5F4B-8B7D-5C6183AEA672",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 39,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 40,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "D12C6F7D-E555-58F8-9151-1AE9409AAF71",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 40,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 41,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "7CE5997D-55BF-5731-A073-ED930791BBCE",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 41,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 42,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "48A62CFE-7EBD-5943-900B-5435D9514AFD",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 42,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 43,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "35328D5E-2305-54BD-A0BD-EF8C43377AF7",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 43,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 44,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "21D357BF-B550-59FD-A067-E7FA6F8FF723",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 44,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 45,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "04161021-79E6-5944-B73A-EEBD718B6B81",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 45,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 46,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "8E447894-C827-5B26-A93C-00BF305FFE81",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 46,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 47,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "3DADD753-7790-57EB-B3CF-7F5A7155D938",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 47,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 48,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "EF10BF23-8E00-5633-B79D-8E022B9E8794",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 48,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 49,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "4A46A503-63D2-5AB4-AD93-B1B57293E38A",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 49,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 50,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "C0D4AD0E-7666-59ED-8873-DD532FEE1E8B",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 50,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 51,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "02854008-1613-5D14-8635-9FE0052DCC41",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 51,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 52,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "33C97C36-91F3-5B63-8A5C-5D56A65BCDA6",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 52,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 53,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "DDF8A2EC-B91F-534C-806E-8D59534AB9FA",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 53,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 54,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "F1745CBE-C998-52AF-944B-407BA809059B",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 54,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 55,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "998DC54B-895B-56FC-85F9-CF05DE6D218D",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 55,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 56,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "349282C7-5343-562D-A80B-9141C5AC0814",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 56,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 57,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "EAC4B901-F351-5706-ABD7-3CD0BCD72606",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 57,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 58,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "57C7E24C-7ABD-5C2F-BBCE-B5F9974E188D",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 58,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 59,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "3568172D-517A-50C7-9B3D-D5A9A3F1ECC5",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 59,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 60,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "03DDCD2B-1BE4-5304-B681-B4CF5862A2EA",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 60,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 61,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "B3D6C88F-F070-5D69-8340-A42D2709E2B7",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 61,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 62,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "9B345AE6-B9E9-54A0-B1D3-9E5711A1E1D5",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 62,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 63,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "6311B94E-78C0-5195-A98F-E9287980574C",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 63,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 64,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "4CC70580-ED2D-514D-A42F-00D0E886641E",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 64,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 65,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "3DF05ADE-EB8F-59D3-83C3-3BB75FFE4DFB",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 65,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 66,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "A12DEC7B-E760-5199-9934-D779663FC594",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 66,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 67,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "007DEF9A-B3FC-50B8-93A2-62418805B65A",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 67,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 68,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "7E53786C-3DA4-5E62-9260-624BD94D88CE",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 68,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 69,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "80643F4C-F6F7-5D66-A82F-3B71C47761C3",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 69,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 70,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "3F57F300-1008-5235-B735-2F788FC53A94",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 70,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 71,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "D943EF04-047A-59FE-9918-165AA8A22996",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 71,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 72,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "582CCE84-9626-50FB-B2B4-E2855A0E9B9C",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 72,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 73,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "A0A0B535-7C3F-5E34-BC49-87411081FF75",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 73,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 74,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "A2F5B7A4-2E8A-57E5-9818-48547B45D487",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 74,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 75,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "4AFE3009-760C-5F1B-B204-7E0D4067C2F5",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 75,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 76,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "4868D5E6-1A71-5E1D-B17E-00C6EFC66771",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 76,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 77,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "901ABDB9-6ABA-5B70-B8D9-648D9ACBC312",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 77,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 78,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "843490DD-D05D-55D0-B9AA-0CC7B4D30488",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 78,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 79,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "AA638998-285E-5501-8B02-537E4E859C45",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 79,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 80,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "F8107850-BB90-50FB-9106-82BA00AB9D81",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 80,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 81,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "7B05A50A-05BC-5C58-AE75-CC0480EEACCB",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 81,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 82,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "2AAD3D1E-BB5E-500F-ACBD-4E11EDB530E1",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 82,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 83,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "6563D752-6BDC-5025-927F-5A17BA871585",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 83,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 84,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "9C223A32-1565-57AE-BB6C-5DE746999DEF",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 84,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 85,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "D4E95284-D273-5996-9EC8-442862B5B83B",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 85,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 86,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "8FB7727D-60A1-5C1D-BE10-D961149EEDC8",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 86,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 87,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "CD6EEDA4-2CB1-5231-8D3B-0BCA359CF760",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 87,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 88,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "53C2E663-97A5-5F55-8C12-DBC9BA04F32C",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 88,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 89,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "CFE773FF-2716-581A-8068-96BB0ED908E9",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 89,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 90,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "3B911DD3-4FB1-5481-87DD-030879BF926A",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 90,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 91,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "F40A043A-FD5E-5B58-BC31-EE85299A6F0E",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 91,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 92,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "64D63BD9-F399-5883-BCA7-FAD2B7690B8F",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 92,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 93,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "6E538BBC-A5BC-5CAC-B715-8146F653F3F2",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 93,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 94,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "39E4EE76-B0CA-5D69-83AA-4226239D30F2",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 94,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 95,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "00F68ED4-2ABA-5D6B-BA08-6709676EDB08",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 95,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 96,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "33B4F087-6C3D-5D35-AC5E-16FFD85D843E",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 96,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 97,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "295CCBF1-C3CC-5099-A564-F978E93B4C97",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 97,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 98,
+        "cue_type": "Memo",
+        "status": "created",
+        "created_cue_id": "9A237A5C-494D-5512-AF6B-B37F4235CC8D",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 98,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      },
+      {
+        "index": 99,
+        "cue_type": "Wait",
+        "status": "created",
+        "created_cue_id": "D1986033-7E52-53F6-BEC0-903D9D134ADC",
+        "verified": true,
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "position_index": 99,
+        "health_status": "healthy",
+        "cleanup_required": false,
+        "cleanup": null,
+        "errors": null,
+        "warnings": [],
+        "error_code": null,
+        "suggested_action": null
+      }
+    ],
+    "planned_operations": [
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D"
+        ],
+        "after_cue_id": null,
+        "parent_container_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "mode": "empty_group"
+      },
+      {
+        "operation": "move_into_container",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/move/{created_cue_id}",
+        "args": [
+          0,
+          "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D"
+        ],
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "expected_index": 0
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+        "after_cue_id": null,
+        "mode": "empty_group",
+        "expected_index": 0,
+        "cart_row": null,
+        "cart_column": null,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "group",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 1,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "group",
+        "sequence_index": 1,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 1,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 2,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 2,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 2,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "audio",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 3,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "audio",
+        "sequence_index": 3,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 3,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "mic",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 4,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "mic",
+        "sequence_index": 4,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 4,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "video",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 5,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "video",
+        "sequence_index": 5,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 5,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "camera",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 6,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "camera",
+        "sequence_index": 6,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 6,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "text",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 7,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "text",
+        "sequence_index": 7,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 7,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "light",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 8,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "light",
+        "sequence_index": 8,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 8,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "fade",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 9,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "fade",
+        "sequence_index": 9,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 9,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "network",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 10,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "network",
+        "sequence_index": 10,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 10,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "midi",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 11,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "midi",
+        "sequence_index": 11,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 11,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "midi file",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 12,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "midi file",
+        "sequence_index": 12,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 12,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "timecode",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 13,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "timecode",
+        "sequence_index": 13,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 13,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "start",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 14,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "start",
+        "sequence_index": 14,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 14,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "stop",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 15,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "stop",
+        "sequence_index": 15,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 15,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "pause",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 16,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "pause",
+        "sequence_index": 16,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 16,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "load",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 17,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "load",
+        "sequence_index": 17,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 17,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "reset",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 18,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "reset",
+        "sequence_index": 18,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 18,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "devamp",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 19,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "devamp",
+        "sequence_index": 19,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 19,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "goto",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 20,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "goto",
+        "sequence_index": 20,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 20,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "target",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 21,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "target",
+        "sequence_index": 21,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 21,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "arm",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 22,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "arm",
+        "sequence_index": 22,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 22,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "disarm",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 23,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "disarm",
+        "sequence_index": 23,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 23,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 24,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 24,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 24,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 25,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 25,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 25,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 26,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 26,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 26,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 27,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 27,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 27,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 28,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 28,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 28,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 29,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 29,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 29,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 30,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 30,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 30,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 31,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 31,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 31,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 32,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 32,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 32,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 33,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 33,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 33,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 34,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 34,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 34,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 35,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 35,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 35,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 36,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 36,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 36,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 37,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 37,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 37,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 38,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 38,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 38,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 39,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 39,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 39,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 40,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 40,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 40,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 41,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 41,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 41,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 42,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 42,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 42,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 43,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 43,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 43,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 44,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 44,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 44,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 45,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 45,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 45,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 46,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 46,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 46,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 47,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 47,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 47,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 48,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 48,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 48,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 49,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 49,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 49,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 50,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 50,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 50,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 51,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 51,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 51,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 52,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 52,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 52,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 53,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 53,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 53,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 54,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 54,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 54,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 55,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 55,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 55,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 56,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 56,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 56,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 57,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 57,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 57,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 58,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 58,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 58,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 59,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 59,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 59,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 60,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 60,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 60,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 61,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 61,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 61,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 62,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 62,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 62,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 63,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 63,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 63,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 64,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 64,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 64,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 65,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 65,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 65,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 66,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 66,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 66,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 67,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 67,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 67,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 68,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 68,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 68,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 69,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 69,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 69,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 70,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 70,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 70,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 71,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 71,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 71,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 72,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 72,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 72,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 73,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 73,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 73,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 74,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 74,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 74,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 75,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 75,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 75,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 76,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 76,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 76,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 77,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 77,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 77,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 78,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 78,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 78,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 79,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 79,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 79,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 80,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 80,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 80,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 81,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 81,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 81,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 82,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 82,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 82,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 83,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 83,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 83,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 84,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 84,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 84,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 85,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 85,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 85,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 86,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 86,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 86,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 87,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 87,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 87,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 88,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 88,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 88,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 89,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 89,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 89,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 90,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 90,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 90,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 91,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 91,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 91,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 92,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 92,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 92,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 93,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 93,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 93,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 94,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 94,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 94,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 95,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 95,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 95,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 96,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 96,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 96,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 97,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 97,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 97,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 98,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "memo",
+        "sequence_index": 98,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 98,
+        "cacheable": false
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "<previous_created_cue_id>"
+        ],
+        "status": "planned",
+        "sequence_index": 99,
+        "anchor_from_previous": true
+      },
+      {
+        "operation": "verify",
+        "cue_id": "{created_cue_id}",
+        "expected_type": "wait",
+        "sequence_index": 99,
+        "cacheable": false
+      },
+      {
+        "operation": "verify_structure",
+        "mode": "anchored",
+        "after_cue_id": "{previous_created_cue_id}",
+        "sequence_index": 99,
+        "cacheable": false
+      }
+    ],
+    "executed_operations": [
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D"
+        ],
+        "status": "ok",
+        "created_cue_id": "1F45A398-9262-5C42-A87B-33298143ED6B"
+      },
+      {
+        "operation": "move_into_container",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/move/1F45A398-9262-5C42-A87B-33298143ED6B",
+        "args": [
+          0,
+          "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D"
+        ],
+        "status": "ok",
+        "created_cue_id": "1F45A398-9262-5C42-A87B-33298143ED6B",
+        "parent_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "group",
+          "1F45A398-9262-5C42-A87B-33298143ED6B"
+        ],
+        "status": "ok",
+        "created_cue_id": "D66157C3-6B9B-5F35-9C65-3BAE2D8A2E7A"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "D66157C3-6B9B-5F35-9C65-3BAE2D8A2E7A"
+        ],
+        "status": "ok",
+        "created_cue_id": "858A7AF3-B909-5B23-B812-CCDA667A43C4"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "audio",
+          "858A7AF3-B909-5B23-B812-CCDA667A43C4"
+        ],
+        "status": "ok",
+        "created_cue_id": "20FDA395-91D9-5FAE-81CA-E2D0A4161B29"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "mic",
+          "20FDA395-91D9-5FAE-81CA-E2D0A4161B29"
+        ],
+        "status": "ok",
+        "created_cue_id": "B366B7DA-C54B-5A14-8AA4-1DD8B97B4A5F"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "video",
+          "B366B7DA-C54B-5A14-8AA4-1DD8B97B4A5F"
+        ],
+        "status": "ok",
+        "created_cue_id": "6D55D4BF-D289-5690-AD44-44158889F24A"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "camera",
+          "6D55D4BF-D289-5690-AD44-44158889F24A"
+        ],
+        "status": "ok",
+        "created_cue_id": "B0FC57E7-3ED9-5A84-AC5C-CF0764E6FAC6"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "text",
+          "B0FC57E7-3ED9-5A84-AC5C-CF0764E6FAC6"
+        ],
+        "status": "ok",
+        "created_cue_id": "362E7920-F911-54A7-8452-138C5050A1E8"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "light",
+          "362E7920-F911-54A7-8452-138C5050A1E8"
+        ],
+        "status": "ok",
+        "created_cue_id": "409F3425-FAA6-55C6-B92A-D8FCF8E04594"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "fade",
+          "409F3425-FAA6-55C6-B92A-D8FCF8E04594"
+        ],
+        "status": "ok",
+        "created_cue_id": "EE9FAAA8-6998-5655-BD50-23D6194C3944"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "network",
+          "EE9FAAA8-6998-5655-BD50-23D6194C3944"
+        ],
+        "status": "ok",
+        "created_cue_id": "D1A75696-81B9-5BF7-9781-44255032BD42"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "midi",
+          "D1A75696-81B9-5BF7-9781-44255032BD42"
+        ],
+        "status": "ok",
+        "created_cue_id": "E21098D4-B18F-51A5-A652-ACD7F251D466"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "midi file",
+          "E21098D4-B18F-51A5-A652-ACD7F251D466"
+        ],
+        "status": "ok",
+        "created_cue_id": "A150B385-B6ED-5944-9F3E-81E6D33698F6"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "timecode",
+          "A150B385-B6ED-5944-9F3E-81E6D33698F6"
+        ],
+        "status": "ok",
+        "created_cue_id": "80EA00C7-F1DD-56FF-AB71-B3DB44CE58CA"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "start",
+          "80EA00C7-F1DD-56FF-AB71-B3DB44CE58CA"
+        ],
+        "status": "ok",
+        "created_cue_id": "1686D3D7-39FF-530A-BDD7-87A0D0573354"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "stop",
+          "1686D3D7-39FF-530A-BDD7-87A0D0573354"
+        ],
+        "status": "ok",
+        "created_cue_id": "6C9397B9-0214-5423-A2C8-E2CCBA66643C"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "pause",
+          "6C9397B9-0214-5423-A2C8-E2CCBA66643C"
+        ],
+        "status": "ok",
+        "created_cue_id": "E6E89EFE-4BFA-56F8-AC18-68633C7D2716"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "load",
+          "E6E89EFE-4BFA-56F8-AC18-68633C7D2716"
+        ],
+        "status": "ok",
+        "created_cue_id": "A5637B10-F9DE-5363-8F2B-EA09D7A6D5DC"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "reset",
+          "A5637B10-F9DE-5363-8F2B-EA09D7A6D5DC"
+        ],
+        "status": "ok",
+        "created_cue_id": "89C133C4-1A55-5CFA-B5E2-67B98935EBAC"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "devamp",
+          "89C133C4-1A55-5CFA-B5E2-67B98935EBAC"
+        ],
+        "status": "ok",
+        "created_cue_id": "BE564DCD-BF70-55CC-A787-75472AA8650C"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "goto",
+          "BE564DCD-BF70-55CC-A787-75472AA8650C"
+        ],
+        "status": "ok",
+        "created_cue_id": "1FB0630F-CE74-5412-91B8-AE23F209E33E"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "target",
+          "1FB0630F-CE74-5412-91B8-AE23F209E33E"
+        ],
+        "status": "ok",
+        "created_cue_id": "E792F962-3FA3-5667-B6C5-FBE315A9D6B0"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "arm",
+          "E792F962-3FA3-5667-B6C5-FBE315A9D6B0"
+        ],
+        "status": "ok",
+        "created_cue_id": "FBF68FA6-79CD-5939-9E88-6F947F4A8EBD"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "disarm",
+          "FBF68FA6-79CD-5939-9E88-6F947F4A8EBD"
+        ],
+        "status": "ok",
+        "created_cue_id": "345C1087-E678-52AA-939F-DFE6901CD2EE"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "345C1087-E678-52AA-939F-DFE6901CD2EE"
+        ],
+        "status": "ok",
+        "created_cue_id": "77DA5EC7-ECFC-575D-9313-705D100AD0F3"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "77DA5EC7-ECFC-575D-9313-705D100AD0F3"
+        ],
+        "status": "ok",
+        "created_cue_id": "85DA16A4-9A54-526C-96AF-1F7D7B78B720"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "85DA16A4-9A54-526C-96AF-1F7D7B78B720"
+        ],
+        "status": "ok",
+        "created_cue_id": "5C30DFA2-B3E4-511F-B3D9-4567D36FF0FA"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "5C30DFA2-B3E4-511F-B3D9-4567D36FF0FA"
+        ],
+        "status": "ok",
+        "created_cue_id": "3D0A9A07-FF85-534E-90F8-FE6401B54F73"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "3D0A9A07-FF85-534E-90F8-FE6401B54F73"
+        ],
+        "status": "ok",
+        "created_cue_id": "5DC8D0D8-60C5-5EAE-91CC-01FD74FE530D"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "5DC8D0D8-60C5-5EAE-91CC-01FD74FE530D"
+        ],
+        "status": "ok",
+        "created_cue_id": "30238024-A4B4-53BC-9DEB-A9EFAA9CA1BA"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "30238024-A4B4-53BC-9DEB-A9EFAA9CA1BA"
+        ],
+        "status": "ok",
+        "created_cue_id": "9D680ABA-ED85-5027-83B2-3759B514AEFA"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "9D680ABA-ED85-5027-83B2-3759B514AEFA"
+        ],
+        "status": "ok",
+        "created_cue_id": "F422B46B-0C47-580F-8018-A62B7F670E22"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "F422B46B-0C47-580F-8018-A62B7F670E22"
+        ],
+        "status": "ok",
+        "created_cue_id": "EAC35108-FC0A-5DDD-AF99-27F95F176E99"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "EAC35108-FC0A-5DDD-AF99-27F95F176E99"
+        ],
+        "status": "ok",
+        "created_cue_id": "5557E0F5-77AB-58B8-86A8-4519151DCC0A"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "5557E0F5-77AB-58B8-86A8-4519151DCC0A"
+        ],
+        "status": "ok",
+        "created_cue_id": "6F8AD168-2858-53C4-A9D5-1108B1C9ABFA"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "6F8AD168-2858-53C4-A9D5-1108B1C9ABFA"
+        ],
+        "status": "ok",
+        "created_cue_id": "9A4FA3A0-50D1-535A-B852-0C5A96786010"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "9A4FA3A0-50D1-535A-B852-0C5A96786010"
+        ],
+        "status": "ok",
+        "created_cue_id": "2BF3A362-93F1-5697-921B-0D4B994B8FA3"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "2BF3A362-93F1-5697-921B-0D4B994B8FA3"
+        ],
+        "status": "ok",
+        "created_cue_id": "759F7B35-ED74-50AF-9D7C-498237D7ED8A"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "759F7B35-ED74-50AF-9D7C-498237D7ED8A"
+        ],
+        "status": "ok",
+        "created_cue_id": "361F8E3B-3114-599F-BE4F-8156EFD0E165"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "361F8E3B-3114-599F-BE4F-8156EFD0E165"
+        ],
+        "status": "ok",
+        "created_cue_id": "F0753D4D-FC79-5F4B-8B7D-5C6183AEA672"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "F0753D4D-FC79-5F4B-8B7D-5C6183AEA672"
+        ],
+        "status": "ok",
+        "created_cue_id": "D12C6F7D-E555-58F8-9151-1AE9409AAF71"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "D12C6F7D-E555-58F8-9151-1AE9409AAF71"
+        ],
+        "status": "ok",
+        "created_cue_id": "7CE5997D-55BF-5731-A073-ED930791BBCE"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "7CE5997D-55BF-5731-A073-ED930791BBCE"
+        ],
+        "status": "ok",
+        "created_cue_id": "48A62CFE-7EBD-5943-900B-5435D9514AFD"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "48A62CFE-7EBD-5943-900B-5435D9514AFD"
+        ],
+        "status": "ok",
+        "created_cue_id": "35328D5E-2305-54BD-A0BD-EF8C43377AF7"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "35328D5E-2305-54BD-A0BD-EF8C43377AF7"
+        ],
+        "status": "ok",
+        "created_cue_id": "21D357BF-B550-59FD-A067-E7FA6F8FF723"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "21D357BF-B550-59FD-A067-E7FA6F8FF723"
+        ],
+        "status": "ok",
+        "created_cue_id": "04161021-79E6-5944-B73A-EEBD718B6B81"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "04161021-79E6-5944-B73A-EEBD718B6B81"
+        ],
+        "status": "ok",
+        "created_cue_id": "8E447894-C827-5B26-A93C-00BF305FFE81"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "8E447894-C827-5B26-A93C-00BF305FFE81"
+        ],
+        "status": "ok",
+        "created_cue_id": "3DADD753-7790-57EB-B3CF-7F5A7155D938"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "3DADD753-7790-57EB-B3CF-7F5A7155D938"
+        ],
+        "status": "ok",
+        "created_cue_id": "EF10BF23-8E00-5633-B79D-8E022B9E8794"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "EF10BF23-8E00-5633-B79D-8E022B9E8794"
+        ],
+        "status": "ok",
+        "created_cue_id": "4A46A503-63D2-5AB4-AD93-B1B57293E38A"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "4A46A503-63D2-5AB4-AD93-B1B57293E38A"
+        ],
+        "status": "ok",
+        "created_cue_id": "C0D4AD0E-7666-59ED-8873-DD532FEE1E8B"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "C0D4AD0E-7666-59ED-8873-DD532FEE1E8B"
+        ],
+        "status": "ok",
+        "created_cue_id": "02854008-1613-5D14-8635-9FE0052DCC41"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "02854008-1613-5D14-8635-9FE0052DCC41"
+        ],
+        "status": "ok",
+        "created_cue_id": "33C97C36-91F3-5B63-8A5C-5D56A65BCDA6"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "33C97C36-91F3-5B63-8A5C-5D56A65BCDA6"
+        ],
+        "status": "ok",
+        "created_cue_id": "DDF8A2EC-B91F-534C-806E-8D59534AB9FA"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "DDF8A2EC-B91F-534C-806E-8D59534AB9FA"
+        ],
+        "status": "ok",
+        "created_cue_id": "F1745CBE-C998-52AF-944B-407BA809059B"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "F1745CBE-C998-52AF-944B-407BA809059B"
+        ],
+        "status": "ok",
+        "created_cue_id": "998DC54B-895B-56FC-85F9-CF05DE6D218D"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "998DC54B-895B-56FC-85F9-CF05DE6D218D"
+        ],
+        "status": "ok",
+        "created_cue_id": "349282C7-5343-562D-A80B-9141C5AC0814"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "349282C7-5343-562D-A80B-9141C5AC0814"
+        ],
+        "status": "ok",
+        "created_cue_id": "EAC4B901-F351-5706-ABD7-3CD0BCD72606"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "EAC4B901-F351-5706-ABD7-3CD0BCD72606"
+        ],
+        "status": "ok",
+        "created_cue_id": "57C7E24C-7ABD-5C2F-BBCE-B5F9974E188D"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "57C7E24C-7ABD-5C2F-BBCE-B5F9974E188D"
+        ],
+        "status": "ok",
+        "created_cue_id": "3568172D-517A-50C7-9B3D-D5A9A3F1ECC5"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "3568172D-517A-50C7-9B3D-D5A9A3F1ECC5"
+        ],
+        "status": "ok",
+        "created_cue_id": "03DDCD2B-1BE4-5304-B681-B4CF5862A2EA"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "03DDCD2B-1BE4-5304-B681-B4CF5862A2EA"
+        ],
+        "status": "ok",
+        "created_cue_id": "B3D6C88F-F070-5D69-8340-A42D2709E2B7"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "B3D6C88F-F070-5D69-8340-A42D2709E2B7"
+        ],
+        "status": "ok",
+        "created_cue_id": "9B345AE6-B9E9-54A0-B1D3-9E5711A1E1D5"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "9B345AE6-B9E9-54A0-B1D3-9E5711A1E1D5"
+        ],
+        "status": "ok",
+        "created_cue_id": "6311B94E-78C0-5195-A98F-E9287980574C"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "6311B94E-78C0-5195-A98F-E9287980574C"
+        ],
+        "status": "ok",
+        "created_cue_id": "4CC70580-ED2D-514D-A42F-00D0E886641E"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "4CC70580-ED2D-514D-A42F-00D0E886641E"
+        ],
+        "status": "ok",
+        "created_cue_id": "3DF05ADE-EB8F-59D3-83C3-3BB75FFE4DFB"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "3DF05ADE-EB8F-59D3-83C3-3BB75FFE4DFB"
+        ],
+        "status": "ok",
+        "created_cue_id": "A12DEC7B-E760-5199-9934-D779663FC594"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "A12DEC7B-E760-5199-9934-D779663FC594"
+        ],
+        "status": "ok",
+        "created_cue_id": "007DEF9A-B3FC-50B8-93A2-62418805B65A"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "007DEF9A-B3FC-50B8-93A2-62418805B65A"
+        ],
+        "status": "ok",
+        "created_cue_id": "7E53786C-3DA4-5E62-9260-624BD94D88CE"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "7E53786C-3DA4-5E62-9260-624BD94D88CE"
+        ],
+        "status": "ok",
+        "created_cue_id": "80643F4C-F6F7-5D66-A82F-3B71C47761C3"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "80643F4C-F6F7-5D66-A82F-3B71C47761C3"
+        ],
+        "status": "ok",
+        "created_cue_id": "3F57F300-1008-5235-B735-2F788FC53A94"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "3F57F300-1008-5235-B735-2F788FC53A94"
+        ],
+        "status": "ok",
+        "created_cue_id": "D943EF04-047A-59FE-9918-165AA8A22996"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "D943EF04-047A-59FE-9918-165AA8A22996"
+        ],
+        "status": "ok",
+        "created_cue_id": "582CCE84-9626-50FB-B2B4-E2855A0E9B9C"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "582CCE84-9626-50FB-B2B4-E2855A0E9B9C"
+        ],
+        "status": "ok",
+        "created_cue_id": "A0A0B535-7C3F-5E34-BC49-87411081FF75"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "A0A0B535-7C3F-5E34-BC49-87411081FF75"
+        ],
+        "status": "ok",
+        "created_cue_id": "A2F5B7A4-2E8A-57E5-9818-48547B45D487"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "A2F5B7A4-2E8A-57E5-9818-48547B45D487"
+        ],
+        "status": "ok",
+        "created_cue_id": "4AFE3009-760C-5F1B-B204-7E0D4067C2F5"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "4AFE3009-760C-5F1B-B204-7E0D4067C2F5"
+        ],
+        "status": "ok",
+        "created_cue_id": "4868D5E6-1A71-5E1D-B17E-00C6EFC66771"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "4868D5E6-1A71-5E1D-B17E-00C6EFC66771"
+        ],
+        "status": "ok",
+        "created_cue_id": "901ABDB9-6ABA-5B70-B8D9-648D9ACBC312"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "901ABDB9-6ABA-5B70-B8D9-648D9ACBC312"
+        ],
+        "status": "ok",
+        "created_cue_id": "843490DD-D05D-55D0-B9AA-0CC7B4D30488"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "843490DD-D05D-55D0-B9AA-0CC7B4D30488"
+        ],
+        "status": "ok",
+        "created_cue_id": "AA638998-285E-5501-8B02-537E4E859C45"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "AA638998-285E-5501-8B02-537E4E859C45"
+        ],
+        "status": "ok",
+        "created_cue_id": "F8107850-BB90-50FB-9106-82BA00AB9D81"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "F8107850-BB90-50FB-9106-82BA00AB9D81"
+        ],
+        "status": "ok",
+        "created_cue_id": "7B05A50A-05BC-5C58-AE75-CC0480EEACCB"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "7B05A50A-05BC-5C58-AE75-CC0480EEACCB"
+        ],
+        "status": "ok",
+        "created_cue_id": "2AAD3D1E-BB5E-500F-ACBD-4E11EDB530E1"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "2AAD3D1E-BB5E-500F-ACBD-4E11EDB530E1"
+        ],
+        "status": "ok",
+        "created_cue_id": "6563D752-6BDC-5025-927F-5A17BA871585"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "6563D752-6BDC-5025-927F-5A17BA871585"
+        ],
+        "status": "ok",
+        "created_cue_id": "9C223A32-1565-57AE-BB6C-5DE746999DEF"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "9C223A32-1565-57AE-BB6C-5DE746999DEF"
+        ],
+        "status": "ok",
+        "created_cue_id": "D4E95284-D273-5996-9EC8-442862B5B83B"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "D4E95284-D273-5996-9EC8-442862B5B83B"
+        ],
+        "status": "ok",
+        "created_cue_id": "8FB7727D-60A1-5C1D-BE10-D961149EEDC8"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "8FB7727D-60A1-5C1D-BE10-D961149EEDC8"
+        ],
+        "status": "ok",
+        "created_cue_id": "CD6EEDA4-2CB1-5231-8D3B-0BCA359CF760"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "CD6EEDA4-2CB1-5231-8D3B-0BCA359CF760"
+        ],
+        "status": "ok",
+        "created_cue_id": "53C2E663-97A5-5F55-8C12-DBC9BA04F32C"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "53C2E663-97A5-5F55-8C12-DBC9BA04F32C"
+        ],
+        "status": "ok",
+        "created_cue_id": "CFE773FF-2716-581A-8068-96BB0ED908E9"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "CFE773FF-2716-581A-8068-96BB0ED908E9"
+        ],
+        "status": "ok",
+        "created_cue_id": "3B911DD3-4FB1-5481-87DD-030879BF926A"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "3B911DD3-4FB1-5481-87DD-030879BF926A"
+        ],
+        "status": "ok",
+        "created_cue_id": "F40A043A-FD5E-5B58-BC31-EE85299A6F0E"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "F40A043A-FD5E-5B58-BC31-EE85299A6F0E"
+        ],
+        "status": "ok",
+        "created_cue_id": "64D63BD9-F399-5883-BCA7-FAD2B7690B8F"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "64D63BD9-F399-5883-BCA7-FAD2B7690B8F"
+        ],
+        "status": "ok",
+        "created_cue_id": "6E538BBC-A5BC-5CAC-B715-8146F653F3F2"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "6E538BBC-A5BC-5CAC-B715-8146F653F3F2"
+        ],
+        "status": "ok",
+        "created_cue_id": "39E4EE76-B0CA-5D69-83AA-4226239D30F2"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "39E4EE76-B0CA-5D69-83AA-4226239D30F2"
+        ],
+        "status": "ok",
+        "created_cue_id": "00F68ED4-2ABA-5D6B-BA08-6709676EDB08"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "00F68ED4-2ABA-5D6B-BA08-6709676EDB08"
+        ],
+        "status": "ok",
+        "created_cue_id": "33B4F087-6C3D-5D35-AC5E-16FFD85D843E"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "33B4F087-6C3D-5D35-AC5E-16FFD85D843E"
+        ],
+        "status": "ok",
+        "created_cue_id": "295CCBF1-C3CC-5099-A564-F978E93B4C97"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "memo",
+          "295CCBF1-C3CC-5099-A564-F978E93B4C97"
+        ],
+        "status": "ok",
+        "created_cue_id": "9A237A5C-494D-5512-AF6B-B37F4235CC8D"
+      },
+      {
+        "operation": "new",
+        "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/new",
+        "args": [
+          "wait",
+          "9A237A5C-494D-5512-AF6B-B37F4235CC8D"
+        ],
+        "status": "ok",
+        "created_cue_id": "D1986033-7E52-53F6-BEC0-903D9D134ADC"
+      }
+    ],
+    "confirm_token": "[REDACTED]",
+    "error_code": null,
+    "suggested_action": null,
+    "errors": null,
+    "warnings": [
+      "Sequence creation is sequential and has no automatic rollback."
+    ],
+    "message": "Cue sequence created; planned_count counts generated plan operations, created_count counts logical cues, and each item was verified before the next /new."
+  },
+  "cleanup_seconds": 10.67,
+  "cleanup": {
+    "ok": true,
+    "status": "deleted_immediately",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": false,
+    "requested_count": 1,
+    "planned_count": 100,
+    "deleted_count": 100,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_id": "1F45A398-9262-5C42-A87B-33298143ED6B",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "D66157C3-6B9B-5F35-9C65-3BAE2D8A2E7A",
+        "cue_type": "Group",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "858A7AF3-B909-5B23-B812-CCDA667A43C4",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "20FDA395-91D9-5FAE-81CA-E2D0A4161B29",
+        "cue_type": "Audio",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "B366B7DA-C54B-5A14-8AA4-1DD8B97B4A5F",
+        "cue_type": "Mic",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "6D55D4BF-D289-5690-AD44-44158889F24A",
+        "cue_type": "Video",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "B0FC57E7-3ED9-5A84-AC5C-CF0764E6FAC6",
+        "cue_type": "Camera",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "362E7920-F911-54A7-8452-138C5050A1E8",
+        "cue_type": "Text",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "409F3425-FAA6-55C6-B92A-D8FCF8E04594",
+        "cue_type": "Light",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "EE9FAAA8-6998-5655-BD50-23D6194C3944",
+        "cue_type": "Fade",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "D1A75696-81B9-5BF7-9781-44255032BD42",
+        "cue_type": "Network",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "E21098D4-B18F-51A5-A652-ACD7F251D466",
+        "cue_type": "MIDI",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "A150B385-B6ED-5944-9F3E-81E6D33698F6",
+        "cue_type": "MIDI File",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "80EA00C7-F1DD-56FF-AB71-B3DB44CE58CA",
+        "cue_type": "Timecode",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "1686D3D7-39FF-530A-BDD7-87A0D0573354",
+        "cue_type": "Start",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "6C9397B9-0214-5423-A2C8-E2CCBA66643C",
+        "cue_type": "Stop",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "E6E89EFE-4BFA-56F8-AC18-68633C7D2716",
+        "cue_type": "Pause",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "A5637B10-F9DE-5363-8F2B-EA09D7A6D5DC",
+        "cue_type": "Load",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "89C133C4-1A55-5CFA-B5E2-67B98935EBAC",
+        "cue_type": "Reset",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "BE564DCD-BF70-55CC-A787-75472AA8650C",
+        "cue_type": "Devamp",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "1FB0630F-CE74-5412-91B8-AE23F209E33E",
+        "cue_type": "GoTo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "E792F962-3FA3-5667-B6C5-FBE315A9D6B0",
+        "cue_type": "Target",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "FBF68FA6-79CD-5939-9E88-6F947F4A8EBD",
+        "cue_type": "Arm",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "345C1087-E678-52AA-939F-DFE6901CD2EE",
+        "cue_type": "Disarm",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "77DA5EC7-ECFC-575D-9313-705D100AD0F3",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "85DA16A4-9A54-526C-96AF-1F7D7B78B720",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "5C30DFA2-B3E4-511F-B3D9-4567D36FF0FA",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "3D0A9A07-FF85-534E-90F8-FE6401B54F73",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "5DC8D0D8-60C5-5EAE-91CC-01FD74FE530D",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "30238024-A4B4-53BC-9DEB-A9EFAA9CA1BA",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "9D680ABA-ED85-5027-83B2-3759B514AEFA",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "F422B46B-0C47-580F-8018-A62B7F670E22",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "EAC35108-FC0A-5DDD-AF99-27F95F176E99",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "5557E0F5-77AB-58B8-86A8-4519151DCC0A",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "6F8AD168-2858-53C4-A9D5-1108B1C9ABFA",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "9A4FA3A0-50D1-535A-B852-0C5A96786010",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "2BF3A362-93F1-5697-921B-0D4B994B8FA3",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "759F7B35-ED74-50AF-9D7C-498237D7ED8A",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "361F8E3B-3114-599F-BE4F-8156EFD0E165",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "F0753D4D-FC79-5F4B-8B7D-5C6183AEA672",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "D12C6F7D-E555-58F8-9151-1AE9409AAF71",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "7CE5997D-55BF-5731-A073-ED930791BBCE",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "48A62CFE-7EBD-5943-900B-5435D9514AFD",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "35328D5E-2305-54BD-A0BD-EF8C43377AF7",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "21D357BF-B550-59FD-A067-E7FA6F8FF723",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "04161021-79E6-5944-B73A-EEBD718B6B81",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "8E447894-C827-5B26-A93C-00BF305FFE81",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "3DADD753-7790-57EB-B3CF-7F5A7155D938",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "EF10BF23-8E00-5633-B79D-8E022B9E8794",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "4A46A503-63D2-5AB4-AD93-B1B57293E38A",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "C0D4AD0E-7666-59ED-8873-DD532FEE1E8B",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "02854008-1613-5D14-8635-9FE0052DCC41",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "33C97C36-91F3-5B63-8A5C-5D56A65BCDA6",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "DDF8A2EC-B91F-534C-806E-8D59534AB9FA",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "F1745CBE-C998-52AF-944B-407BA809059B",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "998DC54B-895B-56FC-85F9-CF05DE6D218D",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "349282C7-5343-562D-A80B-9141C5AC0814",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "EAC4B901-F351-5706-ABD7-3CD0BCD72606",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "57C7E24C-7ABD-5C2F-BBCE-B5F9974E188D",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "3568172D-517A-50C7-9B3D-D5A9A3F1ECC5",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "03DDCD2B-1BE4-5304-B681-B4CF5862A2EA",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "B3D6C88F-F070-5D69-8340-A42D2709E2B7",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "9B345AE6-B9E9-54A0-B1D3-9E5711A1E1D5",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "6311B94E-78C0-5195-A98F-E9287980574C",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "4CC70580-ED2D-514D-A42F-00D0E886641E",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "3DF05ADE-EB8F-59D3-83C3-3BB75FFE4DFB",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "A12DEC7B-E760-5199-9934-D779663FC594",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "007DEF9A-B3FC-50B8-93A2-62418805B65A",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "7E53786C-3DA4-5E62-9260-624BD94D88CE",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "80643F4C-F6F7-5D66-A82F-3B71C47761C3",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "3F57F300-1008-5235-B735-2F788FC53A94",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "D943EF04-047A-59FE-9918-165AA8A22996",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "582CCE84-9626-50FB-B2B4-E2855A0E9B9C",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "A0A0B535-7C3F-5E34-BC49-87411081FF75",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "A2F5B7A4-2E8A-57E5-9818-48547B45D487",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "4AFE3009-760C-5F1B-B204-7E0D4067C2F5",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "4868D5E6-1A71-5E1D-B17E-00C6EFC66771",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "901ABDB9-6ABA-5B70-B8D9-648D9ACBC312",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "843490DD-D05D-55D0-B9AA-0CC7B4D30488",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "AA638998-285E-5501-8B02-537E4E859C45",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "F8107850-BB90-50FB-9106-82BA00AB9D81",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "7B05A50A-05BC-5C58-AE75-CC0480EEACCB",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "2AAD3D1E-BB5E-500F-ACBD-4E11EDB530E1",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "6563D752-6BDC-5025-927F-5A17BA871585",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "9C223A32-1565-57AE-BB6C-5DE746999DEF",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "D4E95284-D273-5996-9EC8-442862B5B83B",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "8FB7727D-60A1-5C1D-BE10-D961149EEDC8",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "CD6EEDA4-2CB1-5231-8D3B-0BCA359CF760",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "53C2E663-97A5-5F55-8C12-DBC9BA04F32C",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "CFE773FF-2716-581A-8068-96BB0ED908E9",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "3B911DD3-4FB1-5481-87DD-030879BF926A",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "F40A043A-FD5E-5B58-BC31-EE85299A6F0E",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "64D63BD9-F399-5883-BCA7-FAD2B7690B8F",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "6E538BBC-A5BC-5CAC-B715-8146F653F3F2",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "39E4EE76-B0CA-5D69-83AA-4226239D30F2",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "00F68ED4-2ABA-5D6B-BA08-6709676EDB08",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "33B4F087-6C3D-5D35-AC5E-16FFD85D843E",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "295CCBF1-C3CC-5099-A564-F978E93B4C97",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "9A237A5C-494D-5512-AF6B-B37F4235CC8D",
+        "cue_type": "Memo",
+        "status": "deleted_immediately"
+      },
+      {
+        "cue_id": "D1986033-7E52-53F6-BEC0-903D9D134ADC",
+        "cue_type": "Wait",
+        "status": "deleted_immediately"
+      }
+    ],
+    "pending_cue_ids": [],
+    "uncertain_cue_ids": [],
+    "confirm_token": "[REDACTED]",
+    "container_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+    "recursive": true,
+    "delete_container": false,
+    "preserved_container_id": "7EFFB592-6447-5BD5-9E78-D8B2C1CCE30D",
+    "expanded_count": 100,
+    "errors": null,
+    "warnings": [
+      "Deletes were executed sequentially and are not atomic."
+    ],
+    "message": "Cue delete batch completed with fresh existence readback after every delete."
+  },
+  "independent_order_and_types_match": true,
+  "final_checks": {
+    "root_order": true,
+    "current_list": true,
+    "full_cue_index": true,
+    "list_contents": true,
+    "overrides": true,
+    "inactive": true,
+    "count": 259
+  },
+  "computer_use": {
+    "app": "<redacted-local-path-2e4542d9aa>.app",
+    "before_cues": 241,
+    "during_cues": 341,
+    "after_cues": 241,
+    "group_children": [
+      0,
+      100,
+      0
+    ],
+    "active_cues": 0,
+    "all_24_types_in_requested_order": true
+  },
+  "limits": "No GO, playback, Save, configuration change or automatic retry. Other live cases remain unchecked."
+}

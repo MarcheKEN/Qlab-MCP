@@ -1,0 +1,349 @@
+{
+  "date": "2026-10-11",
+  "qlab_version": "5.5.10",
+  "source": "Client(mcp), closeout after visual context-only read fix",
+  "prior_cases": "Earlier MIDI/Wall Clock/Timecode/Group/Mic cases are narrated in the Markdown report; this JSON records closeout only.",
+  "workspace_activity": {
+    "running": 0,
+    "paused": 0
+  },
+  "restored_families": [
+    "Group",
+    "Load",
+    "Mic",
+    "Text"
+  ],
+  "ui_contrast": {
+    "Text": "Channel 5 then Workspace Channel (Any); disabled triggers and disarmed cue; selected Wait/Basics restored"
+  },
+  "calls": [
+    {
+      "tool": "qlab_get_text_cue_details",
+      "status": "ok",
+      "ok": true,
+      "family": "Text",
+      "triggers": {
+        "hotkeyTriggerEnabled": false,
+        "midiTriggerEnabled": false,
+        "midiTriggerCommand": 1,
+        "midiTriggerChannel": 0,
+        "midiTriggerByte1": 0,
+        "midiTriggerByte2": 0,
+        "midiTriggerByte1String": "0",
+        "midiTriggerByte2String": "0",
+        "wallClockTriggerEnabled": false,
+        "wallClockHours": 0,
+        "wallClockMinutes": 0,
+        "wallClockSeconds": 0,
+        "timecodeTriggerEnabled": false,
+        "timecodeShowAsTimecode": true,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0.0,
+        "duckTime": 1.0,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1.0,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "errors": {}
+    },
+    {
+      "tool": "qlab_edit_text_cues",
+      "status": "dry_run",
+      "ok": true,
+      "dry_run": true,
+      "requested": [
+        {
+          "midiTriggerChannel": 5
+        }
+      ],
+      "cues": [
+        {
+          "family": "Text",
+          "before": {
+            "midiTriggerChannel": 0
+          },
+          "after": null,
+          "executed_count": 0,
+          "errors": null
+        }
+      ]
+    },
+    {
+      "tool": "qlab_edit_text_cues",
+      "status": "updated",
+      "ok": true,
+      "dry_run": false,
+      "requested": [
+        {
+          "midiTriggerChannel": 5
+        }
+      ],
+      "cues": [
+        {
+          "family": "Text",
+          "before": {
+            "midiTriggerChannel": 0
+          },
+          "after": {
+            "timecodeTrigger": {
+              "hours": 1,
+              "minutes": 0,
+              "seconds": 0,
+              "bits": 0,
+              "frames": 0
+            },
+            "midiTriggerByte2": 0,
+            "timecodeShowAsTimecode": true,
+            "continueMode": 0,
+            "skipIfDisarmed": false,
+            "midiTriggerByte1String": "0",
+            "wallClockMinutes": 0,
+            "midiTriggerCommand": 1,
+            "hotkeyTriggerEnabled": false,
+            "midiTriggerByte2String": "0",
+            "wallClockTriggerEnabled": false,
+            "midiTriggerByte1": 0,
+            "midiTriggerEnabled": false,
+            "wallClockHours": 0,
+            "timecodeTriggerEnabled": false,
+            "armed": false,
+            "midiTriggerChannel": 5,
+            "wallClockSeconds": 0
+          },
+          "executed_count": 1,
+          "errors": null
+        }
+      ]
+    },
+    {
+      "tool": "qlab_edit_text_cues",
+      "status": "dry_run",
+      "ok": true,
+      "dry_run": true,
+      "requested": [
+        {
+          "midiTriggerChannel": 0
+        }
+      ],
+      "cues": [
+        {
+          "family": "Text",
+          "before": {
+            "midiTriggerChannel": 5
+          },
+          "after": null,
+          "executed_count": 0,
+          "errors": null
+        }
+      ]
+    },
+    {
+      "tool": "qlab_edit_text_cues",
+      "status": "updated",
+      "ok": true,
+      "dry_run": false,
+      "requested": [
+        {
+          "midiTriggerChannel": 0
+        }
+      ],
+      "cues": [
+        {
+          "family": "Text",
+          "before": {
+            "midiTriggerChannel": 5
+          },
+          "after": {
+            "timecodeTrigger": {
+              "hours": 1,
+              "minutes": 0,
+              "seconds": 0,
+              "bits": 0,
+              "frames": 0
+            },
+            "midiTriggerByte2": 0,
+            "timecodeShowAsTimecode": true,
+            "continueMode": 0,
+            "skipIfDisarmed": false,
+            "midiTriggerByte1String": "0",
+            "wallClockMinutes": 0,
+            "midiTriggerCommand": 1,
+            "hotkeyTriggerEnabled": false,
+            "midiTriggerByte2String": "0",
+            "wallClockTriggerEnabled": false,
+            "midiTriggerByte1": 0,
+            "midiTriggerEnabled": false,
+            "wallClockHours": 0,
+            "timecodeTriggerEnabled": false,
+            "armed": false,
+            "midiTriggerChannel": 0,
+            "wallClockSeconds": 0
+          },
+          "executed_count": 1,
+          "errors": null
+        }
+      ]
+    },
+    {
+      "tool": "qlab_get_text_cue_details",
+      "status": "ok",
+      "ok": true,
+      "family": "Text",
+      "triggers": {
+        "hotkeyTriggerEnabled": false,
+        "midiTriggerEnabled": false,
+        "midiTriggerCommand": 1,
+        "midiTriggerChannel": 0,
+        "midiTriggerByte1": 0,
+        "midiTriggerByte2": 0,
+        "midiTriggerByte1String": "0",
+        "midiTriggerByte2String": "0",
+        "wallClockTriggerEnabled": false,
+        "wallClockHours": 0,
+        "wallClockMinutes": 0,
+        "wallClockSeconds": 0,
+        "timecodeTriggerEnabled": false,
+        "timecodeShowAsTimecode": true,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0.0,
+        "duckTime": 1.0,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1.0,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "errors": {}
+    },
+    {
+      "tool": "qlab_get_control_cue_details",
+      "status": "ok",
+      "ok": true,
+      "family": "Load",
+      "triggers": {
+        "hotkeyTriggerEnabled": false,
+        "midiTriggerEnabled": false,
+        "midiTriggerCommand": 1,
+        "midiTriggerChannel": 0,
+        "midiTriggerByte1": 0,
+        "midiTriggerByte2": 0,
+        "midiTriggerByte1String": "0",
+        "midiTriggerByte2String": "0",
+        "wallClockTriggerEnabled": false,
+        "wallClockHours": 0,
+        "wallClockMinutes": 0,
+        "wallClockSeconds": 0,
+        "timecodeTriggerEnabled": false,
+        "timecodeShowAsTimecode": true,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0.0,
+        "duckTime": 1.0,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1.0,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "errors": {}
+    },
+    {
+      "tool": "qlab_get_group_cue_details",
+      "status": "ok",
+      "ok": true,
+      "family": "Group",
+      "triggers": {
+        "hotkeyTriggerEnabled": false,
+        "midiTriggerEnabled": false,
+        "midiTriggerCommand": 1,
+        "midiTriggerChannel": 0,
+        "midiTriggerByte1": 0,
+        "midiTriggerByte2": 0,
+        "midiTriggerByte1String": "0",
+        "midiTriggerByte2String": "0",
+        "wallClockTriggerEnabled": false,
+        "wallClockHours": 0,
+        "wallClockMinutes": 0,
+        "wallClockSeconds": 0,
+        "timecodeTriggerEnabled": false,
+        "timecodeShowAsTimecode": true,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0.0,
+        "duckTime": 1.0,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1.0,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "errors": {}
+    },
+    {
+      "tool": "qlab_get_mic_cue_details",
+      "status": "ok",
+      "ok": true,
+      "family": "Mic",
+      "triggers": {
+        "hotkeyTriggerEnabled": false,
+        "midiTriggerEnabled": false,
+        "midiTriggerCommand": 1,
+        "midiTriggerChannel": 0,
+        "midiTriggerByte1": 0,
+        "midiTriggerByte2": 0,
+        "midiTriggerByte1String": "0",
+        "midiTriggerByte2String": "0",
+        "wallClockTriggerEnabled": false,
+        "wallClockHours": 0,
+        "wallClockMinutes": 0,
+        "wallClockSeconds": 0,
+        "timecodeTriggerEnabled": false,
+        "timecodeShowAsTimecode": true,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0.0,
+        "duckTime": 1.0,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1.0,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "errors": {}
+    }
+  ]
+}

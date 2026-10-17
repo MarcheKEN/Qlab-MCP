@@ -1,0 +1,1324 @@
+{
+  "baseline": {
+    "ok": true,
+    "status": "ok",
+    "partial": false,
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "error_code": null,
+    "message": null,
+    "suggested_action": null,
+    "coverage": {
+      "source": "documented_osc",
+      "unavailable_via_osc": [],
+      "unavailable_fields": [],
+      "failed_routes": [],
+      "notes": [
+        "Containing Cue List context comes from qlab_get_group_cues; detail reads the immediate parent.",
+        "Read-only cue configuration; no live output is calculated or queried.",
+        "Children are bounded summaries; depth zero reads no children."
+      ]
+    },
+    "warnings": [
+      "Technical notes and paths may contain sensitive free text."
+    ],
+    "errors": {},
+    "cue_id": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+    "profile": "technical",
+    "identity": {
+      "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "type": "Group",
+      "number": "",
+      "name": "",
+      "displayName": "Playlist - Shuffle, Loop, Crossfade",
+      "parent_id": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+      "cue_list_id": null,
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false
+    },
+    "basics": {
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "allowsEditingDuration": false,
+      "colorName": "none",
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "notes": ""
+    },
+    "state": {
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false
+    },
+    "timing": {
+      "preWait": 0.0,
+      "duration": 699.1363265306122,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      }
+    },
+    "triggers": {
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": 0.0,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "timecodeTriggerText": "1:00:00:00"
+    },
+    "group": {
+      "mode": 6,
+      "isChildAuditioning": false,
+      "isChildFlagged": false
+    },
+    "mode_label": "Playlist",
+    "playlist": {
+      "currentCue": "none",
+      "currentCueID": "none",
+      "doCrossfade": true,
+      "doLoop": true,
+      "doShuffle": true,
+      "crossfadeDuration": 3.0
+    },
+    "contents": {
+      "children": [
+        {
+          "uniqueID": "69FAE776-BD85-5490-B4B1-25D716F55E34",
+          "type": "Audio",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "Rihanna - Don-'t Stop The Music.mp3",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "4B564579-4FC3-50A6-85DB-05A22B75005F",
+          "type": "Audio",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "<redacted-local-path-a56ca6550c>.mp3",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "8DD1F3DC-66BD-58CB-9B59-333EE9918601",
+          "type": "Audio",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "Shape of You - Ed Sheeran.mp3",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        }
+      ],
+      "direct_child_count": 3,
+      "returned_count": 3,
+      "max_depth": 2,
+      "max_cues": 1000,
+      "truncated": false,
+      "truncation_reasons": []
+    },
+    "edit_capabilities": {
+      "tool": "qlab_edit_group_cues",
+      "allowed_properties": [
+        "armed",
+        "autoLoad",
+        "colorName",
+        "continueMode",
+        "duckLevel",
+        "duckOthers",
+        "duckTime",
+        "duration",
+        "fadeAndStopOthersTime",
+        "flagged",
+        "mode",
+        "name",
+        "notes",
+        "number",
+        "playlist/crossfade/duration",
+        "playlist/doCrossfade",
+        "playlist/doLoop",
+        "playlist/doShuffle",
+        "postWait",
+        "preWait",
+        "secondColorName",
+        "secondTriggerAction",
+        "secondTriggerOnRelease",
+        "skipIfDisarmed",
+        "timecodeTrigger/bits",
+        "timecodeTrigger/frames",
+        "timecodeTrigger/hours",
+        "timecodeTrigger/minutes",
+        "timecodeTrigger/seconds",
+        "timecodeTrigger/text",
+        "useSecondColor"
+      ],
+      "blocked_properties": {
+        "fadeAndStopOthers": "Requires fresh integer scope; boolean cannot identify scope."
+      },
+      "requires_fresh_preflight": true,
+      "mode_playlist_writes_require_one_property": true,
+      "pending_validation": [
+        "Playhead and playback-position controls",
+        "Playlist navigation, current-cue, shuffle and crossfade-curve controls",
+        "Cue Cart cell movement"
+      ]
+    },
+    "technical_payload": {
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "allowsEditingDuration": false,
+      "colorName": "none",
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "notes": "",
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false,
+      "preWait": 0.0,
+      "duration": 699.1363265306122,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "mode": 6,
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": 0.0,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTriggerText": "1:00:00:00"
+    },
+    "redactions": []
+  },
+  "changed_dry": {
+    "ok": true,
+    "status": "dry_run",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": true,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 0,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+        "cue_id": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+        "profile": "group_basic",
+        "status": "dry_run",
+        "properties": {
+          "duckLevel": -6,
+          "secondTriggerAction": 6
+        },
+        "operations": [
+          {
+            "operation": "set_property",
+            "property": "duckLevel",
+            "path": "duckLevel",
+            "mode": "saved",
+            "args": [
+              -6
+            ],
+            "arg_values": {
+              "value": -6
+            },
+            "read_key": "duckLevel",
+            "risk_tier": "high",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          },
+          {
+            "operation": "set_property",
+            "property": "secondTriggerAction",
+            "path": "secondTriggerAction",
+            "mode": "saved",
+            "args": [
+              6
+            ],
+            "arg_values": {
+              "value": 6
+            },
+            "read_key": "secondTriggerAction",
+            "risk_tier": "high",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "duckLevel": 0,
+          "parent": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+          "type": "Group",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "mode": 6,
+          "secondTriggerAction": 0,
+          "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+          "isWarning": false,
+          "allowsEditingDuration": false,
+          "isBroken": false
+        },
+        "after": null,
+        "diff": {
+          "duckLevel": {
+            "before": 0,
+            "requested": -6
+          },
+          "secondTriggerAction": {
+            "before": 0,
+            "requested": 6
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "duckLevel",
+            "key": "duckLevel",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510/duckLevel",
+            "args": [
+              -6
+            ],
+            "status": "planned"
+          },
+          {
+            "operation": "set_property",
+            "property": "secondTriggerAction",
+            "key": "secondTriggerAction",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510/secondTriggerAction",
+            "args": [
+              6
+            ],
+            "status": "planned"
+          }
+        ],
+        "executed_operations": [],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "dry_run"
+  },
+  "changed": {
+    "ok": true,
+    "status": "updated",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": false,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 1,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+        "cue_id": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+        "profile": "group_basic",
+        "status": "updated",
+        "properties": {
+          "duckLevel": -6,
+          "secondTriggerAction": 6
+        },
+        "operations": [
+          {
+            "operation": "set_property",
+            "property": "duckLevel",
+            "path": "duckLevel",
+            "mode": "saved",
+            "args": [
+              -6
+            ],
+            "arg_values": {
+              "value": -6
+            },
+            "read_key": "duckLevel",
+            "risk_tier": "high",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          },
+          {
+            "operation": "set_property",
+            "property": "secondTriggerAction",
+            "path": "secondTriggerAction",
+            "mode": "saved",
+            "args": [
+              6
+            ],
+            "arg_values": {
+              "value": 6
+            },
+            "read_key": "secondTriggerAction",
+            "risk_tier": "high",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "duckLevel": 0,
+          "parent": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+          "type": "Group",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "mode": 6,
+          "secondTriggerAction": 0,
+          "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+          "isWarning": false,
+          "allowsEditingDuration": false,
+          "isBroken": false
+        },
+        "after": {
+          "duckLevel": -6.000000000000001,
+          "type": "Group",
+          "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+          "secondTriggerAction": 6
+        },
+        "diff": {
+          "duckLevel": {
+            "before": 0,
+            "requested": -6
+          },
+          "secondTriggerAction": {
+            "before": 0,
+            "requested": 6
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "duckLevel",
+            "key": "duckLevel",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510/duckLevel",
+            "args": [
+              -6
+            ],
+            "status": "verified"
+          },
+          {
+            "operation": "set_property",
+            "property": "secondTriggerAction",
+            "key": "secondTriggerAction",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510/secondTriggerAction",
+            "args": [
+              6
+            ],
+            "status": "verified"
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "set_property",
+            "property": "duckLevel",
+            "key": "duckLevel",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510/duckLevel",
+            "args": [
+              -6
+            ],
+            "status": "sent",
+            "reply_error": null
+          },
+          {
+            "operation": "set_property",
+            "property": "secondTriggerAction",
+            "key": "secondTriggerAction",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510/secondTriggerAction",
+            "args": [
+              6
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "updated"
+  },
+  "readback": {
+    "ok": true,
+    "status": "ok",
+    "partial": false,
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "error_code": null,
+    "message": null,
+    "suggested_action": null,
+    "coverage": {
+      "source": "documented_osc",
+      "unavailable_via_osc": [],
+      "unavailable_fields": [],
+      "failed_routes": [],
+      "notes": [
+        "Containing Cue List context comes from qlab_get_group_cues; detail reads the immediate parent.",
+        "Read-only cue configuration; no live output is calculated or queried.",
+        "Children are bounded summaries; depth zero reads no children."
+      ]
+    },
+    "warnings": [
+      "Technical notes and paths may contain sensitive free text."
+    ],
+    "errors": {},
+    "cue_id": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+    "profile": "technical",
+    "identity": {
+      "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "type": "Group",
+      "number": "",
+      "name": "",
+      "displayName": "Playlist - Shuffle, Loop, Crossfade",
+      "parent_id": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+      "cue_list_id": null,
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false
+    },
+    "basics": {
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "allowsEditingDuration": false,
+      "colorName": "none",
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "notes": ""
+    },
+    "state": {
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false
+    },
+    "timing": {
+      "preWait": 0.0,
+      "duration": 699.1363265306122,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      }
+    },
+    "triggers": {
+      "secondTriggerAction": 6,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": -6.000000000000001,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "timecodeTriggerText": "1:00:00:00"
+    },
+    "group": {
+      "mode": 6,
+      "isChildAuditioning": false,
+      "isChildFlagged": false
+    },
+    "mode_label": "Playlist",
+    "playlist": {
+      "currentCue": "none",
+      "currentCueID": "none",
+      "doCrossfade": true,
+      "doLoop": true,
+      "doShuffle": true,
+      "crossfadeDuration": 3.0
+    },
+    "contents": {
+      "children": [
+        {
+          "uniqueID": "69FAE776-BD85-5490-B4B1-25D716F55E34",
+          "type": "Audio",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "Rihanna - Don-'t Stop The Music.mp3",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "4B564579-4FC3-50A6-85DB-05A22B75005F",
+          "type": "Audio",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "<redacted-local-path-a56ca6550c>.mp3",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "8DD1F3DC-66BD-58CB-9B59-333EE9918601",
+          "type": "Audio",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "Shape of You - Ed Sheeran.mp3",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        }
+      ],
+      "direct_child_count": 3,
+      "returned_count": 3,
+      "max_depth": 2,
+      "max_cues": 1000,
+      "truncated": false,
+      "truncation_reasons": []
+    },
+    "edit_capabilities": {
+      "tool": "qlab_edit_group_cues",
+      "allowed_properties": [
+        "armed",
+        "autoLoad",
+        "colorName",
+        "continueMode",
+        "duckLevel",
+        "duckOthers",
+        "duckTime",
+        "duration",
+        "fadeAndStopOthersTime",
+        "flagged",
+        "mode",
+        "name",
+        "notes",
+        "number",
+        "playlist/crossfade/duration",
+        "playlist/doCrossfade",
+        "playlist/doLoop",
+        "playlist/doShuffle",
+        "postWait",
+        "preWait",
+        "secondColorName",
+        "secondTriggerAction",
+        "secondTriggerOnRelease",
+        "skipIfDisarmed",
+        "timecodeTrigger/bits",
+        "timecodeTrigger/frames",
+        "timecodeTrigger/hours",
+        "timecodeTrigger/minutes",
+        "timecodeTrigger/seconds",
+        "timecodeTrigger/text",
+        "useSecondColor"
+      ],
+      "blocked_properties": {
+        "fadeAndStopOthers": "Requires fresh integer scope; boolean cannot identify scope."
+      },
+      "requires_fresh_preflight": true,
+      "mode_playlist_writes_require_one_property": true,
+      "pending_validation": [
+        "Playhead and playback-position controls",
+        "Playlist navigation, current-cue, shuffle and crossfade-curve controls",
+        "Cue Cart cell movement"
+      ]
+    },
+    "technical_payload": {
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "allowsEditingDuration": false,
+      "colorName": "none",
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "notes": "",
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false,
+      "preWait": 0.0,
+      "duration": 699.1363265306122,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "mode": 6,
+      "secondTriggerAction": 6,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": -6.000000000000001,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTriggerText": "1:00:00:00"
+    },
+    "redactions": []
+  },
+  "restored_dry": {
+    "ok": true,
+    "status": "dry_run",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": true,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 0,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+        "cue_id": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+        "profile": "group_basic",
+        "status": "dry_run",
+        "properties": {
+          "duckLevel": 0,
+          "secondTriggerAction": 0
+        },
+        "operations": [
+          {
+            "operation": "set_property",
+            "property": "duckLevel",
+            "path": "duckLevel",
+            "mode": "saved",
+            "args": [
+              0
+            ],
+            "arg_values": {
+              "value": 0
+            },
+            "read_key": "duckLevel",
+            "risk_tier": "high",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          },
+          {
+            "operation": "set_property",
+            "property": "secondTriggerAction",
+            "path": "secondTriggerAction",
+            "mode": "saved",
+            "args": [
+              0
+            ],
+            "arg_values": {
+              "value": 0
+            },
+            "read_key": "secondTriggerAction",
+            "risk_tier": "high",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "duckLevel": -6.000000000000001,
+          "parent": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+          "type": "Group",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "mode": 6,
+          "secondTriggerAction": 6,
+          "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+          "isWarning": false,
+          "allowsEditingDuration": false,
+          "isBroken": false
+        },
+        "after": null,
+        "diff": {
+          "duckLevel": {
+            "before": -6.000000000000001,
+            "requested": 0
+          },
+          "secondTriggerAction": {
+            "before": 6,
+            "requested": 0
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "duckLevel",
+            "key": "duckLevel",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510/duckLevel",
+            "args": [
+              0
+            ],
+            "status": "planned"
+          },
+          {
+            "operation": "set_property",
+            "property": "secondTriggerAction",
+            "key": "secondTriggerAction",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510/secondTriggerAction",
+            "args": [
+              0
+            ],
+            "status": "planned"
+          }
+        ],
+        "executed_operations": [],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "dry_run"
+  },
+  "restored": {
+    "ok": true,
+    "status": "updated",
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "dry_run": false,
+    "requested_count": 1,
+    "planned_count": 1,
+    "updated_count": 1,
+    "failed_count": 0,
+    "timeout_confirmed_count": 0,
+    "results": [
+      {
+        "cue_ref": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+        "cue_id": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+        "profile": "group_basic",
+        "status": "updated",
+        "properties": {
+          "duckLevel": 0,
+          "secondTriggerAction": 0
+        },
+        "operations": [
+          {
+            "operation": "set_property",
+            "property": "duckLevel",
+            "path": "duckLevel",
+            "mode": "saved",
+            "args": [
+              0
+            ],
+            "arg_values": {
+              "value": 0
+            },
+            "read_key": "duckLevel",
+            "risk_tier": "high",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          },
+          {
+            "operation": "set_property",
+            "property": "secondTriggerAction",
+            "path": "secondTriggerAction",
+            "mode": "saved",
+            "args": [
+              0
+            ],
+            "arg_values": {
+              "value": 0
+            },
+            "read_key": "secondTriggerAction",
+            "risk_tier": "high",
+            "real_write_enabled": true,
+            "planned_only_reason": null,
+            "capability_gate": null,
+            "readback": "value",
+            "contextual_requirements": []
+          }
+        ],
+        "confirm_gates": [],
+        "before": {
+          "isRunning": false,
+          "isPaused": false,
+          "cueTargetID": "",
+          "duckLevel": -6.000000000000001,
+          "parent": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+          "type": "Group",
+          "isAuditioning": false,
+          "hasCueTargets": false,
+          "canHavePatchTargets": false,
+          "mode": 6,
+          "secondTriggerAction": 6,
+          "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+          "isWarning": false,
+          "allowsEditingDuration": false,
+          "isBroken": false
+        },
+        "after": {
+          "duckLevel": 0,
+          "type": "Group",
+          "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+          "secondTriggerAction": 0
+        },
+        "diff": {
+          "duckLevel": {
+            "before": -6.000000000000001,
+            "requested": 0
+          },
+          "secondTriggerAction": {
+            "before": 6,
+            "requested": 0
+          }
+        },
+        "planned_operations": [
+          {
+            "operation": "set_property",
+            "property": "duckLevel",
+            "key": "duckLevel",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510/duckLevel",
+            "args": [
+              0
+            ],
+            "status": "verified"
+          },
+          {
+            "operation": "set_property",
+            "property": "secondTriggerAction",
+            "key": "secondTriggerAction",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510/secondTriggerAction",
+            "args": [
+              0
+            ],
+            "status": "verified"
+          }
+        ],
+        "executed_operations": [
+          {
+            "operation": "set_property",
+            "property": "duckLevel",
+            "key": "duckLevel",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510/duckLevel",
+            "args": [
+              0
+            ],
+            "status": "sent",
+            "reply_error": null
+          },
+          {
+            "operation": "set_property",
+            "property": "secondTriggerAction",
+            "key": "secondTriggerAction",
+            "address": "/workspace/8E86FE91-668B-560C-B738-4D581B5A7498/cue_id/FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510/secondTriggerAction",
+            "args": [
+              0
+            ],
+            "status": "sent",
+            "reply_error": null
+          }
+        ],
+        "errors": null,
+        "warnings": [],
+        "notices": [],
+        "updateq_plan": null,
+        "group_child_readback": null,
+        "side_effects": [],
+        "debug": null
+      }
+    ],
+    "errors": null,
+    "warnings": [
+      "Sequential, non-atomic edits; no automatic rollback or setter retry."
+    ],
+    "error_code": null,
+    "suggested_action": null,
+    "message": "updated"
+  },
+  "restored_readback": {
+    "ok": true,
+    "status": "ok",
+    "partial": false,
+    "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+    "error_code": null,
+    "message": null,
+    "suggested_action": null,
+    "coverage": {
+      "source": "documented_osc",
+      "unavailable_via_osc": [],
+      "unavailable_fields": [],
+      "failed_routes": [],
+      "notes": [
+        "Containing Cue List context comes from qlab_get_group_cues; detail reads the immediate parent.",
+        "Read-only cue configuration; no live output is calculated or queried.",
+        "Children are bounded summaries; depth zero reads no children."
+      ]
+    },
+    "warnings": [
+      "Technical notes and paths may contain sensitive free text."
+    ],
+    "errors": {},
+    "cue_id": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+    "profile": "technical",
+    "identity": {
+      "uniqueID": "FF2A2F6A-05AD-5ED9-B5DB-FE89D53DB510",
+      "type": "Group",
+      "number": "",
+      "name": "",
+      "displayName": "Playlist - Shuffle, Loop, Crossfade",
+      "parent_id": "DCBE4AD4-E7F5-57F2-97B4-DA4388CD9F87",
+      "cue_list_id": null,
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false
+    },
+    "basics": {
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "allowsEditingDuration": false,
+      "colorName": "none",
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "notes": ""
+    },
+    "state": {
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false
+    },
+    "timing": {
+      "preWait": 0.0,
+      "duration": 699.1363265306122,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      }
+    },
+    "triggers": {
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": 0.0,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "timecodeTriggerText": "1:00:00:00"
+    },
+    "group": {
+      "mode": 6,
+      "isChildAuditioning": false,
+      "isChildFlagged": false
+    },
+    "mode_label": "Playlist",
+    "playlist": {
+      "currentCue": "none",
+      "currentCueID": "none",
+      "doCrossfade": true,
+      "doLoop": true,
+      "doShuffle": true,
+      "crossfadeDuration": 3.0
+    },
+    "contents": {
+      "children": [
+        {
+          "uniqueID": "69FAE776-BD85-5490-B4B1-25D716F55E34",
+          "type": "Audio",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "Rihanna - Don-'t Stop The Music.mp3",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "4B564579-4FC3-50A6-85DB-05A22B75005F",
+          "type": "Audio",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "<redacted-local-path-a56ca6550c>.mp3",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "8DD1F3DC-66BD-58CB-9B59-333EE9918601",
+          "type": "Audio",
+          "number": "",
+          "name": "",
+          "displayName": null,
+          "listName": "Shape of You - Ed Sheeran.mp3",
+          "colorName": "none",
+          "armed": true,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        }
+      ],
+      "direct_child_count": 3,
+      "returned_count": 3,
+      "max_depth": 2,
+      "max_cues": 1000,
+      "truncated": false,
+      "truncation_reasons": []
+    },
+    "edit_capabilities": {
+      "tool": "qlab_edit_group_cues",
+      "allowed_properties": [
+        "armed",
+        "autoLoad",
+        "colorName",
+        "continueMode",
+        "duckLevel",
+        "duckOthers",
+        "duckTime",
+        "duration",
+        "fadeAndStopOthersTime",
+        "flagged",
+        "mode",
+        "name",
+        "notes",
+        "number",
+        "playlist/crossfade/duration",
+        "playlist/doCrossfade",
+        "playlist/doLoop",
+        "playlist/doShuffle",
+        "postWait",
+        "preWait",
+        "secondColorName",
+        "secondTriggerAction",
+        "secondTriggerOnRelease",
+        "skipIfDisarmed",
+        "timecodeTrigger/bits",
+        "timecodeTrigger/frames",
+        "timecodeTrigger/hours",
+        "timecodeTrigger/minutes",
+        "timecodeTrigger/seconds",
+        "timecodeTrigger/text",
+        "useSecondColor"
+      ],
+      "blocked_properties": {
+        "fadeAndStopOthers": "Requires fresh integer scope; boolean cannot identify scope."
+      },
+      "requires_fresh_preflight": true,
+      "mode_playlist_writes_require_one_property": true,
+      "pending_validation": [
+        "Playhead and playback-position controls",
+        "Playlist navigation, current-cue, shuffle and crossfade-curve controls",
+        "Cue Cart cell movement"
+      ]
+    },
+    "technical_payload": {
+      "secondColorName": "none",
+      "useSecondColor": false,
+      "allowsEditingDuration": false,
+      "colorName": "none",
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "notes": "",
+      "armed": true,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false,
+      "preWait": 0.0,
+      "duration": 699.1363265306122,
+      "postWait": 0.0,
+      "continueMode": 0,
+      "timecodeTrigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "mode": 6,
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false,
+      "duckOthers": false,
+      "duckLevel": 0.0,
+      "duckTime": 1.0,
+      "fadeAndStopOthers": false,
+      "fadeAndStopOthersTime": 1.0,
+      "timecodeTriggerText": "1:00:00:00"
+    },
+    "redactions": []
+  }
+}

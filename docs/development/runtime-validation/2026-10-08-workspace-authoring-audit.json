@@ -1,0 +1,5210 @@
+{
+  "date": "2026-10-08",
+  "version": "5.5.10",
+  "catalogue": {
+    "tools": 73,
+    "reads": 46,
+    "writes": 27
+  },
+  "original_index": {
+    "before": 417,
+    "after": 427,
+    "unchanged": true,
+    "changed": []
+  },
+  "root": {
+    "ok": true,
+    "status": "ok",
+    "partial": false,
+    "workspace_id": "<WORKSPACE_UUID>",
+    "error_code": null,
+    "message": null,
+    "suggested_action": null,
+    "coverage": {
+      "source": "documented_osc",
+      "unavailable_via_osc": [
+        "sync_enabled",
+        "mtc_source_name",
+        "ltc_input_patch",
+        "ltc_sync_channel"
+      ],
+      "unavailable_fields": [
+        "currentTimecode",
+        "currentTimecode/text"
+      ],
+      "failed_routes": [],
+      "notes": [
+        "Timecode mode/configuration does not prove synchronization is enabled or a signal is present.",
+        "Current timecode may be unavailable when the list is not receiving timecode.",
+        "Depth 0 reads no children; max_cues counts descendants, excluding the list root.",
+        "Reads are sequential observations, not an atomic snapshot."
+      ]
+    },
+    "warnings": [],
+    "errors": {},
+    "cue_list_id": "<AUDIT_LIST_UUID>",
+    "profile": "safe",
+    "identity": {
+      "uniqueID": "<AUDIT_LIST_UUID>",
+      "type": "Cue List",
+      "name": "MCP \u00b7 Auditor\u00eda autor\u00eda \u00b7 08-10",
+      "displayName": "MCP \u00b7 Auditor\u00eda autor\u00eda \u00b7 08-10",
+      "listName": "MCP \u00b7 Auditor\u00eda autor\u00eda \u00b7 08-10",
+      "number": "",
+      "colorName": "none",
+      "secondColorName": "none",
+      "useSecondColor": false
+    },
+    "basics": {
+      "defaultName": "",
+      "notes": null,
+      "mode": 0,
+      "autoLoad": false,
+      "skipIfDisarmed": false,
+      "secondTriggerAction": 0,
+      "secondTriggerOnRelease": false
+    },
+    "state": {
+      "armed": false,
+      "flagged": false,
+      "isBroken": false,
+      "isWarning": false,
+      "isRunning": false,
+      "isPaused": false,
+      "isLoaded": false,
+      "isActionRunning": false,
+      "isAuditioning": false,
+      "isOverridden": false,
+      "isChildAuditioning": false,
+      "isChildFlagged": false,
+      "isPanicking": false,
+      "isTailingOut": false
+    },
+    "playhead": {
+      "number": "226",
+      "uniqueID": "<CUE_3_UUID>",
+      "present": true
+    },
+    "playback_position": {
+      "number": "226",
+      "uniqueID": "<CUE_3_UUID>",
+      "present": true
+    },
+    "incoming_timecode": {
+      "current": null,
+      "text": null,
+      "sync_mode": {
+        "value": 0,
+        "label": "MTC"
+      },
+      "smpte_format": {
+        "value": 3,
+        "label": "30 fps"
+      },
+      "start_behavior": {
+        "value": 4,
+        "label": "Start all earlier triggers"
+      },
+      "stop_behavior": {
+        "value": 1,
+        "label": "Pause timecode-triggered cues"
+      },
+      "freewheel_seconds": 0.25,
+      "lookback_seconds": 0,
+      "trigger": {
+        "hours": 1,
+        "minutes": 0,
+        "seconds": 0,
+        "frames": 0,
+        "bits": 0
+      },
+      "trigger_text": "1:00:00:00"
+    },
+    "contents": {
+      "children": [
+        {
+          "uniqueID": "<CUE_0_UUID>",
+          "type": "Memo",
+          "number": "223",
+          "name": "00 \u00b7 Auditor\u00eda est\u00e1tica \u00b7 NO EJECUTAR",
+          "displayName": null,
+          "listName": "00 \u00b7 Auditor\u00eda est\u00e1tica \u00b7 NO EJECUTAR",
+          "colorName": "none",
+          "armed": false,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "<CUE_1_UUID>",
+          "type": "Audio",
+          "number": "224",
+          "name": "01 \u00b7 Audio \u00b7 authorized audio fixture",
+          "displayName": null,
+          "listName": "01 \u00b7 Audio \u00b7 authorized audio fixture",
+          "colorName": "none",
+          "armed": false,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "<CUE_2_UUID>",
+          "type": "Video",
+          "number": "225",
+          "name": "02 \u00b7 Imagen \u00b7 \u00c1rbol m\u00e1gico",
+          "displayName": null,
+          "listName": "02 \u00b7 Imagen \u00b7 \u00c1rbol m\u00e1gico",
+          "colorName": "none",
+          "armed": false,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "<CUE_3_UUID>",
+          "type": "Light",
+          "number": "226",
+          "name": "03 \u00b7 Luz de entrada \u00b7 2 s",
+          "displayName": null,
+          "listName": "03 \u00b7 Luz de entrada \u00b7 2 s",
+          "colorName": "none",
+          "armed": false,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "<CUE_4_UUID>",
+          "type": "Wait",
+          "number": "227",
+          "name": "04 \u00b7 Espera \u00b7 10 s",
+          "displayName": null,
+          "listName": "04 \u00b7 Espera \u00b7 10 s",
+          "colorName": "none",
+          "armed": false,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "<CUE_5_UUID>",
+          "type": "Fade",
+          "number": "228",
+          "name": "05 \u00b7 Salida audio \u00b7 3 s",
+          "displayName": null,
+          "listName": "05 \u00b7 Salida audio \u00b7 3 s",
+          "colorName": "none",
+          "armed": false,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "<CUE_6_UUID>",
+          "type": "Fade",
+          "number": "229",
+          "name": "06 \u00b7 Salida imagen \u00b7 3 s",
+          "displayName": null,
+          "listName": "06 \u00b7 Salida imagen \u00b7 3 s",
+          "colorName": "none",
+          "armed": false,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "<CUE_7_UUID>",
+          "type": "Light",
+          "number": "230",
+          "name": "07 \u00b7 Negro \u00b7 2 s",
+          "displayName": null,
+          "listName": "07 \u00b7 Negro \u00b7 2 s",
+          "colorName": "none",
+          "armed": false,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        },
+        {
+          "uniqueID": "<CUE_8_UUID>",
+          "type": "Stop",
+          "number": "231",
+          "name": "08 \u00b7 Stop audio \u00b7 t=17",
+          "displayName": null,
+          "listName": "08 \u00b7 Stop audio \u00b7 t=17",
+          "colorName": "none",
+          "armed": false,
+          "flagged": false,
+          "child_count": 0,
+          "children": [],
+          "children_complete": true
+        }
+      ],
+      "direct_child_count": 9,
+      "returned_count": 9,
+      "max_depth": 1,
+      "max_cues": 12,
+      "truncated": false,
+      "truncation_reasons": []
+    }
+  },
+  "operation_records": [
+    {
+      "tool": "edit_audio",
+      "phase": 1,
+      "cue_id": "<CUE_1_UUID>",
+      "status": "updated",
+      "before": {
+        "isRunning": false,
+        "isPaused": false,
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Audio",
+        "isAuditioning": false,
+        "hasCueTargets": false,
+        "canHavePatchTargets": false,
+        "uniqueID": "<CUE_1_UUID>",
+        "isWarning": false,
+        "allowsEditingDuration": false,
+        "isBroken": true,
+        "name": "",
+        "armed": true,
+        "fileTarget": ""
+      },
+      "requested": {
+        "name": "01 \u00b7 Audio \u00b7 authorized audio fixture",
+        "armed": false,
+        "fileTarget": "<LOCAL_FILE>"
+      },
+      "after": {
+        "uniqueID": "<CUE_1_UUID>",
+        "type": "Audio",
+        "name": "01 \u00b7 Audio \u00b7 authorized audio fixture",
+        "armed": false,
+        "fileTarget": "<LOCAL_FILE>"
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "name",
+          "key": "name",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_1_UUID>/name",
+          "args": [
+            "01 \u00b7 Audio \u00b7 authorized audio fixture"
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "armed",
+          "key": "armed",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_1_UUID>/armed",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "fileTarget",
+          "key": "fileTarget",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_1_UUID>/fileTarget",
+          "args": [
+            "<LOCAL_FILE>"
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_light",
+      "phase": 1,
+      "cue_id": "<CUE_3_UUID>",
+      "status": "updated",
+      "before": {
+        "isRunning": false,
+        "continueMode": 0,
+        "isPaused": false,
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Light",
+        "isAuditioning": false,
+        "hasCueTargets": false,
+        "canHavePatchTargets": false,
+        "uniqueID": "<CUE_3_UUID>",
+        "isWarning": true,
+        "duration": 5,
+        "allowsEditingDuration": true,
+        "isBroken": false,
+        "name": "",
+        "armed": true,
+        "lightCommandText": ""
+      },
+      "requested": {
+        "name": "03 \u00b7 Luz de entrada \u00b7 2 s",
+        "armed": false,
+        "continueMode": 2,
+        "duration": 2,
+        "lightCommandText": "Grupo1 = 30\nGrupo2 = 5\nLED1.red = 35\nLED2.blue = 15\nLED3.green = 10"
+      },
+      "after": {
+        "uniqueID": "<CUE_3_UUID>",
+        "type": "Light",
+        "name": "03 \u00b7 Luz de entrada \u00b7 2 s",
+        "armed": false,
+        "continueMode": 2,
+        "duration": 2,
+        "lightCommandText": "Grupo1 = 30\nGrupo2 = 5\nLED1.red = 35\nLED2.blue = 15\nLED3.green = 10"
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "name",
+          "key": "name",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_3_UUID>/name",
+          "args": [
+            "03 \u00b7 Luz de entrada \u00b7 2 s"
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "armed",
+          "key": "armed",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_3_UUID>/armed",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "continueMode",
+          "key": "continueMode",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_3_UUID>/continueMode",
+          "args": [
+            2
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "duration",
+          "key": "duration",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_3_UUID>/duration",
+          "args": [
+            2
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "lightCommandText",
+          "key": "lightCommandText",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_3_UUID>/lightCommandText",
+          "args": [
+            "Grupo1 = 30\nGrupo2 = 5\nLED1.red = 35\nLED2.blue = 15\nLED3.green = 10"
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_light",
+      "phase": 1,
+      "cue_id": "<CUE_7_UUID>",
+      "status": "updated",
+      "before": {
+        "isRunning": false,
+        "continueMode": 0,
+        "isPaused": false,
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Light",
+        "isAuditioning": false,
+        "hasCueTargets": false,
+        "canHavePatchTargets": false,
+        "uniqueID": "<CUE_7_UUID>",
+        "isWarning": true,
+        "duration": 5,
+        "allowsEditingDuration": true,
+        "isBroken": false,
+        "name": "",
+        "armed": true,
+        "lightCommandText": ""
+      },
+      "requested": {
+        "name": "07 \u00b7 Negro \u00b7 2 s",
+        "armed": false,
+        "continueMode": 2,
+        "duration": 2,
+        "lightCommandText": "Grupo1 = 0\nGrupo2 = 0\nLED1.red = 0\nLED2.blue = 0\nLED3.green = 0"
+      },
+      "after": {
+        "uniqueID": "<CUE_7_UUID>",
+        "type": "Light",
+        "name": "07 \u00b7 Negro \u00b7 2 s",
+        "armed": false,
+        "continueMode": 2,
+        "duration": 2,
+        "lightCommandText": "Grupo1 = 0\nGrupo2 = 0\nLED1.red = 0\nLED2.blue = 0\nLED3.green = 0"
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "name",
+          "key": "name",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_7_UUID>/name",
+          "args": [
+            "07 \u00b7 Negro \u00b7 2 s"
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "armed",
+          "key": "armed",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_7_UUID>/armed",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "continueMode",
+          "key": "continueMode",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_7_UUID>/continueMode",
+          "args": [
+            2
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "duration",
+          "key": "duration",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_7_UUID>/duration",
+          "args": [
+            2
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "lightCommandText",
+          "key": "lightCommandText",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_7_UUID>/lightCommandText",
+          "args": [
+            "Grupo1 = 0\nGrupo2 = 0\nLED1.red = 0\nLED2.blue = 0\nLED3.green = 0"
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_video",
+      "phase": 2,
+      "cue_id": "<CUE_2_UUID>",
+      "status": "updated",
+      "before": {
+        "isRunning": false,
+        "isPaused": false,
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Video",
+        "isAuditioning": false,
+        "hasCueTargets": false,
+        "canHavePatchTargets": false,
+        "uniqueID": "<CUE_2_UUID>",
+        "isWarning": false,
+        "allowsEditingDuration": false,
+        "isBroken": true,
+        "name": "",
+        "stageID": "<REFERENCE_UUID>",
+        "fileTarget": ""
+      },
+      "requested": {
+        "name": "02 \u00b7 Imagen \u00b7 \u00c1rbol m\u00e1gico",
+        "stageID": "<REFERENCE_UUID>",
+        "fileTarget": "<LOCAL_FILE>"
+      },
+      "after": {
+        "type": "Video",
+        "uniqueID": "<CUE_2_UUID>",
+        "name": "02 \u00b7 Imagen \u00b7 \u00c1rbol m\u00e1gico",
+        "stageID": "<REFERENCE_UUID>",
+        "fileTarget": "<LOCAL_FILE>"
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "name",
+          "key": "name",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_2_UUID>/name",
+          "args": [
+            "02 \u00b7 Imagen \u00b7 \u00c1rbol m\u00e1gico"
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "stageID",
+          "key": "stageID",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_2_UUID>/stageID",
+          "args": [
+            "<REFERENCE_UUID>"
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "fileTarget",
+          "key": "fileTarget",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_2_UUID>/fileTarget",
+          "args": [
+            "<LOCAL_FILE>"
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_control",
+      "phase": 2,
+      "cue_id": "<CUE_0_UUID>",
+      "status": "updated",
+      "before": {
+        "isRunning": false,
+        "isPaused": false,
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Memo",
+        "isAuditioning": false,
+        "hasCueTargets": false,
+        "canHavePatchTargets": false,
+        "notes": "",
+        "uniqueID": "<CUE_0_UUID>",
+        "isWarning": false,
+        "allowsEditingDuration": false,
+        "isBroken": false,
+        "name": "",
+        "armed": true
+      },
+      "requested": {
+        "name": "00 \u00b7 Auditor\u00eda est\u00e1tica \u00b7 NO EJECUTAR",
+        "notes": "Escena de 17 s: audio + imagen en t=0; luz entra en 2 s; fades en t=12; negro t=15\u201317. Todos desarmados.",
+        "armed": false
+      },
+      "after": {
+        "armed": false,
+        "notes": "Escena de 17 s: audio + imagen en t=0; luz entra en 2 s; fades en t=12; negro t=15\u201317. Todos desarmados.",
+        "type": "Memo",
+        "uniqueID": "<CUE_0_UUID>",
+        "name": "00 \u00b7 Auditor\u00eda est\u00e1tica \u00b7 NO EJECUTAR"
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "name",
+          "key": "name",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_0_UUID>/name",
+          "args": [
+            "00 \u00b7 Auditor\u00eda est\u00e1tica \u00b7 NO EJECUTAR"
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "notes",
+          "key": "notes",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_0_UUID>/notes",
+          "args": [
+            "Escena de 17 s: audio + imagen en t=0; luz entra en 2 s; fades en t=12; negro t=15\u201317. Todos desarmados."
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "armed",
+          "key": "armed",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_0_UUID>/armed",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_control",
+      "phase": 2,
+      "cue_id": "<CUE_4_UUID>",
+      "status": "updated",
+      "before": {
+        "isRunning": false,
+        "continueMode": 0,
+        "isPaused": false,
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Wait",
+        "isAuditioning": false,
+        "hasCueTargets": false,
+        "canHavePatchTargets": false,
+        "uniqueID": "<CUE_4_UUID>",
+        "isWarning": false,
+        "duration": 1,
+        "allowsEditingDuration": true,
+        "isBroken": false,
+        "name": "",
+        "armed": true
+      },
+      "requested": {
+        "name": "04 \u00b7 Espera \u00b7 10 s",
+        "armed": false,
+        "continueMode": 2,
+        "duration": 10
+      },
+      "after": {
+        "armed": false,
+        "continueMode": 2,
+        "duration": 10,
+        "type": "Wait",
+        "uniqueID": "<CUE_4_UUID>",
+        "name": "04 \u00b7 Espera \u00b7 10 s"
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "name",
+          "key": "name",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_4_UUID>/name",
+          "args": [
+            "04 \u00b7 Espera \u00b7 10 s"
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "armed",
+          "key": "armed",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_4_UUID>/armed",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "continueMode",
+          "key": "continueMode",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_4_UUID>/continueMode",
+          "args": [
+            2
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "duration",
+          "key": "duration",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_4_UUID>/duration",
+          "args": [
+            10
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_control",
+      "phase": 2,
+      "cue_id": "<CUE_8_UUID>",
+      "status": "updated",
+      "before": {
+        "isRunning": false,
+        "isPaused": false,
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Stop",
+        "isAuditioning": false,
+        "hasCueTargets": true,
+        "canHavePatchTargets": false,
+        "uniqueID": "<CUE_8_UUID>",
+        "isWarning": false,
+        "allowsEditingDuration": false,
+        "isBroken": true,
+        "name": "",
+        "armed": true
+      },
+      "requested": {
+        "name": "08 \u00b7 Stop audio \u00b7 t=17",
+        "armed": false,
+        "cueTargetID": "<CUE_1_UUID>"
+      },
+      "after": {
+        "armed": false,
+        "cueTargetID": "<CUE_1_UUID>",
+        "type": "Stop",
+        "uniqueID": "<CUE_8_UUID>",
+        "name": "08 \u00b7 Stop audio \u00b7 t=17"
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "name",
+          "key": "name",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_8_UUID>/name",
+          "args": [
+            "08 \u00b7 Stop audio \u00b7 t=17"
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "armed",
+          "key": "armed",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_8_UUID>/armed",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "cueTargetID",
+          "key": "cueTargetID",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_8_UUID>/cueTargetID",
+          "args": [
+            "<CUE_1_UUID>"
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_fade",
+      "phase": 2,
+      "cue_id": "<CUE_5_UUID>",
+      "status": "updated",
+      "before": {
+        "armed": true,
+        "isRunning": false,
+        "isPaused": false,
+        "patchTargetID": "",
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Fade",
+        "isAuditioning": false,
+        "hasCueTargets": true,
+        "canHavePatchTargets": true,
+        "uniqueID": "<CUE_5_UUID>",
+        "isWarning": false,
+        "allowsEditingDuration": true,
+        "isBroken": true,
+        "targetMode": 0,
+        "name": ""
+      },
+      "requested": {
+        "name": "05 \u00b7 Salida audio \u00b7 3 s",
+        "armed": false,
+        "cueTargetID": "<CUE_1_UUID>"
+      },
+      "after": {
+        "uniqueID": "<CUE_5_UUID>",
+        "type": "Fade",
+        "name": "05 \u00b7 Salida audio \u00b7 3 s",
+        "armed": false,
+        "cueTargetID": "<CUE_1_UUID>"
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "name",
+          "key": "name",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_5_UUID>/name",
+          "args": [
+            "05 \u00b7 Salida audio \u00b7 3 s"
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "armed",
+          "key": "armed",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_5_UUID>/armed",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "cueTargetID",
+          "key": "cueTargetID",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_5_UUID>/cueTargetID",
+          "args": [
+            "<CUE_1_UUID>"
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_fade",
+      "phase": 3,
+      "cue_id": "<CUE_6_UUID>",
+      "status": "updated",
+      "before": {
+        "armed": true,
+        "isRunning": false,
+        "isPaused": false,
+        "patchTargetID": "",
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Fade",
+        "isAuditioning": false,
+        "hasCueTargets": true,
+        "canHavePatchTargets": true,
+        "uniqueID": "<CUE_6_UUID>",
+        "isWarning": false,
+        "allowsEditingDuration": true,
+        "isBroken": true,
+        "targetMode": 0,
+        "name": ""
+      },
+      "requested": {
+        "name": "06 \u00b7 Salida imagen \u00b7 3 s",
+        "armed": false,
+        "cueTargetID": "<CUE_2_UUID>"
+      },
+      "after": {
+        "uniqueID": "<CUE_6_UUID>",
+        "type": "Fade",
+        "name": "06 \u00b7 Salida imagen \u00b7 3 s",
+        "armed": false,
+        "cueTargetID": "<CUE_2_UUID>"
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "name",
+          "key": "name",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_6_UUID>/name",
+          "args": [
+            "06 \u00b7 Salida imagen \u00b7 3 s"
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "armed",
+          "key": "armed",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_6_UUID>/armed",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "cueTargetID",
+          "key": "cueTargetID",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_6_UUID>/cueTargetID",
+          "args": [
+            "<CUE_2_UUID>"
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_video",
+      "phase": 3,
+      "cue_id": "<CUE_2_UUID>",
+      "status": "verification_inconclusive",
+      "before": {
+        "isRunning": false,
+        "isPaused": false,
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Video",
+        "isAuditioning": false,
+        "hasCueTargets": false,
+        "canHavePatchTargets": false,
+        "uniqueID": "<CUE_2_UUID>",
+        "isWarning": false,
+        "allowsEditingDuration": true,
+        "isBroken": false,
+        "armed": true,
+        "continueMode": 0,
+        "duration": 0,
+        "opacity": 0,
+        "translation": {
+          "x": 0,
+          "y": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1
+        },
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ]
+      },
+      "requested": {
+        "armed": false,
+        "continueMode": 1,
+        "duration": 17,
+        "opacity": 0.8,
+        "translation": {
+          "x": 0,
+          "y": 0
+        },
+        "scale": {
+          "x": 0.7,
+          "y": 0.7
+        },
+        "quaternion": 1
+      },
+      "after": {
+        "type": "Video",
+        "uniqueID": "<CUE_2_UUID>",
+        "armed": false,
+        "continueMode": 1,
+        "duration": 17,
+        "opacity": 0.800000011920929,
+        "translation": {
+          "x": 0,
+          "y": 0
+        },
+        "scale": {
+          "x": 0.699999988079071,
+          "y": 0.699999988079071
+        },
+        "quaternion": [
+          1,
+          0,
+          0,
+          0
+        ]
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "armed",
+          "key": "armed",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_2_UUID>/armed",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "continueMode",
+          "key": "continueMode",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_2_UUID>/continueMode",
+          "args": [
+            1
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "duration",
+          "key": "duration",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_2_UUID>/duration",
+          "args": [
+            17
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "opacity",
+          "key": "opacity",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_2_UUID>/opacity",
+          "args": [
+            0.8
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "translation",
+          "key": "translation",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_2_UUID>/translation",
+          "args": [
+            0,
+            0
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "scale",
+          "key": "scale",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_2_UUID>/scale",
+          "args": [
+            0.7,
+            0.7
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "quaternion",
+          "key": "quaternion",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_2_UUID>/quaternion",
+          "args": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": {
+        "quaternion": "Setter verification failed; no retry was sent."
+      }
+    },
+    {
+      "tool": "edit_audio",
+      "phase": 4,
+      "cue_id": "<CUE_1_UUID>",
+      "status": "updated",
+      "before": {
+        "isRunning": false,
+        "continueMode": 0,
+        "isPaused": false,
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Audio",
+        "isAuditioning": false,
+        "hasCueTargets": false,
+        "canHavePatchTargets": false,
+        "uniqueID": "<CUE_1_UUID>",
+        "isWarning": false,
+        "allowsEditingDuration": false,
+        "isBroken": false,
+        "sliderLevel/0": 0,
+        "endTime": 226.2334693877551,
+        "infiniteLoop": false
+      },
+      "requested": {
+        "continueMode": 1,
+        "sliderLevel/0": -12,
+        "infiniteLoop": false,
+        "endTime": 17
+      },
+      "after": {
+        "uniqueID": "<CUE_1_UUID>",
+        "type": "Audio",
+        "continueMode": 1,
+        "sliderLevel/0": -11.999953269958496,
+        "infiniteLoop": false,
+        "endTime": 17
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "continueMode",
+          "key": "continueMode",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_1_UUID>/continueMode",
+          "args": [
+            1
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "sliderLevel",
+          "key": "sliderLevel/0",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_1_UUID>/sliderLevel/0",
+          "args": [
+            -12
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "infiniteLoop",
+          "key": "infiniteLoop",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_1_UUID>/infiniteLoop",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "endTime",
+          "key": "endTime",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_1_UUID>/endTime",
+          "args": [
+            17
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_fade",
+      "phase": "enable",
+      "cue_id": "<CUE_5_UUID>",
+      "status": "updated",
+      "before": {
+        "uniqueID": "<CUE_5_UUID>",
+        "type": "Fade",
+        "parent": "<AUDIT_LIST_UUID>",
+        "isRunning": false,
+        "isPaused": false,
+        "isAuditioning": false,
+        "isBroken": true,
+        "isWarning": false,
+        "doLevel/0/0": false
+      },
+      "requested": {
+        "doLevel/0/0": true
+      },
+      "after": {
+        "uniqueID": "<CUE_5_UUID>",
+        "type": "Fade",
+        "doLevel/0/0": true
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "doLevel",
+          "key": "doLevel/0/0",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_5_UUID>/doLevel/0/0",
+          "args": [
+            true
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_fade",
+      "phase": "enable",
+      "cue_id": "<CUE_6_UUID>",
+      "status": "updated",
+      "before": {
+        "uniqueID": "<CUE_6_UUID>",
+        "type": "Fade",
+        "parent": "<AUDIT_LIST_UUID>",
+        "isRunning": false,
+        "isPaused": false,
+        "isAuditioning": false,
+        "isBroken": true,
+        "isWarning": false,
+        "doOpacity": false
+      },
+      "requested": {
+        "doOpacity": true
+      },
+      "after": {
+        "uniqueID": "<CUE_6_UUID>",
+        "type": "Fade",
+        "doOpacity": true
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "doOpacity",
+          "key": "doOpacity",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_6_UUID>/doOpacity",
+          "args": [
+            true
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_fade",
+      "phase": "values",
+      "cue_id": "<CUE_5_UUID>",
+      "status": "updated",
+      "before": {
+        "isRunning": false,
+        "continueMode": 0,
+        "isPaused": false,
+        "patchTargetID": "",
+        "cueTargetID": "<CUE_1_UUID>",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Fade",
+        "isAuditioning": false,
+        "hasCueTargets": true,
+        "canHavePatchTargets": true,
+        "uniqueID": "<CUE_5_UUID>",
+        "isWarning": false,
+        "duration": 3,
+        "allowsEditingDuration": true,
+        "isBroken": false,
+        "targetMode": 0,
+        "stopTargetWhenDone": false,
+        "sliderLevel/0": -60
+      },
+      "requested": {
+        "continueMode": 1,
+        "duration": 3,
+        "stopTargetWhenDone": true,
+        "sliderLevel/0": "-inf"
+      },
+      "after": {
+        "uniqueID": "<CUE_5_UUID>",
+        "type": "Fade",
+        "continueMode": 1,
+        "duration": 3,
+        "stopTargetWhenDone": true,
+        "sliderLevel/0": -60
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "continueMode",
+          "key": "continueMode",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_5_UUID>/continueMode",
+          "args": [
+            1
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "duration",
+          "key": "duration",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_5_UUID>/duration",
+          "args": [
+            3
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "stopTargetWhenDone",
+          "key": "stopTargetWhenDone",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_5_UUID>/stopTargetWhenDone",
+          "args": [
+            true
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "sliderLevel",
+          "key": "sliderLevel/0",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_5_UUID>/sliderLevel/0",
+          "args": [
+            "-inf"
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_fade",
+      "phase": "values",
+      "cue_id": "<CUE_6_UUID>",
+      "status": "updated",
+      "before": {
+        "isRunning": false,
+        "continueMode": 0,
+        "isPaused": false,
+        "patchTargetID": "",
+        "cueTargetID": "<CUE_2_UUID>",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Fade",
+        "isAuditioning": false,
+        "hasCueTargets": true,
+        "canHavePatchTargets": true,
+        "uniqueID": "<CUE_6_UUID>",
+        "isWarning": false,
+        "duration": 3,
+        "allowsEditingDuration": true,
+        "isBroken": false,
+        "targetMode": 0,
+        "stopTargetWhenDone": false,
+        "opacity": 1
+      },
+      "requested": {
+        "continueMode": 2,
+        "duration": 3,
+        "stopTargetWhenDone": true,
+        "opacity": 0
+      },
+      "after": {
+        "uniqueID": "<CUE_6_UUID>",
+        "type": "Fade",
+        "continueMode": 2,
+        "duration": 3,
+        "stopTargetWhenDone": true,
+        "opacity": 0
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "continueMode",
+          "key": "continueMode",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_6_UUID>/continueMode",
+          "args": [
+            2
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "duration",
+          "key": "duration",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_6_UUID>/duration",
+          "args": [
+            3
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "stopTargetWhenDone",
+          "key": "stopTargetWhenDone",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_6_UUID>/stopTargetWhenDone",
+          "args": [
+            true
+          ],
+          "status": "sent",
+          "reply_error": null
+        },
+        {
+          "operation": "set_property",
+          "property": "opacity",
+          "key": "opacity",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_6_UUID>/opacity",
+          "args": [
+            0
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_video",
+      "phase": "resetRotation",
+      "cue_id": "<CUE_2_UUID>",
+      "status": "updated",
+      "before": {
+        "isRunning": false,
+        "isPaused": false,
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Video",
+        "isAuditioning": false,
+        "hasCueTargets": false,
+        "canHavePatchTargets": false,
+        "uniqueID": "<CUE_2_UUID>",
+        "isWarning": false,
+        "allowsEditingDuration": true,
+        "isBroken": false,
+        "resetRotation": [
+          1,
+          0,
+          0,
+          0
+        ]
+      },
+      "requested": {
+        "resetRotation": true
+      },
+      "after": {
+        "type": "Video",
+        "uniqueID": "<CUE_2_UUID>",
+        "resetRotation": [
+          0,
+          0,
+          0,
+          1
+        ]
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "resetRotation",
+          "key": "resetRotation",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_2_UUID>/resetRotation",
+          "args": [],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_video",
+      "phase": "custom_geometry",
+      "cue_id": "<CUE_2_UUID>",
+      "status": "updated",
+      "before": {
+        "isRunning": false,
+        "isPaused": false,
+        "cueTargetID": "",
+        "parent": "<AUDIT_LIST_UUID>",
+        "type": "Video",
+        "isAuditioning": false,
+        "hasCueTargets": false,
+        "canHavePatchTargets": false,
+        "uniqueID": "<CUE_2_UUID>",
+        "isWarning": false,
+        "allowsEditingDuration": true,
+        "isBroken": false,
+        "fillStage": true
+      },
+      "requested": {
+        "fillStage": false
+      },
+      "after": {
+        "type": "Video",
+        "uniqueID": "<CUE_2_UUID>",
+        "fillStage": false
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "fillStage",
+          "key": "fillStage",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_2_UUID>/fillStage",
+          "args": [
+            false
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_light",
+      "phase": "complete_rgb",
+      "cue_id": "<CUE_3_UUID>",
+      "status": "updated",
+      "before": {
+        "uniqueID": "<CUE_3_UUID>",
+        "type": "Light",
+        "parent": "<AUDIT_LIST_UUID>",
+        "isRunning": false,
+        "isPaused": false,
+        "isAuditioning": false,
+        "isBroken": false,
+        "isWarning": false,
+        "lightCommandText": "Grupo1 = 30\nGrupo2 = 5\nLED1.red = 35\nLED2.blue = 15\nLED3.green = 10"
+      },
+      "requested": {
+        "lightCommandText": "Grupo1 = 30\nGrupo2 = 5\nLED1.red = 35\nLED1.green = 0\nLED1.blue = 0\nLED2.red = 0\nLED2.green = 0\nLED2.blue = 15\nLED3.red = 0\nLED3.green = 10\nLED3.blue = 0"
+      },
+      "after": {
+        "uniqueID": "<CUE_3_UUID>",
+        "type": "Light",
+        "lightCommandText": "Grupo1 = 30\nGrupo2 = 5\nLED1.red = 35\nLED1.green = 0\nLED1.blue = 0\nLED2.red = 0\nLED2.green = 0\nLED2.blue = 15\nLED3.red = 0\nLED3.green = 10\nLED3.blue = 0"
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "lightCommandText",
+          "key": "lightCommandText",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_3_UUID>/lightCommandText",
+          "args": [
+            "Grupo1 = 30\nGrupo2 = 5\nLED1.red = 35\nLED1.green = 0\nLED1.blue = 0\nLED2.red = 0\nLED2.green = 0\nLED2.blue = 15\nLED3.red = 0\nLED3.green = 10\nLED3.blue = 0"
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    },
+    {
+      "tool": "edit_light",
+      "phase": "complete_rgb",
+      "cue_id": "<CUE_7_UUID>",
+      "status": "updated",
+      "before": {
+        "uniqueID": "<CUE_7_UUID>",
+        "type": "Light",
+        "parent": "<AUDIT_LIST_UUID>",
+        "isRunning": false,
+        "isPaused": false,
+        "isAuditioning": false,
+        "isBroken": false,
+        "isWarning": false,
+        "lightCommandText": "Grupo1 = 0\nGrupo2 = 0\nLED1.red = 0\nLED2.blue = 0\nLED3.green = 0"
+      },
+      "requested": {
+        "lightCommandText": "Grupo1 = 0\nGrupo2 = 0\nLED1.red = 0\nLED1.green = 0\nLED1.blue = 0\nLED2.red = 0\nLED2.green = 0\nLED2.blue = 0\nLED3.red = 0\nLED3.green = 0\nLED3.blue = 0"
+      },
+      "after": {
+        "uniqueID": "<CUE_7_UUID>",
+        "type": "Light",
+        "lightCommandText": "Grupo1 = 0\nGrupo2 = 0\nLED1.red = 0\nLED1.green = 0\nLED1.blue = 0\nLED2.red = 0\nLED2.green = 0\nLED2.blue = 0\nLED3.red = 0\nLED3.green = 0\nLED3.blue = 0"
+      },
+      "executed": [
+        {
+          "operation": "set_property",
+          "property": "lightCommandText",
+          "key": "lightCommandText",
+          "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_7_UUID>/lightCommandText",
+          "args": [
+            "Grupo1 = 0\nGrupo2 = 0\nLED1.red = 0\nLED1.green = 0\nLED1.blue = 0\nLED2.red = 0\nLED2.green = 0\nLED2.blue = 0\nLED3.red = 0\nLED3.green = 0\nLED3.blue = 0"
+          ],
+          "status": "sent",
+          "reply_error": null
+        }
+      ],
+      "errors": null
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "missing_target",
+      "data": {
+        "ok": false,
+        "status": "preflight_failed",
+        "workspace_id": "<WORKSPACE_UUID>",
+        "dry_run": true,
+        "requested_count": 1,
+        "planned_count": 0,
+        "updated_count": 0,
+        "failed_count": 1,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "<CUE_8_UUID>",
+            "cue_id": "<CUE_8_UUID>",
+            "profile": "control_basic",
+            "status": "dry_run_preflight_failed",
+            "properties": {},
+            "operations": [],
+            "before": null,
+            "after": null,
+            "diff": {},
+            "planned_operations": [],
+            "executed_operations": [],
+            "errors": {
+              "preflight": "Fresh cue identity could not be verified."
+            },
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          }
+        ],
+        "errors": {
+          "batch": "Inspect per-cue errors; pending operations were not sent."
+        },
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "preflight_failed"
+      }
+    },
+    {
+      "name": "wait_target",
+      "data": {
+        "ok": false,
+        "status": "preflight_failed",
+        "workspace_id": "<WORKSPACE_UUID>",
+        "dry_run": true,
+        "requested_count": 1,
+        "planned_count": 0,
+        "updated_count": 0,
+        "failed_count": 1,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "<CUE_4_UUID>",
+            "cue_id": "<CUE_4_UUID>",
+            "profile": "control_basic",
+            "status": "dry_run_preflight_failed",
+            "properties": {},
+            "operations": [],
+            "before": null,
+            "after": null,
+            "diff": {},
+            "planned_operations": [],
+            "executed_operations": [],
+            "errors": {
+              "preflight": "Wait and Memo cannot have targets."
+            },
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          }
+        ],
+        "errors": {
+          "batch": "Inspect per-cue errors; pending operations were not sent."
+        },
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "preflight_failed"
+      }
+    },
+    {
+      "name": "unknown_property",
+      "data": {
+        "content": [
+          {
+            "type": "text",
+            "text": "1 validation error for call[qlab_edit_control_cues]\nupdates.0.properties.unknownProperty\n  Extra inputs are not permitted [type=extra_forbidden, input_value=1, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "name": "whole_batch_preflight",
+      "data": {
+        "ok": false,
+        "status": "preflight_failed",
+        "workspace_id": "<WORKSPACE_UUID>",
+        "dry_run": true,
+        "requested_count": 2,
+        "planned_count": 1,
+        "updated_count": 0,
+        "failed_count": 1,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "<CUE_0_UUID>",
+            "cue_id": "<CUE_0_UUID>",
+            "profile": "control_basic",
+            "status": "dry_run",
+            "properties": {
+              "name": "BATCH SENTINEL SHOULD NOT APPLY"
+            },
+            "operations": [
+              {
+                "operation": "set_property",
+                "property": "name",
+                "path": "name",
+                "mode": "saved",
+                "args": [
+                  "BATCH SENTINEL SHOULD NOT APPLY"
+                ],
+                "arg_values": {
+                  "value": "BATCH SENTINEL SHOULD NOT APPLY"
+                },
+                "read_key": "name",
+                "risk_tier": "safe",
+                "real_write_enabled": true,
+                "planned_only_reason": null,
+                "capability_gate": null,
+                "readback": "value",
+                "contextual_requirements": []
+              }
+            ],
+            "before": {
+              "isRunning": false,
+              "isPaused": false,
+              "cueTargetID": "",
+              "parent": "<AUDIT_LIST_UUID>",
+              "type": "Memo",
+              "isAuditioning": false,
+              "hasCueTargets": false,
+              "canHavePatchTargets": false,
+              "uniqueID": "<CUE_0_UUID>",
+              "isWarning": false,
+              "allowsEditingDuration": false,
+              "isBroken": false,
+              "name": "00 \u00b7 Auditor\u00eda est\u00e1tica \u00b7 NO EJECUTAR"
+            },
+            "after": null,
+            "diff": {
+              "name": {
+                "before": "00 \u00b7 Auditor\u00eda est\u00e1tica \u00b7 NO EJECUTAR",
+                "requested": "BATCH SENTINEL SHOULD NOT APPLY"
+              }
+            },
+            "planned_operations": [
+              {
+                "operation": "set_property",
+                "property": "name",
+                "key": "name",
+                "address": "/workspace/<WORKSPACE_UUID>/cue_id/<CUE_0_UUID>/name",
+                "args": [
+                  "BATCH SENTINEL SHOULD NOT APPLY"
+                ],
+                "status": "planned"
+              }
+            ],
+            "executed_operations": [],
+            "errors": null,
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          },
+          {
+            "cue_ref": "<CUE_8_UUID>",
+            "cue_id": "<CUE_8_UUID>",
+            "profile": "control_basic",
+            "status": "dry_run_preflight_failed",
+            "properties": {},
+            "operations": [],
+            "before": null,
+            "after": null,
+            "diff": {},
+            "planned_operations": [],
+            "executed_operations": [],
+            "errors": {
+              "preflight": "Fresh cue identity could not be verified."
+            },
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          }
+        ],
+        "errors": {
+          "batch": "Inspect per-cue errors; pending operations were not sent."
+        },
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "preflight_failed"
+      }
+    }
+  ],
+  "final_states": [
+    {
+      "ok": true,
+      "status": "ok",
+      "partial": false,
+      "workspace_id": "<WORKSPACE_UUID>",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [
+          "Hotkey trigger configuration",
+          "MIDI trigger configuration",
+          "Wall Clock trigger configuration",
+          "Timecode trigger enabled state",
+          "Timecode trigger display format"
+        ],
+        "unavailable_fields": [],
+        "failed_routes": [],
+        "notes": [
+          "Containing Cue List context comes from qlab_get_control_cues; detail reads the immediate parent.",
+          "Read-only cue configuration; no live output is calculated or queried.",
+          "Audio Maps are excluded. Patch references do not expand Workspace Settings.",
+          "OSC coverage is not the entire inspector: Load load time and Target assigned number have no documented OSC read.",
+          "Memo notes are included in safe; other notes require technical. No cue action is executed."
+        ]
+      },
+      "warnings": [],
+      "errors": {},
+      "cue_id": "<CUE_0_UUID>",
+      "profile": "safe",
+      "identity": {
+        "uniqueID": "<CUE_0_UUID>",
+        "type": "Memo",
+        "number": "223",
+        "name": "00 \u00b7 Auditor\u00eda est\u00e1tica \u00b7 NO EJECUTAR",
+        "displayName": "00 \u00b7 Auditor\u00eda est\u00e1tica \u00b7 NO EJECUTAR",
+        "parent_id": "<AUDIT_LIST_UUID>",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": false,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "notes": "Escena de 17 s: audio + imagen en t=0; luz entra en 2 s; fades en t=12; negro t=15\u201317. Todos desarmados.",
+        "defaultName": "",
+        "listName": "00 \u00b7 Auditor\u00eda est\u00e1tica \u00b7 NO EJECUTAR",
+        "cartPosition": [
+          0,
+          0
+        ],
+        "hasCueTargets": false,
+        "hasFileTargets": false,
+        "canHavePatchTargets": false,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isPanicking": false,
+        "isTailingOut": false,
+        "isCrossfadingOut": false,
+        "isNextInPlaylist": false
+      },
+      "timing": {
+        "preWait": 0,
+        "duration": 0,
+        "postWait": 0,
+        "continueMode": 0,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "currentDuration": 0,
+        "tempDuration": 0,
+        "actionElapsed": 0,
+        "percentActionElapsed": 0,
+        "preWaitElapsed": 0,
+        "percentPreWaitElapsed": 0,
+        "postWaitElapsed": 0,
+        "percentPostWaitElapsed": 0,
+        "maxTimeInCueSequence": 0,
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "target": null,
+      "reset": null,
+      "devamp": null,
+      "triggers": {
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_control_cues",
+        "allowed_properties": [
+          "armed",
+          "autoLoad",
+          "colorName",
+          "continueMode",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "fadeAndStopOthersTime",
+          "flagged",
+          "name",
+          "notes",
+          "number",
+          "postWait",
+          "preWait",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "skipIfDisarmed",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "useSecondColor"
+        ],
+        "blocked_properties": {
+          "fadeAndStopOthers": "Requires integer scope readback; boolean cannot identify scope."
+        },
+        "requires_fresh_preflight": true,
+        "unavailable_via_osc": [
+          "Load Time",
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display"
+        ],
+        "pending_validation": []
+      },
+      "redactions": []
+    },
+    {
+      "ok": true,
+      "status": "ok",
+      "partial": false,
+      "workspace_id": "<WORKSPACE_UUID>",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [],
+        "unavailable_fields": [
+          "isChildAuditioning",
+          "isChildFlagged",
+          "sliceMarkers"
+        ],
+        "failed_routes": [],
+        "notes": [
+          "Audio Maps, Audio Objects, live metrics and indexed effect reads are excluded.",
+          "Levels are read as one aggregate; crosspoints are never scanned individually.",
+          "Patch identity is a reference; use workspace Audio Settings for patch configuration.",
+          "Containing Cue List context comes from qlab_get_audio_cues; detail reads only the immediate parent."
+        ]
+      },
+      "warnings": [],
+      "errors": {},
+      "inspection_values": {},
+      "cue_id": "<CUE_1_UUID>",
+      "profile": "safe",
+      "identity": {
+        "uniqueID": "<CUE_1_UUID>",
+        "type": "Audio",
+        "number": "224",
+        "name": "01 \u00b7 Audio \u00b7 authorized audio fixture",
+        "displayName": "01 \u00b7 Audio \u00b7 authorized audio fixture",
+        "parent_id": "<AUDIT_LIST_UUID>",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": false,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "hasFileTargets": true,
+        "fileTarget": null,
+        "notes": null
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isChildAuditioning": null,
+        "isChildFlagged": null,
+        "isPanicking": false,
+        "isTailingOut": false
+      },
+      "timing": {
+        "doFade": false,
+        "lockFadeToCue": false,
+        "preWait": 0,
+        "duration": 17,
+        "postWait": 0,
+        "continueMode": 1,
+        "startTime": 0,
+        "endTime": 17,
+        "rate": 1,
+        "preservePitch": false,
+        "playCount": 1,
+        "infiniteLoop": false,
+        "lastSlicePlayCount": 1,
+        "lastSliceInfiniteLoop": false,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        }
+      },
+      "audio": {
+        "audioOutputPatchID": "<REFERENCE_UUID>",
+        "audioOutputPatchName": "Patch 1",
+        "audioOutputPatchNumber": 1,
+        "numChannelsIn": 2,
+        "muteChannels": [],
+        "soloChannels": [],
+        "sliceMarkers": null
+      },
+      "level": {
+        "input_channel": 0,
+        "output_channel": 0,
+        "value": -11.999952848622781
+      },
+      "triggers": {
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_audio_cues",
+        "allowed_properties": [
+          "addSliceMarker",
+          "armed",
+          "audioOutputPatchID",
+          "autoLoad",
+          "colorName",
+          "continueMode",
+          "deleteSliceMarker",
+          "deleteSliceMarkers",
+          "doFade",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "endTime",
+          "fadeAndStopOthersTime",
+          "fileTarget",
+          "flagged",
+          "gang",
+          "infiniteLoop",
+          "inputChannelName",
+          "lastSliceInfiniteLoop",
+          "lastSlicePlayCount",
+          "level",
+          "lockFadeToCue",
+          "mute",
+          "mute/channel/clear",
+          "mute/clear",
+          "mute/objectID",
+          "name",
+          "notes",
+          "number",
+          "objectID/colorName",
+          "objectID/name",
+          "objectID/position",
+          "objectID/spread",
+          "objectIDLevel",
+          "playCount",
+          "postWait",
+          "preWait",
+          "preservePitch",
+          "rate",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "setSilentLevels",
+          "skipIfDisarmed",
+          "sliceMarker/playCount",
+          "sliceMarker/time",
+          "sliderLevel",
+          "solo",
+          "solo/channel/clear",
+          "solo/clear",
+          "solo/objectID",
+          "startTime",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "useSecondColor"
+        ],
+        "blocked_properties": {
+          "setDefaultLevels": "Template default state cannot be read reliably.",
+          "doObjectIDLevel": "Documented for Fade cues only.",
+          "doLevel": "Documented for Fade cues only.",
+          "fadeAndStopOthers": "Scope readback must be an integer, not boolean.",
+          "duration": "Cue duration capability is unavailable or false."
+        },
+        "requires_fresh_preflight": true,
+        "gated_or_planned_properties": {
+          "skipIfDisarmed": "Requires signed dry run, readable baseline and family dependencies.",
+          "mute/clear": "Requires signed dry run, readable baseline and family dependencies.",
+          "solo/channel/clear": "Requires signed dry run, readable baseline and family dependencies.",
+          "startTime": "Requires signed dry run, readable baseline and family dependencies.",
+          "setSilentLevels": "Requires signed dry run, readable baseline and family dependencies.",
+          "preservePitch": "Requires signed dry run, readable baseline and family dependencies.",
+          "lastSlicePlayCount": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/minutes": "Requires signed dry run, readable baseline and family dependencies.",
+          "number": "Requires signed dry run, readable baseline and family dependencies.",
+          "sliceMarker/playCount": "Requires signed dry run, readable baseline and family dependencies.",
+          "level": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondColorName": "Requires signed dry run, readable baseline and family dependencies.",
+          "mute": "Requires signed dry run, readable baseline and family dependencies.",
+          "deleteSliceMarker": "Requires signed dry run, readable baseline and family dependencies.",
+          "useSecondColor": "Requires signed dry run, readable baseline and family dependencies.",
+          "playCount": "Requires signed dry run, readable baseline and family dependencies.",
+          "preWait": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondTriggerOnRelease": "Requires signed dry run, readable baseline and family dependencies.",
+          "deleteSliceMarkers": "Requires signed dry run, readable baseline and family dependencies.",
+          "audioOutputPatchID": "Requires signed dry run, readable baseline and family dependencies.",
+          "objectIDLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "solo/objectID": "Requires signed dry run, readable baseline and family dependencies.",
+          "objectID/colorName": "Requires signed dry run, readable baseline and family dependencies.",
+          "name": "Requires signed dry run, readable baseline and family dependencies.",
+          "objectID/position": "Requires signed dry run, readable baseline and family dependencies.",
+          "continueMode": "Requires signed dry run, readable baseline and family dependencies.",
+          "armed": "Requires signed dry run, readable baseline and family dependencies.",
+          "colorName": "Requires signed dry run, readable baseline and family dependencies.",
+          "endTime": "Requires signed dry run, readable baseline and family dependencies.",
+          "sliderLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "objectID/name": "Requires signed dry run, readable baseline and family dependencies.",
+          "lockFadeToCue": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckTime": "Requires signed dry run, readable baseline and family dependencies.",
+          "doFade": "Requires signed dry run, readable baseline and family dependencies.",
+          "objectID/spread": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/seconds": "Requires signed dry run, readable baseline and family dependencies.",
+          "mute/channel/clear": "Requires signed dry run, readable baseline and family dependencies.",
+          "rate": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckOthers": "Requires signed dry run, readable baseline and family dependencies.",
+          "notes": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/hours": "Requires signed dry run, readable baseline and family dependencies.",
+          "flagged": "Requires signed dry run, readable baseline and family dependencies.",
+          "gang": "Requires signed dry run, readable baseline and family dependencies.",
+          "solo": "Requires signed dry run, readable baseline and family dependencies.",
+          "lastSliceInfiniteLoop": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "addSliceMarker": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/bits": "Requires signed dry run, readable baseline and family dependencies.",
+          "mute/objectID": "Requires signed dry run, readable baseline and family dependencies.",
+          "postWait": "Requires signed dry run, readable baseline and family dependencies.",
+          "inputChannelName": "Requires signed dry run, readable baseline and family dependencies.",
+          "autoLoad": "Requires signed dry run, readable baseline and family dependencies.",
+          "fileTarget": "Requires signed dry run, readable baseline and family dependencies.",
+          "solo/clear": "Requires signed dry run, readable baseline and family dependencies.",
+          "sliceMarker/time": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondTriggerAction": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/text": "Requires signed dry run, readable baseline and family dependencies.",
+          "fadeAndStopOthersTime": "Requires signed dry run, readable baseline and family dependencies.",
+          "infiniteLoop": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/frames": "Requires signed dry run, readable baseline and family dependencies."
+        },
+        "property_capabilities": {
+          "addSliceMarker": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "armed": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "audioOutputPatchID": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "autoLoad": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "colorName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "continueMode": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "deleteSliceMarker": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "deleteSliceMarkers": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doFade": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doLevel": {
+            "state": "blocked",
+            "reason": "Documented for Fade cues only."
+          },
+          "doObjectIDLevel": {
+            "state": "blocked",
+            "reason": "Documented for Fade cues only."
+          },
+          "duckLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckOthers": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckTime": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duration": {
+            "state": "blocked",
+            "reason": "Cue duration capability is unavailable or false."
+          },
+          "endTime": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "fadeAndStopOthers": {
+            "state": "blocked",
+            "reason": "Scope readback must be an integer, not boolean."
+          },
+          "fadeAndStopOthersTime": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "fileTarget": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "flagged": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "gang": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "infiniteLoop": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "inputChannelName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "lastSliceInfiniteLoop": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "lastSlicePlayCount": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "level": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "lockFadeToCue": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "mute": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "mute/channel/clear": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "mute/clear": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "mute/objectID": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "name": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "notes": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "number": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "objectID/colorName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "objectID/name": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "objectID/position": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "objectID/spread": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "objectIDLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "playCount": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "postWait": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "preWait": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "preservePitch": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "rate": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondColorName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondTriggerAction": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondTriggerOnRelease": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "setDefaultLevels": {
+            "state": "blocked",
+            "reason": "Template default state cannot be read reliably."
+          },
+          "setSilentLevels": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "skipIfDisarmed": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "sliceMarker/playCount": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "sliceMarker/time": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "sliderLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "solo": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "solo/channel/clear": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "solo/clear": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "solo/objectID": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "startTime": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/bits": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/frames": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/hours": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/minutes": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/seconds": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/text": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "useSecondColor": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "Hotkey/MIDI/Wall Clock setup": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Timecode activation/display": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Trim": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Audio FX": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Undocumented curves": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          }
+        },
+        "max_cues": 50,
+        "max_indexed_operations_per_cue": 50,
+        "notes": [
+          "All writes require signed five-minute single-use confirmations.",
+          "Basics, Triggers and supported family settings can share a sequential non-atomic batch.",
+          "Selectors which may reset dependent settings require a separate dry run."
+        ],
+        "unavailable_via_osc": [
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display",
+          "Trim",
+          "Audio FX",
+          "Undocumented curves"
+        ],
+        "excluded": [
+          "Audio Maps",
+          "/live",
+          "cue execution",
+          "workspace settings",
+          "deprecated aliases"
+        ]
+      },
+      "redactions": []
+    },
+    {
+      "ok": true,
+      "status": "partial",
+      "partial": true,
+      "workspace_id": "<WORKSPACE_UUID>",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [],
+        "unavailable_fields": [
+          "isChildAuditioning",
+          "isChildFlagged",
+          "sliceMarkers"
+        ],
+        "failed_routes": [
+          "infiniteLoop"
+        ],
+        "notes": [
+          "Audio Maps, Audio Objects, live metrics and indexed effect reads are excluded.",
+          "Levels are read as one aggregate; crosspoints are never scanned individually.",
+          "Patch identity is a reference; use workspace Audio Settings for patch configuration.",
+          "Containing Cue List context comes from qlab_get_video_cues; detail reads only the immediate parent.",
+          "Stage/input references do not expand patches, stages, regions or routes."
+        ]
+      },
+      "warnings": [],
+      "errors": {
+        "infiniteLoop": "Invalid OSC value for this field"
+      },
+      "cue_id": "<CUE_2_UUID>",
+      "profile": "safe",
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": true,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "notes": null,
+        "hasFileTargets": true,
+        "fileTarget": null
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isChildAuditioning": null,
+        "isChildFlagged": null,
+        "isPanicking": false,
+        "isTailingOut": false
+      },
+      "timing": {
+        "doFade": false,
+        "lockFadeToCue": false,
+        "preWait": 0,
+        "duration": 17,
+        "postWait": 0,
+        "continueMode": 1,
+        "startTime": 0,
+        "endTime": 0,
+        "rate": 1,
+        "preservePitch": false,
+        "playCount": 1,
+        "infiniteLoop": null,
+        "lastSlicePlayCount": 1,
+        "lastSliceInfiniteLoop": false,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "holdLastFrame": false,
+        "clockType": "video"
+      },
+      "video": {
+        "stageID": "<REFERENCE_UUID>",
+        "stageName": "Stage 9",
+        "stageNumber": 9,
+        "cueSize": {
+          "width": 1024,
+          "height": 1536
+        },
+        "anchor": {
+          "x": 0,
+          "y": 0
+        },
+        "translation": {
+          "x": 0,
+          "y": 0
+        },
+        "scale": {
+          "x": 0.699999988079071,
+          "y": 0.699999988079071
+        },
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "cropTop": 0,
+        "cropBottom": 0,
+        "cropLeft": 0,
+        "cropRight": 0,
+        "opacity": 0.800000011920929,
+        "layer": 1000,
+        "blendMode": "Normal",
+        "fillStage": false,
+        "fillStyle": 1,
+        "preserveAspectRatio": true,
+        "smooth": true,
+        "videoEffects": []
+      },
+      "triggers": {
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_video_cues",
+        "allowed_properties": [
+          "anchor",
+          "anchor/x",
+          "anchor/y",
+          "armed",
+          "audioOutputPatchID",
+          "autoLoad",
+          "blendMode",
+          "clockType",
+          "colorName",
+          "continueMode",
+          "crop",
+          "cropBottom",
+          "cropLeft",
+          "cropRight",
+          "cropTop",
+          "doFade",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "duration",
+          "endTime",
+          "fadeAndStopOthersTime",
+          "fileTarget",
+          "fillStage",
+          "fillStyle",
+          "flagged",
+          "gang",
+          "holdLastFrame",
+          "infiniteLoop",
+          "inputChannelName",
+          "layer",
+          "level",
+          "lockFadeToCue",
+          "mute/channel",
+          "mute/channel/clear",
+          "name",
+          "notes",
+          "number",
+          "opacity",
+          "origin",
+          "origin/x",
+          "origin/y",
+          "playCount",
+          "postWait",
+          "preWait",
+          "preserveAspectRatio",
+          "preservePitch",
+          "quaternion",
+          "rate",
+          "resetRotation",
+          "scale",
+          "scale/x",
+          "scale/y",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "skipIfDisarmed",
+          "sliderLevel",
+          "smooth",
+          "solo/channel",
+          "solo/channel/clear",
+          "stageID",
+          "startTime",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "translation",
+          "translation/x",
+          "translation/y",
+          "useSecondColor"
+        ],
+        "video_fx": {
+          "allowed_operations": [],
+          "schema_operations": [
+            "videoEffectIndex/enabled",
+            "videoEffectIndex/parameter",
+            "videoEffectIndex/parameters",
+            "videoEffectIndex/delete",
+            "videoEffectIndex/move",
+            "videoEffects/add",
+            "videoEffects/insert"
+          ],
+          "blocked_operations": {
+            "videoEffectIndex/enabled": "No existing effect with verifiable native type identity.",
+            "videoEffectIndex/parameter": "No existing effect with verifiable native type identity.",
+            "videoEffectIndex/parameters": "No existing effect with verifiable native type identity."
+          },
+          "catalogue_effect_count": 60,
+          "catalogue_parameter_count": 262,
+          "range_policy": "Conservative published bands; QLab can allow values outside them.",
+          "pending_validation": [
+            "videoEffectIndex/delete",
+            "videoEffectIndex/move",
+            "videoEffects/add",
+            "videoEffects/insert"
+          ],
+          "requires_explicit_effect_type": true,
+          "requires_full_stack_preflight": true,
+          "excluded": [
+            "Fade FX flags",
+            "/live",
+            "effect-name write addressing"
+          ]
+        },
+        "blocked_properties": {
+          "videoEffectIndex/enabled": "Native effect type identity is unavailable; parameter keys cannot prove identity.",
+          "fadeAndStopOthers": "Scope readback must be an integer, not boolean.",
+          "addSliceMarker": "OSC slice inventory is unavailable; absence does not prove an empty list.",
+          "deleteSliceMarker": "OSC slice inventory is unavailable; absence does not prove an empty list.",
+          "deleteSliceMarkers": "OSC slice inventory is unavailable; absence does not prove an empty list.",
+          "sliceMarker/time": "OSC slice inventory is unavailable; absence does not prove an empty list.",
+          "sliceMarker/playCount": "OSC slice inventory is unavailable; absence does not prove an empty list.",
+          "lastSlicePlayCount": "OSC slice inventory is unavailable; absence does not prove an empty list."
+        },
+        "requires_fresh_preflight": true,
+        "unavailable_via_osc": [
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display"
+        ],
+        "excluded": [
+          "Audio Maps",
+          "/live",
+          "cue execution",
+          "workspace stage/region edits"
+        ],
+        "pending_validation": [
+          "effect creation/deletion/reordering and parameters",
+          "Audio FX",
+          "Text fragment formatting",
+          "Camera input channel bounds"
+        ],
+        "blocked_operations": [
+          "setDefaultLevels",
+          "setSilentLevels"
+        ]
+      },
+      "selected_video_effects": [],
+      "redactions": [],
+      "identity": {
+        "uniqueID": "<CUE_2_UUID>",
+        "type": "Video",
+        "number": "225",
+        "name": "02 \u00b7 Imagen \u00b7 \u00c1rbol m\u00e1gico",
+        "displayName": "02 \u00b7 Imagen \u00b7 \u00c1rbol m\u00e1gico",
+        "parent_id": "<AUDIT_LIST_UUID>",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "audio": {
+        "audioOutputPatchID": "<REFERENCE_UUID>",
+        "audioOutputPatchName": "Patch 1",
+        "audioOutputPatchNumber": 1,
+        "numChannelsIn": 0,
+        "muteChannels": [],
+        "soloChannels": [],
+        "sliceMarkers": null
+      },
+      "level": null
+    },
+    {
+      "ok": true,
+      "status": "ok",
+      "partial": false,
+      "workspace_id": "<WORKSPACE_UUID>",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [],
+        "unavailable_fields": [
+          "isChildAuditioning",
+          "isChildFlagged"
+        ],
+        "failed_routes": [],
+        "notes": [
+          "Containing Cue List context comes from qlab_get_light_cues; detail reads the immediate parent.",
+          "Read-only cue configuration; no live output is calculated or queried.",
+          "Light command text is not executed; use workspace Light Settings for patch configuration."
+        ]
+      },
+      "warnings": [],
+      "errors": {},
+      "inspection_values": {},
+      "cue_id": "<CUE_3_UUID>",
+      "profile": "safe",
+      "identity": {
+        "uniqueID": "<CUE_3_UUID>",
+        "type": "Light",
+        "number": "226",
+        "name": "03 \u00b7 Luz de entrada \u00b7 2 s",
+        "displayName": "03 \u00b7 Luz de entrada \u00b7 2 s",
+        "parent_id": "<AUDIT_LIST_UUID>",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": true,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "notes": null
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isChildAuditioning": null,
+        "isChildFlagged": null,
+        "isPanicking": false,
+        "isTailingOut": false
+      },
+      "timing": {
+        "preWait": 0,
+        "duration": 2,
+        "postWait": 0,
+        "continueMode": 2,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        }
+      },
+      "light": {
+        "lightCommandText": "Grupo1 = 30\nGrupo2 = 5\nLED1.red = 35\nLED1.green = 0\nLED1.blue = 0\nLED2.red = 0\nLED2.green = 0\nLED2.blue = 15\nLED3.red = 0\nLED3.green = 10\nLED3.blue = 0",
+        "alwaysCollate": false,
+        "subcontroller": false
+      },
+      "triggers": {
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_light_cues",
+        "allowed_properties": [
+          "alwaysCollate",
+          "armed",
+          "autoLoad",
+          "colorName",
+          "continueMode",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "duration",
+          "fadeAndStopOthersTime",
+          "flagged",
+          "lightCommandText",
+          "name",
+          "notes",
+          "number",
+          "postWait",
+          "preWait",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "skipIfDisarmed",
+          "subcontroller",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "useSecondColor"
+        ],
+        "blocked_properties": {
+          "fadeAndStopOthers": "Scope readback must be an integer, not boolean."
+        },
+        "requires_fresh_preflight": true,
+        "gated_or_planned_properties": {
+          "alwaysCollate": "Requires signed dry run, readable baseline and family dependencies.",
+          "skipIfDisarmed": "Requires signed dry run, readable baseline and family dependencies.",
+          "name": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "lightCommandText": "Requires signed dry run, readable baseline and family dependencies.",
+          "continueMode": "Requires signed dry run, readable baseline and family dependencies.",
+          "armed": "Requires signed dry run, readable baseline and family dependencies.",
+          "colorName": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/bits": "Requires signed dry run, readable baseline and family dependencies.",
+          "useSecondColor": "Requires signed dry run, readable baseline and family dependencies.",
+          "preWait": "Requires signed dry run, readable baseline and family dependencies.",
+          "duration": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckTime": "Requires signed dry run, readable baseline and family dependencies.",
+          "postWait": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondTriggerOnRelease": "Requires signed dry run, readable baseline and family dependencies.",
+          "autoLoad": "Requires signed dry run, readable baseline and family dependencies.",
+          "subcontroller": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/minutes": "Requires signed dry run, readable baseline and family dependencies.",
+          "number": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondTriggerAction": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/text": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/seconds": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckOthers": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondColorName": "Requires signed dry run, readable baseline and family dependencies.",
+          "fadeAndStopOthersTime": "Requires signed dry run, readable baseline and family dependencies.",
+          "notes": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/hours": "Requires signed dry run, readable baseline and family dependencies.",
+          "flagged": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/frames": "Requires signed dry run, readable baseline and family dependencies."
+        },
+        "property_capabilities": {
+          "alwaysCollate": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "armed": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "autoLoad": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "colorName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "continueMode": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckOthers": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckTime": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duration": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "fadeAndStopOthers": {
+            "state": "blocked",
+            "reason": "Scope readback must be an integer, not boolean."
+          },
+          "fadeAndStopOthersTime": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "flagged": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "lightCommandText": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "name": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "notes": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "number": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "postWait": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "preWait": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondColorName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondTriggerAction": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondTriggerOnRelease": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "skipIfDisarmed": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "subcontroller": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/bits": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/frames": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/hours": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/minutes": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/seconds": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/text": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "useSecondColor": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "Hotkey/MIDI/Wall Clock setup": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Timecode activation/display": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Trim": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Audio FX": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Undocumented curves": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          }
+        },
+        "max_cues": 50,
+        "max_indexed_operations_per_cue": 0,
+        "notes": [
+          "All writes require signed five-minute single-use confirmations.",
+          "Basics, Triggers and supported family settings can share a sequential non-atomic batch.",
+          "Selectors which may reset dependent settings require a separate dry run."
+        ],
+        "unavailable_via_osc": [
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display",
+          "Trim",
+          "Audio FX",
+          "Undocumented curves"
+        ],
+        "excluded": [
+          "Audio Maps",
+          "/live",
+          "cue execution",
+          "workspace settings",
+          "deprecated aliases"
+        ]
+      },
+      "redactions": []
+    },
+    {
+      "ok": true,
+      "status": "ok",
+      "partial": false,
+      "workspace_id": "<WORKSPACE_UUID>",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [
+          "Hotkey trigger configuration",
+          "MIDI trigger configuration",
+          "Wall Clock trigger configuration",
+          "Timecode trigger enabled state",
+          "Timecode trigger display format"
+        ],
+        "unavailable_fields": [],
+        "failed_routes": [],
+        "notes": [
+          "Containing Cue List context comes from qlab_get_control_cues; detail reads the immediate parent.",
+          "Read-only cue configuration; no live output is calculated or queried.",
+          "Audio Maps are excluded. Patch references do not expand Workspace Settings.",
+          "OSC coverage is not the entire inspector: Load load time and Target assigned number have no documented OSC read.",
+          "Memo notes are included in safe; other notes require technical. No cue action is executed."
+        ]
+      },
+      "warnings": [],
+      "errors": {},
+      "cue_id": "<CUE_4_UUID>",
+      "profile": "safe",
+      "identity": {
+        "uniqueID": "<CUE_4_UUID>",
+        "type": "Wait",
+        "number": "227",
+        "name": "04 \u00b7 Espera \u00b7 10 s",
+        "displayName": "04 \u00b7 Espera \u00b7 10 s",
+        "parent_id": "<AUDIT_LIST_UUID>",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": true,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "notes": null,
+        "defaultName": "wait 10 seconds",
+        "listName": "04 \u00b7 Espera \u00b7 10 s",
+        "cartPosition": [
+          0,
+          0
+        ],
+        "hasCueTargets": false,
+        "hasFileTargets": false,
+        "canHavePatchTargets": false,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isPanicking": false,
+        "isTailingOut": false,
+        "isCrossfadingOut": false,
+        "isNextInPlaylist": false
+      },
+      "timing": {
+        "preWait": 0,
+        "duration": 10,
+        "postWait": 10,
+        "continueMode": 2,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "currentDuration": 10,
+        "tempDuration": 0,
+        "actionElapsed": 0,
+        "percentActionElapsed": 0,
+        "preWaitElapsed": 0,
+        "percentPreWaitElapsed": 0,
+        "postWaitElapsed": 0,
+        "percentPostWaitElapsed": 0,
+        "maxTimeInCueSequence": 15,
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "target": null,
+      "reset": null,
+      "devamp": null,
+      "triggers": {
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_control_cues",
+        "allowed_properties": [
+          "armed",
+          "autoLoad",
+          "colorName",
+          "continueMode",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "duration",
+          "fadeAndStopOthersTime",
+          "flagged",
+          "name",
+          "notes",
+          "number",
+          "postWait",
+          "preWait",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "skipIfDisarmed",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "useSecondColor"
+        ],
+        "blocked_properties": {
+          "fadeAndStopOthers": "Requires integer scope readback; boolean cannot identify scope."
+        },
+        "requires_fresh_preflight": true,
+        "unavailable_via_osc": [
+          "Load Time",
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display"
+        ],
+        "pending_validation": []
+      },
+      "redactions": []
+    },
+    {
+      "ok": true,
+      "status": "ok",
+      "partial": false,
+      "workspace_id": "<WORKSPACE_UUID>",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [],
+        "unavailable_fields": [],
+        "failed_routes": [],
+        "notes": [
+          "Read-only documented configuration; no cue action, compilation, live or indexed scan.",
+          "Patch references do not expand Workspace Settings. Audio Maps and Audio Objects are excluded.",
+          "Confirmed inherited reads: Audio target levels/doLevel and Video target opacity. Other target and patch capabilities remain unverified."
+        ]
+      },
+      "warnings": [],
+      "errors": {},
+      "inspection_values": {},
+      "cue_id": "<CUE_5_UUID>",
+      "profile": "safe",
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": true,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "notes": null,
+        "defaultName": "fade and stop 01 \u00b7 Audio \u00b7 authorized audio fixture",
+        "listName": "05 \u00b7 Salida audio \u00b7 3 s",
+        "cartPosition": [
+          0,
+          0
+        ],
+        "hasCueTargets": true,
+        "hasFileTargets": false,
+        "canHavePatchTargets": true,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isPanicking": false,
+        "isTailingOut": false,
+        "isCrossfadingOut": false,
+        "isNextInPlaylist": false
+      },
+      "timing": {
+        "preWait": 0,
+        "duration": 3,
+        "postWait": 0,
+        "continueMode": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "currentDuration": 3,
+        "tempDuration": 0,
+        "actionElapsed": 0,
+        "percentActionElapsed": 0,
+        "preWaitElapsed": 0,
+        "percentPreWaitElapsed": 0,
+        "postWaitElapsed": 0,
+        "percentPostWaitElapsed": 0,
+        "maxTimeInCueSequence": 5,
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "triggers": {
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_fade_cues",
+        "allowed_properties": [
+          "armed",
+          "autoLoad",
+          "colorName",
+          "continueMode",
+          "cueTargetID",
+          "doLevel",
+          "doObjectIDLevel",
+          "doOpacity",
+          "doRate",
+          "doRotation",
+          "doScale",
+          "doTranslation",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "duration",
+          "fadeAndStopOthersTime",
+          "fadeType",
+          "flagged",
+          "gang",
+          "geoMode",
+          "inputChannelName",
+          "level",
+          "levelsMode",
+          "name",
+          "notes",
+          "number",
+          "opacity",
+          "patchTargetID",
+          "pathHeight",
+          "pathWidth",
+          "postWait",
+          "preWait",
+          "quaternion",
+          "rate",
+          "rotation",
+          "rotationType",
+          "scale/x",
+          "scale/y",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "skipIfDisarmed",
+          "sliderLevel",
+          "stopTargetWhenDone",
+          "targetMode",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "translation/x",
+          "translation/y",
+          "useSecondColor"
+        ],
+        "blocked_properties": {
+          "fadeAndStopOthers": "Scope readback must be an integer, not boolean."
+        },
+        "requires_fresh_preflight": true,
+        "gated_or_planned_properties": {
+          "skipIfDisarmed": "Requires signed dry run, readable baseline and family dependencies.",
+          "name": "Requires signed dry run, readable baseline and family dependencies.",
+          "continueMode": "Requires signed dry run, readable baseline and family dependencies.",
+          "armed": "Requires signed dry run, readable baseline and family dependencies.",
+          "colorName": "Requires signed dry run, readable baseline and family dependencies.",
+          "scale/x": "Requires signed dry run, readable baseline and family dependencies.",
+          "quaternion": "Requires signed dry run, readable baseline and family dependencies.",
+          "sliderLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "rotationType": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckTime": "Requires signed dry run, readable baseline and family dependencies.",
+          "patchTargetID": "Requires signed dry run, readable baseline and family dependencies.",
+          "doTranslation": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/minutes": "Requires signed dry run, readable baseline and family dependencies.",
+          "number": "Requires signed dry run, readable baseline and family dependencies.",
+          "doLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "doOpacity": "Requires signed dry run, readable baseline and family dependencies.",
+          "geoMode": "Requires signed dry run, readable baseline and family dependencies.",
+          "level": "Requires signed dry run, readable baseline and family dependencies.",
+          "pathHeight": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/seconds": "Requires signed dry run, readable baseline and family dependencies.",
+          "rate": "Requires signed dry run, readable baseline and family dependencies.",
+          "translation/x": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckOthers": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondColorName": "Requires signed dry run, readable baseline and family dependencies.",
+          "doObjectIDLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "notes": "Requires signed dry run, readable baseline and family dependencies.",
+          "cueTargetID": "Requires signed dry run, readable baseline and family dependencies.",
+          "levelsMode": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/hours": "Requires signed dry run, readable baseline and family dependencies.",
+          "doRotation": "Requires signed dry run, readable baseline and family dependencies.",
+          "flagged": "Requires signed dry run, readable baseline and family dependencies.",
+          "gang": "Requires signed dry run, readable baseline and family dependencies.",
+          "translation/y": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/bits": "Requires signed dry run, readable baseline and family dependencies.",
+          "useSecondColor": "Requires signed dry run, readable baseline and family dependencies.",
+          "targetMode": "Requires signed dry run, readable baseline and family dependencies.",
+          "fadeType": "Requires signed dry run, readable baseline and family dependencies.",
+          "preWait": "Requires signed dry run, readable baseline and family dependencies.",
+          "duration": "Requires signed dry run, readable baseline and family dependencies.",
+          "postWait": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondTriggerOnRelease": "Requires signed dry run, readable baseline and family dependencies.",
+          "inputChannelName": "Requires signed dry run, readable baseline and family dependencies.",
+          "autoLoad": "Requires signed dry run, readable baseline and family dependencies.",
+          "scale/y": "Requires signed dry run, readable baseline and family dependencies.",
+          "pathWidth": "Requires signed dry run, readable baseline and family dependencies.",
+          "doScale": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondTriggerAction": "Requires signed dry run, readable baseline and family dependencies.",
+          "rotation": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/text": "Requires signed dry run, readable baseline and family dependencies.",
+          "fadeAndStopOthersTime": "Requires signed dry run, readable baseline and family dependencies.",
+          "stopTargetWhenDone": "Requires signed dry run, readable baseline and family dependencies.",
+          "doRate": "Requires signed dry run, readable baseline and family dependencies.",
+          "opacity": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/frames": "Requires signed dry run, readable baseline and family dependencies."
+        },
+        "property_capabilities": {
+          "armed": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "autoLoad": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "colorName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "continueMode": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "cueTargetID": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doObjectIDLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doOpacity": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doRate": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doRotation": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doScale": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doTranslation": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckOthers": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckTime": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duration": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "fadeAndStopOthers": {
+            "state": "blocked",
+            "reason": "Scope readback must be an integer, not boolean."
+          },
+          "fadeAndStopOthersTime": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "fadeType": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "flagged": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "gang": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "geoMode": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "inputChannelName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "level": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "levelsMode": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "name": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "notes": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "number": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "opacity": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "patchTargetID": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "pathHeight": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "pathWidth": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "postWait": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "preWait": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "quaternion": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "rate": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "rotation": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "rotationType": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "scale/x": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "scale/y": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondColorName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondTriggerAction": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondTriggerOnRelease": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "skipIfDisarmed": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "sliderLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "stopTargetWhenDone": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "targetMode": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/bits": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/frames": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/hours": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/minutes": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/seconds": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/text": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "translation/x": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "translation/y": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "useSecondColor": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "Hotkey/MIDI/Wall Clock setup": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Timecode activation/display": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Trim": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Audio FX": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Undocumented curves": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          }
+        },
+        "max_cues": 50,
+        "max_indexed_operations_per_cue": 50,
+        "notes": [
+          "All writes require signed five-minute single-use confirmations.",
+          "Basics, Triggers and supported family settings can share a sequential non-atomic batch.",
+          "Selectors which may reset dependent settings require a separate dry run."
+        ],
+        "unavailable_via_osc": [
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display",
+          "Trim",
+          "Audio FX",
+          "Undocumented curves"
+        ],
+        "excluded": [
+          "Audio Maps",
+          "/live",
+          "cue execution",
+          "workspace settings",
+          "deprecated aliases"
+        ]
+      },
+      "redactions": [],
+      "identity": {
+        "uniqueID": "<CUE_5_UUID>",
+        "type": "Fade",
+        "number": "228",
+        "name": "05 \u00b7 Salida audio \u00b7 3 s",
+        "displayName": "05 \u00b7 Salida audio \u00b7 3 s",
+        "parent_id": "<AUDIT_LIST_UUID>",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "target": {
+        "cueTargetID": "<CUE_1_UUID>",
+        "cueTargetNumber": "224",
+        "tempCueTargetID": "",
+        "tempCueTargetNumber": "",
+        "currentCueTargetID": "<CUE_1_UUID>",
+        "currentCueTargetNumber": "224"
+      },
+      "fade": {
+        "targetMode": 0,
+        "patchTargetID": "",
+        "fadeType": 1,
+        "geoMode": 0,
+        "levelsMode": 0,
+        "doOpacity": false,
+        "doRate": false,
+        "doRotation": false,
+        "doScale": false,
+        "doTranslation": false,
+        "rotation": 0,
+        "rotationType": 0,
+        "stopTargetWhenDone": true
+      },
+      "audio": {
+        "doLevel": [
+          [
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        ]
+      },
+      "geometry": null,
+      "path": null
+    },
+    {
+      "ok": true,
+      "status": "ok",
+      "partial": false,
+      "workspace_id": "<WORKSPACE_UUID>",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [],
+        "unavailable_fields": [],
+        "failed_routes": [],
+        "notes": [
+          "Read-only documented configuration; no cue action, compilation, live or indexed scan.",
+          "Patch references do not expand Workspace Settings. Audio Maps and Audio Objects are excluded.",
+          "Confirmed inherited reads: Audio target levels/doLevel and Video target opacity. Other target and patch capabilities remain unverified."
+        ]
+      },
+      "warnings": [],
+      "errors": {},
+      "inspection_values": {},
+      "cue_id": "<CUE_6_UUID>",
+      "profile": "safe",
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": true,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "notes": null,
+        "defaultName": "fade and stop 02 \u00b7 Imagen \u00b7 \u00c1rbol m\u00e1gico",
+        "listName": "06 \u00b7 Salida imagen \u00b7 3 s",
+        "cartPosition": [
+          0,
+          0
+        ],
+        "hasCueTargets": true,
+        "hasFileTargets": false,
+        "canHavePatchTargets": true,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isPanicking": false,
+        "isTailingOut": false,
+        "isCrossfadingOut": false,
+        "isNextInPlaylist": false
+      },
+      "timing": {
+        "preWait": 0,
+        "duration": 3,
+        "postWait": 0,
+        "continueMode": 2,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "currentDuration": 3,
+        "tempDuration": 0,
+        "actionElapsed": 0,
+        "percentActionElapsed": 0,
+        "preWaitElapsed": 0,
+        "percentPreWaitElapsed": 0,
+        "postWaitElapsed": 0,
+        "percentPostWaitElapsed": 0,
+        "maxTimeInCueSequence": 5,
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "triggers": {
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_fade_cues",
+        "allowed_properties": [
+          "armed",
+          "autoLoad",
+          "colorName",
+          "continueMode",
+          "cueTargetID",
+          "doLevel",
+          "doObjectIDLevel",
+          "doOpacity",
+          "doRate",
+          "doRotation",
+          "doScale",
+          "doTranslation",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "duration",
+          "fadeAndStopOthersTime",
+          "fadeType",
+          "flagged",
+          "gang",
+          "geoMode",
+          "inputChannelName",
+          "level",
+          "levelsMode",
+          "name",
+          "notes",
+          "number",
+          "opacity",
+          "patchTargetID",
+          "pathHeight",
+          "pathWidth",
+          "postWait",
+          "preWait",
+          "quaternion",
+          "rate",
+          "rotation",
+          "rotationType",
+          "scale/x",
+          "scale/y",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "skipIfDisarmed",
+          "sliderLevel",
+          "stopTargetWhenDone",
+          "targetMode",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "translation/x",
+          "translation/y",
+          "useSecondColor"
+        ],
+        "blocked_properties": {
+          "fadeAndStopOthers": "Scope readback must be an integer, not boolean."
+        },
+        "requires_fresh_preflight": true,
+        "gated_or_planned_properties": {
+          "skipIfDisarmed": "Requires signed dry run, readable baseline and family dependencies.",
+          "name": "Requires signed dry run, readable baseline and family dependencies.",
+          "continueMode": "Requires signed dry run, readable baseline and family dependencies.",
+          "armed": "Requires signed dry run, readable baseline and family dependencies.",
+          "colorName": "Requires signed dry run, readable baseline and family dependencies.",
+          "scale/x": "Requires signed dry run, readable baseline and family dependencies.",
+          "quaternion": "Requires signed dry run, readable baseline and family dependencies.",
+          "sliderLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "rotationType": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckTime": "Requires signed dry run, readable baseline and family dependencies.",
+          "patchTargetID": "Requires signed dry run, readable baseline and family dependencies.",
+          "doTranslation": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/minutes": "Requires signed dry run, readable baseline and family dependencies.",
+          "number": "Requires signed dry run, readable baseline and family dependencies.",
+          "doLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "doOpacity": "Requires signed dry run, readable baseline and family dependencies.",
+          "geoMode": "Requires signed dry run, readable baseline and family dependencies.",
+          "level": "Requires signed dry run, readable baseline and family dependencies.",
+          "pathHeight": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/seconds": "Requires signed dry run, readable baseline and family dependencies.",
+          "rate": "Requires signed dry run, readable baseline and family dependencies.",
+          "translation/x": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckOthers": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondColorName": "Requires signed dry run, readable baseline and family dependencies.",
+          "doObjectIDLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "notes": "Requires signed dry run, readable baseline and family dependencies.",
+          "cueTargetID": "Requires signed dry run, readable baseline and family dependencies.",
+          "levelsMode": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/hours": "Requires signed dry run, readable baseline and family dependencies.",
+          "doRotation": "Requires signed dry run, readable baseline and family dependencies.",
+          "flagged": "Requires signed dry run, readable baseline and family dependencies.",
+          "gang": "Requires signed dry run, readable baseline and family dependencies.",
+          "translation/y": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/bits": "Requires signed dry run, readable baseline and family dependencies.",
+          "useSecondColor": "Requires signed dry run, readable baseline and family dependencies.",
+          "targetMode": "Requires signed dry run, readable baseline and family dependencies.",
+          "fadeType": "Requires signed dry run, readable baseline and family dependencies.",
+          "preWait": "Requires signed dry run, readable baseline and family dependencies.",
+          "duration": "Requires signed dry run, readable baseline and family dependencies.",
+          "postWait": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondTriggerOnRelease": "Requires signed dry run, readable baseline and family dependencies.",
+          "inputChannelName": "Requires signed dry run, readable baseline and family dependencies.",
+          "autoLoad": "Requires signed dry run, readable baseline and family dependencies.",
+          "scale/y": "Requires signed dry run, readable baseline and family dependencies.",
+          "pathWidth": "Requires signed dry run, readable baseline and family dependencies.",
+          "doScale": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondTriggerAction": "Requires signed dry run, readable baseline and family dependencies.",
+          "rotation": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/text": "Requires signed dry run, readable baseline and family dependencies.",
+          "fadeAndStopOthersTime": "Requires signed dry run, readable baseline and family dependencies.",
+          "stopTargetWhenDone": "Requires signed dry run, readable baseline and family dependencies.",
+          "doRate": "Requires signed dry run, readable baseline and family dependencies.",
+          "opacity": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/frames": "Requires signed dry run, readable baseline and family dependencies."
+        },
+        "property_capabilities": {
+          "armed": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "autoLoad": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "colorName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "continueMode": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "cueTargetID": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doObjectIDLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doOpacity": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doRate": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doRotation": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doScale": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "doTranslation": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckOthers": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckTime": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duration": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "fadeAndStopOthers": {
+            "state": "blocked",
+            "reason": "Scope readback must be an integer, not boolean."
+          },
+          "fadeAndStopOthersTime": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "fadeType": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "flagged": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "gang": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "geoMode": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "inputChannelName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "level": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "levelsMode": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "name": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "notes": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "number": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "opacity": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "patchTargetID": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "pathHeight": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "pathWidth": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "postWait": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "preWait": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "quaternion": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "rate": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "rotation": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "rotationType": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "scale/x": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "scale/y": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondColorName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondTriggerAction": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondTriggerOnRelease": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "skipIfDisarmed": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "sliderLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "stopTargetWhenDone": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "targetMode": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/bits": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/frames": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/hours": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/minutes": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/seconds": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/text": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "translation/x": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "translation/y": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "useSecondColor": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "Hotkey/MIDI/Wall Clock setup": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Timecode activation/display": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Trim": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Audio FX": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Undocumented curves": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          }
+        },
+        "max_cues": 50,
+        "max_indexed_operations_per_cue": 50,
+        "notes": [
+          "All writes require signed five-minute single-use confirmations.",
+          "Basics, Triggers and supported family settings can share a sequential non-atomic batch.",
+          "Selectors which may reset dependent settings require a separate dry run."
+        ],
+        "unavailable_via_osc": [
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display",
+          "Trim",
+          "Audio FX",
+          "Undocumented curves"
+        ],
+        "excluded": [
+          "Audio Maps",
+          "/live",
+          "cue execution",
+          "workspace settings",
+          "deprecated aliases"
+        ]
+      },
+      "redactions": [],
+      "identity": {
+        "uniqueID": "<CUE_6_UUID>",
+        "type": "Fade",
+        "number": "229",
+        "name": "06 \u00b7 Salida imagen \u00b7 3 s",
+        "displayName": "06 \u00b7 Salida imagen \u00b7 3 s",
+        "parent_id": "<AUDIT_LIST_UUID>",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "target": {
+        "cueTargetID": "<CUE_2_UUID>",
+        "cueTargetNumber": "225",
+        "tempCueTargetID": "",
+        "tempCueTargetNumber": "",
+        "currentCueTargetID": "<CUE_2_UUID>",
+        "currentCueTargetNumber": "225"
+      },
+      "fade": {
+        "targetMode": 0,
+        "patchTargetID": "",
+        "fadeType": 1,
+        "geoMode": 0,
+        "levelsMode": 0,
+        "doOpacity": true,
+        "doRate": false,
+        "doRotation": false,
+        "doScale": false,
+        "doTranslation": false,
+        "rotation": 0,
+        "rotationType": 0,
+        "stopTargetWhenDone": true
+      },
+      "audio": null,
+      "geometry": {
+        "opacity": 0
+      },
+      "path": null
+    },
+    {
+      "ok": true,
+      "status": "ok",
+      "partial": false,
+      "workspace_id": "<WORKSPACE_UUID>",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [],
+        "unavailable_fields": [
+          "isChildAuditioning",
+          "isChildFlagged"
+        ],
+        "failed_routes": [],
+        "notes": [
+          "Containing Cue List context comes from qlab_get_light_cues; detail reads the immediate parent.",
+          "Read-only cue configuration; no live output is calculated or queried.",
+          "Light command text is not executed; use workspace Light Settings for patch configuration."
+        ]
+      },
+      "warnings": [],
+      "errors": {},
+      "inspection_values": {},
+      "cue_id": "<CUE_7_UUID>",
+      "profile": "safe",
+      "identity": {
+        "uniqueID": "<CUE_7_UUID>",
+        "type": "Light",
+        "number": "230",
+        "name": "07 \u00b7 Negro \u00b7 2 s",
+        "displayName": "07 \u00b7 Negro \u00b7 2 s",
+        "parent_id": "<AUDIT_LIST_UUID>",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": true,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "notes": null
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isChildAuditioning": null,
+        "isChildFlagged": null,
+        "isPanicking": false,
+        "isTailingOut": false
+      },
+      "timing": {
+        "preWait": 0,
+        "duration": 2,
+        "postWait": 0,
+        "continueMode": 2,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        }
+      },
+      "light": {
+        "lightCommandText": "Grupo1 = 0\nGrupo2 = 0\nLED1.red = 0\nLED1.green = 0\nLED1.blue = 0\nLED2.red = 0\nLED2.green = 0\nLED2.blue = 0\nLED3.red = 0\nLED3.green = 0\nLED3.blue = 0",
+        "alwaysCollate": false,
+        "subcontroller": false
+      },
+      "triggers": {
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_light_cues",
+        "allowed_properties": [
+          "alwaysCollate",
+          "armed",
+          "autoLoad",
+          "colorName",
+          "continueMode",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "duration",
+          "fadeAndStopOthersTime",
+          "flagged",
+          "lightCommandText",
+          "name",
+          "notes",
+          "number",
+          "postWait",
+          "preWait",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "skipIfDisarmed",
+          "subcontroller",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "useSecondColor"
+        ],
+        "blocked_properties": {
+          "fadeAndStopOthers": "Scope readback must be an integer, not boolean."
+        },
+        "requires_fresh_preflight": true,
+        "gated_or_planned_properties": {
+          "alwaysCollate": "Requires signed dry run, readable baseline and family dependencies.",
+          "skipIfDisarmed": "Requires signed dry run, readable baseline and family dependencies.",
+          "name": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckLevel": "Requires signed dry run, readable baseline and family dependencies.",
+          "lightCommandText": "Requires signed dry run, readable baseline and family dependencies.",
+          "continueMode": "Requires signed dry run, readable baseline and family dependencies.",
+          "armed": "Requires signed dry run, readable baseline and family dependencies.",
+          "colorName": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/bits": "Requires signed dry run, readable baseline and family dependencies.",
+          "useSecondColor": "Requires signed dry run, readable baseline and family dependencies.",
+          "preWait": "Requires signed dry run, readable baseline and family dependencies.",
+          "duration": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckTime": "Requires signed dry run, readable baseline and family dependencies.",
+          "postWait": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondTriggerOnRelease": "Requires signed dry run, readable baseline and family dependencies.",
+          "autoLoad": "Requires signed dry run, readable baseline and family dependencies.",
+          "subcontroller": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/minutes": "Requires signed dry run, readable baseline and family dependencies.",
+          "number": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondTriggerAction": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/text": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/seconds": "Requires signed dry run, readable baseline and family dependencies.",
+          "duckOthers": "Requires signed dry run, readable baseline and family dependencies.",
+          "secondColorName": "Requires signed dry run, readable baseline and family dependencies.",
+          "fadeAndStopOthersTime": "Requires signed dry run, readable baseline and family dependencies.",
+          "notes": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/hours": "Requires signed dry run, readable baseline and family dependencies.",
+          "flagged": "Requires signed dry run, readable baseline and family dependencies.",
+          "timecodeTrigger/frames": "Requires signed dry run, readable baseline and family dependencies."
+        },
+        "property_capabilities": {
+          "alwaysCollate": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "armed": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "autoLoad": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "colorName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "continueMode": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckLevel": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckOthers": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duckTime": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "duration": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "fadeAndStopOthers": {
+            "state": "blocked",
+            "reason": "Scope readback must be an integer, not boolean."
+          },
+          "fadeAndStopOthersTime": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "flagged": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "lightCommandText": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "name": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "notes": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "number": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "postWait": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "preWait": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondColorName": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondTriggerAction": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "secondTriggerOnRelease": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "skipIfDisarmed": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "subcontroller": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/bits": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/frames": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/hours": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/minutes": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/seconds": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "timecodeTrigger/text": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "useSecondColor": {
+            "state": "gated",
+            "reason": "Signed confirmation, readable baseline and verified family dependencies required."
+          },
+          "Hotkey/MIDI/Wall Clock setup": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Timecode activation/display": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Trim": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Audio FX": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          },
+          "Undocumented curves": {
+            "state": "unavailable_via_osc",
+            "reason": "No documented saved setter in this OSC phase."
+          }
+        },
+        "max_cues": 50,
+        "max_indexed_operations_per_cue": 0,
+        "notes": [
+          "All writes require signed five-minute single-use confirmations.",
+          "Basics, Triggers and supported family settings can share a sequential non-atomic batch.",
+          "Selectors which may reset dependent settings require a separate dry run."
+        ],
+        "unavailable_via_osc": [
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display",
+          "Trim",
+          "Audio FX",
+          "Undocumented curves"
+        ],
+        "excluded": [
+          "Audio Maps",
+          "/live",
+          "cue execution",
+          "workspace settings",
+          "deprecated aliases"
+        ]
+      },
+      "redactions": []
+    },
+    {
+      "ok": true,
+      "status": "ok",
+      "partial": false,
+      "workspace_id": "<WORKSPACE_UUID>",
+      "error_code": null,
+      "message": null,
+      "suggested_action": null,
+      "coverage": {
+        "source": "documented_osc",
+        "unavailable_via_osc": [
+          "Hotkey trigger configuration",
+          "MIDI trigger configuration",
+          "Wall Clock trigger configuration",
+          "Timecode trigger enabled state",
+          "Timecode trigger display format"
+        ],
+        "unavailable_fields": [],
+        "failed_routes": [],
+        "notes": [
+          "Containing Cue List context comes from qlab_get_control_cues; detail reads the immediate parent.",
+          "Read-only cue configuration; no live output is calculated or queried.",
+          "Audio Maps are excluded. Patch references do not expand Workspace Settings.",
+          "OSC coverage is not the entire inspector: Load load time and Target assigned number have no documented OSC read.",
+          "Memo notes are included in safe; other notes require technical. No cue action is executed."
+        ]
+      },
+      "warnings": [],
+      "errors": {},
+      "cue_id": "<CUE_8_UUID>",
+      "profile": "safe",
+      "identity": {
+        "uniqueID": "<CUE_8_UUID>",
+        "type": "Stop",
+        "number": "231",
+        "name": "08 \u00b7 Stop audio \u00b7 t=17",
+        "displayName": "08 \u00b7 Stop audio \u00b7 t=17",
+        "parent_id": "<AUDIT_LIST_UUID>",
+        "cue_list_id": null,
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false
+      },
+      "basics": {
+        "secondColorName": "none",
+        "useSecondColor": false,
+        "allowsEditingDuration": false,
+        "colorName": "none",
+        "autoLoad": false,
+        "skipIfDisarmed": false,
+        "notes": null,
+        "defaultName": "stop 01 \u00b7 Audio \u00b7 authorized audio fixture",
+        "listName": "08 \u00b7 Stop audio \u00b7 t=17",
+        "cartPosition": [
+          0,
+          0
+        ],
+        "hasCueTargets": true,
+        "hasFileTargets": false,
+        "canHavePatchTargets": false,
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1
+      },
+      "state": {
+        "armed": false,
+        "flagged": false,
+        "isBroken": false,
+        "isWarning": false,
+        "isRunning": false,
+        "isPaused": false,
+        "isLoaded": false,
+        "isActionRunning": false,
+        "isAuditioning": false,
+        "isOverridden": false,
+        "isPanicking": false,
+        "isTailingOut": false,
+        "isCrossfadingOut": false,
+        "isNextInPlaylist": false
+      },
+      "timing": {
+        "preWait": 0,
+        "duration": 0,
+        "postWait": 0,
+        "continueMode": 0,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "currentDuration": 0,
+        "tempDuration": 0,
+        "actionElapsed": 0,
+        "percentActionElapsed": 0,
+        "preWaitElapsed": 0,
+        "percentPreWaitElapsed": 0,
+        "postWaitElapsed": 0,
+        "percentPostWaitElapsed": 0,
+        "maxTimeInCueSequence": 0,
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "target": {
+        "cueTargetID": "<CUE_1_UUID>",
+        "cueTargetNumber": "224",
+        "tempCueTargetID": "",
+        "tempCueTargetNumber": "",
+        "currentCueTargetID": "<CUE_1_UUID>",
+        "currentCueTargetNumber": "224"
+      },
+      "reset": null,
+      "devamp": null,
+      "triggers": {
+        "secondTriggerAction": 0,
+        "secondTriggerOnRelease": false,
+        "duckOthers": false,
+        "duckLevel": 0,
+        "duckTime": 1,
+        "fadeAndStopOthers": false,
+        "fadeAndStopOthersTime": 1,
+        "timecodeTrigger": {
+          "hours": 1,
+          "minutes": 0,
+          "seconds": 0,
+          "frames": 0,
+          "bits": 0
+        },
+        "timecodeTriggerText": "1:00:00:00"
+      },
+      "edit_capabilities": {
+        "tool": "qlab_edit_control_cues",
+        "allowed_properties": [
+          "armed",
+          "autoLoad",
+          "colorName",
+          "continueMode",
+          "cueTargetID",
+          "duckLevel",
+          "duckOthers",
+          "duckTime",
+          "fadeAndStopOthersTime",
+          "flagged",
+          "name",
+          "notes",
+          "number",
+          "postWait",
+          "preWait",
+          "secondColorName",
+          "secondTriggerAction",
+          "secondTriggerOnRelease",
+          "skipIfDisarmed",
+          "timecodeTrigger/bits",
+          "timecodeTrigger/frames",
+          "timecodeTrigger/hours",
+          "timecodeTrigger/minutes",
+          "timecodeTrigger/seconds",
+          "timecodeTrigger/text",
+          "useSecondColor"
+        ],
+        "blocked_properties": {
+          "fadeAndStopOthers": "Requires integer scope readback; boolean cannot identify scope."
+        },
+        "requires_fresh_preflight": true,
+        "unavailable_via_osc": [
+          "Load Time",
+          "Hotkey/MIDI/Wall Clock setup",
+          "Timecode activation/display"
+        ],
+        "pending_validation": []
+      },
+      "redactions": []
+    }
+  ],
+  "focused_tests": {
+    "passed": 162
+  },
+  "quaternion_input": [
+    1,
+    0,
+    0,
+    0
+  ],
+  "mutations": {
+    "created_roots": 1,
+    "created_cues": 9,
+    "cue_setters": 57,
+    "root_setters": 3
+  },
+  "token_codec_tests": {
+    "passed": 6
+  },
+  "follow_up_2026_10_09": {
+    "date": "2026-10-09",
+    "qlab_version": "5.5.10",
+    "interface": "FastMCP Client(mcp), current source; installed MCP not restarted",
+    "workspace_path_checked_via_ui": "<redacted-local-path-851cab375f>.qlab5",
+    "workspace_count": 1,
+    "mode": "edit",
+    "active_cues_before_and_after": 0,
+    "native_loop_reads": {
+      "image": {
+        "batch": 1,
+        "direct": 1,
+        "type": "int"
+      },
+      "movie": {
+        "batch": false,
+        "direct": false,
+        "type": "bool"
+      },
+      "audio": {
+        "batch": false,
+        "direct": false,
+        "type": "bool"
+      }
+    },
+    "image_and_movie_details": {
+      "ok": true,
+      "partial": false,
+      "errors": {}
+    },
+    "rotation": {
+      "before": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "apply": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "restored": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "apply_status": "updated",
+      "restore_status": "updated",
+      "setters_per_operation": {
+        "apply": 1,
+        "restore": 1
+      },
+      "always_reply_same_connection": true,
+      "restored_sections": {
+        "identity": true,
+        "basics": true,
+        "state": true,
+        "timing": true,
+        "video": true,
+        "audio": true,
+        "triggers": true
+      },
+      "ui": "Inspector image inverted after apply and upright after restore; original Memo selection restored"
+    },
+    "automated": {
+      "focused_passed": 151,
+      "suite_passed": 1654,
+      "suite_skipped": 35,
+      "subtests_passed": 61,
+      "catalogue_count": 73,
+      "generic_editor_registered": false
+    },
+    "limits": [
+      "Camera/Text quaternion regression-tested, not written live in this follow-up",
+      "Image infiniteLoop is a native observed value; image loop editing remains blocked without embedded audio evidence",
+      "No GO, Preview, Send, /live, external signals or saved workspace file write"
+    ]
+  },
+  "post_restart_2026_10_09": {
+    "mcp": "restarted public MCP tools",
+    "workspace": {
+      "id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+      "name": "redacted-workspace-6b31c91e.qlab5",
+      "version": "5.5.10",
+      "count": 1,
+      "mode": "edit",
+      "active_cues": 0
+    },
+    "read": {
+      "cue_id": "784EFB63-6C65-5F7E-845F-4F4FE126B844",
+      "type": "Video",
+      "ok": true,
+      "partial": false,
+      "errors": {},
+      "infiniteLoop": true,
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    "rotation": {
+      "baseline": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "changed": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "apply": "updated; one setter; readback matched",
+      "restored": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "restore": "updated; one setter; readback matched",
+      "ui": "image inverted after apply and upright after restore"
+    },
+    "scope": [
+      "Computer Use read-only",
+      "no GO, Preview or Send",
+      "cue armed state preserved",
+      "zero active cues after restoration"
+    ],
+    "tool_catalogue_count": 73,
+    "ui": {
+      "path": "<redacted-local-path-851cab375f>.qlab5",
+      "geometry": "upright before and after restore; upside down after apply",
+      "io": "file target matched; Video Format: No audio; no visible loop control",
+      "selection": "original Memo cue 223 restored",
+      "active_cues": 0
+    }
+  }
+}

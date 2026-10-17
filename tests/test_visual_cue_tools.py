@@ -69,6 +69,17 @@ def detail(reader, kind, **kwargs):
     return getattr(reader, f"get_{kind}_cue_details")(WS, FIRST, **kwargs)
 
 
+def test_unavailable_slices_do_not_advertise_enabled_edits():
+    osc = fixture('video')
+    osc.cell_values[FIRST].pop('sliceMarkers')
+    result = detail(QLabReader(osc), 'video')
+    assert result.ok and result.audio.sliceMarkers is None
+    for key in ('addSliceMarker', 'deleteSliceMarker', 'deleteSliceMarkers', 'sliceMarker/time',
+                'sliceMarker/playCount', 'lastSlicePlayCount'):
+        assert key in result.edit_capabilities['blocked_properties']
+        assert key not in result.edit_capabilities['allowed_properties']
+
+
 @pytest.mark.parametrize("kind", KINDS)
 def test_scoped_paged_inventory_and_empty(kind):
     osc = fixture(kind)
@@ -114,6 +125,60 @@ def test_typed_geometry_and_family_exclusions(kind):
         assert result.text.outputSize.width == 200
     else:
         assert result.audio.numChannelsIn == 0 and result.timing.holdLastFrame is True
+
+
+@pytest.mark.parametrize('kind', KINDS)
+def test_selected_fx_enabled_updates_summary_and_returns_metadata(kind):
+    osc = fixture(kind)
+    osc.cell_values[FIRST].update({
+        'videoEffectIndex/0/enabled': False,
+        'videoEffectIndex/0/parameter/inputContrast': 1,
+    })
+    result = detail(QLabReader(osc), kind, video_effects=[{
+        'effect_type': 'ColorControls', 'index': 0, 'key': 'inputContrast'}])
+    assert result.ok and not result.partial
+    assert result.video.videoEffects[0].enabled is False
+    assert result.selected_video_effects[0]['enabled'] is False
+    assert result.selected_video_effects[0]['parameter_metadata']['inputContrast']['kind'] == 'number'
+
+
+@pytest.mark.parametrize('kind', KINDS)
+def test_selected_fx_can_discover_type_from_index(kind):
+    osc = fixture(kind)
+    osc.cell_values[FIRST].update({
+        'videoEffectIndex/0/enabled': True,
+        'videoEffectIndex/0/parameter/inputContrast': 1,
+    })
+    result = detail(QLabReader(osc), kind, video_effects=[{'index': 0, 'key': 'inputContrast'}])
+    assert result.ok and not result.partial
+    selected = result.selected_video_effects[0]
+    assert selected['type'] == 'ColorControls'
+    assert selected['parameters'] == {'inputContrast': 1}
+    assert result.edit_capabilities['video_fx']['allowed_operations'] == [
+        'videoEffectIndex/enabled', 'videoEffectIndex/parameter', 'videoEffectIndex/parameters'
+    ]
+
+
+def test_video_fx_read_selector_requires_index_but_not_effect_type():
+    async def get_tool():
+        async with Client(server.mcp) as client:
+            return next(tool for tool in await client.list_tools() if tool.name == 'qlab_get_video_cue_details')
+
+    schema = asyncio.run(get_tool()).inputSchema['properties']['video_effects']['anyOf'][0]['items']
+    assert schema['required'] == ['index']
+    assert 'effect_type' in schema['properties']
+
+
+@pytest.mark.parametrize('kind', KINDS)
+def test_selected_fx_missing_enabled_is_partial(kind):
+    osc = fixture(kind)
+    osc.cell_values[FIRST]['videoEffectIndex/0/parameter/inputContrast'] = 1
+    result = detail(QLabReader(osc), kind, video_effects=[{
+        'effect_type': 'ColorControls', 'index': 0, 'key': 'inputContrast'}])
+    assert result.partial and result.status == 'partial'
+    assert 'videoEffectSelectors' in result.errors
+    assert 'videoEffectIndex/selected' in result.coverage.failed_routes
+    assert result.selected_video_effects == []
 
 
 @pytest.mark.parametrize("kind", KINDS)
@@ -217,3 +282,47 @@ def test_fastmcp_roundtrip(kind, monkeypatch):
                 with pytest.raises(Exception):
                     await client.call_tool("qlab_get_text_cue_details", {"workspace_id": WS, "cue_id": FIRST, "input_channel": 0})
     asyncio.run(run())
+
+
+@pytest.mark.parametrize('values,expected', [([None, None], None), ([2, 2], 2), ([2, 3], None), ([2, None], None)])
+def test_text_optional_attributes_from_fragments(values, expected):
+    osc = fixture('text')
+    for run, value in zip(osc.cell_values[FIRST]['text/format'], values):
+        if value is not None:
+            run['shadowBlurRadius'] = value
+    result = detail(QLabReader(osc), 'text')
+    assert result.text.shadowBlurRadius == expected
+    assert not any('/text/format/shadowBlurRadius' in address for address, _ in osc.calls)
+    assert not result.errors
+
+
+def test_text_format_timeout_is_not_hidden():
+    osc = fixture('text')
+    reader = QLabReader(osc)
+    original = reader.read_cue_property
+    def request(ws, cue, prop):
+        if prop == 'text/format':
+            raise TimeoutError('format timeout')
+        return original(ws, cue, prop)
+    reader.read_cue_property = request
+    result = detail(reader, 'text')
+    assert result.partial and 'text/format' in result.errors
+    assert result.text.fragments is None and result.text.shadowBlurRadius is None
+
+@pytest.mark.parametrize('value, expected', [(0, False), (1, True), (False, False), (True, True)])
+def test_video_infinite_loop_native_boolean_reads(value, expected):
+    osc = fixture('video')
+    osc.cell_values[FIRST]['infiniteLoop'] = value
+    result = detail(QLabReader(osc), 'video', profile='technical')
+    assert result.ok and not result.partial
+    assert result.timing.infiniteLoop is expected
+    assert result.technical_payload['infiniteLoop'] is expected
+
+
+@pytest.mark.parametrize('value', [2, -1, 1.0, '1', 'true', [], float('nan')])
+def test_video_infinite_loop_invalid_read_stays_partial(value):
+    osc = fixture('video')
+    osc.cell_values[FIRST]['infiniteLoop'] = value
+    result = detail(QLabReader(osc), 'video')
+    assert result.partial and result.timing.infiniteLoop is None
+    assert result.errors['infiniteLoop'] == 'Invalid OSC value for this field'

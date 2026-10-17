@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import struct
 from dataclasses import dataclass, replace
 from string import Formatter
@@ -389,9 +390,8 @@ COMMON_CATALOG_PROPERTIES = (
     _planned_prop("duckLevel", "decibel", reason="ducking_changes_cue_behavior"),
     _planned_prop("duckOthers", "boolean", reason="ducking_changes_cue_behavior"),
     _planned_prop("duckTime", "non_negative_number", reason="ducking_changes_cue_behavior"),
-    _planned_prop("fadeAndStopOthers", "number", reason="fade_and_stop_changes_other_cues"),
+    _planned_prop("fadeAndStopOthers", "fade_stop_mode", reason="fade_and_stop_changes_other_cues"),
     _planned_prop("fadeAndStopOthersTime", "non_negative_number", reason="fade_and_stop_changes_other_cues"),
-    _planned_prop("fileTarget", "string", reason="file_paths_need_dedicated_safety_policy"),
     _planned_prop("cueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("cueTargetID", "cue_target_id", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
     _planned_prop("tempCueTargetNumber", "cue_target_number", reason="target_refs_need_dedicated_resolution", contextual_requirements=("target_ref_resolves",)),
@@ -400,7 +400,6 @@ COMMON_CATALOG_PROPERTIES = (
     _planned_prop("targetMode", "target_mode", reason="target_behavior_needs_validation"),
     _planned_prop("secondTriggerAction", "second_trigger_action", reason="second_trigger_changes_show_control_behavior"),
     _planned_prop("secondTriggerOnRelease", "boolean", reason="second_trigger_changes_show_control_behavior"),
-    _op("timecodeTrigger", (("hours", "timecode_part"), ("minutes", "timecode_part"), ("seconds", "timecode_part"), ("frames", "timecode_part"), ("bits", "timecode_part")), planned_only_reason="timecode_trigger_changes_show_control_behavior"),
     _planned_prop("timecodeTrigger/hours", "timecode_part", reason="timecode_trigger_changes_show_control_behavior"),
     _planned_prop("timecodeTrigger/minutes", "timecode_part", reason="timecode_trigger_changes_show_control_behavior"),
     _planned_prop("timecodeTrigger/seconds", "timecode_part", reason="timecode_trigger_changes_show_control_behavior"),
@@ -588,7 +587,6 @@ VIDEO_SLICE_MARKER_PROPERTIES = (
 )
 
 AUDIO_CATALOG_PROPERTIES = (
-    _planned_prop("fileTarget", "string", reason="file_paths_need_dedicated_safety_policy"),
     *_planned_patch_refs("audioOutputPatch", validator="patch_ref"),
     *_planned_patch_refs("audioMap", validator="patch_ref"),
     _planned_prop("doFade", "boolean", reason="integrated_fade_changes_playback_behavior"),
@@ -1002,7 +1000,6 @@ MIC_CATALOG_PROPERTIES = (
 )
 
 VIDEO_CATALOG_PROPERTIES = (
-    _planned_prop("fileTarget", "string", reason="file_paths_need_dedicated_safety_policy"),
     _planned_prop("layer", "video_layer", reason="video_layer_changes_need_visual_validation"),
     _planned_prop("fillStage", "boolean", reason="video_framing_changes_need_visual_validation"),
     _planned_prop("fillStyle", "video_fill_style", reason="video_framing_changes_need_visual_validation"),
@@ -1396,7 +1393,7 @@ MIDI_CATALOG_PROPERTIES = (
 )
 
 MIDI_FILE_CATALOG_PROPERTIES = (
-    _planned_prop("fileTarget", "string", reason="file_paths_need_dedicated_safety_policy"),
+    _prop("fileTarget", "string", risk_tier="high", real_write_enabled=True),
     _prop("rate", "rate", risk_tier="medium", real_write_enabled=True),
     _prop("startTime", "non_negative_number", risk_tier="medium", real_write_enabled=True),
     _prop("endTime", "non_negative_number", risk_tier="medium", real_write_enabled=True),
@@ -1484,7 +1481,7 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
     "wait_basic": UpdateProfileSpec("wait_basic", ("Wait",), COMMON_PROPERTIES, "safe", True, "Wait cue common properties."),
     "group_basic": UpdateProfileSpec(
         "group_basic",
-        ("Group", "Cue List", "Cue Cart"),
+        ("Group", "Cue List", "Cue Cart", "Cart"),
         (*COMMON_PROPERTIES, *_group_properties()),
         "medium",
         True,
@@ -1493,7 +1490,7 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
     AUDIO_BASIC_UPDATE_PROFILE: UpdateProfileSpec(
         AUDIO_BASIC_UPDATE_PROFILE,
         ("Audio",),
-        (*COMMON_PROPERTIES, *AUDIO_SAFE_PROPERTIES, *AUDIO_CATALOG_PROPERTIES),
+        (*COMMON_PROPERTIES, _prop("fileTarget", "string", risk_tier="high", real_write_enabled=True), *AUDIO_SAFE_PROPERTIES, *AUDIO_CATALOG_PROPERTIES),
         "medium",
         True,
         "Audio transport, cue I/O selection, and Levels use specialized confirmation gates; other catalog routes remain dry-run only.",
@@ -1506,7 +1503,7 @@ UPDATE_PROFILES: dict[str, UpdateProfileSpec] = {
         True,
         "Mic cue I/O selection and Levels use specialized confirmation gates; Format remains dry-run only pending input-patch capacity validation.",
     ),
-    "video_basic": UpdateProfileSpec("video_basic", ("Video",), (*COMMON_PROPERTIES, *VIDEO_AUDIO_TIME_PROPERTIES, *VIDEO_AUDIO_LEVEL_PROPERTIES, *VIDEO_AUDIO_MATRIX_PROPERTIES, *VIDEO_AUDIO_LEVEL_META_PROPERTIES, *VIDEO_AUDIO_MUTE_SOLO_PROPERTIES, *VIDEO_AUDIO_LEVEL_BULK_PROPERTIES, _planned_prop("doFade", "boolean", reason="video_integrated_fade_requires_confirm_token"), _planned_prop("lockFadeToCue", "boolean", reason="video_integrated_fade_requires_confirm_token"), *VIDEO_SLICE_MARKER_PROPERTIES, *VIDEO_CATALOG_PROPERTIES), "medium", True, "Video opacity, translation, visual scalars, embedded-audio timing, audio level, audio matrix, audio level metadata, mute/solo, integrated fade, clockType, and slice marker edits use specialized confirmation gates; remaining visual properties stay dry-run only."),
+    "video_basic": UpdateProfileSpec("video_basic", ("Video",), (*COMMON_PROPERTIES, _prop("fileTarget", "string", risk_tier="high", real_write_enabled=True), *VIDEO_AUDIO_TIME_PROPERTIES, *VIDEO_AUDIO_LEVEL_PROPERTIES, *VIDEO_AUDIO_MATRIX_PROPERTIES, *VIDEO_AUDIO_LEVEL_META_PROPERTIES, *VIDEO_AUDIO_MUTE_SOLO_PROPERTIES, *VIDEO_AUDIO_LEVEL_BULK_PROPERTIES, _planned_prop("doFade", "boolean", reason="video_integrated_fade_requires_confirm_token"), _planned_prop("lockFadeToCue", "boolean", reason="video_integrated_fade_requires_confirm_token"), *VIDEO_SLICE_MARKER_PROPERTIES, *VIDEO_CATALOG_PROPERTIES), "medium", True, "Video file target, opacity, translation, visual scalars, embedded-audio timing, audio level, audio matrix, audio level metadata, mute/solo, integrated fade, clockType, and slice marker edits use specialized confirmation gates; remaining visual properties stay dry-run only."),
     "camera_basic": UpdateProfileSpec("camera_basic", ("Camera",), (*COMMON_PROPERTIES, *MIC_CATALOG_PROPERTIES, *VIDEO_CATALOG_PROPERTIES, *CAMERA_CATALOG_PROPERTIES), "medium", True, "Camera opacity, translation, and visual scalars use specialized confirmation gates; remaining visual properties stay dry-run only."),
     TEXT_BASIC_UPDATE_PROFILE: UpdateProfileSpec(
         TEXT_BASIC_UPDATE_PROFILE,
@@ -1600,7 +1597,6 @@ CAPABILITY_GATES = {
     "fade_targets",
     "group_mode",
     "group_playlist",
-    "file_target_access",
     "light_output",
     "midi_output",
     "network_output",
@@ -1621,8 +1617,6 @@ def _default_capability_gate(profile: str, prop: CuePropertySpec) -> str | None:
     name = prop.name
     if prop.planned_only_reason.startswith("deprecated_") or name == "patch":
         return "deprecated_osc"
-    if name == "fileTarget":
-        return "file_target_access"
     if "Patch" in name or "patchTarget" in name or "audioMapTarget" in name:
         return "patch_routing"
     if name.startswith(("cueTarget", "tempCueTarget", "targetMode")):
@@ -1673,6 +1667,23 @@ def _apply_default_capability_gates() -> None:
 
 _apply_default_capability_gates()
 
+CONTROL_EDIT_TYPES = ("Start", "Stop", "Pause", "Load", "Reset", "GoTo", "Arm", "Disarm", "Wait", "Memo")
+_control_names = {"duckLevel", "duckOthers", "duckTime", "fadeAndStopOthers", "fadeAndStopOthersTime",
+                  "secondTriggerAction", "secondTriggerOnRelease"}
+_control_properties = [prop for prop in COMMON_PROPERTIES if prop.name != "tempDuration"]
+_control_properties.extend(prop for prop in COMMON_CATALOG_PROPERTIES
+                           if prop.name in _control_names or prop.name.startswith("timecodeTrigger/"))
+_control_properties.extend(prop for prop in RESET_CATALOG_PROPERTIES if prop.name in {"cueTargetID", "patchTargetID", "targetMode"})
+UPDATE_PROFILES["control_basic"] = UpdateProfileSpec(
+    "control_basic", CONTROL_EDIT_TYPES, tuple(replace(prop, real_write_enabled=True,
+        planned_only_reason=None) for prop in _control_properties), "high", False,
+    "Internal profile: execute only through qlab_edit_control_cues and its expiring single-use tokens.",
+)
+for _name, _profile in tuple(UPDATE_PROFILES.items()):
+    UPDATE_PROFILES[_name] = replace(_profile, properties=tuple(
+        replace(prop, real_write_enabled=False, planned_only_reason="temporary_overrides_outside_persistent_editing")
+        if prop.name.startswith("temp") else prop for prop in _profile.properties
+    ))
 UPDATE_PROFILE_NAMES = tuple(UPDATE_PROFILES)
 WRITE_GATE_REQUIREMENTS = (
     "QLAB_ENABLE_WRITE",
@@ -1724,7 +1735,7 @@ def editable_update_capabilities(cue_type: str | None) -> dict[str, Any]:
     normalized_type = cue_type.casefold() if isinstance(cue_type, str) else None
     compatible_profiles = [COMMON_UPDATE_PROFILE]
     for name, spec in UPDATE_PROFILES.items():
-        if name == COMMON_UPDATE_PROFILE or not spec.cue_types or normalized_type is None:
+        if name in {COMMON_UPDATE_PROFILE, "control_basic"} or not spec.cue_types or normalized_type is None:
             continue
         if normalized_type in {candidate.casefold() for candidate in spec.cue_types}:
             compatible_profiles.append(name)
@@ -1780,7 +1791,7 @@ def editable_update_capabilities(cue_type: str | None) -> dict[str, Any]:
             if prop["planned_only_reason"]:
                 planned_only_reason[property_name] = prop["planned_only_reason"]
 
-    return {
+    result = {
         "compatible_profiles": compatible_profiles,
         "recommended_profile": recommended_profile,
         "real_write_properties": sorted(real_write_details),
@@ -1811,6 +1822,24 @@ def editable_update_capabilities(cue_type: str | None) -> dict[str, Any]:
         "available_capability_gates": sorted(CAPABILITY_GATES),
     }
 
+    if cue_type in (*CONTROL_EDIT_TYPES, "Devamp", "Target"):
+        from .control import control_edit_capabilities
+        result["edit_tool"] = control_edit_capabilities(cue_type)["tool"]
+        result["control_edit_capabilities"] = control_edit_capabilities(cue_type)
+    elif normalized_type == "group":
+        from .group import group_edit_capabilities
+        result["edit_tool"] = "qlab_edit_group_cues"
+        result["group_edit_capabilities"] = group_edit_capabilities()
+    elif normalized_type in {"cue list", "cue cart", "cart"}:
+        result["edit_tool"] = "qlab_edit_cue_lists"
+    elif normalized_type in {"video", "camera", "text"}:
+        result["edit_tool"] = "qlab_edit_" + normalized_type + "_cues"
+    if normalized_type in {"audio", "mic", "light", "fade", "network", "midi", "midi file", "timecode", "script"}:
+        from .remaining import capabilities
+        result["edit_tool"] = "qlab_edit_" + normalized_type.replace(" ", "_") + "_cues"
+        result["family_edit_capabilities"] = capabilities(normalized_type.replace(" ", "_"))
+    return result
+
 
 def validate_update_profile_for_cue(profile: str, cue_values: dict[str, Any] | None) -> None:
     spec = UPDATE_PROFILES[validate_update_profile(profile)]
@@ -1833,6 +1862,10 @@ def normalize_update_request(
     operations: list[dict[str, Any]] | None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     update_profile = validate_update_profile(profile)
+    if (properties and "timecodeTrigger" in properties) or any(
+        isinstance(op, dict) and op.get("property") == "timecodeTrigger" for op in operations or []
+    ):
+        raise UnsafeWriteOperationError("timecodeTrigger is read-only; edit its text or components.")
     normalized_properties: dict[str, Any] = {}
     normalized_operations: list[dict[str, Any]] = []
 
@@ -1872,6 +1905,14 @@ def ensure_real_write_allowed(
         raise UnsafeWriteOperationError("; ".join(errors.values()))
 
 
+def excluded_saved_operation(operation: dict[str, Any]) -> bool:
+    """Exclusions hold even when a legacy specialized gate supplies a token."""
+    prop = str(operation.get("property", ""))
+    return (operation.get("mode") != "saved" or prop.startswith("temp")
+            or prop in {"scriptSource", "audioMapID", "audioMapTargetID", "playheadID", "playhead", "qList", "sliceMarkers"}
+            or "/live" in str(operation.get("path", "")))
+
+
 def real_write_permission_errors(
     profile: str,
     operations: list[dict[str, Any]],
@@ -1884,6 +1925,9 @@ def real_write_permission_errors(
     errors: dict[str, str] = {}
     for operation in operations:
         prop = str(operation["property"])
+        if excluded_saved_operation(operation):
+            errors[prop] = f"{prop} is gated or dry-run only outside verified saved OSC editing; confirmation cannot enable it."
+            continue
         if profile == "fade_basic":
             errors[prop] = (
                 f"{prop} is gated or dry-run only outside the specialized single-cue Fade gate."
@@ -1916,7 +1960,7 @@ def real_write_permission_errors(
         if profile == "light_basic" and prop == "lightCommandText":
             errors[prop] = (
                 "lightCommandText is gated or dry-run only outside the specialized "
-                "single-cue Phase 4 qlab_edit_cues flow."
+                "verified qlab_edit_light_cues flow."
             )
             continue
         if profile == "light_basic" and prop in {
@@ -1934,22 +1978,15 @@ def real_write_permission_errors(
         if profile == "light_basic" and prop in {"alwaysCollate", "subcontroller"}:
             errors[prop] = (
                 f"{prop} is gated or dry-run only outside the specialized single-cue Phase 5 "
-                "qlab_edit_cues flow."
+                "qlab_edit_light_cues flow."
             )
             continue
         if operation["real_write_enabled"]:
             continue
-        token = str(operation.get("confirm_token") or "")
-        if token not in confirmed:
-            errors[prop] = (
-                f"{prop} is gated or dry-run only for real writes and requires confirm_token {token!r}; broad capability gate "
-                f"{operation.get('capability_gate') or 'no_real_write_gate'!r} is dry-run discovery only."
-            )
-        if not operation.get("read_key") or len(operation.get("args") or []) != 1:
-            errors[prop] = (
-                f"{prop} is gated or dry-run only because it has no deterministic one-value readback; "
-                "dry-run only until a verifier is implemented."
-            )
+        errors[prop] = (
+            f"{prop} is gated or dry-run only until an explicitly verified specialized writer authorizes it; "
+            "deterministic discovery tokens do not authorize setters."
+        )
     return errors
 
 
@@ -1960,6 +1997,10 @@ def read_keys_for_operations(operations: list[dict[str, Any]]) -> list[str]:
         keys.append("mode")
     if any(operation.get("property") in {"duration", "tempDuration"} for operation in operations):
         keys.append("allowsEditingDuration")
+    if any(op.get("property") == "secondTriggerAction" for op in operations):
+        keys.append("mode")
+    if any(str(op.get("property", "")).startswith("timecodeTrigger/") for op in operations):
+        keys.append("parent")
     return list(dict.fromkeys(keys))
 
 
@@ -1967,7 +2008,12 @@ def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
     catalog = profile_catalog()
     edit_cues_capability = {
         "planned": True,
-        "tool": "qlab_edit_cues",
+        "tool": None,
+        "public_generic_editor": False,
+        "replacement_tools": ["qlab_edit_" + family + "_cues" for family in (
+            "audio", "mic", "video", "camera", "text", "light", "fade", "network", "midi",
+            "midi_file", "timecode", "script", "control", "devamp", "target", "group",
+        )] + ["qlab_edit_cue_lists"],
         "batch": {
             "min_items": 1,
             "max_items": 50,
@@ -2022,11 +2068,12 @@ def planned_write_capabilities(dry_run_default: bool) -> dict[str, Any]:
                 "load", "reset", "devamp", "goto", "target", "arm", "disarm",
             ],
             "sequence": {
-                "max_items": 50,
+                "max_items": 100,
                 "one_new_per_item": True,
                 "anchor": "previous_created_cue_id",
                 "stops_on_ambiguity": True,
                 "rollback": False,
+                "execution_budget_seconds": 270,
             },
             "initial_placement": "same_as_create_cue",
             "initialization": "qlab_cue_template_defaults",
@@ -2069,6 +2116,15 @@ def _normalize_one_operation(
     if normalized_mode == "live" and profile in video_phase2_profiles:
         raise UnsafeWriteOperationError("Video-family editing blocks live mode; use saved mode for dry-run planning")
     normalized_args = _normalize_args(spec, raw_args, source=source)
+    if spec.name.startswith("timecodeTrigger/"):
+        value = normalized_args["value"]
+        component = spec.name.split("/")[1]
+        if component == "text":
+            match = re.fullmatch(r"(\d{1,2}):(\d{2}):(\d{2})[:;](\d{2})(?:\.(\d{2}))?", value)
+            if not match or any(int(x or 0) >= limit for x, limit in zip(match.groups(), (24, 60, 60, 30, 100), strict=True)):
+                raise UnsafeWriteOperationError("Invalid Timecode trigger text; use hours:minutes:seconds:frames[.bits].")
+        elif value >= {"hours": 24, "minutes": 60, "seconds": 60, "frames": 30, "bits": 100}[component]:
+            raise UnsafeWriteOperationError("Timecode trigger component is outside its valid range.")
     path = _render_path(spec, normalized_args)
     if normalized_mode == "live":
         path = f"{path}/live"
@@ -2272,6 +2328,8 @@ def _validate_value(validator: str, value: Any) -> Any:
         return _int_range(value, 0, 2, "value must be 0, 1, or 2")
     if validator == "second_trigger_action":
         return _int_range(value, 0, 7, "value must be a second trigger action index from 0 to 7")
+    if validator == "fade_stop_mode":
+        return _int_range(value, 0, 3, "value must be a Fade & Stop mode from 0 to 3")
     if validator == "timecode_part":
         return _int_range(value, 0, 99, "value must be a non-negative timecode component")
     if validator == "group_mode":

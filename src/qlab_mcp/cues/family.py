@@ -1,19 +1,25 @@
 """Shared bounded inventory and exact detail execution for specialized cue families."""
 
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, Field, StrictBool, StrictInt, StrictStr
 
-from .list_models import FiniteNumber
-from .lists import _finish, _inventory
+from .list_models import CueTimecodeComponents, FiniteNumber
+from .lists import _field_adapter, _finish, _inventory
 from .refs import _bounded_cue_refs_from_shallow
 from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES, serialized_payload_bytes
 from .profiles import _coerce_qlab_bool
 from ..sanitizer import sanitize_exception_message
 from ..settings.redaction import _redact_payload
+from .. import control_applescript
 
 Level = FiniteNumber | Literal["-inf"]
+
+TEXT_FRAGMENT_ATTRIBUTES = (
+    "backgroundColor", "shadowColor", "shadowBlurRadius", "shadowOffset",
+    "strikethroughColor", "underlineColor", "strikethroughStyle", "underlineStyle",
+)
 
 
 class AudioCrosspoint(BaseModel):
@@ -23,6 +29,8 @@ class AudioCrosspoint(BaseModel):
 
 
 def _fail(result, code, message, route="selection"):
+    if code == "cue_payload_too_large" and hasattr(result, "edit_capabilities"):
+        result.edit_capabilities = {}  # No usable baseline remains after dropping oversized details.
     result.ok, result.status, result.partial = False, "error", False
     result.error_code, result.message = code, message
     result.errors[route] = message
@@ -46,13 +54,30 @@ def _section(model, values, result, keys):
             continue
         try:
             value = values[key]
-            # QLab returns preservePitch as integer 0/1 in valuesForKeys.
-            if key == "preservePitch" and type(value) is int and value in (0, 1):
+            # QLab returns these documented booleans as integer 0/1 in OSC reads.
+            if key in {"preservePitch", "infiniteLoop"} and type(value) is int and value in (0, 1):
                 value = _coerce_qlab_bool(value)
-            clean[name] = TypeAdapter(field.rebuild_annotation()).validate_python(value)
+            clean[name] = _field_adapter(model, name).validate_python(value)
         except ValueError:
             result.errors[key] = "Invalid OSC value for this field"
     return model(**clean)
+
+
+class ControlTriggers(control_applescript.NativeTriggerProperties):
+    model_config = {"populate_by_name": True}
+    # Native bytes may encode "any" or inequalities; preserve the observed integer.
+    midiTriggerByte1: StrictInt | None = None
+    midiTriggerByte2: StrictInt | None = None
+    secondTriggerAction: StrictInt | None = None
+    secondTriggerOnRelease: StrictBool | None = None
+    duckOthers: StrictBool | None = None
+    duckLevel: FiniteNumber | None = None
+    duckTime: FiniteNumber | None = None
+    fadeAndStopOthers: StrictBool | Annotated[StrictInt, Field(ge=0, le=3)] | None = None
+    fadeAndStopOthersTime: FiniteNumber | None = None
+    timecodeTrigger: CueTimecodeComponents | None = None
+    timecodeTriggerText: StrictStr | None = Field(default=None, validation_alias="timecodeTrigger/text")
+
 
 
 class CueFamilyReadsMixin:
@@ -119,7 +144,7 @@ class CueFamilyReadsMixin:
 
     def _get_family_details(self, workspace_id, cue_id, profile, input_channel, output_channel,
                                   result_model, summary_model, detail_models, *, max_bytes=MAX_SENSITIVE_CUE_RESPONSE_BYTES,
-                                  accepted_types=None, conditional_models=None):
+                                  accepted_types=None, conditional_models=None, include_native_triggers=False):
         result = result_model(workspace_id=str(workspace_id), cue_id=str(cue_id))
         cue_type = result.cue_type
         family = cue_type.lower()
@@ -128,6 +153,8 @@ class CueFamilyReadsMixin:
             target = str(UUID(str(cue_id)))
             if profile not in {"safe", "technical"}:
                 raise ValueError("Invalid profile")
+            if type(include_native_triggers) is not bool:
+                raise ValueError("include_native_triggers must be boolean")
             if (input_channel is None) != (output_channel is None):
                 raise ValueError("Provide both channels together")
             if input_channel is not None and (type(input_channel) is not int or type(output_channel) is not int
@@ -157,14 +184,20 @@ class CueFamilyReadsMixin:
         actual_type = values["type"]
         if callable(detail_models):
             detail_models = detail_models(actual_type)
+        if "triggers" in type(result).model_fields:
+            detail_models = {**detail_models, "triggers": ControlTriggers}
         keys = list(dict.fromkeys(field.validation_alias or name
                                  for model in detail_models.values() for name, field in model.model_fields.items()
+                                 if name not in control_applescript.TRIGGER_KEYS
                                  if profile == "technical" or name not in {"notes", "fileTarget"}
                                  or (cue_type == "Control" and actual_type == "Memo" and name == "notes")))
         keys.append("parent")
         if profile == "technical" and cue_type in {"Audio", "Video"}:
             keys.append("audioTrackFormats")
         direct_keys = [key for key in keys if "/" in key]
+        if "triggers" in detail_models:
+            # valuesForKeys reduces Fade & Stop scope to a boolean in QLab 5.5.10.
+            direct_keys.append("fadeAndStopOthers")
         batch_keys = [key for key in keys if key not in direct_keys]
         try:
             extra = self.read_cue_values(result.workspace_id, result.cue_id, ["uniqueID", "type", *batch_keys], cacheable=False)["values"]
@@ -205,11 +238,27 @@ class CueFamilyReadsMixin:
                 else:
                     return _fail(result_model(workspace_id=result.workspace_id, cue_id=result.cue_id, profile=profile),
                                  f"{family}_cue_payload_invalid", sanitize_exception_message(exc))
+        fragment_keys = {f"text/format/{name}" for name in TEXT_FRAGMENT_ATTRIBUTES} if cue_type == "Text" else set()
         for key in direct_keys:
+            if key in fragment_keys:
+                continue
             try:
                 values[key] = self.read_cue_property(result.workspace_id, result.cue_id, key)["value"]
             except Exception as exc:
                 result.errors[key] = sanitize_exception_message(exc)
+        if cue_type == "Text":
+            runs = values.get("text/format")
+            for name in TEXT_FRAGMENT_ATTRIBUTES:
+                key = f"text/format/{name}"
+                values[key] = None
+                if isinstance(runs, list) and runs and all(isinstance(run, dict) and run.get(name) is not None for run in runs):
+                    first = runs[0][name]
+                    if all(run[name] == first for run in runs):
+                        values[key] = first
+            result.coverage.notes.append(
+                "Optional Text attributes are summarized only when every fragment contains the same value; "
+                "inspect text.fragments for absent or mixed attributes."
+            )
         if direct_keys or conditional_models is not None:
             try:
                 final = self.read_cue_values(result.workspace_id, result.cue_id, ["uniqueID", "type", *guards], cacheable=False)["values"]
@@ -224,6 +273,22 @@ class CueFamilyReadsMixin:
             values = _redact_payload(values, section=f"{family}_cue", profile=profile, redactions=result.redactions)
         for name, model in detail_models.items():
             setattr(result, name, _section(model, values, result, keys))
+        if "triggers" in detail_models:
+            if include_native_triggers:
+                try:
+                    snapshot = control_applescript.trigger_snapshot(self, result.workspace_id, result.cue_id, actual_type)
+                    result.triggers = result.triggers.model_copy(update={key: snapshot[key] for key in control_applescript.TRIGGER_KEYS})
+                    result.coverage.source = "documented_osc_and_applescript"
+                except Exception as exc:
+                    result.errors["applescript:triggers"] = sanitize_exception_message(exc)
+            if not include_native_triggers or "applescript:triggers" in result.errors:
+                result.coverage.unavailable_fields.extend(sorted(control_applescript.TRIGGER_KEYS))
+        if cue_type in {"Video", "Camera", "Text"}:
+            from ..write.visual import capabilities
+            result.edit_capabilities = capabilities(cue_type, result)
+        elif actual_type in {"Audio", "Mic", "Light", "Fade", "Network", "MIDI", "MIDI File", "Timecode", "Script"}:
+            from ..write.remaining import capabilities
+            result.edit_capabilities = capabilities(actual_type.lower().replace(" ", "_"), result.triggers, result)
         parent = values.get("parent")
         if parent is None:
             result.coverage.unavailable_fields.append("parent")
@@ -242,11 +307,12 @@ class CueFamilyReadsMixin:
                                                value=matrix[input_channel][output_channel])
             except ValueError as exc:
                 result.errors["level"] = str(exc)
-        result.coverage.notes = ["Audio Maps, Audio Objects, live metrics and indexed effect reads are excluded.",
+        result.coverage.notes = ["Audio Maps, Audio Objects and live metrics are excluded.",
                                  "Levels are read as one aggregate; crosspoints are never scanned individually.",
                                  "Patch identity is a reference; use workspace Audio Settings for patch configuration.",
                                  f"Containing Cue List context comes from qlab_get_{family}_cues; detail reads only the immediate parent."]
         if cue_type in {"Video", "Camera", "Text"}:
+            result.coverage.notes.append("Video FX parameters require explicit indexed selectors; no automatic stack scan is performed.")
             result.coverage.notes.append("Stage/input references do not expand patches, stages, regions or routes.")
         if cue_type == "Text":
             result.coverage.notes = [note for note in result.coverage.notes if not note.startswith(("Levels", "Patch"))]

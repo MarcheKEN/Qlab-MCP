@@ -1,0 +1,15 @@
+{
+  "command": ".venv/bin/python -m pytest -q",
+  "result": "3612 passed, 61 subtests passed in 55.54s",
+  "source_sha256": {
+    "src/qlab_mcp/write/remaining.py": "562d4c6343e8d94ae3f88c06f90bd7ec3e5df1676cb7237e8ef4171b52f2ae21",
+    "src/qlab_mcp/write/remaining_context.py": "296c2bcd7aa91a9c07751301d3ae06b8602d9d0f1535c8203513b52fcaa92895",
+    "src/qlab_mcp/write/control.py": "619f5831186d2ce76d50dcc43e5599f095e7cf75c1b719fe8314fe3e69b0c001",
+    "src/qlab_mcp/write/operations.py": "2ffe6782ee0fb8b44b2ac2b3096811c948412331b8dd483e96bb37ffbaf8027e",
+    "src/qlab_mcp/server.py": "e88cf580f393329301f3a70c6cd07f3b84b4b9666ca59adf40e8f4f81bdbf9e2",
+    "tests/test_remaining_cue_completion.py": "3a39b66b3ddec703e6774813a88da31159efd4c135f4e47096e2915c81d94313"
+  },
+  "diff_check": "passed",
+  "release_published": false,
+  "new_dependencies": false
+}

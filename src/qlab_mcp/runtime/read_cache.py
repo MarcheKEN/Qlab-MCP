@@ -28,6 +28,7 @@ class ReadCache:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._entries: dict[Hashable, _CacheEntry] = {}
+        self._next_expiry = 0.0
         self._inflight: dict[Hashable, _InflightEntry] = {}
         # Owners only publish results if no clear() happened while they ran.
         self._generation = 0
@@ -45,9 +46,11 @@ class ReadCache:
 
         with self._lock:
             now = time.monotonic()
-            expired_keys = [cache_key for cache_key, entry in self._entries.items() if entry.expires_at <= now]
-            for cache_key in expired_keys:
-                self._entries.pop(cache_key, None)
+            if now >= self._next_expiry:
+                expired_keys = [cache_key for cache_key, entry in self._entries.items() if entry.expires_at <= now]
+                for cache_key in expired_keys:
+                    self._entries.pop(cache_key, None)
+                self._next_expiry = min((entry.expires_at for entry in self._entries.values()), default=float("inf"))
             entry = self._entries.get(key)
             if entry is not None and entry.expires_at > now:
                 return entry.value
@@ -78,7 +81,9 @@ class ReadCache:
             raise
         with self._lock:
             if self._generation == generation:
-                self._entries[key] = _CacheEntry(expires_at=time.monotonic() + ttl, value=value)
+                expires_at = time.monotonic() + ttl
+                self._entries[key] = _CacheEntry(expires_at=expires_at, value=value)
+                self._next_expiry = min(self._next_expiry, expires_at)
                 inflight.value = value
                 self._inflight.pop(key, None)
                 inflight.event.set()
@@ -88,6 +93,7 @@ class ReadCache:
         with self._lock:
             self._generation += 1
             self._entries.clear()
+            self._next_expiry = 0.0
             inflight = list(self._inflight.values())
             self._inflight.clear()
             for entry in inflight:

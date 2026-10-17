@@ -1,37 +1,30 @@
 # OSC Coverage Snapshot
 
+Current media exception: `fileTarget` is writable only through the typed Audio,
+Video and MIDI File family editors with their signed preflight/readback protocol.
+The common dictionary route is counted as gated via `file_target_family`; it is
+not enabled in the common writer. Earlier phase notes below are historical.
+
 Source of truth: `docs/references/qlab_osc_dictionary.md`.
 
 Generated view: `extract_cue_osc_inventory(...)` + `registry_coverage(...)` against
 `profile_catalog()`.
 
-The summary table is registry baseline coverage for mutating OSC routes in the
-official dictionary. It does not count specialized runtime token exceptions
-implemented above the registry gate, such as Text cue `confirm:textBasic:v1:`
-exceptions, the runtime-validated Group `confirm:groupMode:v1:` and
-`confirm:groupPlaylist:v1:` exceptions, the closed Phase 4C
-`Video` `videoEffectIndex/0/parameter/inputRadius` real write, Phase 6
-`inputIntensity`, Phase 7 `fillStage`/`fillStyle`, Phase 7B `layer`, the
-Phase 7D local `quaternion` candidate, the Phase 7E local `resetRotation`
-action candidate, the Phase 7F local `smooth` candidate, and the Phase 8A local
-cue I/O ID candidates, and the Phase 8B local Video embedded-audio Time & Loops
-candidates, the local Audio/Mic Phase 9A slider, Phase 9B matrix, and Phase 9C
-metadata candidates, the Phase 8C local Video slice marker candidates, the
-local Devamp saved-configuration candidate, and the local Fade Basics,
-direct-target, geometry, Levels, behavior, and setup/recovery candidates.
-Those
-exceptions are listed in Current Invariants.
+The table counts mutating dictionary routes by registry metadata. It is not
+runtime authorization: family validators, verifiers and published capabilities
+still decide which operations can be planned and executed. Signed tokens never
+enable blocked operations. Historical gate descriptions are preserved below.
 
 ## Summary
 
 | Section | Real write | Gated | Planned only | Missing |
 |---|---:|---:|---:|---:|
-| common/global cue properties | 15 | 21 | 0 | 0 |
+| common/global cue properties | 14 | 21 | 1 | 0 |
 | Group/List/Cart | 6 | 9 | 12 | 0 |
 | Audio | 6 | 65 | 0 | 0 |
-| Mic | 2 | 5 | 0 | 0 |
+| Mic | 1 | 5 | 1 | 0 |
 | Video | 0 | 79 | 0 | 0 |
-| Camera | 2 | 4 | 0 | 0 |
+| Camera | 1 | 4 | 1 | 0 |
 | Text | 0 | 19 | 0 | 0 |
 | Light | 0 | 11 | 0 | 0 |
 | Fade | 0 | 25 | 0 | 0 |
@@ -43,7 +36,40 @@ exceptions are listed in Current Invariants.
 | Devamp | 0 | 3 | 0 | 0 |
 | Script | 0 | 1 | 0 | 0 |
 
-## Current Invariants
+## Current public contract (reviewed 2026-10-17)
+
+- `qlab_edit_cues`, `QLabReader.edit_cues()` and `QLabReader.update_cue()`
+  are removed. Family editors reuse private helpers, not a generic entry point.
+- Registry statuses describe route metadata, not permission to execute a setter.
+  A deterministic discovery token cannot authorize an unvalidated operation.
+- Temporary overrides including `tempDuration`, `/live`, Script source and
+  compilation, Audio Maps, playhead/navigation and unvalidated operations remain
+  excluded regardless of confirmation.
+- Group Basics/Triggers/mode/Playlist and Cue List/Cart Basics/Timecode use the
+  shared signed `confirm:controlCue:v1:` motor: 300-second expiry, complete batch
+  reservation and single use, exact UUIDs, fresh dependencies and readback.
+  Group mode/Playlist retain the separate single-property gate and ordered child
+  snapshots. Second Trigger 6–7 requires mode 6; mode edits preserve its baseline.
+- Existing-effect FX parameters and typed Text formatting use specialized visual
+  editors. Their static catalog and simulated tests do not prove live acceptance.
+  Capabilities report unavailable identities, selectors and structural endpoints.
+- Setters use the reader's socket with `alwaysReply`, tolerate a successful empty
+  acknowledgment, read back fresh state and stop uncertainty without retry.
+
+The route table above is regenerated and checked against current registry
+metadata; it is not a count of tools or live-validated setters. Dated Text/FX
+[October 9–14 reports](../../development/runtime-validation/README.md) cover only
+their named cases. Missing identity/baseline/default/reconstruction still blocks writes.
+
+## Historical invariants and runtime evidence
+
+Current family editors emit signed `confirm:controlCue:v1:` tokens. Do not
+construct or reuse the legacy tokens below.
+
+The following records describe earlier private motor gates and historical
+fixtures. They are retained as evidence; they do not override the current public
+contract, authorize excluded operations, or establish current runtime readiness.
+
 
 - `missing` must stay zero for mutating cue OSC routes parsed from the official dictionary.
 - `scriptSource` and `scriptText` stay `not_editable_by_osc`; `compileSource` is gated by `script_compile`.
@@ -276,7 +302,7 @@ exceptions are listed in Current Invariants.
   rollback. Embedded
   audio evidence for this gate is now only `numChannelsIn > 0` or non-empty
   `audioTrackFormats`; `levels` and `sliderLevels` are not evidence because
-  `v11 dorado.png` exposed them with `numChannelsIn = 0` and
+  `v11 <redacted-local-path-b5e5675827>.png` exposed them with `numChannelsIn = 0` and
   `audioTrackFormats = {}`. They remain required only for baseline/readback.
   Phase 9A accepts finite numeric dB only and blocks `-inf`, output names,
   `/live`, raw OSC, playback/show-control, save, batch, and multi-property.

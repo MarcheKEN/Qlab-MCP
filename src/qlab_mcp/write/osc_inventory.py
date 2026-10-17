@@ -310,12 +310,19 @@ def _base_key(value: str) -> str:
 
 
 def _best_match(profile: str, keys: list[str], indexed: dict[str, dict[str, dict[str, Any]]]) -> dict[str, Any]:
-    for candidate_profile in (profile, "common"):
+    candidates = (profile, "common")
+    family_file_target = profile == "common" and keys == ["fileTarget"]
+    if family_file_target:
+        # fileTarget is deliberately scoped to media families, not the common writer.
+        candidates += ("audio_basic", "video_basic", "midi_file_basic")
+    for candidate_profile in candidates:
         for key in keys:
             prop = indexed.get(candidate_profile, {}).get(key)
             if not prop:
                 continue
-            if prop["real_write_enabled"]:
+            if family_file_target and candidate_profile != "common":
+                status = "gated"
+            elif prop["real_write_enabled"]:
                 status = "real_write"
             elif prop.get("capability_gate"):
                 status = "gated"
@@ -326,7 +333,7 @@ def _best_match(profile: str, keys: list[str], indexed: dict[str, dict[str, dict
                 "registry_profile": candidate_profile,
                 "registry_property": prop["property"],
                 "risk": prop["risk_tier"],
-                "capability_gate": prop.get("capability_gate"),
+                "capability_gate": "file_target_family" if family_file_target else prop.get("capability_gate"),
                 "planned_only_reason": prop.get("planned_only_reason"),
                 "validator": {arg["name"]: arg["validator"] for arg in prop["args"]},
             }

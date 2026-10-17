@@ -1,5 +1,6 @@
 """Cue List inventory and exact detail, sharing the existing OSC reader."""
 
+from functools import lru_cache
 from typing import Any
 from uuid import UUID
 
@@ -82,6 +83,11 @@ def _inventory(reader: Any, workspace_id: str) -> list[dict[str, Any]]:
     return roots
 
 
+@lru_cache(maxsize=512)
+def _field_adapter(model: Any, field: str) -> TypeAdapter:
+    return TypeAdapter(model.model_fields[field].rebuild_annotation())
+
+
 def _section(model: Any, mapping: dict[str, str], values: dict[str, Any], result: CueListDetailsResult) -> Any:
     clean = {}
     for field, key in mapping.items():
@@ -94,7 +100,7 @@ def _section(model: Any, mapping: dict[str, str], values: dict[str, Any], result
                 if type(value) is not int or value not in ENUMS[key]:
                     raise ValueError("Unknown or invalid timecode enumeration")
                 value = {"value": value, "label": ENUMS[key][value]}
-            clean[field] = TypeAdapter(model.model_fields[field].rebuild_annotation()).validate_python(value)
+            clean[field] = _field_adapter(model, field).validate_python(value)
         except (ValueError, TypeError):
             result.errors[key] = "Invalid OSC value for this field"
     return model(**clean)

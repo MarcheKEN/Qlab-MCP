@@ -1,5 +1,15 @@
 # Cue I/O Selection and Edit Cues
 
+Current note (2026-10-17): Use exact-UUID family editors and signed
+`confirm:controlCue:v1:` tokens; `qlab_edit_cues` is retired. Current source
+supports its published inventory-bound stage/input/output selections. The
+[October 5 report](../../../development/runtime-validation/2026-10-05-remaining-cue-completion.md)
+records Mic input restoration, not every patch combination. Workspace object
+edits are separate supported tools. Remaining work is individual untested I/O
+combinations; the phase matrix below is historical.
+
+## Historical phase specification
+
 Status: implemented locally; Audio and Mic I/O runtime validation remains
 pending. No new runtime probe is part of the 0.3.0 preparation.
 

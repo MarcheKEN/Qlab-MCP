@@ -1,5 +1,11 @@
 # Completion audit — current state
 
+> Historical evidence or dated plan. Use the [current tools](../../../user/tools.md) and
+> [roadmap](../../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 Checked: 2026-07-21. This checklist audits the explicit completion requirements from the supplied objective; it does not redefine success around the reports already written.
 
 | Requirement | Evidence | Status |

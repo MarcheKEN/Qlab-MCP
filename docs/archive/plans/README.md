@@ -8,3 +8,5 @@
 These plans record completed or superseded work. They are not current project
 status. Use the [roadmap](../../status/roadmap.md) and
 [active workorders](../../status/workorders/active/README.md) instead.
+
+- [Historical phase roadmap retained from October 14](2026-10-14-historical-phase-roadmap.md) — superseded phase tokens and limits.

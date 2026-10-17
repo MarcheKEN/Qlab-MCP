@@ -1,4 +1,32 @@
-# qlab_edit_cues Runtime Checklist
+# Cue Editor Runtime Checklist
+
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
+Use the public family editors with exact workspace and cue UUIDs. The generic
+MCP tool and Python `QLabReader.edit_cues()` / `QLabReader.update_cue()` methods
+are removed. Split mixed-family batches between their editors.
+
+Before each test, check workspace path/identity, Edit access and mode, and absence
+of running or paused cues. Use authorized test fixtures. Read the baseline and
+capabilities, request a dry run, and review every planned operation. Copy its
+fresh signed tokens into `confirm_gates`; one setter is sent per operation with
+fresh readback. A timeout never authorizes a retry. Restore with another dry run
+and new tokens. Record applied, failed and pending operations separately.
+
+No execution, compilation, `/live`, Audio Maps or temporary overrides. Blocked
+properties remain blocked even with a token. Refer to the [tool catalogue](../../user/tools.md)
+and [agent workflows](../../user/agent-workflows.md) for family restrictions.
+
+## Historical checklist — retired generic editor
+
+The following records the former phase contract. Its tools, tokens and candidate
+operations are historical; they do not authorize current writes.
+
+### Former qlab_edit_cues checklist
 
 `qlab_edit_cues` is the only public cue-edit tool.
 
@@ -14,9 +42,10 @@ Use this checklist only on a disposable editable QLab test workspace.
   outputs, one capability family at a time.
 - `scriptSource` and `scriptText` are not editable by documented OSC; only
   `compileSource` can be planned behind `script_compile`.
-- `fileTarget` and file path writes are blocked by default; real writes require
-  both the exact dry-run `confirm_token` and `QLAB_ALLOWED_FILE_ROOTS` covering
-  the intended test media root.
+- Before searching or inspecting media, ask the user directly for permission.
+  Real `fileTarget` writes retain the exact dry-run `confirm_token`, existing
+  file and media-format checks, and fresh QLab readback; no folder allowlist is
+  required.
 - Run `dry_run=true` before any `dry_run=false` write.
 
 ## Public write-tool confirmation boundaries
@@ -236,7 +265,6 @@ live MCP restart invalidation remain separate follow-up limits.
 
 - `cue_behavior`
 - `target_resolution`
-- `file_target_access`
 - `patch_routing`
 - `audio_output`
 - `slice_editing`

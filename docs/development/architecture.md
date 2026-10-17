@@ -1,12 +1,11 @@
 # Current Architecture
 
-This describes the current QLab MCP development surface based on 0.3.0. Historical graphs and refactor
+This describes the current QLab MCP 0.4.0 development surface. Historical graphs and refactor
 analysis live under [`docs/archive/`](../archive/README.md).
 
-The 0.3.0 architecture audit concluded
-[`no extraction for 0.3.0`](../status/architecture-audit-0.3.0.md): the current
-write boundaries are retained until a future family-level extraction can prove
-contract and safety preservation.
+The historical 0.3.0 architecture audit concluded
+[`no extraction for 0.3.0`](../status/architecture-audit-0.3.0.md): that release retained its write boundaries. The current family modules and
+shared executor are described below.
 
 The supported threat model and accepted risks are defined in the repository
 root [`SECURITY.md`](../../SECURITY.md). The current hardening rejects
@@ -23,7 +22,16 @@ verification. The completed response is size-checked without patch expansion.
 Control/organization cues use the same family executor with an accepted-type
 set and type-selected models. Filtering precedes pagination; detail reads
 verify that the concrete type remains unchanged, including changes within the
-family. Devamp and Reset are typed blocks, not separate transports or tools.
+family. Devamp and Reset detail reads are typed blocks sharing the transport;
+Devamp editing has its own public tool.
+
+Fixed native properties use `control_applescript.py`: Load `loadTime`, Target
+`assignedNumber` and supported native cue Triggers. Native Trigger reads are
+opt-in through `include_native_triggers`; failed native reads preserve OSC data
+and report unavailable coverage. The fixed script receives JSON arguments, checks local
+app/workspace/cue identity and setter preconditions, and returns JSON independent
+of the macOS numeric locale. They share the signed Control executor and expose
+their transport explicitly; no arbitrary script or new public tool exists.
 
 Fade, Network, MIDI/MIDI File, Timecode, and Script also use the family
 executor. A conditional extension reads only the fields of the selected
@@ -31,9 +39,11 @@ message, output, fade, or target mode, then rechecks identity and selector.
 Failures in secondary reads preserve confirmed identity as partial data.
 Sensitive Network text and Script source require the technical profile.
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 48 decorated tools,
-their schemas, annotations, timeouts, and result models. Each call creates a
-fresh `QLabReader` and closes it after the operation. `qlab-mcp` maps to
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 79 decorated tools
+(49 read-only and 30 gated writes),
+their schemas, annotations, timeouts, and result models. QLab-backed calls
+create a fresh `QLabReader` and close it after the operation; local media tools
+do not use that reader. `qlab-mcp` maps to
 `qlab_mcp.server:main`.
 
 `fastmcp_entrypoint.py` is a repository-only inspection wrapper. It and
@@ -42,27 +52,42 @@ another public start command.
 
 ## Read path
 
-`QLabReader` is the compatibility facade composed from focused mixins:
+`QLabReader` is the reader facade composed from focused mixins:
 
 - `runtime/connection.py` — discovery, authentication, mode, and readiness;
 - `cues/` — overview, bounded indexes, queries, profiles, and cue details;
 - `cues/family.py` — shared scoped inventory and exact typed detail execution
   for Audio, Mic, Video, Text, Camera, Light, Group, Control, Fade, Network,
-  MIDI/MIDI File, Timecode and Script; family models constrain requested keys;
+  MIDI/MIDI File, Timecode and Script; family models constrain requested keys
+  and optional indexed inspections;
+- `media.py` — bounded local file discovery, with truncation reported explicitly;
+- `audio_analysis.py` — optional, read-only local-file analysis independent of
+  OSC and `QLabReader`; its dependencies load only when called;
 - `settings/` — settings inventory, detail normalization, and redaction;
 - `status.py` — derived workspace status;
-- `runtime/read_cache.py` — short-lived safe-read cache and single-flight;
+- `runtime/read_cache.py` — short-lived safe-read cache and single-flight,
+  pruning only when an entry can expire;
 - `osc/` — address validation, OSC encoding, UDP/TCP request sessions, sender-IP
   and OSC reply matching, deadlines, and socket cleanup. UDP source-port
   filtering remains intentionally unimplemented pending QLab 5.5.10 evidence.
 
 Reads use explicit workspace qualification once a workspace is selected.
-Technical profiles are opt-in; Text details include visible text in safe mode.
+The family and Cue List parsers share bounded compiled field validators;
+this cache contains schemas, not OSC values. Unescaped TCP reply frames avoid
+byte-by-byte decoding. See the [performance measurements](runtime-validation/2026-10-08-mcp-performance.md).
+The static `tools/list` catalogue uses native FastMCP caching for five minutes,
+before schema dereferencing. Tool calls, resources and prompts are excluded
+from that middleware's cache; published schemas and validation are preserved.
+Technical profiles are opt-in and can expose paths, notes and Script/Network
+content. Generic `full_sensitive` and `exhaustive` responses have separate
+50-cue/1-MiB bounds; those are not a universal technical-family byte cap.
+Text details include visible text in safe mode.
 Cache entries are invalidated around writes;
 verification reads are fresh.
 
 Workspace Settings reads use six domain tools and the shared domain executor.
-Video has a three-query overview plus UUID-only Stage and Output Route tools.
+Video has a three-query overview plus UUID-only Stage, Output Route, and Region
+tools.
 The exact tools reuse the settings transport/redaction helpers and provide typed
 summaries with an optional redacted technical payload. Internal settings readers
 remain available to Workspace Status and Cue Details; their Video overview uses
@@ -79,23 +104,73 @@ canonical, `scriptText` is not a public OSC key, and `exhaustive` is available
 for cue details rather than mass cue queries. FastMCP/Pydantic schema errors
 and structured runtime errors are separate compatibility surfaces.
 
+## Transport, deadlines and response boundaries
+
+Without a passcode, ordinary requests use a fresh UDP socket bound to an
+ephemeral port and announce `/udpReplyPort`. `QLAB_REPLY_PORT` is not the
+normal fixed listener in this path. Configured passcodes select a persistent
+TCP/SLIP session for the reader, with workspace authentication and session
+discard on protocol/transport/preparation failures. Selected read paths use
+a separate one-shot TCP helper; this is distinct from the protected session.
+Read-only calls can send protocol setup such as `/connect` and `/udpReplyPort`;
+they do not modify saved cue properties or execute cues.
+
+`QLAB_TIMEOUT` bounds individual OSC transactions and native script invocations.
+The server also declares per-tool call budgets; OSC operations and cache waits
+respect the reader deadline. MCP startup timeout belongs to the client and is
+a third separate limit. Native lifecycle subprocesses use the configured
+per-invocation timeout; they do not acquire the OSC deadline automatically.
+
+`server_responses.py` normalizes structured operation results and errors.
+`sanitizer.py` removes internal diagnostic paths/stack fields; settings redaction
+also protects credentials and device/network fields. These are separate from
+the opt-in disclosure of show data in technical profiles. Schema validation
+errors remain distinct from structured QLab/runtime errors.
+
 ## Write path
 
 `write/safety.py`, `write/registry.py`, and `write/allowlist.py` define the
 disabled-by-default safety and capability boundary. `write/operations.py`
-retains batch planning and orchestration while extracted family modules own
-their domain rules. `write/tokens.py`, `write/timeouts.py`, and
-`write/results.py` provide shared token, deadline, and result behavior.
+handles Cue creation and shared read helpers; `write/control.py` runs the
+signed family edit batches, with `write/group.py`, `write/visual.py`, and
+`write/remaining.py` providing family rules. The former generic Python cue
+editor and its phase-specific modules have been removed. `write/tokens.py` and
+`write/timeouts.py` provide shared token and deadline behavior.
 
-Move, Delete, and Workspace Settings writes have dedicated modules and public
-tools. `settings/write_registry.py` and `settings/write_operations.py` keep the
-first Workspace Settings write separate from cue-edit orchestration. The
-`qlab_edit_workspace_settings` tool currently accepts only the typed
-`general.minGoTime` operation; future researched operations stay outside the
-executable registry until their own implementation wave. Real writes require
+Root Cue List/Cart creation and editing use `write/cue_lists.py`; root reordering
+shares the Move executor. Move, Delete, and Workspace Settings writes have
+dedicated modules and public tools. `settings/write_registry.py` and
+`settings/write_operations.py` retain the established `minGoTime` writer;
+`settings/object_writes.py` handles the other typed settings edits. The public
+`qlab_edit_workspace_settings` tool was replaced by five object-specific Edit
+tools. Real writes require
 exact targeting, readiness, deterministic preflight, the required fresh token,
 one setter per operation, cache invalidation, and fresh readback. A timed-out setter is never resent automatically; later reads
 determine whether the result is confirmed or uncertain.
+
+## Local documents and media
+
+`workspace_documents.py` uses its own fixed AppleScript bridge, invoked through
+the normal fresh-reader wrapper. Get returns the selected document and the
+full local inventory, including other open documents’ paths and names.
+Save/Close require existing-workspace write readiness, Edit Mode and inactivity;
+Close rejects dirty documents, and Save includes all pending edits. The dirty
+flag is not a revision identifier. Open requires an empty native inventory,
+write-enable, a readable `.qlab5`, a bounded fingerprint and a document token;
+there is no existing UUID for OSC readiness before opening.
+
+Open/Save fingerprints are bounded to 64 MiB and 4,096 entries, with unsupported
+package entries/symlinks rejected. Document tokens expire after five minutes
+and are single-use/process-bound. Every attempted event requires fresh native
+readback; a no-send acknowledgement is blocked and an unacknowledged response
+stays uncertain. No automatic event retry is performed. The native bridge
+requires the running local `/Applications/QLab.app` and Automation permission.
+
+`media.py` searches home by filename with entry/time/result bounds and skips
+symlinks. `audio_analysis.py` resolves an authorized file, lazily loads optional
+Python dependencies, invokes bounded FFmpeg/ffprobe subprocesses without a
+shell and returns paged source-relative measurements. Conversational consent
+is an agent obligation; the server cannot verify it. OS access checks remain.
 
 ## Sources of truth
 
@@ -104,6 +179,8 @@ determine whether the result is confirmed or uncertain.
 - Write capability policy: write registry/allowlist and write-mode tests.
 - Imported QLab protocol: `docs/references/` plus checksum tests.
 - Current project state: `docs/status/`.
-- Historical decisions and runtime evidence: `docs/archive/`.
+- Historical plans: `docs/archive/`; dated runtime/research/review evidence also
+  remains under indexed `docs/development/` directories. Original counts and
+  failed observations do not override current source or establish new proof.
 - Agent-facing contract research:
   [`2026-08-13-mcp-agent-ux-and-edit-cleanup.md`](research/2026-08-13-mcp-agent-ux-and-edit-cleanup.md).

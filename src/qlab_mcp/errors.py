@@ -11,6 +11,10 @@ class OscTimeoutError(QLabMcpError):
     """Raised when QLab does not reply before the configured timeout."""
 
 
+class OscPreparationError(QLabMcpError):
+    """Preparation failed before the requested OSC mutation was sent."""
+
+
 class OscProtocolError(QLabMcpError):
     """Raised when an OSC packet cannot be encoded, decoded, or matched."""
 

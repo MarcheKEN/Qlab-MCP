@@ -191,16 +191,9 @@ def _query_uses_live_state(filters: list[dict[str, Any]]) -> bool:
     return any(query_filter["filter"] in LIVE_STATE_QUERY_FILTERS for query_filter in filters)
 
 def _parse_bool_filter(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, int) and value in {0, 1}:
-        return bool(value)
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "t", "yes", "y", "1"}:
-            return True
-        if normalized in {"false", "f", "no", "n", "0"}:
-            return False
+    normalized = _coerce_qlab_bool(value)
+    if normalized is not None:
+        return normalized
     raise ValueError(f"Boolean cue query filter value must be true or false: {value!r}")
 
 def _string_equals(actual: Any, expected: Any) -> bool:

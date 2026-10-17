@@ -1,0 +1,3377 @@
+{
+  "date": "2026-10-11",
+  "scope": "installed MCP Text extended acceptance",
+  "qlab_version": "5.5.10",
+  "positive_write_calls": 4,
+  "setters": 7,
+  "negative_cases": 12,
+  "focused_tests_passed": 150,
+  "full_text_and_state_restored": true,
+  "ui_checked": [
+    "percentage red prefix",
+    "smaller azul",
+    "green small one",
+    "blue two and fin",
+    "original restoration"
+  ],
+  "baseline": {
+    "text": "Codex MCP text test — placeholder only",
+    "fixedWidth": 0,
+    "outputSize": {
+      "width": 1390,
+      "height": 100
+    },
+    "fragments": [
+      {
+        "range": [
+          0,
+          38
+        ],
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 72,
+        "lineSpacing": 1,
+        "color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "alignment": "center",
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      }
+    ],
+    "alignment": "center",
+    "fontFamily": "Helvetica Neue",
+    "fontStyle": "Bold",
+    "fontFamilyAndStyle": {
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold"
+    },
+    "fontName": "HelveticaNeue-Bold",
+    "fontSize": 72,
+    "lineSpacing": 1,
+    "color": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "backgroundColor": null,
+    "shadowColor": null,
+    "shadowBlurRadius": null,
+    "shadowOffset": null,
+    "strikethroughColor": null,
+    "underlineColor": null,
+    "strikethroughStyle": null,
+    "underlineStyle": null
+  },
+  "styled": {
+    "text": "Árbol luz azul\none\ttwo\rfin",
+    "fixedWidth": 0,
+    "outputSize": {
+      "width": 417,
+      "height": 263
+    },
+    "fragments": [
+      {
+        "range": [
+          0,
+          7
+        ],
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 72,
+        "lineSpacing": 1,
+        "color": [
+          1,
+          0,
+          0,
+          1
+        ],
+        "alignment": "center",
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      },
+      {
+        "range": [
+          7,
+          3
+        ],
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 72,
+        "lineSpacing": 1,
+        "color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "alignment": "center",
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      },
+      {
+        "range": [
+          10,
+          4
+        ],
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 48,
+        "lineSpacing": 1,
+        "color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "alignment": "center",
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      },
+      {
+        "range": [
+          14,
+          1
+        ],
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 72,
+        "lineSpacing": 1,
+        "color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "alignment": "center",
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      },
+      {
+        "range": [
+          15,
+          3
+        ],
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 36,
+        "lineSpacing": 1,
+        "color": [
+          0,
+          1,
+          0,
+          1
+        ],
+        "alignment": "center",
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      },
+      {
+        "range": [
+          18,
+          8
+        ],
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 72,
+        "lineSpacing": 1,
+        "color": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "alignment": "center",
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      }
+    ],
+    "alignment": "center",
+    "fontFamily": "Helvetica Neue",
+    "fontStyle": "Bold",
+    "fontFamilyAndStyle": {
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold"
+    },
+    "fontName": "HelveticaNeue-Bold",
+    "fontSize": 72,
+    "lineSpacing": 1,
+    "color": [
+      1,
+      0,
+      0,
+      1
+    ],
+    "backgroundColor": null,
+    "shadowColor": null,
+    "shadowBlurRadius": null,
+    "shadowOffset": null,
+    "strikethroughColor": null,
+    "underlineColor": null,
+    "strikethroughStyle": null,
+    "underlineStyle": null
+  },
+  "merged": {
+    "text": "Árbol luz azul\none\ttwo\rfin",
+    "fixedWidth": 0,
+    "outputSize": {
+      "width": 463,
+      "height": 263
+    },
+    "fragments": [
+      {
+        "range": [
+          0,
+          26
+        ],
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 72,
+        "lineSpacing": 1,
+        "color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "alignment": "center",
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      }
+    ],
+    "alignment": "center",
+    "fontFamily": "Helvetica Neue",
+    "fontStyle": "Bold",
+    "fontFamilyAndStyle": {
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold"
+    },
+    "fontName": "HelveticaNeue-Bold",
+    "fontSize": 72,
+    "lineSpacing": 1,
+    "color": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "backgroundColor": null,
+    "shadowColor": null,
+    "shadowBlurRadius": null,
+    "shadowOffset": null,
+    "strikethroughColor": null,
+    "underlineColor": null,
+    "strikethroughStyle": null,
+    "underlineStyle": null
+  },
+  "final": {
+    "text": "Codex MCP text test — placeholder only",
+    "fixedWidth": 0,
+    "outputSize": {
+      "width": 1390,
+      "height": 100
+    },
+    "fragments": [
+      {
+        "range": [
+          0,
+          38
+        ],
+        "fontFamily": "Helvetica Neue",
+        "fontStyle": "Bold",
+        "fontName": "HelveticaNeue-Bold",
+        "fontSize": 72,
+        "lineSpacing": 1,
+        "color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "alignment": "center",
+        "backgroundColor": null,
+        "shadowColor": null,
+        "shadowBlurRadius": null,
+        "shadowOffset": null,
+        "strikethroughColor": null,
+        "underlineColor": null,
+        "strikethroughStyle": null,
+        "underlineStyle": null
+      }
+    ],
+    "alignment": "center",
+    "fontFamily": "Helvetica Neue",
+    "fontStyle": "Bold",
+    "fontFamilyAndStyle": {
+      "fontFamily": "Helvetica Neue",
+      "fontStyle": "Bold"
+    },
+    "fontName": "HelveticaNeue-Bold",
+    "fontSize": 72,
+    "lineSpacing": 1,
+    "color": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "backgroundColor": null,
+    "shadowColor": null,
+    "shadowBlurRadius": null,
+    "shadowOffset": null,
+    "strikethroughColor": null,
+    "underlineColor": null,
+    "strikethroughStyle": null,
+    "underlineStyle": null
+  },
+  "records": [
+    {
+      "name": "content",
+      "result": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "dry_run": false,
+        "requested_count": 1,
+        "planned_count": 1,
+        "updated_count": 1,
+        "failed_count": 0,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "22222222-2222-4222-8222-222222222222",
+            "cue_id": "22222222-2222-4222-8222-222222222222",
+            "profile": "text_basic",
+            "status": "updated",
+            "properties": {
+              "text": "Árbol luz azul\none\ttwo\rfin"
+            },
+            "operations": [
+              {
+                "operation": "set_property",
+                "property": "text",
+                "path": "text",
+                "mode": "saved",
+                "args": [
+                  "Árbol luz azul\none\ttwo\rfin"
+                ],
+                "arg_values": {
+                  "value": "Árbol luz azul\none\ttwo\rfin"
+                },
+                "read_key": "text",
+                "risk_tier": "high",
+                "real_write_enabled": true,
+                "capability_gate": "video_visual",
+                "readback": "value",
+                "contextual_requirements": [],
+                "real_write_possible": true,
+                "requires_confirm_token": "redacted"
+              }
+            ],
+            "confirm_gates": "redacted",
+            "before": {
+              "isRunning": false,
+              "isPaused": false,
+              "cueTargetID": "",
+              "parent": "33333333-3333-4333-8333-333333333333",
+              "type": "Text",
+              "isAuditioning": false,
+              "hasCueTargets": false,
+              "canHavePatchTargets": false,
+              "uniqueID": "22222222-2222-4222-8222-222222222222",
+              "isWarning": false,
+              "allowsEditingDuration": true,
+              "isBroken": false,
+              "text": "Codex MCP text test — placeholder only"
+            },
+            "after": {
+              "type": "Text",
+              "uniqueID": "22222222-2222-4222-8222-222222222222",
+              "text": "Árbol luz azul\none\ttwo\rfin"
+            },
+            "diff": {
+              "text": {
+                "before": "Codex MCP text test — placeholder only",
+                "requested": "Árbol luz azul\none\ttwo\rfin"
+              }
+            },
+            "planned_operations": [
+              {
+                "operation": "set_property",
+                "property": "text",
+                "key": "text",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text",
+                "args": [
+                  "Árbol luz azul\none\ttwo\rfin"
+                ],
+                "status": "verified"
+              }
+            ],
+            "executed_operations": [
+              {
+                "operation": "set_property",
+                "property": "text",
+                "key": "text",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text",
+                "args": [
+                  "Árbol luz azul\none\ttwo\rfin"
+                ],
+                "status": "sent",
+                "reply_error": null
+              }
+            ],
+            "errors": null,
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          }
+        ],
+        "errors": null,
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "updated"
+      }
+    },
+    {
+      "name": "percentage_tail_words",
+      "result": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "dry_run": false,
+        "requested_count": 1,
+        "planned_count": 1,
+        "updated_count": 1,
+        "failed_count": 0,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "22222222-2222-4222-8222-222222222222",
+            "cue_id": "22222222-2222-4222-8222-222222222222",
+            "profile": "text_basic",
+            "status": "updated",
+            "properties": {
+              "text/format@0": {
+                "selector": {
+                  "kind": "range",
+                  "index": {
+                    "percent": 0
+                  },
+                  "length": {
+                    "percent": 25
+                  }
+                },
+                "attributes": {
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ]
+                }
+              },
+              "text/format@1": {
+                "selector": {
+                  "kind": "range",
+                  "index": 18,
+                  "length": -1
+                },
+                "attributes": {
+                  "color": [
+                    0,
+                    0,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "text/format@2": {
+                "selector": {
+                  "kind": "word",
+                  "index": 2
+                },
+                "attributes": {
+                  "fontSize": 48
+                }
+              },
+              "text/format@3": {
+                "selector": {
+                  "kind": "word",
+                  "index": 3
+                },
+                "attributes": {
+                  "fontSize": 36,
+                  "color": [
+                    0,
+                    1,
+                    0,
+                    1
+                  ]
+                }
+              }
+            },
+            "operations": [
+              {
+                "property": "text/format@0",
+                "path": "text/format",
+                "args": [
+                  "{\"color\":[1,0,0,1],\"range\":[0,7]}"
+                ],
+                "arg_values": {
+                  "selector": {
+                    "kind": "range",
+                    "index": {
+                      "percent": 0
+                    },
+                    "length": {
+                      "percent": 25
+                    }
+                  },
+                  "attributes": {
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ]
+                  }
+                },
+                "real_write_enabled": true,
+                "real_write_possible": true,
+                "requires_confirm_token": "redacted"
+              },
+              {
+                "property": "text/format@1",
+                "path": "text/format",
+                "args": [
+                  "{\"color\":[0,0,1,1],\"range\":[18,8]}"
+                ],
+                "arg_values": {
+                  "selector": {
+                    "kind": "range",
+                    "index": 18,
+                    "length": -1
+                  },
+                  "attributes": {
+                    "color": [
+                      0,
+                      0,
+                      1,
+                      1
+                    ]
+                  }
+                },
+                "real_write_enabled": true,
+                "real_write_possible": true,
+                "requires_confirm_token": "redacted"
+              },
+              {
+                "property": "text/format@2",
+                "path": "text/format",
+                "args": [
+                  "{\"fontSize\":48,\"range\":[10,4]}"
+                ],
+                "arg_values": {
+                  "selector": {
+                    "kind": "word",
+                    "index": 2
+                  },
+                  "attributes": {
+                    "fontSize": 48
+                  }
+                },
+                "real_write_enabled": true,
+                "real_write_possible": true,
+                "requires_confirm_token": "redacted"
+              },
+              {
+                "property": "text/format@3",
+                "path": "text/format",
+                "args": [
+                  "{\"fontSize\":36,\"color\":[0,1,0,1],\"range\":[15,3]}"
+                ],
+                "arg_values": {
+                  "selector": {
+                    "kind": "word",
+                    "index": 3
+                  },
+                  "attributes": {
+                    "fontSize": 36,
+                    "color": [
+                      0,
+                      1,
+                      0,
+                      1
+                    ]
+                  }
+                },
+                "real_write_enabled": true,
+                "real_write_possible": true,
+                "requires_confirm_token": "redacted"
+              }
+            ],
+            "confirm_gates": "redacted",
+            "before": {
+              "isRunning": false,
+              "isPaused": false,
+              "cueTargetID": "",
+              "parent": "33333333-3333-4333-8333-333333333333",
+              "type": "Text",
+              "isAuditioning": false,
+              "hasCueTargets": false,
+              "canHavePatchTargets": false,
+              "uniqueID": "22222222-2222-4222-8222-222222222222",
+              "isWarning": false,
+              "allowsEditingDuration": true,
+              "isBroken": false,
+              "text/format@0": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      26
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "text/format@1": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      26
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "text/format@2": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      26
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "text/format@3": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      26
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              }
+            },
+            "after": {
+              "type": "Text",
+              "uniqueID": "22222222-2222-4222-8222-222222222222",
+              "text/format@0": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      7
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      7,
+                      19
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "text/format@1": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      7
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      7,
+                      11
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      0,
+                      0,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      18,
+                      8
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "text/format@2": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      7
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      7,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 48,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      10,
+                      4
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      14,
+                      4
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      0,
+                      0,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      18,
+                      8
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "text/format@3": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      7
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      7,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 48,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      10,
+                      4
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      14,
+                      1
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 36,
+                    "color": [
+                      0,
+                      1,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      15,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      0,
+                      0,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      18,
+                      8
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              }
+            },
+            "diff": {
+              "text/format@0": {
+                "before": {
+                  "text": "Árbol luz azul\none\ttwo\rfin",
+                  "runs": [
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        0,
+                        26
+                      ],
+                      "lineSpacing": 1
+                    }
+                  ]
+                },
+                "requested": {
+                  "selector": {
+                    "kind": "range",
+                    "index": {
+                      "percent": 0
+                    },
+                    "length": {
+                      "percent": 25
+                    }
+                  },
+                  "attributes": {
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ]
+                  }
+                }
+              },
+              "text/format@1": {
+                "before": {
+                  "text": "Árbol luz azul\none\ttwo\rfin",
+                  "runs": [
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        0,
+                        26
+                      ],
+                      "lineSpacing": 1
+                    }
+                  ]
+                },
+                "requested": {
+                  "selector": {
+                    "kind": "range",
+                    "index": 18,
+                    "length": -1
+                  },
+                  "attributes": {
+                    "color": [
+                      0,
+                      0,
+                      1,
+                      1
+                    ]
+                  }
+                }
+              },
+              "text/format@2": {
+                "before": {
+                  "text": "Árbol luz azul\none\ttwo\rfin",
+                  "runs": [
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        0,
+                        26
+                      ],
+                      "lineSpacing": 1
+                    }
+                  ]
+                },
+                "requested": {
+                  "selector": {
+                    "kind": "word",
+                    "index": 2
+                  },
+                  "attributes": {
+                    "fontSize": 48
+                  }
+                }
+              },
+              "text/format@3": {
+                "before": {
+                  "text": "Árbol luz azul\none\ttwo\rfin",
+                  "runs": [
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        0,
+                        26
+                      ],
+                      "lineSpacing": 1
+                    }
+                  ]
+                },
+                "requested": {
+                  "selector": {
+                    "kind": "word",
+                    "index": 3
+                  },
+                  "attributes": {
+                    "fontSize": 36,
+                    "color": [
+                      0,
+                      1,
+                      0,
+                      1
+                    ]
+                  }
+                }
+              }
+            },
+            "planned_operations": [
+              {
+                "operation": "set_property",
+                "property": "text/format@0",
+                "key": "text/format@0",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"color\":[1,0,0,1],\"range\":[0,7]}"
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "text/format@1",
+                "key": "text/format@1",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"color\":[0,0,1,1],\"range\":[18,8]}"
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "text/format@2",
+                "key": "text/format@2",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"fontSize\":48,\"range\":[10,4]}"
+                ],
+                "status": "verified"
+              },
+              {
+                "operation": "set_property",
+                "property": "text/format@3",
+                "key": "text/format@3",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"fontSize\":36,\"color\":[0,1,0,1],\"range\":[15,3]}"
+                ],
+                "status": "verified"
+              }
+            ],
+            "executed_operations": [
+              {
+                "operation": "set_property",
+                "property": "text/format@0",
+                "key": "text/format@0",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"color\":[1,0,0,1],\"range\":[0,7]}"
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "text/format@1",
+                "key": "text/format@1",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"color\":[0,0,1,1],\"range\":[18,8]}"
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "text/format@2",
+                "key": "text/format@2",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"fontSize\":48,\"range\":[10,4]}"
+                ],
+                "status": "sent",
+                "reply_error": null
+              },
+              {
+                "operation": "set_property",
+                "property": "text/format@3",
+                "key": "text/format@3",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"fontSize\":36,\"color\":[0,1,0,1],\"range\":[15,3]}"
+                ],
+                "status": "sent",
+                "reply_error": null
+              }
+            ],
+            "errors": null,
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          }
+        ],
+        "errors": null,
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "updated"
+      }
+    },
+    {
+      "name": "out_of_bounds",
+      "result": {
+        "ok": false,
+        "status": "preflight_failed",
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "dry_run": true,
+        "requested_count": 1,
+        "planned_count": 0,
+        "updated_count": 0,
+        "failed_count": 1,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "22222222-2222-4222-8222-222222222222",
+            "cue_id": "22222222-2222-4222-8222-222222222222",
+            "profile": "text_basic",
+            "status": "dry_run_preflight_failed",
+            "properties": {},
+            "operations": [],
+            "confirm_gates": "redacted",
+            "before": null,
+            "after": null,
+            "diff": {},
+            "planned_operations": [],
+            "executed_operations": [],
+            "errors": {
+              "preflight": "Text range is empty or outside saved text."
+            },
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          }
+        ],
+        "errors": {
+          "batch": "Inspect per-cue errors; pending operations were not sent."
+        },
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "preflight_failed"
+      }
+    },
+    {
+      "name": "zero_length",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "3 validation errors for call[qlab_edit_text_cues]\nupdates.0.operations.0.text/format.args.selector.range.length.constrained-int\n  Input should be greater than or equal to 1 [type=greater_than_equal, input_value=0, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/greater_than_equal\nupdates.0.operations.0.text/format.args.selector.range.length.literal[-1]\n  Input should be -1 [type=literal_error, input_value=0, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nupdates.0.operations.0.text/format.args.selector.range.length.Percent\n  Input should be a valid dictionary or instance of Percent [type=model_type, input_value=0, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "name": "decimal_index",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "2 validation errors for call[qlab_edit_text_cues]\nupdates.0.operations.0.text/format.args.selector.range.index.constrained-int\n  Input should be a valid integer [type=int_type, input_value=0.5, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/int_type\nupdates.0.operations.0.text/format.args.selector.range.index.Percent\n  Input should be a valid dictionary or instance of Percent [type=model_type, input_value=0.5, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "name": "percent_above_100",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "2 validation errors for call[qlab_edit_text_cues]\nupdates.0.operations.0.text/format.args.selector.range.index.constrained-int\n  Input should be a valid integer [type=int_type, input_value={'percent': 101}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/int_type\nupdates.0.operations.0.text/format.args.selector.range.index.Percent.percent\n  Input should be less than or equal to 100 [type=less_than_equal, input_value=101, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "name": "boolean_size",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "2 validation errors for call[qlab_edit_text_cues]\nupdates.0.operations.0.text/format.args.attributes.fontSize.int\n  Input should be a valid integer [type=int_type, input_value=True, input_type=bool]\n    For further information visit https://errors.pydantic.dev/2.13/v/int_type\nupdates.0.operations.0.text/format.args.attributes.fontSize.float\n  Input should be a valid number [type=float_type, input_value=True, input_type=bool]\n    For further information visit https://errors.pydantic.dev/2.13/v/float_type"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "name": "invalid_color",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "1 validation error for call[qlab_edit_text_cues]\nupdates.0.operations.0.text/format.args.attributes.color.0\n  Input should be less than or equal to 1 [type=less_than_equal, input_value=2, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "name": "unknown_attribute",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "1 validation error for call[qlab_edit_text_cues]\nupdates.0.operations.0.text/format.args.attributes.madeUp\n  Extra inputs are not permitted [type=extra_forbidden, input_value=1, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "name": "partial_alignment",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "1 validation error for call[qlab_edit_text_cues]\nupdates.0.operations.0.text/format.args\n  Value error, Alignment affects the entire text; use the full selector. [type=value_error, input_value={'selector': {'kind': 'wo...: {'alignment': 'left'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error"
+          }
+        ],
+        "isError": true
+      }
+    },
+    {
+      "name": "missing_underline",
+      "result": {
+        "ok": false,
+        "status": "preflight_failed",
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "dry_run": true,
+        "requested_count": 1,
+        "planned_count": 0,
+        "updated_count": 0,
+        "failed_count": 1,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "22222222-2222-4222-8222-222222222222",
+            "cue_id": "22222222-2222-4222-8222-222222222222",
+            "profile": "text_basic",
+            "status": "dry_run_preflight_failed",
+            "properties": {},
+            "operations": [],
+            "confirm_gates": "redacted",
+            "before": null,
+            "after": null,
+            "diff": {},
+            "planned_operations": [],
+            "executed_operations": [],
+            "errors": {
+              "preflight": "JSON formatting transport is pending runtime validation for: underlineStyle"
+            },
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          }
+        ],
+        "errors": {
+          "batch": "Inspect per-cue errors; pending operations were not sent."
+        },
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "preflight_failed"
+      }
+    },
+    {
+      "name": "duplicate_destination",
+      "result": {
+        "ok": false,
+        "status": "preflight_failed",
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "dry_run": true,
+        "requested_count": 1,
+        "planned_count": 0,
+        "updated_count": 0,
+        "failed_count": 1,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "22222222-2222-4222-8222-222222222222",
+            "cue_id": "22222222-2222-4222-8222-222222222222",
+            "profile": "text_basic",
+            "status": "dry_run_preflight_failed",
+            "properties": {},
+            "operations": [],
+            "confirm_gates": "redacted",
+            "before": null,
+            "after": null,
+            "diff": {},
+            "planned_operations": [],
+            "executed_operations": [],
+            "errors": {
+              "preflight": "Overlapping Text formatting destinations require separate dry runs."
+            },
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          }
+        ],
+        "errors": {
+          "batch": "Inspect per-cue errors; pending operations were not sent."
+        },
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "preflight_failed"
+      }
+    },
+    {
+      "name": "valid_then_invalid",
+      "result": {
+        "ok": false,
+        "status": "preflight_failed",
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "dry_run": true,
+        "requested_count": 1,
+        "planned_count": 0,
+        "updated_count": 0,
+        "failed_count": 1,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "22222222-2222-4222-8222-222222222222",
+            "cue_id": "22222222-2222-4222-8222-222222222222",
+            "profile": "text_basic",
+            "status": "dry_run_preflight_failed",
+            "properties": {},
+            "operations": [],
+            "confirm_gates": "redacted",
+            "before": null,
+            "after": null,
+            "diff": {},
+            "planned_operations": [],
+            "executed_operations": [],
+            "errors": {
+              "preflight": "Text word index is outside saved text."
+            },
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          }
+        ],
+        "errors": {
+          "batch": "Inspect per-cue errors; pending operations were not sent."
+        },
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "preflight_failed"
+      }
+    },
+    {
+      "name": "reused_tokens",
+      "result": {
+        "ok": false,
+        "status": "preflight_failed",
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "dry_run": false,
+        "requested_count": 1,
+        "planned_count": 1,
+        "updated_count": 0,
+        "failed_count": 1,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "22222222-2222-4222-8222-222222222222",
+            "cue_id": "22222222-2222-4222-8222-222222222222",
+            "profile": "text_basic",
+            "status": "preflight_failed",
+            "properties": {
+              "text/format@0": {
+                "selector": {
+                  "kind": "range",
+                  "index": {
+                    "percent": 0
+                  },
+                  "length": {
+                    "percent": 25
+                  }
+                },
+                "attributes": {
+                  "color": [
+                    1,
+                    0,
+                    0,
+                    1
+                  ]
+                }
+              },
+              "text/format@1": {
+                "selector": {
+                  "kind": "range",
+                  "index": 18,
+                  "length": -1
+                },
+                "attributes": {
+                  "color": [
+                    0,
+                    0,
+                    1,
+                    1
+                  ]
+                }
+              },
+              "text/format@2": {
+                "selector": {
+                  "kind": "word",
+                  "index": 2
+                },
+                "attributes": {
+                  "fontSize": 48
+                }
+              },
+              "text/format@3": {
+                "selector": {
+                  "kind": "word",
+                  "index": 3
+                },
+                "attributes": {
+                  "fontSize": 36,
+                  "color": [
+                    0,
+                    1,
+                    0,
+                    1
+                  ]
+                }
+              }
+            },
+            "operations": [
+              {
+                "property": "text/format@0",
+                "path": "text/format",
+                "args": [
+                  "{\"color\":[1,0,0,1],\"range\":[0,7]}"
+                ],
+                "arg_values": {
+                  "selector": {
+                    "kind": "range",
+                    "index": {
+                      "percent": 0
+                    },
+                    "length": {
+                      "percent": 25
+                    }
+                  },
+                  "attributes": {
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ]
+                  }
+                },
+                "real_write_enabled": true,
+                "real_write_possible": true,
+                "requires_confirm_token": "redacted"
+              },
+              {
+                "property": "text/format@1",
+                "path": "text/format",
+                "args": [
+                  "{\"color\":[0,0,1,1],\"range\":[18,8]}"
+                ],
+                "arg_values": {
+                  "selector": {
+                    "kind": "range",
+                    "index": 18,
+                    "length": -1
+                  },
+                  "attributes": {
+                    "color": [
+                      0,
+                      0,
+                      1,
+                      1
+                    ]
+                  }
+                },
+                "real_write_enabled": true,
+                "real_write_possible": true,
+                "requires_confirm_token": "redacted"
+              },
+              {
+                "property": "text/format@2",
+                "path": "text/format",
+                "args": [
+                  "{\"fontSize\":48,\"range\":[10,4]}"
+                ],
+                "arg_values": {
+                  "selector": {
+                    "kind": "word",
+                    "index": 2
+                  },
+                  "attributes": {
+                    "fontSize": 48
+                  }
+                },
+                "real_write_enabled": true,
+                "real_write_possible": true,
+                "requires_confirm_token": "redacted"
+              },
+              {
+                "property": "text/format@3",
+                "path": "text/format",
+                "args": [
+                  "{\"fontSize\":36,\"color\":[0,1,0,1],\"range\":[15,3]}"
+                ],
+                "arg_values": {
+                  "selector": {
+                    "kind": "word",
+                    "index": 3
+                  },
+                  "attributes": {
+                    "fontSize": 36,
+                    "color": [
+                      0,
+                      1,
+                      0,
+                      1
+                    ]
+                  }
+                },
+                "real_write_enabled": true,
+                "real_write_possible": true,
+                "requires_confirm_token": "redacted"
+              }
+            ],
+            "confirm_gates": "redacted",
+            "before": {
+              "isRunning": false,
+              "isPaused": false,
+              "cueTargetID": "",
+              "parent": "33333333-3333-4333-8333-333333333333",
+              "type": "Text",
+              "isAuditioning": false,
+              "hasCueTargets": false,
+              "canHavePatchTargets": false,
+              "uniqueID": "22222222-2222-4222-8222-222222222222",
+              "isWarning": false,
+              "allowsEditingDuration": true,
+              "isBroken": false,
+              "text/format@0": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      7
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      7,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 48,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      10,
+                      4
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      14,
+                      1
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 36,
+                    "color": [
+                      0,
+                      1,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      15,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      0,
+                      0,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      18,
+                      8
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "text/format@1": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      7
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      7,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 48,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      10,
+                      4
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      14,
+                      1
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 36,
+                    "color": [
+                      0,
+                      1,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      15,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      0,
+                      0,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      18,
+                      8
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "text/format@2": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      7
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      7,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 48,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      10,
+                      4
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      14,
+                      1
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 36,
+                    "color": [
+                      0,
+                      1,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      15,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      0,
+                      0,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      18,
+                      8
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              },
+              "text/format@3": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      7
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      7,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 48,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      10,
+                      4
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      14,
+                      1
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 36,
+                    "color": [
+                      0,
+                      1,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      15,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      0,
+                      0,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      18,
+                      8
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              }
+            },
+            "after": null,
+            "diff": {
+              "text/format@0": {
+                "before": {
+                  "text": "Árbol luz azul\none\ttwo\rfin",
+                  "runs": [
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        0,
+                        0,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        0,
+                        7
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        7,
+                        3
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 48,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        10,
+                        4
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        14,
+                        1
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 36,
+                      "color": [
+                        0,
+                        1,
+                        0,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        15,
+                        3
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        0,
+                        0,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        18,
+                        8
+                      ],
+                      "lineSpacing": 1
+                    }
+                  ]
+                },
+                "requested": {
+                  "selector": {
+                    "kind": "range",
+                    "index": {
+                      "percent": 0
+                    },
+                    "length": {
+                      "percent": 25
+                    }
+                  },
+                  "attributes": {
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ]
+                  }
+                }
+              },
+              "text/format@1": {
+                "before": {
+                  "text": "Árbol luz azul\none\ttwo\rfin",
+                  "runs": [
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        0,
+                        0,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        0,
+                        7
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        7,
+                        3
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 48,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        10,
+                        4
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        14,
+                        1
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 36,
+                      "color": [
+                        0,
+                        1,
+                        0,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        15,
+                        3
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        0,
+                        0,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        18,
+                        8
+                      ],
+                      "lineSpacing": 1
+                    }
+                  ]
+                },
+                "requested": {
+                  "selector": {
+                    "kind": "range",
+                    "index": 18,
+                    "length": -1
+                  },
+                  "attributes": {
+                    "color": [
+                      0,
+                      0,
+                      1,
+                      1
+                    ]
+                  }
+                }
+              },
+              "text/format@2": {
+                "before": {
+                  "text": "Árbol luz azul\none\ttwo\rfin",
+                  "runs": [
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        0,
+                        0,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        0,
+                        7
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        7,
+                        3
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 48,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        10,
+                        4
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        14,
+                        1
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 36,
+                      "color": [
+                        0,
+                        1,
+                        0,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        15,
+                        3
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        0,
+                        0,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        18,
+                        8
+                      ],
+                      "lineSpacing": 1
+                    }
+                  ]
+                },
+                "requested": {
+                  "selector": {
+                    "kind": "word",
+                    "index": 2
+                  },
+                  "attributes": {
+                    "fontSize": 48
+                  }
+                }
+              },
+              "text/format@3": {
+                "before": {
+                  "text": "Árbol luz azul\none\ttwo\rfin",
+                  "runs": [
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        0,
+                        0,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        0,
+                        7
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        7,
+                        3
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 48,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        10,
+                        4
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        14,
+                        1
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 36,
+                      "color": [
+                        0,
+                        1,
+                        0,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        15,
+                        3
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        0,
+                        0,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        18,
+                        8
+                      ],
+                      "lineSpacing": 1
+                    }
+                  ]
+                },
+                "requested": {
+                  "selector": {
+                    "kind": "word",
+                    "index": 3
+                  },
+                  "attributes": {
+                    "fontSize": 36,
+                    "color": [
+                      0,
+                      1,
+                      0,
+                      1
+                    ]
+                  }
+                }
+              }
+            },
+            "planned_operations": [
+              {
+                "operation": "set_property",
+                "property": "text/format@0",
+                "key": "text/format@0",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"color\":[1,0,0,1],\"range\":[0,7]}"
+                ],
+                "status": "planned"
+              },
+              {
+                "operation": "set_property",
+                "property": "text/format@1",
+                "key": "text/format@1",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"color\":[0,0,1,1],\"range\":[18,8]}"
+                ],
+                "status": "planned"
+              },
+              {
+                "operation": "set_property",
+                "property": "text/format@2",
+                "key": "text/format@2",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"fontSize\":48,\"range\":[10,4]}"
+                ],
+                "status": "planned"
+              },
+              {
+                "operation": "set_property",
+                "property": "text/format@3",
+                "key": "text/format@3",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"fontSize\":36,\"color\":[0,1,0,1],\"range\":[15,3]}"
+                ],
+                "status": "planned"
+              }
+            ],
+            "executed_operations": [],
+            "errors": {
+              "confirmation": "Confirmation baseline, property or dependencies changed."
+            },
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          }
+        ],
+        "errors": {
+          "batch": "Inspect per-cue errors; pending operations were not sent."
+        },
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "preflight_failed"
+      }
+    },
+    {
+      "name": "uniform_format_restore",
+      "result": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "dry_run": false,
+        "requested_count": 1,
+        "planned_count": 1,
+        "updated_count": 1,
+        "failed_count": 0,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "22222222-2222-4222-8222-222222222222",
+            "cue_id": "22222222-2222-4222-8222-222222222222",
+            "profile": "text_basic",
+            "status": "updated",
+            "properties": {
+              "text/format@0": {
+                "selector": {
+                  "kind": "full"
+                },
+                "attributes": {
+                  "fontSize": 72,
+                  "lineSpacing": 1,
+                  "color": [
+                    1,
+                    1,
+                    1,
+                    1
+                  ]
+                }
+              }
+            },
+            "operations": [
+              {
+                "property": "text/format@0",
+                "path": "text/format",
+                "args": [
+                  "{\"fontSize\":72,\"lineSpacing\":1,\"color\":[1,1,1,1]}"
+                ],
+                "arg_values": {
+                  "selector": {
+                    "kind": "full"
+                  },
+                  "attributes": {
+                    "fontSize": 72,
+                    "lineSpacing": 1,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ]
+                  }
+                },
+                "real_write_enabled": true,
+                "real_write_possible": true,
+                "requires_confirm_token": "redacted"
+              }
+            ],
+            "confirm_gates": "redacted",
+            "before": {
+              "isRunning": false,
+              "isPaused": false,
+              "cueTargetID": "",
+              "parent": "33333333-3333-4333-8333-333333333333",
+              "type": "Text",
+              "isAuditioning": false,
+              "hasCueTargets": false,
+              "canHavePatchTargets": false,
+              "uniqueID": "22222222-2222-4222-8222-222222222222",
+              "isWarning": false,
+              "allowsEditingDuration": true,
+              "isBroken": false,
+              "text/format@0": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      0,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      7
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      7,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 48,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      10,
+                      4
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      14,
+                      1
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 36,
+                    "color": [
+                      0,
+                      1,
+                      0,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      15,
+                      3
+                    ],
+                    "lineSpacing": 1
+                  },
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      0,
+                      0,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      18,
+                      8
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              }
+            },
+            "after": {
+              "type": "Text",
+              "uniqueID": "22222222-2222-4222-8222-222222222222",
+              "text/format@0": {
+                "text": "Árbol luz azul\none\ttwo\rfin",
+                "runs": [
+                  {
+                    "fontSize": 72,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ],
+                    "fontName": "HelveticaNeue-Bold",
+                    "fontFamily": "Helvetica Neue",
+                    "fontStyle": "Bold",
+                    "alignment": "center",
+                    "range": [
+                      0,
+                      26
+                    ],
+                    "lineSpacing": 1
+                  }
+                ]
+              }
+            },
+            "diff": {
+              "text/format@0": {
+                "before": {
+                  "text": "Árbol luz azul\none\ttwo\rfin",
+                  "runs": [
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        0,
+                        0,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        0,
+                        7
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        7,
+                        3
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 48,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        10,
+                        4
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        1,
+                        1,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        14,
+                        1
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 36,
+                      "color": [
+                        0,
+                        1,
+                        0,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        15,
+                        3
+                      ],
+                      "lineSpacing": 1
+                    },
+                    {
+                      "fontSize": 72,
+                      "color": [
+                        0,
+                        0,
+                        1,
+                        1
+                      ],
+                      "fontName": "HelveticaNeue-Bold",
+                      "fontFamily": "Helvetica Neue",
+                      "fontStyle": "Bold",
+                      "alignment": "center",
+                      "range": [
+                        18,
+                        8
+                      ],
+                      "lineSpacing": 1
+                    }
+                  ]
+                },
+                "requested": {
+                  "selector": {
+                    "kind": "full"
+                  },
+                  "attributes": {
+                    "fontSize": 72,
+                    "lineSpacing": 1,
+                    "color": [
+                      1,
+                      1,
+                      1,
+                      1
+                    ]
+                  }
+                }
+              }
+            },
+            "planned_operations": [
+              {
+                "operation": "set_property",
+                "property": "text/format@0",
+                "key": "text/format@0",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"fontSize\":72,\"lineSpacing\":1,\"color\":[1,1,1,1]}"
+                ],
+                "status": "verified"
+              }
+            ],
+            "executed_operations": [
+              {
+                "operation": "set_property",
+                "property": "text/format@0",
+                "key": "text/format@0",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text/format",
+                "args": [
+                  "{\"fontSize\":72,\"lineSpacing\":1,\"color\":[1,1,1,1]}"
+                ],
+                "status": "sent",
+                "reply_error": null
+              }
+            ],
+            "errors": null,
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          }
+        ],
+        "errors": null,
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "updated"
+      }
+    },
+    {
+      "name": "content_restore",
+      "result": {
+        "ok": true,
+        "status": "updated",
+        "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "dry_run": false,
+        "requested_count": 1,
+        "planned_count": 1,
+        "updated_count": 1,
+        "failed_count": 0,
+        "timeout_confirmed_count": 0,
+        "results": [
+          {
+            "cue_ref": "22222222-2222-4222-8222-222222222222",
+            "cue_id": "22222222-2222-4222-8222-222222222222",
+            "profile": "text_basic",
+            "status": "updated",
+            "properties": {
+              "text": "Codex MCP text test — placeholder only"
+            },
+            "operations": [
+              {
+                "operation": "set_property",
+                "property": "text",
+                "path": "text",
+                "mode": "saved",
+                "args": [
+                  "Codex MCP text test — placeholder only"
+                ],
+                "arg_values": {
+                  "value": "Codex MCP text test — placeholder only"
+                },
+                "read_key": "text",
+                "risk_tier": "high",
+                "real_write_enabled": true,
+                "capability_gate": "video_visual",
+                "readback": "value",
+                "contextual_requirements": [],
+                "real_write_possible": true,
+                "requires_confirm_token": "redacted"
+              }
+            ],
+            "confirm_gates": "redacted",
+            "before": {
+              "isRunning": false,
+              "isPaused": false,
+              "cueTargetID": "",
+              "parent": "33333333-3333-4333-8333-333333333333",
+              "type": "Text",
+              "isAuditioning": false,
+              "hasCueTargets": false,
+              "canHavePatchTargets": false,
+              "uniqueID": "22222222-2222-4222-8222-222222222222",
+              "isWarning": false,
+              "allowsEditingDuration": true,
+              "isBroken": false,
+              "text": "Árbol luz azul\none\ttwo\rfin"
+            },
+            "after": {
+              "type": "Text",
+              "uniqueID": "22222222-2222-4222-8222-222222222222",
+              "text": "Codex MCP text test — placeholder only"
+            },
+            "diff": {
+              "text": {
+                "before": "Árbol luz azul\none\ttwo\rfin",
+                "requested": "Codex MCP text test — placeholder only"
+              }
+            },
+            "planned_operations": [
+              {
+                "operation": "set_property",
+                "property": "text",
+                "key": "text",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text",
+                "args": [
+                  "Codex MCP text test — placeholder only"
+                ],
+                "status": "verified"
+              }
+            ],
+            "executed_operations": [
+              {
+                "operation": "set_property",
+                "property": "text",
+                "key": "text",
+                "address": "/workspace/11111111-1111-4111-8111-111111111111/cue_id/22222222-2222-4222-8222-222222222222/text",
+                "args": [
+                  "Codex MCP text test — placeholder only"
+                ],
+                "status": "sent",
+                "reply_error": null
+              }
+            ],
+            "errors": null,
+            "warnings": [],
+            "notices": [],
+            "updateq_plan": null,
+            "group_child_readback": null,
+            "side_effects": [],
+            "debug": null
+          }
+        ],
+        "errors": null,
+        "warnings": [
+          "Sequential, non-atomic edits; no automatic rollback or setter retry."
+        ],
+        "error_code": null,
+        "suggested_action": null,
+        "message": "updated"
+      }
+    }
+  ]
+}

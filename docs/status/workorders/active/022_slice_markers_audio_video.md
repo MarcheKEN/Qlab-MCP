@@ -1,5 +1,15 @@
 # Video Phase 8C - Slice Markers for Audio and Video
 
+Current note (2026-10-17): [Two Audio play-count edits](../../../development/runtime-validation/2026-10-05-remaining-cue-completion.md)
+were restored. The [Video fixture](../../../development/runtime-validation/2026-10-02-visual-cue-fixes.md)
+lacked readable marker inventory; fallback `[]` is not a safe baseline. Current
+Audio/Video operations use `confirm:controlCue:v1:`. Video allows one slice
+operation per cue update, not a global one-cue batch limit. Remaining proof is
+a healthy Video marker fixture and other creation/deletion/time/last-slice
+operations. Older `videoSlices` tokens below are historical.
+
+## Historical phase specification
+
 Status: implemented locally; runtime validation pending. This workorder records
 Phase 8C/8C.2 local hardening; no new runtime probe is part of the 0.3.0
 preparation.

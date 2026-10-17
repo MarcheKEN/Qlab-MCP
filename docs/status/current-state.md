@@ -1,5 +1,31 @@
 # Current Project State — 2026-10-17
 
+## Latest validation — 2026-10-17
+
+The development branch exposes **79 tools: 49 reads and 30 gated writes**.
+The documentation reconciliation and code cleanup are included in PR #18.
+At `9a346bc`, the local suite passed **1,942 tests and 61 subtests**, with
+35 skips; GitHub CI, lockfile verification and artifact builds passed.
+
+The subsequent [installed-MCP acceptance pass](../development/runtime-validation/2026-10-17-installed-mcp-acceptance.md)
+invoked all 79 tools on QLab 5.5.10 and exercised real writes through 26 of
+the 30 write tools. It covered representative operations, all 29 Query filters,
+eight generic detail profiles, native fields, audio analysis and pagination.
+The four remaining writers received preview or blocking checks only.
+This is tool-level coverage, not acceptance of every argument combination.
+
+All 24 temporary cues were removed. The final 493-row structural index and root
+order matched the baseline; edited pre-existing properties were restored.
+No cues were active. Selection became empty; the already-dirty document was
+not saved or closed. Four configured Video routes reported disconnected, and
+one Script preview encountered a transient permission failure before a fresh
+readiness check and successful execution. No playback or hardware proof is claimed.
+
+Current instructions are in the [tool catalogue](../user/tools.md) and
+[workflows](../user/agent-workflows.md). The dated sections below retain their
+original evidence and counts; their restart/pending notices are not global
+current restrictions.
+
 ## Documentation reconciliation — 2026-10-17
 
 Current source exposes 79 tools (49 reads, 30 gated writes). The [roadmap](roadmap.md)

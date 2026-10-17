@@ -529,8 +529,9 @@ and process-bound; cue-editor `confirm_gates` do not apply. A confirmed no-send
 response is blocked without counting an event. A missing send acknowledgement
 stays uncertain even when the document already matches the desired state.
 Readback can confirm a timed-out or errored attempted event; inspect the explicit
-status and never resend automatically. Native Get has bounded live evidence;
-the existing reports do not establish live Open/Save/Close acceptance.
+status and never resend automatically. Native Get, Save preview and dirty-Close/
+nonempty-Open blocking have [bounded live evidence](../development/runtime-validation/2026-10-17-installed-mcp-acceptance.md);
+actual Open/Save/Close events remain unvalidated by these reports.
 
 ## Move Cue Lists and Carts
 
@@ -645,8 +646,11 @@ Delete acknowledgement handling and fresh child readback are corrected locally.
 QLab 5.5.10 validation covers individual leaves, mixed batches, empty Groups and
 nested recursive deletion; see the [runtime report](../development/runtime-validation/2026-09-26-delete-cues.md).
 Those live results predate the latest structural/progress hardening and opt-in
-Group removal. Their exact installed-MCP and visual acceptance is not separately
-recorded; see the [hardening report](../development/runtime-validation/2026-09-27-move-delete-hardening.md).
+Group removal; see the [hardening report](../development/runtime-validation/2026-09-27-move-delete-hardening.md).
+The [October 17 installed-MCP pass](../development/runtime-validation/2026-10-17-installed-mcp-acceptance.md)
+adds explicit-leaf batch and empty-Group deletion with complete structural
+restoration. It does not validate recursive Group-root removal or provide UI
+comparison of that hardening.
 Do not retry an error blindly.
 
 `qlab_delete_cues` accepts either 1–50 explicit leaf UUIDs, one exact empty
@@ -875,7 +879,7 @@ specific tool as well as the baseline and dependencies. They cannot migrate
 between families. Whole-batch preflight, same-connection `/alwaysReply` for OSC, fresh
 readback, stop-on-failure and no automatic resend/rollback are shared.
 
-Both expose Basics and OSC Triggers, plus `cueTargetID` (exact UUID or `""` to
+Both expose Basics and supported OSC/native Triggers, plus `cueTargetID` (exact UUID or `""` to
 clear). Neither accepts duration, patches, target modes or temporary targets.
 `qlab_get_control_cue_details` advertises the appropriate Edit tool and per-cue
 blocked properties. Fade & Stop scope remains blocked if its exact query returns
@@ -970,9 +974,11 @@ requires integer readback. Camera input channel count/offset remain blocked
 until input bounds can be verified. Typed FX operations require native index/type
 proof and a complete fresh stack. Text formatting limits are described below.
 Audio FX and default/silent bulk levels remain pending. Stage/region edits use
-Workspace Settings tools. Audio Maps, /live, trigger capture/activation,
-Hotkey/MIDI/Wall Clock setup and playback are excluded. Retarget media separately
-before changing media-dependent properties.
+Workspace Settings tools. Supported MIDI/Wall Clock configuration and guarded
+MIDI/Wall Clock/Timecode activation follow the separate
+[native Trigger workflow](#native-cue-triggers). Hotkey assignment/enabling,
+capture, Audio Maps, `/live` and playback remain excluded. Retarget media
+separately before changing media-dependent properties.
 
 
 ## Edit Audio, Mic, Light, Fade, Network, MIDI, MIDI File, Timecode and Script cues
@@ -1042,8 +1048,8 @@ multiple play-count edits verify the full cumulative slice inventory.
 | Network | `customString` is opaque saved text. Patch UUID membership is required, not a guessed patch-name protocol. Fades need readable mode/bounds; Device Definition parameters stay pending and blocked without metadata. |
 | MIDI | Saved Voice/MSC/SysEx only. Byte aliases/status, 7/14-bit ranges and compatible fade commands are checked. MSC command-dependent fields stay blocked without activation metadata. SysEx uses 7-bit hexadecimal payload without F0/F7. |
 | MIDI File | Existing absolute file path, MIDI Type 0/1 header, healthy readable timing. Type 2 is rejected. |
-| Timecode | Current cue format validates SMPTE/drop-frame. Positive LTC channels require a known patch output bound; observed channel zero is not writable. QLab may normalize end time on frame-rate change while preserving duration. |
-| Script | Basics/OSC Triggers only. Source remains read-only; no compilation. |
+| Timecode | `startTime` and `endTime` are SMPTE strings such as `"01:00:01:00"`, not numeric seconds. The current cue format validates SMPTE/drop-frame. Positive LTC channels require a known patch output bound; observed channel zero is not writable. QLab may normalize end time on frame-rate change while preserving duration. |
+| Script | Basics and supported OSC/native Triggers. Source remains read-only; no compilation. |
 
 Capabilities distinguish `gated`, `blocked`, `pending_validation` and
 `unavailable_via_osc`; a pending property is not in `allowed_properties`.
@@ -1057,9 +1063,11 @@ returned −59.01564 for a Fade slider request of −59: the tool reported faile
 verification, retained the observed value and sent no retry. It was restored with
 a fresh confirmation. This low-level boundary is not declared exact/verified.
 
-Audio Maps, `/live`, playback, external signals, trigger capture/activation,
-Hotkey/MIDI/Wall Clock setup, Trim, Audio FX and undocumented curves remain out
-of scope. The generic editor has been removed. See the
+Audio Maps, `/live`, playback, external signals, capture, Hotkey assignment/enabling,
+Trim, Audio FX and undocumented curves remain out of scope. Supported incoming
+MIDI/Wall Clock configuration and guarded activation use the
+[native Trigger workflow](#native-cue-triggers); they do not send signals or run
+cues. The generic editor has been removed. See the
 [live evidence and pending fixtures](../development/runtime-validation/2026-10-05-remaining-cue-completion.md).
 
 ## FX and Text fragment operations
@@ -1084,6 +1092,10 @@ validate a setter. Duplicate/ambiguous instances remain blocked. Parameters
 use the published write bands; reads preserve out-of-band values. JSON is
 generated internally. The catalogue contains 60 effects and 262 destinations;
 this does not mean all their defaults or structural operations are live tested.
+Call `qlab_get_video_effect_catalogue(offset=0, limit=10)` and follow
+`next_offset` until it is null. `limit` is 1–10 (default 10), not the total
+catalogue size. Optional `effect_types` accepts 1–10 exact types and filters
+before pagination. This catalogue is static metadata; it takes no workspace UUID.
 Vector/boolean parameter operations use an internally generated JSON setter
 and aggregate native reads; numeric/enum operations retain scalar routes.
 

@@ -14,6 +14,11 @@ additional restrictions. No automatic mutation retry or rollback is provided.
 Workspace-settings editors use `confirm:workspaceSettings:v1:` and one operation
 per request. Native document operations have a separate token and preflight.
 
+The [October 17 installed-MCP pass](../development/runtime-validation/2026-10-17-installed-mcp-acceptance.md)
+invoked every tool and exercised real writes through 26 of the 30 writers.
+Its coverage is representative; remaining per-operation gaps below are not
+closed by tool invocation alone. The pass changed no code and tested no playback.
+
 ## Supported work and remaining gates
 
 | Area | Current scope | Remaining evidence or capability limits |
@@ -27,8 +32,8 @@ per request. Native document operations have a separate token and preflight.
 | Group and root containers | Typed Group/Playlist, Cue List/Cart create/edit/reorder | Mode/child-snapshot checks remain. Cart cell Move execution and unattended root List/Cart deletion remain blocked; moving sidebar roots does not move cells. |
 | Other cue families | Audio/Mic/Light/Fade/Network/MIDI/MIDI File/Timecode/Script typed editors | The [completion report](../development/runtime-validation/2026-10-05-remaining-cue-completion.md) records individual live gaps. Unknown device/command/range metadata blocks MSC/Device Definition operations. Script source/compilation is excluded. |
 | Native cue fields | Fixed local Load Time, assigned number and opt-in native Triggers | [Field](../development/runtime-validation/2026-10-10-control-applescript.md) and [Trigger](../development/runtime-validation/2026-10-10-native-triggers.md) proof is bounded. Hotkey enabling/assignment needs key/modifier identity; weekdays, capture and arbitrary scripts remain excluded. |
-| Workspace Settings | General, Audio output patch, Video route/stage/region edits | [September 29](../development/runtime-validation/2026-09-29-workspace-settings.md) gives limited reversible proof. Audio Maps and Light/Network/MIDI settings writers remain excluded. |
-| Native documents | Exact local inventory, bounded Open/Save/clean-Close | [Document Get](../development/runtime-validation/2026-10-14-editor-completion.md) was observed. Existing reports do not establish live Open/Save/Close acceptance. |
+| Workspace Settings | General, Audio output patch, Video route/stage/region edits | [September 29](../development/runtime-validation/2026-09-29-workspace-settings.md) gives limited reversible proof; the October 17 pass repeats one operation through each of the five editors. Audio Maps and Light/Network/MIDI settings writers remain excluded. |
+| Native documents | Exact local inventory, bounded Open/Save/clean-Close | Document Get, Save preview and dirty-Close/nonempty-Open blocking were observed in the October 17 pass. Actual Open/Save/Close events remain unvalidated by these reports. |
 | Local analysis | Consent-based media search and optional paged audio analysis | Optional Python dependencies and FFmpeg/ffprobe are required for real decoding. Measurements are source-relative; they do not classify lyrics or establish playback/hardware behavior. |
 
 ## Active validation

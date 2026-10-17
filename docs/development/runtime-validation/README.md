@@ -7,6 +7,7 @@ Use the [current tool catalogue](../../user/tools.md) and
 
 ## Records
 
+- [Installed MCP acceptance — 2026-10-17](2026-10-17-installed-mcp-acceptance.md)
 - [Empty Group Delete — QLab MCP 0.3.0](empty-group-delete-2026-08-13.md)
 - [Cue Editor Runtime Checklist](edit-cues.md)
 - [`qlab_create_cues` Runtime Checklist](create-cues.md)

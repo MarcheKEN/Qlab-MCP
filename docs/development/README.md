@@ -1,5 +1,8 @@
 # Development
 
+- [2026-10-17 installed MCP acceptance](runtime-validation/2026-10-17-installed-mcp-acceptance.md)
+- [2026-10-17 documentation review](reviews/2026-10-17-documentation-audit.md)
+- [2026-10-17 code cleanup](reviews/2026-10-17-code-cleanup.md)
 - [2026-10-15 precommit validation](reviews/2026-10-15-precommit-validation.md)
 - [Architecture](architecture.md)
 - [2026-10-14 editor and workspace lifecycle follow-up](runtime-validation/2026-10-14-editor-completion.md)

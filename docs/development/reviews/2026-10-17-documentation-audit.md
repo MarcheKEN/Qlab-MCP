@@ -62,3 +62,32 @@ as evidence, without claiming they received a new visual privacy audit.
 This is a documentation/source review. No new cue writes, native document
 events, playback, rendering or physical output were validated. Optional tests
 can skip when their local fixtures or backend executables are unavailable.
+
+## Final clarity review and runtime handoff — 2026-10-17
+
+After code cleanup at `9a346bc`, a final documentation pass found two stale
+blanket exclusions of native MIDI/Wall Clock configuration and Trigger
+activation in the user workflows. They now refer to the existing guarded native
+workflow; Hotkey assignment/enabling, capture and playback stay excluded.
+The guide also states the FX catalogue's 1–10 page limit and distinguishes
+Timecode SMPTE strings from Audio/Video seconds. No executable code changed.
+
+The preceding [installed-MCP acceptance session](../runtime-validation/2026-10-17-installed-mcp-acceptance.md)
+is now recorded and linked from current state, roadmap and development indexes.
+It distinguishes 79 invoked tools from 26 executed writers, documents the four
+preview/block-only writers, transient permission failure, incomplete media
+search and selection change, and preserves untested runtime boundaries.
+The final documentation pass itself made no live QLab calls.
+
+Fresh checks covered all 182 repository Markdown files for local destinations:
+**1,483 relative links** and **101 canonical-guide heading links** resolve;
+all **18 JSON examples** parse successfully. Both 79-row public catalogues match the current in-process
+registry (49 reads, 30 writes). Focused server, reference and authoring-document
+checks passed: **145 tests**. Tool definitions remain identical to the pre-edit
+snapshot. Historical records retain their dated counts and observations;
+imported references, transcripts and captures were not rewritten.
+
+The scope includes canonical guides, current status/workorders, source/schema
+cross-checks, repository navigation and historical authority labels. It does
+not claim a new semantic audit of every historical sentence, screenshot or
+external website, or acceptance of every tool parameter combination.

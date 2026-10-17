@@ -986,7 +986,7 @@ def test_fastmcp_initialization_reports_project_version_and_universal_guidance()
             return client.initialize_result
 
     initialize_result = asyncio.run(initialize())
-    assert initialize_result.serverInfo.version == "0.3.0"
+    assert initialize_result.serverInfo.version == "0.4.0"
     instructions = initialize_result.instructions
     assert instructions
     for phrase in (

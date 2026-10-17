@@ -1,6 +1,6 @@
 # User Guide
 
-QLab MCP 0.3.0 inspects QLab 5 and provides gated cue, settings and local
+QLab MCP 0.4.0 inspects QLab 5 and provides gated cue, settings and local
 document changes.
 It does not expose playback or raw OSC.
 

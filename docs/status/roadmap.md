@@ -2,7 +2,7 @@
 
 ## Current contract
 
-The source exposes 79 tools: 49 reads and 30 gated writes. The [tool catalogue](../user/tools.md)
+QLab MCP **0.4.0** exposes 79 tools: 49 reads and 30 gated writes. The [tool catalogue](../user/tools.md)
 and generated schemas define their arguments; [architecture](../development/architecture.md)
 describes implementation. Generic `qlab_edit_cues` and `qlab_edit_workspace_settings`
 are retired. Use the typed cue-family and scoped workspace-settings editors.

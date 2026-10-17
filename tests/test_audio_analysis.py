@@ -624,5 +624,5 @@ def test_audio_extra_is_locked_with_base_versions_preserved():
     lock = tomllib.loads(Path("uv.lock").read_text())
     package = next(item for item in lock["package"] if item["name"] == "qlab-mcp")
     assert set(item["name"] for item in package["optional-dependencies"]["audio"]) == {"numpy", "librosa"}
-    assert package["version"] == project["project"]["version"] == "0.3.0"
+    assert package["version"] == project["project"]["version"] == "0.4.0"
     assert next(item for item in lock["package"] if item["name"] == "fastmcp")["version"] == "3.3.1"

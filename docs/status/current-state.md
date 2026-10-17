@@ -1,5 +1,13 @@
 # Current Project State — 2026-10-17
 
+## Version 0.4.0 — release preparation
+
+The package, MCP initialization version and current user guidance now identify
+this development branch as **0.4.0**. PR #18 prepares that version; no tag or
+GitHub Release has been published. Earlier 0.3.0 reports and validation counts
+below retain their original version: the version bump does not rerun or rename
+historical runtime evidence.
+
 ## Latest validation — 2026-10-17
 
 The development branch exposes **79 tools: 49 reads and 30 gated writes**.

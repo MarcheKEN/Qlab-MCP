@@ -1,6 +1,6 @@
 # Current Architecture
 
-This describes the current QLab MCP development surface based on 0.3.0. Historical graphs and refactor
+This describes the current QLab MCP 0.4.0 development surface. Historical graphs and refactor
 analysis live under [`docs/archive/`](../archive/README.md).
 
 The historical 0.3.0 architecture audit concluded

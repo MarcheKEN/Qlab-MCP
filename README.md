@@ -4,7 +4,7 @@ Original project code and authored documentation are licensed under
 [MIT](LICENSE), copyright 2026 MarcheKEN. Imported QLab/QClass references and
 other third-party material are excluded; see [NOTICE](NOTICE).
 
-QLab MCP `0.3.0` is a FastMCP server for inspecting QLab 5 workspaces over OSC
+QLab MCP `0.4.0` is a FastMCP server for inspecting QLab 5 workspaces over OSC
 and requesting narrowly gated cue, settings and local document changes. It is read-only by default;
 write mode is disabled unless explicitly configured and remains dry-run-first.
 

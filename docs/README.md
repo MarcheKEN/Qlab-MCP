@@ -1,5 +1,8 @@
 # QLab-MCP Documentation
 
+Current development version: **0.4.0**. Older version numbers in dated reports
+and archive titles describe historical evidence.
+
 Start here, then follow the folder index nearest to the work you are doing.
 
 Current API and operating instructions are in `docs/user/`, the root README,

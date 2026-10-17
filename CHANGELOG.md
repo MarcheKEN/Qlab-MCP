@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (Unreleased)
 
 - Reuse existing reader normalization and inherited cue model fields, and
   simplify equivalent settings/creation branches without changing MCP contracts.

@@ -25,8 +25,10 @@ verify that the concrete type remains unchanged, including changes within the
 family. Devamp and Reset detail reads are typed blocks sharing the transport;
 Devamp editing has its own public tool.
 
-Two saved Control fields use `control_applescript.py`: Load `loadTime` and
-Target `assignedNumber`. The fixed script receives JSON arguments, checks local
+Fixed native properties use `control_applescript.py`: Load `loadTime`, Target
+`assignedNumber` and supported native cue Triggers. Native Trigger reads are
+opt-in through `include_native_triggers`; failed native reads preserve OSC data
+and report unavailable coverage. The fixed script receives JSON arguments, checks local
 app/workspace/cue identity and setter preconditions, and returns JSON independent
 of the macOS numeric locale. They share the signed Control executor and expose
 their transport explicitly; no arbitrary script or new public tool exists.
@@ -37,8 +39,8 @@ message, output, fade, or target mode, then rechecks identity and selector.
 Failures in secondary reads preserve confirmed identity as partial data.
 Sensitive Network text and Script source require the technical profile.
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 74 decorated tools
-(47 read-only and 27 gated writes),
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 79 decorated tools
+(49 read-only and 30 gated writes),
 their schemas, annotations, timeouts, and result models. QLab-backed calls
 create a fresh `QLabReader` and close it after the operation; local media tools
 do not use that reader. `qlab-mcp` maps to
@@ -76,7 +78,10 @@ byte-by-byte decoding. See the [performance measurements](runtime-validation/202
 The static `tools/list` catalogue uses native FastMCP caching for five minutes,
 before schema dereferencing. Tool calls, resources and prompts are excluded
 from that middleware's cache; published schemas and validation are preserved.
-Technical profiles are opt-in; Text details include visible text in safe mode.
+Technical profiles are opt-in and can expose paths, notes and Script/Network
+content. Generic `full_sensitive` and `exhaustive` responses have separate
+50-cue/1-MiB bounds; those are not a universal technical-family byte cap.
+Text details include visible text in safe mode.
 Cache entries are invalidated around writes;
 verification reads are fresh.
 
@@ -99,6 +104,29 @@ canonical, `scriptText` is not a public OSC key, and `exhaustive` is available
 for cue details rather than mass cue queries. FastMCP/Pydantic schema errors
 and structured runtime errors are separate compatibility surfaces.
 
+## Transport, deadlines and response boundaries
+
+Without a passcode, ordinary requests use a fresh UDP socket bound to an
+ephemeral port and announce `/udpReplyPort`. `QLAB_REPLY_PORT` is not the
+normal fixed listener in this path. Configured passcodes select a persistent
+TCP/SLIP session for the reader, with workspace authentication and session
+discard on protocol/transport/preparation failures. Selected read paths use
+a separate one-shot TCP helper; this is distinct from the protected session.
+Read-only calls can send protocol setup such as `/connect` and `/udpReplyPort`;
+they do not modify saved cue properties or execute cues.
+
+`QLAB_TIMEOUT` bounds individual OSC transactions and native script invocations.
+The server also declares per-tool call budgets; OSC operations and cache waits
+respect the reader deadline. MCP startup timeout belongs to the client and is
+a third separate limit. Native lifecycle subprocesses use the configured
+per-invocation timeout; they do not acquire the OSC deadline automatically.
+
+`server_responses.py` normalizes structured operation results and errors.
+`sanitizer.py` removes internal diagnostic paths/stack fields; settings redaction
+also protects credentials and device/network fields. These are separate from
+the opt-in disclosure of show data in technical profiles. Schema validation
+errors remain distinct from structured QLab/runtime errors.
+
 ## Write path
 
 `write/safety.py`, `write/registry.py`, and `write/allowlist.py` define the
@@ -120,6 +148,30 @@ exact targeting, readiness, deterministic preflight, the required fresh token,
 one setter per operation, cache invalidation, and fresh readback. A timed-out setter is never resent automatically; later reads
 determine whether the result is confirmed or uncertain.
 
+## Local documents and media
+
+`workspace_documents.py` uses its own fixed AppleScript bridge, invoked through
+the normal fresh-reader wrapper. Get returns the selected document and the
+full local inventory, including other open documents’ paths and names.
+Save/Close require existing-workspace write readiness, Edit Mode and inactivity;
+Close rejects dirty documents, and Save includes all pending edits. The dirty
+flag is not a revision identifier. Open requires an empty native inventory,
+write-enable, a readable `.qlab5`, a bounded fingerprint and a document token;
+there is no existing UUID for OSC readiness before opening.
+
+Open/Save fingerprints are bounded to 64 MiB and 4,096 entries, with unsupported
+package entries/symlinks rejected. Document tokens expire after five minutes
+and are single-use/process-bound. Every attempted event requires fresh native
+readback; a no-send acknowledgement is blocked and an unacknowledged response
+stays uncertain. No automatic event retry is performed. The native bridge
+requires the running local `/Applications/QLab.app` and Automation permission.
+
+`media.py` searches home by filename with entry/time/result bounds and skips
+symlinks. `audio_analysis.py` resolves an authorized file, lazily loads optional
+Python dependencies, invokes bounded FFmpeg/ffprobe subprocesses without a
+shell and returns paged source-relative measurements. Conversational consent
+is an agent obligation; the server cannot verify it. OS access checks remain.
+
 ## Sources of truth
 
 - Public MCP contract: `src/qlab_mcp/server.py`, models, and
@@ -127,6 +179,8 @@ determine whether the result is confirmed or uncertain.
 - Write capability policy: write registry/allowlist and write-mode tests.
 - Imported QLab protocol: `docs/references/` plus checksum tests.
 - Current project state: `docs/status/`.
-- Historical decisions and runtime evidence: `docs/archive/`.
+- Historical plans: `docs/archive/`; dated runtime/research/review evidence also
+  remains under indexed `docs/development/` directories. Original counts and
+  failed observations do not override current source or establish new proof.
 - Agent-facing contract research:
   [`2026-08-13-mcp-agent-ux-and-edit-cleanup.md`](research/2026-08-13-mcp-agent-ux-and-edit-cleanup.md).

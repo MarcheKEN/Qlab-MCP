@@ -8,8 +8,10 @@ This folder indexes current project status and explicitly dated evidence:
 - [Coverage](coverage/README.md) — technical OSC and feature coverage.
 - [Workorders](workorders/README.md) — active and blocked tasks.
 
-Historical plans, completed workorders, research, and audits belong under
-[`docs/archive/`](../archive/README.md).
+Superseded implementation plans and completed workorders live under
+[`docs/archive/`](../archive/README.md). Dated research, runtime captures and
+reviews also remain in the [development indexes](../development/README.md);
+they are evidence, not current instructions.
 
 ## Evidence Labels
 

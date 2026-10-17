@@ -11,7 +11,10 @@ routes agents to that guide without adding a new MCP tool.
 
 ## Choose the tool
 
-See also [Light and Group cues](#light-and-group-cues).
+Start with connection and a bounded overview. Use family inventories and exact
+details when type/list are known; Query handles cross-family discovery. Read
+settings only for the relevant infrastructure. [Light and Group](#light-and-group-cues)
+and the [selection table](#tool-selection) below cover specialized choices.
 
 ## Light and Group cues
 
@@ -281,7 +284,7 @@ tool.
 
 ## Common write gate
 
-Every real write follows this shape:
+Every real write to an existing workspace follows this shape:
 
 1. Resolve one explicit workspace and exact cue/container UUIDs.
 2. Call `qlab_check_write_readiness`. This is a read-only preflight, not a
@@ -294,7 +297,11 @@ Every real write follows this shape:
 6. Require fresh structural or property readback and interpret partial results
    before deciding on a recovery action.
 
-Writes are disabled by default and remain subject to server-side environment,
+Document opening has no existing workspace for this preflight. Follow the
+[separate native Open workflow](#workspace-documents), which requires write-enable,
+an empty inventory, a file fingerprint and a document token.
+
+Writes to existing workspaces are disabled by default and remain subject to server-side environment,
 passcode, `/connect` Edit permission, and Edit Mode checks. MCP annotations and
 descriptions help clients choose a tool; they are not authorization.
 
@@ -488,7 +495,11 @@ and skips the reviewed dry-run/token flow.
 ## Workspace documents
 
 `qlab_get_workspace_document` reads a native local inventory by exact workspace
-UUID. `qlab_open_workspace` accepts an existing absolute `.qlab5` path, but only
+UUID and returns the complete fresh native inventory in `readback`, including
+other open workspaces’ paths, names, UUIDs, modes, dirty flags and active cue IDs.
+Treat that response as deliberately sensitive when logging or sharing it.
+
+`qlab_open_workspace` accepts an existing absolute `.qlab5` path, but only
 when the native inventory is empty; it fingerprints the file/package and binds
 that state to a five-minute token. Opening is one event, followed by a fresh
 inventory. It does not create documents or open alongside an existing workspace.
@@ -502,6 +513,24 @@ will never discard dirty changes. Both require an inactive workspace in Edit
 Mode, use one native event and verify a new inventory. Do not retry a timeout;
 inspect QLab and call Get again first. These tools need the local `/Applications/QLab.app`
 process and macOS Automation permission, and are unavailable for remote QLab.
+
+Open requires `QLAB_ENABLE_WRITE=true`; it does not call existing-workspace
+OSC readiness or require a passcode for a workspace that is not open. Save and
+Close do require that readiness. Open and Save fingerprints allow at most
+64 MiB of cumulative file data and 4,096 package entries including the root;
+package symlinks and unsupported entries are rejected. Close does not fingerprint
+the file. Do not disable these gates to force an oversized or ambiguous target.
+
+Preview the chosen document operation with `dry_run=true`, review
+`planned_operations` and the fresh inventory, then repeat the same arguments
+with `dry_run=false` and its exact `confirm_token`. Document tokens use
+`confirm:workspaceDocument:v1:`, expire after five minutes and are single-use
+and process-bound; cue-editor `confirm_gates` do not apply. A confirmed no-send
+response is blocked without counting an event. A missing send acknowledgement
+stays uncertain even when the document already matches the desired state.
+Readback can confirm a timed-out or errored attempted event; inspect the explicit
+status and never resend automatically. Native Get has bounded live evidence;
+the existing reports do not establish live Open/Save/Close acceptance.
 
 ## Move Cue Lists and Carts
 
@@ -1124,8 +1153,9 @@ See also the [Text selection follow-up](../development/runtime-validation/2026-1
 
 ## File targets
 
-First ask the person whether you may search for or inspect the needed files.
-After they agree, use `qlab_search_media_files(query="trueno", max_results=20)`
+Obtain conversational consent for the needed files. Reuse authorization already
+granted for this task and scope; ask if it is missing or the scope changes.
+The server cannot verify conversation consent. After authorization, use `qlab_search_media_files(query="trueno", max_results=20)`
 to find files by case-insensitive filename substring in the MCP user's home
 folder. It returns absolute paths and file sizes, skips symlinks, and stops
 after 20,000 entries, five seconds or the result limit.
@@ -1154,7 +1184,7 @@ cue's technical detail or use `qlab_search_media_files`. Call:
 ```
 
 This is a file read, independent of QLab, with no OSC connection or playback.
-Optional installation: `uv sync --no-editable --python 3.11 --extra audio --extra dev`; FFmpeg and ffprobe
+Optional installation: `uv sync --locked --no-editable --python 3.11 --extra audio --extra dev`; FFmpeg and ffprobe
 must resolve inside the MCP process PATH. Missing components return
 `dependency_missing`; the base MCP and other tools remain usable. Supported
 containers: WAV, AIFF, MP3, M4A, FLAC, OGG; one audio stream, 1–8 channels,

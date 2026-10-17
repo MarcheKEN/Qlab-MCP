@@ -54,7 +54,7 @@ annotations, and result models.
 | `qlab_get_cue_list_details` | Exact list identity, state, playhead, incoming timecode and bounded tree | AppleScript-only timecode source settings | [Read](agent-workflows.md#cue-lists) |
 | `qlab_get_cue_cart_details` | Exact cart identity, state, timecode, grid and occupied cell positions | Playhead, nested Groups or deep child Inspector | [Read](agent-workflows.md#cue-lists) |
 | `qlab_get_cue_details` | Generic health, target, and editable diagnostics | Prefer family details for a known type | [Read](agent-workflows.md#read-sequence) |
-| `qlab_check_write_readiness` | Read-only preflight before any write | Confirmation or authorization alone | [Common write gate](agent-workflows.md#common-write-gate) |
+| `qlab_check_write_readiness` | Read-only preflight for existing-workspace writes | Confirmation or authorization alone | [Common write gate](agent-workflows.md#common-write-gate) |
 | `qlab_create_cue_lists` | Create 1–50 empty root Cue Lists/Carts with QLab defaults | Initial properties, exact placement, atomic transaction, or rollback | [Cue List writes](agent-workflows.md#create-and-edit-cue-lists-and-carts) |
 | `qlab_edit_cue_lists` | Typed common and incoming-timecode edits on 1–50 root Lists/Carts | Playhead, mode conversion, Cart grid resize, or AppleScript-only sync fields | [Cue List writes](agent-workflows.md#create-and-edit-cue-lists-and-carts) |
 | `qlab_create_cues` | One to 100 ordered template-backed cues in an exact Cue List, Group, or empty Cue Cart | Initial setters, GO, atomic transaction, or rollback | [Create](agent-workflows.md#create-cues) |
@@ -75,7 +75,7 @@ annotations, and result models.
 | `qlab_edit_timecode_cues` | Typed Timecode Basics, Triggers and saved family settings, 1–50 UUIDs | Generating timecode, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_script_cues` | Typed Script Basics, Triggers and saved family settings, 1–50 UUIDs | Script source, compilation, execution or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_workspace_general_settings` | Minimum GO time or selection/playhead lock | Other General settings | [Workspace settings](agent-workflows.md#edit-workspace-settings) |
-| `qlab_get_workspace_document` | Exact local document path, modified flag, mode and active cue IDs | Save, close or filesystem edits | [Workspace documents](agent-workflows.md#workspace-documents) |
+| `qlab_get_workspace_document` | Selected document plus full fresh native inventory, including other documents’ paths/names | Save, close or filesystem edits | [Workspace documents](agent-workflows.md#workspace-documents) |
 | `qlab_open_workspace` | Open an existing local `.qlab5` by absolute path when no workspace is open | Creating a document, opening alongside another workspace, or running cues | [Workspace documents](agent-workflows.md#workspace-documents) |
 | `qlab_save_workspace` | Save an exact inactive workspace at its existing path | Save As, selective save, or recovery of earlier contents | [Workspace documents](agent-workflows.md#workspace-documents) |
 | `qlab_close_workspace` | Close an exact inactive, clean workspace | Discarding unsaved edits or implicit save | [Workspace documents](agent-workflows.md#workspace-documents) |
@@ -89,8 +89,10 @@ annotations, and result models.
 
 ## Shared contract
 
-- Writes default to dry-run and require readiness, exact targets, fresh
-  confirmation, and post-write readback.
+- Existing-workspace writes default to dry-run and require readiness, exact
+  targets, fresh confirmation and post-write readback. Native document Open
+  instead requires write-enable, an empty local inventory, a bounded fingerprint
+  and a document token; it cannot run existing-workspace OSC readiness.
 - Edit confirmation is per planned operation; Create, Move, Delete, and
   Workspace Settings Edit tools use dedicated confirmation flows.
 - Batches are sequential/non-transactional unless a tool description says
@@ -112,13 +114,16 @@ and the write workflow sections; a dry-run alone does not close those findings.
 Inspect the generated contract without connecting to QLab:
 
 ```bash
-uv run fastmcp inspect fastmcp.json
+uv run --locked --no-editable --extra dev fastmcp inspect fastmcp.json --skip-env
 ```
 
 ## Cue editing migration (2026-10-06)
 
-Public `qlab_edit_cues` is removed. Use the existing family editors with exact
-UUIDs and per-operation signed tokens; split mixed families. Group includes OSC
+Public `qlab_edit_cues` and `qlab_edit_workspace_settings` are removed.
+Replace the former with the matching cue-family editor, and the latter with
+`qlab_edit_workspace_general_settings` or the Audio/Video object editor.
+
+Use the existing family editors with exact UUIDs and per-operation signed tokens; split mixed families. Group includes OSC
 Triggers, with Second Trigger 6–7 limited to Playlist. Video/Camera/Text expose
 bounded FX selectors and typed operations, with native named-getter identity proof
 when inventory metadata is absent. Native creation defaults are verified for

@@ -1,5 +1,11 @@
 # Unified Workspace Settings Edit Implementation Plan
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` to implement this plan task-by-task.
 
 **Goal:** Rename the public Workspace Settings write tool and expose only the implemented `general.minGoTime` operation in Wave 1.

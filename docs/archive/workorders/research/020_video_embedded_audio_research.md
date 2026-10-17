@@ -1,5 +1,11 @@
 # Video Embedded Audio Research
 
+> Historical evidence or dated plan. Use the [current tools](../../../user/tools.md) and
+> [roadmap](../../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 Archive note: this document preserves the original research and runtime
 evidence. Current pending validation lives in
 [`029_video_audio_runtime_validation.md`](../../../status/workorders/active/029_video_audio_runtime_validation.md).

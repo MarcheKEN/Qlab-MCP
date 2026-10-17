@@ -1,5 +1,11 @@
 # Fixed local AppleScript Control fields
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 Date: 2026-10-10. QLab 5.5.10, one running `/Applications/QLab.app` instance,
 one authorized test workspace, Edit Mode and zero active cues. Workspace path,
 UUID and fixture identities were checked privately. Private paths, cue names,

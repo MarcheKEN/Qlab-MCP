@@ -1,5 +1,11 @@
 # 06 — Automated Test Evidence
 
+> Historical evidence or dated plan. Use the [current tools](../../../user/tools.md) and
+> [roadmap](../../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 ## Verdict
 
 The repository has an unusually strong write-safety behavior suite, but transport correctness and maintainability lag behind its raw test count. Of 2,346 collected cases, 2,084 (88.8%) and 67.9% of test LOC live in `tests/test_write_mode.py`. Passing the suite proves extensive planner/gate/readback behavior against fakes; it does not prove protocol-faithful concurrency or a reversible real-QLab workflow.

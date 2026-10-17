@@ -1,10 +1,12 @@
 # Video Phase 8C - Slice Markers for Audio and Video
 
-Current note (2026-10-07): Two Audio slice play-count edits in one call were
-verified and restored in [QLab 5.5.10](../../../development/runtime-validation/2026-10-05-remaining-cue-completion.md).
-On the tested Video cue, the OSC slice inventory was unavailable, so Video
-slice writes stayed blocked; see the [visual follow-up](../../../development/runtime-validation/2026-10-02-visual-cue-fixes.md).
-The remaining marker operations below still need their own evidence.
+Current note (2026-10-17): [Two Audio play-count edits](../../../development/runtime-validation/2026-10-05-remaining-cue-completion.md)
+were restored. The [Video fixture](../../../development/runtime-validation/2026-10-02-visual-cue-fixes.md)
+lacked readable marker inventory; fallback `[]` is not a safe baseline. Current
+Audio/Video operations use `confirm:controlCue:v1:`. Video allows one slice
+operation per cue update, not a global one-cue batch limit. Remaining proof is
+a healthy Video marker fixture and other creation/deletion/time/last-slice
+operations. Older `videoSlices` tokens below are historical.
 
 ## Historical phase specification
 

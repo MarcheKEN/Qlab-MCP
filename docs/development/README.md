@@ -22,8 +22,19 @@ test, packaging, and documentation checks.
 
 ## Published runtime evidence
 
-Prepared capture reports use deterministic synthetic UUIDs, generic workspace
+Capture reports prepared for the October 15 snapshot use deterministic synthetic UUIDs, generic workspace
 names and redacted local/media paths. Identifiers preserve relationships between
 records but are not live QLab targets. Dates, counts, results and evidence limits
 remain those of the original observation; these records are not new acceptance
 tests. See the [publication record](reviews/2026-10-15-precommit-validation.md).
+
+## Record indexes
+
+- [Research](research/README.md)
+- [Runtime validation](runtime-validation/README.md)
+- [Reviews](reviews/README.md)
+- [Historical implementation plans](../superpowers/plans/README.md)
+
+Earlier reports, original-language excerpts and historical screenshots retain
+their dated evidence. No claim is made that every legacy image was visually
+redacted or that old English/publication audits cover later additions.

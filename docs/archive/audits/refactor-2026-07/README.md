@@ -15,7 +15,7 @@ Git history was not rewritten.
 | --- | --- |
 | [Baseline](00_BASELINE.md) | Evidence historical |
 | [Architecture](01_ARCHITECTURE.md) | Partially obsolete after the refactor |
-| [MCP tool catalog](02_MCP_TOOL_CATALOG.md) | Historical; current 13-tool contract is verified by tests |
+| [MCP tool catalog](02_MCP_TOOL_CATALOG.md) | Historical tool inventory; use the current public catalogue |
 | [QLab capability matrix](03_QLAB_CAPABILITY_MATRIX.md) | Mixed historical snapshot |
 | [Real QLab tests](04_REAL_QLAB_TESTS.md) | Sanitized runtime evidence |
 | [Runtime behavior](05_RUNTIME_BEHAVIOR.md) | Findings partly corrected or superseded |

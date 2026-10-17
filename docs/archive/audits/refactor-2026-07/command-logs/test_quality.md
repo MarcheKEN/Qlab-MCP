@@ -1,5 +1,11 @@
 # Test-quality investigation command log
 
+> Historical evidence or dated plan. Use the [current tools](../../../../user/tools.md) and
+> [roadmap](../../../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 Read-only shell commands executed by the `test_quality` subagent. Commands are listed in execution order. No production files, tests, QLab workspaces, or Git history were changed.
 
 For heredoc AST probes whose exact bodies were compacted from the available transcript, the body is explicitly marked unavailable rather than reconstructed.

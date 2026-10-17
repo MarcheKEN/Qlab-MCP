@@ -5,7 +5,7 @@ Original project code and authored documentation are licensed under
 other third-party material are excluded; see [NOTICE](NOTICE).
 
 QLab MCP `0.3.0` is a FastMCP server for inspecting QLab 5 workspaces over OSC
-and requesting narrowly gated structural writes. It is read-only by default;
+and requesting narrowly gated cue, settings and local document changes. It is read-only by default;
 write mode is disabled unless explicitly configured and remains dry-run-first.
 
 The public surface is intentionally focused: 49 read-only tools and 30 gated write
@@ -35,14 +35,14 @@ risks, and QLab 5.5.10 evidence boundary.
 Use the documented non-editable Python 3.11 environment:
 
 ```bash
-uv sync --no-editable --python 3.11 --extra dev
-uv run qlab-mcp
+uv sync --locked --no-editable --python 3.11 --extra dev
+.venv/bin/python -m qlab_mcp.server
 ```
 
 Inspect the generated MCP contract without connecting to QLab:
 
 ```bash
-uv run fastmcp inspect fastmcp.json
+uv run --locked --no-editable --extra dev fastmcp inspect fastmcp.json --skip-env
 ```
 
 For a read-only orientation session:
@@ -60,8 +60,8 @@ workspace. The passcode is never a tool argument.
 Install the `audio` extra and make FFmpeg/ffprobe available in the **MCP process** PATH:
 
 ```bash
-uv sync --no-editable --python 3.11 --extra audio --extra dev
-uv run python -c 'import librosa, numpy, shutil; assert shutil.which("ffmpeg") and shutil.which("ffprobe")'
+uv sync --locked --no-editable --python 3.11 --extra audio --extra dev
+.venv/bin/python -c 'import librosa, numpy, shutil; assert shutil.which("ffmpeg") and shutil.which("ffprobe")'
 ```
 
 `qlab_analyze_audio_file` accepts an absolute file path and works independently
@@ -131,7 +131,7 @@ annotations.
 | `qlab_get_cue_list_details` | Exact Cue List state, playhead, timecode and bounded contents | Read-only; UUID-only; safe or technical |
 | `qlab_get_cue_cart_details` | Exact Cue Cart state, timecode, dimensions and occupied cell positions | Read-only; UUID-only; bounded cells; no playhead |
 | `qlab_get_cue_details` | Exact cue properties and health | Read-only; use exact refs for later writes |
-| `qlab_check_write_readiness` | Preflight before any real write | Read-only report; not a confirmation token |
+| `qlab_check_write_readiness` | Preflight for existing-workspace writes | Read-only report; not a confirmation token |
 | `qlab_create_cue_lists` | Create 1–50 empty root Cue Lists/Carts with QLab defaults | Gated, sequential, no rollback; position with Move afterwards |
 | `qlab_edit_cue_lists` | Typed common and incoming-timecode edits on 1–50 root Lists/Carts | Gated; no playhead, mode conversion, grid resize, or AppleScript-only fields |
 | `qlab_create_cues` | One to 100 ordered template-backed cues in an exact Cue List, Group, or empty Cue Cart | Gated, non-atomic creation; no initial setters, GO, or automatic rollback |
@@ -152,7 +152,7 @@ annotations.
 | `qlab_edit_timecode_cues` | Typed Timecode Basics, Triggers and saved family settings; 1–50 UUIDs | Signed confirmation and fresh dependencies; blocked/pending capabilities excluded |
 | `qlab_edit_script_cues` | Typed Script Basics, Triggers and saved family settings; 1–50 UUIDs | Signed confirmation and fresh dependencies; blocked/pending capabilities excluded |
 | `qlab_edit_workspace_general_settings` | Minimum GO time or selection/playhead lock | Gated, one setter, fresh token, fresh readback |
-| `qlab_get_workspace_document` | Exact local document path, dirty flag, mode and active cue IDs | Read-only native inventory |
+| `qlab_get_workspace_document` | Selected document plus full local document inventory | Read-only; may expose other open documents’ paths and names |
 | `qlab_open_workspace` | Open an existing local workspace when no workspace is open | Gated, single-use token, fresh inventory |
 | `qlab_save_workspace` | Save an inactive workspace at its existing path | Gated, saves all unsaved edits |
 | `qlab_close_workspace` | Close an inactive clean workspace | Gated, refuses unsaved edits |
@@ -199,8 +199,8 @@ silently claim a complete show inventory.
 
 ## Safe write flow
 
-Every real Create, Edit, Move, Delete, or Workspace Settings write follows this
-compact sequence:
+Create, Edit, Move, Delete, Workspace Settings and document Save/Close writes
+to an existing workspace follow this sequence:
 
 1. Resolve one explicit workspace and exact cue/container UUIDs.
 2. Call `qlab_check_write_readiness`.
@@ -209,6 +209,11 @@ compact sequence:
 4. Supply only the fresh token or per-operation gates returned by that plan.
 5. Execute once; never automatically retry timeout or identity ambiguity.
 6. Require fresh structural/property readback before deciding on recovery.
+
+Opening a document is the exception: no workspace exists to resolve or check
+through OSC. `qlab_open_workspace` uses its own local empty-inventory preflight,
+write-enable setting, file fingerprint and document confirmation token. See the
+[document workflow](docs/user/agent-workflows.md#workspace-documents).
 
 Workspace Settings edits are scoped to General, Audio output patches, Video
 output routes, stages, and regions. Read the exact object and property, run a
@@ -245,7 +250,12 @@ QLAB_UPDATE_DEBUG=false
 default. `QLAB_UPDATE_DEBUG` adds optional Edit diagnostics and does not weaken
 gates or verification. Configuration behavior is implemented in
 `src/qlab_mcp/config.py`; restart the MCP process after changing these values.
-This list is only the entry-point summary.
+`QLAB_TIMEOUT` is the per-transaction OSC/native-script timeout, separate from
+the MCP startup timeout and each tool’s overall call budget. With a passcode,
+normal OSC requests use TCP; without one, requests use isolated ephemeral UDP
+reply ports rather than binding `QLAB_REPLY_PORT` as a fixed listener.
+See [setup and troubleshooting](docs/user/setup-and-troubleshooting.md) for
+launch configuration, process environment and startup diagnostics.
 
 ## Evidence boundary
 
@@ -264,6 +274,7 @@ planned structure
 ## Deeper documentation
 
 - [User guide](docs/user/README.md)
+- [Setup and troubleshooting](docs/user/setup-and-troubleshooting.md)
 - [Public tool catalogue](docs/user/tools.md)
 - [Agent workflows](docs/user/agent-workflows.md)
 - [Security policy](SECURITY.md)
@@ -277,5 +288,5 @@ planned structure
 Inspect the current machine-readable contract with:
 
 ```bash
-uv run fastmcp inspect fastmcp.json
+uv run --locked --no-editable --extra dev fastmcp inspect fastmcp.json --skip-env
 ```

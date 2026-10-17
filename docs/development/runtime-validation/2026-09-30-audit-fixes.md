@@ -1,5 +1,11 @@
 # Audit fixes — QLab 5.5.10 validation
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 Date: 2026-09-30. Updated checkout tested through `Client(mcp)` using the existing
 MCP configuration. The installed server may still need restarting to load these
 changes. Version and published release were not changed.

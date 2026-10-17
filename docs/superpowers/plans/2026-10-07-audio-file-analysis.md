@@ -1,5 +1,11 @@
 # Audio File Analysis Implementation Plan
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add one tool, `qlab_analyze_audio_file`, describing an audio file with numeric measurements every 100 ms, individually timed events and a file summary.

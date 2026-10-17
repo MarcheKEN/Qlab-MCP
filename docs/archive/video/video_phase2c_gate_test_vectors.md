@@ -1,5 +1,11 @@
 # Video Phase 2C — Future Gate Test Vectors
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 ## Purpose
 
 Phase 2C documents the future confirmation-gate contract for Video Phase 3A. It does not implement the gate.

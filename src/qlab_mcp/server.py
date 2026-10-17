@@ -306,14 +306,14 @@ mcp = FastMCP(
     )],
     instructions="""
 QLab MCP exposes forty-nine read-only tools plus thirty gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
-Write mode requires QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; it remains dry-run first.
+Existing-workspace writes require QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; they remain dry-run first. Native document Open has its separate empty-inventory preflight, write-enable setting, file fingerprint and document token; no existing workspace is available for OSC readiness.
 This server does not expose GO, stop, panic, playback, audition, /live writes, arbitrary AppleScript, or raw OSC passthrough. Load loadTime, Target assignedNumber and documented cue Triggers use fixed local AppleScript reads/writes. Native Trigger reads require include_native_triggers=true; configuration requires disabled triggers, activation requires disarmed/no continuation/no skip, and Hotkey enabling is blocked without key/modifier readback.
 
-Orient first with qlab_check_connection, then use a bounded workspace overview/status or the relevant domain-specific settings read, qlab_query_cues, and qlab_get_cue_details as needed. Resolve one exact workspace before any write. Use exact UUIDs for workspace and cue writes; never infer a workspace or target from selection, playhead, or active state.
+Orient first with qlab_check_connection, then use a bounded workspace overview/status or the relevant domain-specific settings read, qlab_query_cues, and qlab_get_cue_details as needed. Resolve one exact workspace before an existing-workspace write. Use exact UUIDs for workspace and cue writes; never infer a workspace or target from selection, playhead, or active state.
 
-Before searching for, inspecting, or assigning a local media file, ask the person directly: "¿Me das permiso para buscar y acceder a los archivos que necesito?" Once granted, use qlab_search_media_files; it searches the MCP user's home folder. The operating system still controls which files the MCP process can read. Use the family editor's dry run and fresh readback before changing a cue.
+Before searching for, inspecting, or assigning a local media file, obtain conversational consent. Reuse consent already granted for the same task and scope; otherwise ask the person directly: "¿Me das permiso para buscar y acceder a los archivos que necesito?" Once granted, use qlab_search_media_files; it searches the MCP user's home folder. The server cannot verify conversation consent; the operating system controls which files the MCP process can read. Use the family editor's dry run and fresh readback before changing a cue.
 
-For every real write, call qlab_check_write_readiness, inspect an explicit dry-run, review warnings/errors/planned operations, supply only the exact fresh confirmation token required by that operation, execute once, and require fresh readback. Do not retry a mutation after a timeout or identity ambiguity. Batches are not automatically transactional.
+For every real existing-workspace write, call qlab_check_write_readiness. Native document Open uses its separate empty-inventory preflight instead. For every real write, inspect an explicit dry-run, review warnings/errors/planned operations, supply only the exact fresh confirmation token required by that operation, execute once, and require fresh readback. Do not retry a mutation after a timeout or identity ambiguity. Batches are not automatically transactional.
 
 Create, Edit, Move, Delete, and Workspace Settings writes have different token, atomicity, rollback, and postcondition rules; follow each tool's description and output fields. A structural or settings result is not runtime validation: a successful write is not necessarily GO-ready. Runtime evidence in this project is bounded to QLab 5.5.10.
 """,
@@ -330,6 +330,7 @@ def qlab_get_workspace_document(workspace_id: CanonicalWorkspaceUUID) -> dict[st
     """Read exact local workspace UUID, document path, dirty flag and native mode/activity.
 
     Requires the running /Applications/QLab.app. No save or close; unknown state blocks writes.
+    Readback includes the full native inventory, including other open documents' paths and names.
     """
     return _run_tool(lambda reader: get_workspace_document(reader, str(workspace_id)))
 
@@ -340,8 +341,9 @@ def qlab_open_workspace(path: StrictStr, dry_run: StrictBool = True,
                         confirm_token: StrictStr | None = None) -> dict[str, Any]:
     """Plan or open one existing local .qlab5 document by absolute path.
 
-    Requires an empty inventory (no workspaces open), a bounded file fingerprint
-    and a five-minute single-use token.
+    Requires QLAB_ENABLE_WRITE, an empty inventory of native workspaces (none open),
+    a file fingerprint bounded to 64 MiB/4096 entries and a five-minute single-use token.
+    Uses native preflight instead of existing-workspace OSC write readiness.
     One native event followed by fresh inventory. Do not retry an uncertain result automatically.
     Does not create a workspace, run cues or change file contents.
     """
@@ -734,7 +736,8 @@ def qlab_check_connection(
     """Check whether QLab, workspace resolution, passcode, and safe read access are ready.
 
     Use this before the overview; it reports /connect permission scopes, /showMode state, and safe read access.
-    Do not use it as write authorization; call qlab_check_write_readiness before any real write.
+    Do not use it as write authorization; call qlab_check_write_readiness before an existing-workspace write.
+    Native document Open instead uses its own empty-inventory preflight.
     """
     return _run_tool(
         lambda reader: QlabConnectionCheckResult.model_validate(

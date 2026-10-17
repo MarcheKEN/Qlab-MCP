@@ -1,9 +1,12 @@
 # Video Phase 8B - Video Embedded Audio Time & Loops
 
-Current note (2026-10-07): Video has a family-specific editor; the generic cue
-editor is retired. The selected embedded-audio timing and Integrated Fade
-runtime checks remain open in [Workorder 029](029_video_audio_runtime_validation.md).
-The phase-specific statements below retain their original evidence date.
+Current note (2026-10-17): The [October 1 deeper pass](../../../development/runtime-validation/2026-10-01-visual-cues.md)
+records timing, clock, Integrated Fade/lock flags and restoration. The
+[October 2 follow-up](../../../development/runtime-validation/2026-10-02-visual-cue-fixes.md)
+records pitch and the exact-media-end `endTime` rejection. Remaining work is
+untested combinations and that boundary behavior, rather than blanket pending
+clock/fade acceptance. Current editors support validated typed batches using
+`confirm:controlCue:v1:`; old per-phase limits below are historical.
 
 ## Historical phase specification
 

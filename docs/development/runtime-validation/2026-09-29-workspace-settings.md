@@ -1,5 +1,11 @@
 # Workspace Settings OSC edits — QLab 5.5.10
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 Validation used `/private/tmp/mcp_workspace_settings_disposable.qlab5`, copied byte-for-byte from `redacted-workspace-6b31c91e.qlab5` (SHA-256 `927f302b28401563b54b5faae941ef1e0633824160e8e4075cd7d60e66e70396`). Computer Use confirmed that QLab had closed the original, opened this exact copy, and showed no active cues. OSC reported one workspace, UUID `8E86FE91-668B-560C-B738-4D581B5A7498`, in Edit mode with edit access.
 
 Each published operation was tried as a dry run followed by one setter, a fresh read of the same property, and a separate gated restoration in the copy. No cues were executed. The tested operations were:

@@ -1,20 +1,24 @@
 # User Guide
 
-QLab MCP 0.3.0 inspects QLab 5 and provides narrowly gated structural writes.
+QLab MCP 0.3.0 inspects QLab 5 and provides gated cue, settings and local
+document changes.
 It does not expose playback or raw OSC.
 
 ## Start
 
 ```bash
-uv sync --no-editable --python 3.11 --extra dev
-uv run qlab-mcp
+uv sync --locked --no-editable --python 3.11 --extra dev
+.venv/bin/python -m qlab_mcp.server
 ```
 
 Inspect the MCP contract without connecting to QLab:
 
 ```bash
-uv run fastmcp inspect fastmcp.json
+uv run --locked --no-editable --extra dev fastmcp inspect fastmcp.json --skip-env
 ```
+
+For client configuration, timeouts, optional media dependencies and startup
+failures, use [Setup and troubleshooting](setup-and-troubleshooting.md).
 
 ## Safe orientation
 
@@ -46,7 +50,8 @@ examples live in the [agent workflow guide](agent-workflows.md).
 ### Preflight
 
 Use `qlab_check_write_readiness` before every real Create, Edit, Move, Delete,
-or Workspace Settings write.
+or Workspace Settings write to an existing workspace. Document opening instead
+uses its own empty-inventory native preflight and document token.
 It is a read-only preflight, not a confirmation token.
 
 ### Create
@@ -69,8 +74,9 @@ one placement form, sequential execution, and fresh parent/order readback.
 ### Delete
 
 [`qlab_delete_cues`](agent-workflows.md#delete-cues) deletes explicit leaves,
-one exact empty Group, or empties one container deepest-first while preserving
-its root.
+one exact empty Group, or empties one container deepest-first. Recursive mode
+preserves its root by default; `delete_container=true` can explicitly remove a
+Group root after its descendants. Cue List/Cart root deletion remains blocked.
 
 ## Evidence boundary
 

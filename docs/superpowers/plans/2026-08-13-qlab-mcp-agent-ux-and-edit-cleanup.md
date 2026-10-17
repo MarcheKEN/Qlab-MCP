@@ -1,8 +1,14 @@
 # QLab MCP 0.3.0 Agent UX and Edit Cleanup Implementation Plan
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 > Historical pre-Workspace-Settings plan. Its fixed 13-tool boundary describes
-> the baseline before PR #16; the current branch has 14 tools, documented in
-> the current README and public tool catalogue.
+> the baseline before PR #16; current capabilities are documented in
+> the README and public tool catalogue, not the historical counts below.
 
 > **Execution gate:** This plan is not authorization to implement. Obtain explicit
 > user approval, then execute task by task. Do not run QLab mutations.

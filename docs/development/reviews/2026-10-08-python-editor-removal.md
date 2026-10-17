@@ -1,5 +1,11 @@
 # Python editor compatibility removal — 2026-10-08
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 The user authorized removal of `QLabReader.edit_cues()` and
 `QLabReader.update_cue()`. Both are absent from the reader and write mixin;
 production callers use the family editors and shared signed executor. Obsolete

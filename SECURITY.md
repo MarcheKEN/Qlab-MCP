@@ -42,7 +42,10 @@ argument. Local file access follows the MCP process account and OS permissions.
 - A failed validation sends zero OSC messages.
 - Workspace settings reads use six domain-specific tools; no public settings
   batch or arbitrary section selector is exposed.
-- Sensitive cue detail/query responses are capped at 50 cues and 1 MiB.
+- Generic `full_sensitive` queries and `full_sensitive`/`exhaustive` cue
+  details are capped at 50 cues and 1 MiB. Technical family reads have their
+  own typed limits and can expose notes, paths, Script source and Network text;
+  they do not inherit this generic response-byte cap.
 - `lightCommandText` is limited to 65,536 UTF-8 bytes, 2,000 lines, and 2,000
   analysis results.
 - OSC numeric values must be representable by the OSC wire format. Values are
@@ -85,8 +88,15 @@ existing `.qlab5` file/package with bounded size and entry limits; execution
 rechecks the fingerprint and inventory before one `open` event. Save is limited
 to the current path, saves all unsaved changes, and binds the token to a bounded
 fingerprint. Close uses `saving no` only after a fresh clean-state check; dirty
-documents are never discarded. Every event requires local write readiness and
-a single-use token, then a fresh native inventory. A timeout is never retried.
+documents are never discarded. Save and Close require existing-workspace OSC
+write readiness. Open instead requires `QLAB_ENABLE_WRITE`, a local empty
+inventory, a readable bounded file/package and its own native preflight; no
+workspace UUID or OSC passcode/Edit permission is checked before opening.
+Every event requires a single-use document token and fresh native inventory.
+A timeout is never retried. Fingerprints for Open and Save are bounded to
+64 MiB and 4,096 package entries including the root; package symlinks are rejected.
+Document Get also returns the complete local inventory, including other open
+workspaces’ paths and names, as explicitly requested native diagnostic data.
 
 The native `modified` flag is not a revision counter: edits made while it is
 already true cannot be detected by comparing that flag. Save therefore can
@@ -116,7 +126,8 @@ results, and does not disable input/output validation. Existing safe OSC read
 TTLs and write invalidation remain in place; expiry-scan scheduling does not
 extend the lifetime of any observed value.
 
-All real Create, Edit, Move, Delete, and Workspace Settings write requests use
+All real Create, Edit, Move, Delete, Workspace Settings and document Save/Close
+requests targeting an existing workspace use
 this universal sequence:
 
 1. Resolve one explicit workspace and exact cue/container identifiers.
@@ -150,8 +161,8 @@ Family editors require a signed five-minute, single-use confirmation for every
 setter. Tokens bind the tool, workspace, cue identity/type, indexed operation,
 prior/requested values and dependencies. The complete batch is validated and
 reserved before mutation. Tokens cannot authorize excluded or unverified setters.
-OSC setters prepare `/alwaysReply` on the same UDP socket/TCP session. The two
-fixed AppleScript setters check their preconditions inside the script.
+OSC setters prepare `/alwaysReply` on the same UDP socket/TCP session. The
+fixed AppleScript property/Trigger setters check their preconditions inside the script.
 Both verify fresh saved state. No automatic retry or rollback; restoration uses new tokens.
 `qlab_edit_cues` is no longer public. FX structure requires a complete stack and
 verified effect identity; Text formatting preserves all observed run attributes
@@ -186,12 +197,13 @@ inspection and a new dry-run/token.
 
 ### Delete
 
-`qlab_delete_cues` uses exact leaf UUIDs, one exact empty `Group`, or one
-root-preserving recursive container request with `confirm:deleteCues:v1`.
-Direct container deletion is limited to an inactive empty `Group`; Cue Lists
-and Cue Carts remain recursive-only. Deletes run sequentially and have no
-automatic rollback. Fresh existence readback must confirm disappearance and,
-for recursive requests, root preservation.
+`qlab_delete_cues` uses 1–50 exact leaf UUIDs, one inactive empty `Group`,
+or one recursive container request with `confirm:deleteCues:v1`. Recursive
+mode preserves the root by default. Explicit `delete_container=true` permits
+a Group root to be removed last, with at most 500 total deletions; root-preserving
+mode allows 500 descendants. Cue List/Cart root deletion remains blocked.
+Deletes run sequentially with fresh emptiness/existence checks and no automatic
+rollback; verify the planned preservation or removal of the root.
 
 ## UDP and Reply Integrity
 
@@ -254,7 +266,11 @@ fail-closed.
   the sequence dry-run -> fresh token -> one setter -> fresh readback ->
   rollback. No GO, playback, Dashboard, or physical output is part of that
   evidence.
-- Large QLab replies may use the existing TCP fallback. This does not imply
+- Configured passcodes use a reader-scoped TCP session for normal requests.
+  Without a passcode, each request uses a new ephemeral UDP reply socket and
+  announces it to QLab; `QLAB_REPLY_PORT` is not a fixed listener in that path.
+  Read-only calls may send `/udpReplyPort` or `/connect` setup messages.
+- Selected large or timed-out read paths may use the existing one-shot TCP fallback. This does not imply
   degraded physical playback or output failure.
 - Read profiles and public result shapes are compatibility contracts. The
   server may return structured runtime errors while FastMCP/Pydantic may reject
@@ -288,8 +304,8 @@ writer and bind confirmations to their tool names. Strict schemas exclude
 patches, target modes, duration and temporary properties. Devamp settings require
 an inactive healthy Audio/Video target; Stop target requires Start next enabled.
 Target assignment requires an inactive healthy cue accepting cue targets and
-rejects Fade. Target's Cue Number tab is unavailable via documented OSC and is
-not simulated by cue execution or temporary retargeting. Boolean scope readback
+rejects Fade. Target assigned numbers use the fixed local AppleScript bridge; they are not
+simulated by cue execution or temporary retargeting. Boolean scope readback
 blocks Fade & Stop changes even if returned from the scalar endpoint.
 
 
@@ -383,8 +399,10 @@ runtime readiness or coverage of all setters.
 
 ### Local media discovery
 
-Before searching, inspecting or assigning local media, the agent asks the user
-directly for permission in the conversation. `qlab_search_media_files` then
+Before searching, inspecting or assigning local media, obtain conversational
+authorization. Reuse consent already granted for the same task and scope; ask
+when it is missing or the scope changes. Consent is an agent obligation, not
+a token or server-enforced proof: the MCP server cannot inspect the conversation. `qlab_search_media_files` then
 searches the MCP user's home folder by filename substring. It is bounded to 20,000 entries,
 five seconds and 100 results, and skips symlinks. The operating system still
 controls which files the MCP process can read. FileTarget edits retain existing

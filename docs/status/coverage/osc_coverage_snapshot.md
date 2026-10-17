@@ -36,7 +36,7 @@ enable blocked operations. Historical gate descriptions are preserved below.
 | Devamp | 0 | 3 | 0 | 0 |
 | Script | 0 | 1 | 0 | 0 |
 
-## Current public contract (2026-10-08)
+## Current public contract (reviewed 2026-10-17)
 
 - `qlab_edit_cues`, `QLabReader.edit_cues()` and `QLabReader.update_cue()`
   are removed. Family editors reuse private helpers, not a generic entry point.
@@ -56,7 +56,15 @@ enable blocked operations. Historical gate descriptions are preserved below.
 - Setters use the reader's socket with `alwaysReply`, tolerate a successful empty
   acknowledgment, read back fresh state and stop uncertainty without retry.
 
+The route table above is regenerated and checked against current registry
+metadata; it is not a count of tools or live-validated setters. Dated Text/FX
+[October 9–14 reports](../../development/runtime-validation/README.md) cover only
+their named cases. Missing identity/baseline/default/reconstruction still blocks writes.
+
 ## Historical invariants and runtime evidence
+
+Current family editors emit signed `confirm:controlCue:v1:` tokens. Do not
+construct or reuse the legacy tokens below.
 
 The following records describe earlier private motor gates and historical
 fixtures. They are retained as evidence; they do not override the current public

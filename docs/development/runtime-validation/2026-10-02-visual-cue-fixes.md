@@ -1,5 +1,11 @@
 # Visual editor fixes and remaining QLab limits — 2026-10-02
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 QLab 5.5.10, workspace `redacted-workspace-6b31c91e.qlab5`, UUID
 `8E86FE91-668B-560C-B738-4D581B5A7498`, path
 `<redacted-local-path-851cab375f>.qlab5`.

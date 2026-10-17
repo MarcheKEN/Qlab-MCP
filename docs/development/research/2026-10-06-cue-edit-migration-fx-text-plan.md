@@ -1,5 +1,11 @@
 # Research to complete editors and remove the generic tool
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 Update 2026-10-09: the following analysis retains its original date.
 The generic tool and obsolete Python methods have now been removed. Text
 UTF-16/percentage/ASCII-word selectors and partial fonts with observed tuples

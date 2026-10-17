@@ -1,5 +1,11 @@
 # Workspace Settings: comparison of MCP, QLab and code
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 **Date:** 2026-09-29. **Observed workspace:** `redacted-workspace-6b31c91e.qlab5`, UUID `8E86FE91-668B-560C-B738-4D581B5A7498`, QLab 5.5.10. **Method:** read-only MCP tools, QLab inspection through Computer Use, code reading and five OSC queries without arguments to one region. No setters were sent, cues executed or workspace saved. The settings window was closed afterward. No screenshots or credentials were stored.
 
 Capability sources: [official OSC dictionary](https://qlab.app/docs/v5/scripting/osc-dictionary-v5/), [Workspace Settings manual](https://qlab.app/docs/v5/fundamentals/workspace-settings/) and [earlier inventory and plan](2026-09-29-workspace-settings-osc-edit-plan.md). Live observations apply to QLab 5.5.10; the website may describe a later version.

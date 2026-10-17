@@ -1,4 +1,27 @@
-# Current Project State — 2026-10-15
+# Current Project State — 2026-10-17
+
+## Documentation reconciliation — 2026-10-17
+
+Current source exposes 79 tools (49 reads, 30 gated writes). The [roadmap](roadmap.md)
+now separates implemented contracts from remaining runtime cases; [architecture](../development/architecture.md)
+reflects native document/Trigger operations and actual UDP/TCP behavior.
+Existing-workspace writes require OSC readiness. Native Open instead uses its
+empty-inventory, write-enable, fingerprint and document-token preflight.
+
+Clock/fade/mute already have bounded October 1–2 proof. Solo/solo-clear, healthy
+Video slice inventories and remaining marker operations still need their own
+acceptance. Native document Get has evidence; Open/Save/Close events remain
+unvalidated in the existing reports. Text shadow, fallback and FX identity/
+reconstruction gates remain. Historical pending/restart statements below must
+be read against the latest record, not treated as current global restrictions.
+
+No new live QLab writes, playback or hardware validation were performed for
+this documentation review. See the [documentation audit](../development/reviews/2026-10-17-documentation-audit.md).
+
+## Dated evidence
+
+The sections below retain the counts, fixtures and observations of each date;
+they do not assert current installed-process freshness or live workspace state.
 
 ## Precommit preparation — 2026-10-15
 
@@ -609,7 +632,7 @@ A clean checkout generated with `git archive` passed the reproducible flow with
 `2580 passed, 4 skipped, 41 subtests passed`; the skips correspond to missing
 local `.codex/agents/` fixtures. This local result does not replace GitHub CI.
 
-## Active Workorders
+## Active Workorders — historical preparation snapshot
 
 Workorders 017, 019, 021, and 022 are classified as local implementation with
 runtime validation pending. Workorder 029 remains active runtime-validation

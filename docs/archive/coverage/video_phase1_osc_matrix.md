@@ -1,5 +1,11 @@
 # Video Phase 1 OSC Matrix
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 QLab 5 reference classification for Video, Camera, Text, and Workspace Video.
 Canonical route source: `docs/references/qlab_osc_dictionary.md`.
 Runtime coverage remains generated from the dictionary; this matrix records Phase 1 safety decisions.

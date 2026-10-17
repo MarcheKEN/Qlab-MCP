@@ -54,3 +54,10 @@ source is regenerated.
 
 Archived docs are kept for traceability. They are not the active implementation
 plan.
+
+## Record indexes
+
+- [Research](development/research/README.md)
+- [Runtime validation](development/runtime-validation/README.md)
+- [Reviews](development/reviews/README.md)
+- [Historical implementation plans](superpowers/plans/README.md)

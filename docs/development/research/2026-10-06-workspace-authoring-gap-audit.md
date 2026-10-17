@@ -1,5 +1,11 @@
 # Pending capability audit: workspace authoring
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 Date: 2026-10-06. Scope: reading, creation and persistent editing; no cue execution, `/live`, external signals, Audio Maps or Script compilation.
 
 Subsequent deeper analysis: [generic-tool migration, FX/Text, Group and AppleScript](2026-10-06-cue-edit-migration-fx-text-plan.md) and [Video FX catalog](2026-10-06-video-fx-parameter-inventory.md). The detailed comparison also identifies the limited FX gate still in the generic tool and accidental exposure through its fallback: do not confuse a planned catalog with an effective executor block.

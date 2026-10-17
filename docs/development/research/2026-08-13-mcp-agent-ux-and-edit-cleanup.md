@@ -1,5 +1,11 @@
 # QLab MCP 0.3.0: MCP Agent UX and Edit Cleanup Research
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 Date: 2026-08-13
 
 Repository baseline: `codex/docs` at `7f1f13f5b012329cef2635beb2134d8b82e9475d`

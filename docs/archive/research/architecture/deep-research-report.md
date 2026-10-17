@@ -1,5 +1,11 @@
 # 1. Current Project State (`main` branch)
 
+> Historical evidence or dated plan. Use the [current tools](../../../user/tools.md) and
+> [roadmap](../../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 The **Qlab-MCP** repository is a FastMCP server that exposes tools for interacting with QLab 5 via OSC, focusing on reading data (workspaces, cues, settings, status, details) and carrying out safe write operations (with dry-run and confirmation). The **entry point** appears to be `src/qlab_mcp/server.py`: it creates a `FastMCP(...)` instance, decorates functions such as `@mcp.tool` for each operation, and finally starts the server (`mcp.run()`). The public *tools* correspond to those functions registered in `server.py`; for example, there will be tools for listing cues, getting cue details, reading workspace settings, and so on.
 
 The FastMCP initializer is probably in `server.py`, something like:

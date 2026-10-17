@@ -1,5 +1,11 @@
 # 08 — Project Direction
 
+> Historical evidence or dated plan. Use the [current tools](../../../user/tools.md) and
+> [roadmap](../../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 ## Technical verdict
 
 The architecture is suitable for continued **controlled** expansion, but not for adding more specialized write families at the current rate. The read surface, exact-target safety, dry-run/gate/readback model, narrow dependencies and 13-tool MCP organization are solid. Stability is blocked by one reproduced UDP stale-reply defect, two other protocol lifecycle gaps, a cache invalidation race, inconsistent release artifacts, and the absence of a current reversible QLab proof.

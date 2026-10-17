@@ -1,5 +1,11 @@
 # Documentary inventory of Video FX
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 Date: 2026-10-06. Factual data from the [official Parameter Reference](https://qlab.app/docs/v5/scripting/parameter-reference/#video-effects), cross-checked by the researcher against the local PDF `docs/sources/qlab-5.5.10/reference/QLab_5_Reference_Manual.local-snapshot.pdf`, pages 678–687. The folder name does not prove the PDF's exact date/version or a 5.5.10 runtime trial.
 
 **60 effects, 262 `(effect,key)` targets: 229 numbers, 21 enums, 11 vectors of four floats and one boolean.** This is not a catalog obtained from runtime; there were no writes. FalseColor has no scriptable parameters and GaborGradients has no parameters.

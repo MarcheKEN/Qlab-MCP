@@ -2,6 +2,12 @@
 > are described in [2026-10-05 completion](2026-10-05-remaining-cue-completion.md).
 > The separate-executor and single-property descriptions below are superseded.
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 # Remaining typed cue editors
 
 This migration splits the existing profile executor into nine UUID-only public

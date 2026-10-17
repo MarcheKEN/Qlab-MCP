@@ -1,5 +1,11 @@
 # Audio file analysis — 2026-10-07
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 ## Verified source and runtime
 
 One new public read-only tool, `qlab_analyze_audio_file`; registry: **73 tools,

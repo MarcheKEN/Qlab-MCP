@@ -1,5 +1,11 @@
 # Cue Editor Runtime Checklist
 
+> Historical evidence or dated plan. Use the [current tools](../../user/tools.md) and
+> [roadmap](../../status/roadmap.md) for today’s contract. Counts, tokens, commands and observations
+> below retain their original scope; this record does not authorize implementation
+> or establish present runtime readiness. Original-language quotations and user
+> data are preserved where they are part of the evidence.
+
 Use the public family editors with exact workspace and cue UUIDs. The generic
 MCP tool and Python `QLabReader.edit_cues()` / `QLabReader.update_cue()` methods
 are removed. Split mixed-family batches between their editors.

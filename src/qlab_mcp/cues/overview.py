@@ -14,8 +14,8 @@ from .index import (
     normalize_cue_index_profile,
 )
 from .profiles import _derive_profile_fields
-from .refs import CONTAINER_CUE_TYPES, _bounded_cue_refs_from_shallow, _flatten_cue_refs
-from ..runtime.connection import QLAB_VERSION_KEYS, read_workspace_mode
+from .refs import CONTAINER_CUE_TYPES, _bounded_cue_refs_from_shallow, _flatten_cue_refs, _is_container_cue
+from ..runtime.connection import _workspace_candidate as _workspace_overview_metadata, read_workspace_mode
 
 
 KNOWN_TOTAL_CUES_MEANING = "cue_items_including_cue_lists"
@@ -38,22 +38,6 @@ OVERVIEW_CUE_KEYS = (
     "cartPosition/column",
 )
 
-def _workspace_overview_metadata(workspace: Any) -> dict[str, Any]:
-    if not isinstance(workspace, dict):
-        return {"value": workspace}
-
-    name = workspace.get("displayName") or workspace.get("name") or workspace.get("fileName")
-    qlab_version = next((workspace.get(key) for key in QLAB_VERSION_KEYS if workspace.get(key)), None)
-
-    return {
-        "uniqueID": workspace.get("uniqueID"),
-        "name": name,
-        "displayName": workspace.get("displayName"),
-        "qlab_version": qlab_version,
-        "metadata": dict(workspace),
-    }
-
-
 def _known_child_count(cue: Any) -> int | None:
     if not isinstance(cue, dict):
         return None
@@ -74,10 +58,6 @@ def _cue_overview_node(cue: Any) -> dict[str, Any]:
     node["child_count"] = _known_child_count(cue)
     node["children"] = []
     return node
-
-
-def _is_container_cue(cue: dict[str, Any]) -> bool:
-    return cue.get("type") in CONTAINER_CUE_TYPES
 
 
 def _count_stat(stats: dict[str, Any], bucket: str, key: Any) -> None:

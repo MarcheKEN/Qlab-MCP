@@ -1327,24 +1327,11 @@ class WorkspaceSettingsMixin:
             )
 
         if normalized_section == "video":
-            if normalized_kind == "route":
-                items = self._read_workspace_setting(resolved_workspace_id, "video/routes", errors, "video.routes")
-                return self._setting_details_from_collection(
-                    resolved_workspace_id,
-                    normalized_section,
-                    normalized_kind,
-                    ref,
-                    normalized_profile,
-                    items,
-                    redactions,
-                    errors,
-                )
-            if normalized_kind == "video_input_patch":
+            if normalized_kind in {"route", "video_input_patch"}:
+                command = "video/routes" if normalized_kind == "route" else "video/inputPatchList"
+                error_key = "video.routes" if normalized_kind == "route" else "video.inputPatchList"
                 items = self._read_workspace_setting(
-                    resolved_workspace_id,
-                    "video/inputPatchList",
-                    errors,
-                    "video.inputPatchList",
+                    resolved_workspace_id, command, errors, error_key,
                 )
                 return self._setting_details_from_collection(
                     resolved_workspace_id,
@@ -1488,19 +1475,7 @@ class WorkspaceSettingsMixin:
             )
 
         if normalized_section == "general":
-            if normalized_kind != "all":
-                raise ValueError("General details support only kind all")
-            details = self._workspace_settings_general(resolved_workspace_id, errors)
-            return self._settings_details_result(
-                resolved_workspace_id,
-                normalized_section,
-                normalized_kind,
-                ref,
-                normalized_profile,
-                details=details,
-                redactions=redactions,
-                errors=errors,
-            )
+            raise ValueError("General details support only kind all")
 
     def _get_workspace_settings_details_batch(
         self,

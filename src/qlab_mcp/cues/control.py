@@ -30,10 +30,7 @@ class ControlCuesResult(AudioCuesResult):
 class ControlBasics(MicBasics):
     defaultName: StrictStr | None = None
     listName: StrictStr | None = None
-    secondColorName: StrictStr | None = None
-    useSecondColor: StrictBool | None = None
     cartPosition: tuple[StrictInt, StrictInt] | None = None
-    allowsEditingDuration: StrictBool | None = None
     hasCueTargets: StrictBool | None = None
     hasFileTargets: StrictBool | None = None
     canHavePatchTargets: StrictBool | None = None

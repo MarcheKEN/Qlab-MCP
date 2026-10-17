@@ -79,9 +79,7 @@ class VisualGeometry(BaseModel):
 
 
 class VisualBasics(MicBasics):
-    secondColorName: StrictStr | None = None
-    useSecondColor: StrictBool | None = None
-    allowsEditingDuration: StrictBool | None = None
+    pass
 
 
 class VisualMediaBasics(AudioBasics, VisualBasics):
@@ -89,8 +87,6 @@ class VisualMediaBasics(AudioBasics, VisualBasics):
 
 
 class VideoTiming(AudioTiming):
-    doFade: StrictBool | None = None
-    lockFadeToCue: StrictBool | None = None
     holdLastFrame: StrictBool | None = None
     clockType: Literal["audio", "video"] | None = None
 

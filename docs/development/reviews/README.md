@@ -7,6 +7,7 @@ Use the [current tool catalogue](../../user/tools.md) and
 
 ## Records
 
+- [Code cleanup — 2026-10-17](2026-10-17-code-cleanup.md)
 - [Precommit validation — 2026-10-15](2026-10-15-precommit-validation.md)
 - [Python editor compatibility removal — 2026-10-08](2026-10-08-python-editor-removal.md)
 - [QLab MCP — Workspace Settings Write Pre-PR Audit](2026-08-16-workspace-settings-write-pre-pr-audit.md)

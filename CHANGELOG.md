@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reuse existing reader normalization and inherited cue model fields, and
+  simplify equivalent settings/creation branches without changing MCP contracts.
 - Evidence capture now redacts confirmation tokens embedded in JSON-quoted
   strings as well as structured responses.
 - Workspace document operations now require an explicit native send acknowledgement

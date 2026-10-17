@@ -488,9 +488,9 @@ def _light_definition_summary(definition: Any) -> dict[str, Any]:
 
 
 def _first_present_case_insensitive(mapping: dict[str, Any], keys: tuple[str, ...]) -> Any:
-    for key in keys:
-        if key in mapping and mapping[key] not in (None, ""):
-            return mapping[key]
+    value = _first_present(mapping, keys)
+    if value is not None:
+        return value
     normalized_keys = {key.casefold(): key for key in keys}
     for key, value in mapping.items():
         if str(key).casefold() in normalized_keys and value not in (None, ""):

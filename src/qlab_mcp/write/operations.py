@@ -610,10 +610,7 @@ class QLabWriteMixin:
         placement_mode, placement_target = "destination", destination
 
         try:
-            if effective_dry_run:
-                workspace = _resolve_create_workspace(self, workspace, dry_run=True)
-            else:
-                workspace = _resolve_create_workspace(self, workspace, dry_run=False)
+            workspace = _resolve_create_workspace(self, workspace, dry_run=effective_dry_run)
             prepared = _prepare_create_request(
                 self,
                 workspace,

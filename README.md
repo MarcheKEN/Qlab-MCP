@@ -6,6 +6,9 @@ QLab MCP **0.4.0** connects an MCP-compatible agent to QLab 5, primarily through
 OSC. It can organize cues, configure supported properties and inspect workspace
 settings. Selected local functions use fixed AppleScript bridges on macOS.
 
+**Developed and tested with QLab 5.5.10 on macOS.** Other QLab versions may
+behave differently and have not been validated by this project.
+
 The server provides **79 tools: 49 read-only and 30 gated writes**.
 Writes are disabled by default and require a reviewed preview and confirmation.
 
@@ -66,7 +69,67 @@ uv sync --locked --no-editable --python 3.11
 This installs a snapshot of the project into `.venv`. After updating the
 checkout, repeat the sync to install the new source.
 
-### 3. Connect your MCP client
+### 3. Configure QLab
+
+In the workspace, open **Workspace Settings → Network → OSC Access**:
+
+1. Enable OSC access using the checkbox at the top left.
+2. Use **Add Passcode**, or edit an existing passcode row. QLab passcodes are
+   four-digit numbers. Enable **View** for inspection and **Edit** if you want
+   gated changes. **Control** permits playhead movement and cue start/stop;
+   this MCP does not expose playback controls.
+3. Copy that passcode into `QLAB_PASSCODE` in your MCP client's environment.
+   Preserve any leading zero. For passcode-free inspection, the **No Passcode**
+   row must allow View; existing-workspace writes still require a passcode.
+4. Check the listening ports:
+
+| QLab setting | Default | Use with this MCP |
+| --- | --- | --- |
+| OSC Listen Port (TCP and UDP) | `53000` | Set `QLAB_OSC_PORT` to this workspace port. |
+| Plain Text Listen Port (UDP) | `53535` | Not used by this server; leave it at its default. |
+
+Set `QLAB_HOST=127.0.0.1` when QLab and the MCP server run on the same Mac,
+or use the QLab Mac's reachable address for remote OSC access. The server's
+`QLAB_REPLY_PORT` setting is separate from both QLab listening ports.
+See [QLab's OSC Access documentation](https://qlab.app/docs/v5/fundamentals/workspace-settings/#the-osc-access-tab).
+
+### 4. Connect your MCP client
+
+#### Codex
+
+Add the following to **`~/.codex/config.toml`**, preserving existing settings.
+Codex uses TOML rather than the JSON format shown for other clients below.
+
+```toml
+[mcp_servers.qlab]
+command = "/absolute/path/Qlab-MCP/.venv/bin/python"
+args = ["-m", "qlab_mcp.server"]
+
+[mcp_servers.qlab.env]
+QLAB_HOST = "127.0.0.1"
+QLAB_OSC_PORT = "53000"
+QLAB_PASSCODE = "REPLACE_WITH_QLAB_PASSCODE"
+QLAB_ENABLE_WRITE = "false"
+QLAB_WRITE_DRY_RUN_DEFAULT = "true"
+```
+
+Replace the absolute path and passcode with your own values. Omit
+`QLAB_PASSCODE` only for passcode-free inspection configured in QLab above.
+Keep this configuration private because it contains your passcode.
+
+Restart Codex after saving. In the desktop app, check that `qlab` is enabled
+in the MCP settings, then start a new conversation and ask:
+
+> Use the QLab MCP to check the connection and list the available workspaces.
+> Do not modify anything.
+
+The agent should call `qlab_check_connection`. If several workspaces are open,
+choose the intended workspace by its exact UUID. To allow edits later, follow
+[Enabling writes](#enabling-writes); connecting alone does not enable them.
+See [the official Codex MCP guide](https://developers.openai.com/codex/mcp/)
+for configuration options.
+
+#### Other MCP clients
 
 Configure your client to launch the installed Python interpreter with
 `-m qlab_mcp.server`. For clients using an `mcpServers` JSON configuration:
@@ -92,8 +155,7 @@ Replace the absolute path with your checkout location. Other clients may use
 TOML or a settings form: provide the same command, arguments and environment.
 The client starts the server; a separate terminal server is not required.
 
-In QLab, make the workspace's OSC port match `QLAB_OSC_PORT`. If access is
-passcode-protected, add the matching `QLAB_PASSCODE` to the client environment.
+Add the matching `QLAB_PASSCODE` to the environment for passcode-protected access.
 Restart/reload the connector, then ask the agent to call `qlab_check_connection`.
 Choose an exact workspace UUID if several are open.
 

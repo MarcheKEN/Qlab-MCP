@@ -814,6 +814,14 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {'qlab_get_fonts': {
                      'tags': ['details', 'inventory', 'qlab', 'query', 'safe-read'],
                      'timeout': 60.0,
                      'title': 'Query QLab Cues'}}
+EXPECTED_FASTMCP_TOOL_CONTRACTS["qlab_edit_light_patch"] = {
+    "title": "Edit QLab Light Patch", "timeout": 120.0,
+    "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                    "idempotentHint": False, "openWorldHint": True},
+    "tags": ["gated-write", "qlab", "workspace"],
+    "input_schema_hash": "da21b945f64947bb795554a32462f2e0bfcb8072abbefab601a1dbf9e61b0ad1",
+    "output_schema_hash": "82ef96cebaf5fbe16269fd18b0240d78f5b9b90a4155a17eb797115b09148ecf",
+}
 ADDED_TOOL_NAMES = {
     "qlab_get_video_effect_catalogue", "qlab_get_workspace_document",
     "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace",
@@ -826,6 +834,7 @@ EXPECTED_TOOL_CONCEPTS = {"qlab_get_fonts": ("PostScript", "TCP", "family/style"
     "qlab_open_workspace": ("empty inventory", "single-use", "Do not retry"),
     "qlab_save_workspace": ("existing path", "unsaved", "single-use"),
     "qlab_close_workspace": ("no unsaved changes", "saving no", "single-use"),
+    "qlab_edit_light_patch": ("1–100", "5.5.10", "single-use", "same path", "Light cues are never changed", "Do not retry"),
     "qlab_analyze_audio_file": ("100 ms", "source file", "512 KiB", "FFmpeg"),
     "qlab_search_media_files": ("home folder", "fileTarget", "truncated", "dry-run"),
     "qlab_edit_audio_cues": ("1–50", "dry_run", "confirm_gates", "single-use", "non-atomic", "Never retry"),
@@ -1177,7 +1186,7 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
     tools = asyncio.run(list_tools())
     tool_names = {tool.name for tool in tools}
 
-    assert len(tools) == 79
+    assert len(tools) == 80
     assert tool_names == EXPECTED_TOOL_NAMES
     assert "qlab_create_cue" not in tool_names
     forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
@@ -1196,12 +1205,13 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
             return set().union(*(schema_fields(child) for child in value))
         return set()
 
-    public_input_fields = set().union(
-        *(schema_fields(tool.inputSchema) for tool in tools)
-    )
+    public_input_fields = set().union(*(schema_fields(tool.inputSchema) for tool in tools))
     assert public_input_fields.isdisjoint(
-        {"address", "osc_address", "osc_path", "raw_osc", "raw_osc_message"}
+        {"osc_address", "osc_path", "raw_osc", "raw_osc_message"}
     )
+    # Light Patch uses a bounded DMX address, not an arbitrary OSC address.
+    assert all("address" not in schema_fields(tool.inputSchema)
+               for tool in tools if tool.name != "qlab_edit_light_patch")
 
     real_write_specs = [
         property_spec
@@ -1506,7 +1516,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    write_tools = {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_create_cue_lists", "qlab_edit_cue_lists", "qlab_create_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace"}
+    write_tools = {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_create_cue_lists", "qlab_edit_cue_lists", "qlab_create_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch"}
     read_only_tools = EXPECTED_TOOL_NAMES - write_tools
 
     for tool_name in read_only_tools:
@@ -1517,7 +1527,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
 
     for tool_name in write_tools:
         assert tools[tool_name].annotations.readOnlyHint is False, f"{tool_name} was marked read-only"
-        if tool_name in {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_cue_lists", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_save_workspace", "qlab_close_workspace"}:
+        if tool_name in {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_cue_lists", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch"}:
             assert tools[tool_name].annotations.destructiveHint is True
         else:
             assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
@@ -1740,6 +1750,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_open_workspace",
         "qlab_save_workspace",
         "qlab_close_workspace",
+        "qlab_edit_light_patch",
         "qlab_edit_audio_cues",
         "qlab_edit_mic_cues",
         "qlab_edit_light_cues",
@@ -2865,7 +2876,7 @@ def test_move_delete_capture_records_full_mcp_envelopes_and_redacts_secrets(monk
     async def calls():
         async with Client(mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-            assert len(tools) == 79
+            assert len(tools) == 80
             assert tools["qlab_delete_cues"].inputSchema["properties"]["delete_container"]["default"] is False
             for name in ("qlab_move_cues", "qlab_delete_cues"):
                 assert {"pending_cue_ids", "uncertain_cue_ids"} <= tools[name].outputSchema["properties"].keys()
@@ -2899,3 +2910,73 @@ def test_move_delete_capture_preserves_transport_exception():
     result = asyncio.run(capture["capture_call"](BrokenClient(), {"tool": "qlab_move_cues", "arguments": {}}))
     assert result["response"]["exception_type"] == "OscTimeoutError"
     assert result["response"]["error"] == "synthetic transport timeout"
+
+
+def test_light_patch_tool_has_bounded_discriminated_schema_and_destructive_metadata():
+    async def inspect_tool():
+        async with Client(mcp) as client:
+            return {tool.name: tool for tool in await client.list_tools()}
+
+    tools = asyncio.run(inspect_tool())
+    assert "qlab_edit_light_patch" in tools
+    tool = tools["qlab_edit_light_patch"]
+    assert tool.annotations.readOnlyHint is False
+    assert tool.annotations.destructiveHint is True
+    assert tool.annotations.idempotentHint is False
+    assert tool.inputSchema["properties"]["dry_run"]["default"] is True
+    operations = tool.inputSchema["properties"]["operations"]
+    assert operations["minItems"] == 1 and operations["maxItems"] == 100
+    assert all("action" in variant["required"] for variant in operations["items"]["oneOf"])
+    assert len(operations["items"]["oneOf"]) == 12
+
+
+def test_light_patch_tool_delegates_typed_batch_with_omissions_preserved(monkeypatch):
+    reader = object()
+    calls = []
+    monkeypatch.setattr(server_module, "_reader", lambda: reader)
+
+    def edit(target_reader, workspace_id, operations, dry_run, confirm_token):
+        calls.append((target_reader, workspace_id, operations, dry_run, confirm_token))
+        return {"ok": True, "status": "planned", "executed_operations": []}
+
+    monkeypatch.setattr(server_module, "edit_light_patch", edit)
+    ws = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    operation = {"action": "update_instrument", "name": "Front Wash", "note": "Updated note"}
+
+    async def call():
+        async with Client(mcp) as client:
+            return await client.call_tool("qlab_edit_light_patch", {"workspace_id": ws, "operations": [operation]})
+
+    result = asyncio.run(call())
+    assert not result.is_error
+    assert result.structured_content["status"] == "planned"
+    assert calls == [(reader, ws, [operation], True, None)]
+
+
+def test_light_patch_tool_rejects_invalid_batches_before_reader(monkeypatch):
+    calls = []
+
+    def unexpected_reader():
+        calls.append(True)
+        raise AssertionError("invalid patch input must not construct a reader")
+
+    monkeypatch.setattr(server_module, "_reader", unexpected_reader)
+    ws = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    operation = {"action": "delete_group", "name": "G"}
+    cases = [
+        {"workspace_id": ws, "operations": []},
+        {"workspace_id": ws, "operations": [operation] * 101},
+        {"workspace_id": "selected", "operations": [operation]},
+        {"workspace_id": ws, "operations": [{**operation, "arbitrary_key": True}]},
+        {"workspace_id": ws, "operations": [{"action": "raw_archive", "name": "G"}]},
+        {"workspace_id": ws, "operations": [operation], "dry_run": "false"},
+    ]
+
+    async def rejected():
+        async with Client(mcp) as client:
+            for arguments in cases:
+                with pytest.raises(Exception):
+                    await client.call_tool("qlab_edit_light_patch", arguments)
+                assert calls == []
+
+    asyncio.run(rejected())

@@ -1,6 +1,6 @@
 # Public MCP Tools
 
-QLab MCP exposes exactly 79 tools on the current development branch. This page is a compact human
+QLab MCP exposes exactly 80 tools on the current development branch: 49 reads and 31 gated writes. This page is a compact human
 catalogue; decorated functions, generated schemas, and
 `tests/test_server_tools.py` remain the source of truth for exact parameters,
 annotations, and result models.
@@ -47,6 +47,7 @@ annotations, and result models.
 | `qlab_get_video_output_route` | Exact output route UUID and destination, safe or technical | Independent device inventory or mutation | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_video_region` | Exact OSC bounds, grid/guide and optional one control point | Full point scan or UI-coordinate conversion | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_workspace_light_settings` | Light Patch summary or redacted technical payload | Light Definitions or Dashboard settings | [Read](agent-workflows.md#read-sequence) |
+| `qlab_edit_light_patch` | One signed batch of 1–100 instrument, group and workspace-definition operations, with same-path close/edit/reopen | Cue repair, global Library, Dashboard MIDI, USB device discovery/hardware proof or unvalidated parameter creation | [Light Patch](agent-workflows.md#edit-the-light-patch) |
 | `qlab_get_workspace_network_settings` | Network Patch inventory or exact patch | The complete Network panel | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_workspace_midi_settings` | MIDI Patch inventory or exact patch | The complete MIDI panel | [Read](agent-workflows.md#read-sequence) |
 | `qlab_query_cues` | Bounded filtered cue discovery | Full Inspector payloads | [Read](agent-workflows.md#read-sequence) |
@@ -94,7 +95,8 @@ annotations, and result models.
   instead requires write-enable, an empty local inventory, a bounded fingerprint
   and a document token; it cannot run existing-workspace OSC readiness.
 - Edit confirmation is per planned operation; Create, Move, Delete, and
-  Workspace Settings Edit tools use dedicated confirmation flows.
+  Workspace Settings Edit tools use dedicated confirmation flows. Light Patch
+  uses one source-bound `confirm:lightPatch:v1:` token for the complete batch.
 - Batches are sequential/non-transactional unless a tool description says
   otherwise. Timeout or identity ambiguity means inspect first; do not retry.
 - `destructiveHint` is MCP metadata, not authorization. Runtime gates remain

@@ -533,6 +533,110 @@ status and never resend automatically. Native Get, Save preview and dirty-Close/
 nonempty-Open blocking have [bounded live evidence](../development/runtime-validation/2026-10-17-installed-mcp-acceptance.md);
 actual Open/Save/Close events remain unvalidated by these reports.
 
+## Edit the Light Patch
+
+Use `qlab_get_workspace_light_settings` to orient the patch, then
+`qlab_edit_light_patch` to preview and apply one complete batch. This edits
+instruments, light groups and workspace Light Definitions, not Light cues.
+It requires local QLab **5.5.10/build 5510**, write readiness and a clean inactive
+document in Edit Mode, with start-on-open and start-on-close disabled. The saved file must be an owned, single-link regular
+`.qlab5` bounded to 64 MiB; packages and unsupported archive forms are rejected.
+
+The tool accepts 1–100 strict operations:
+
+| Element | Actions | Fields |
+| --- | --- | --- |
+| Instrument | `create_instrument`, `update_instrument`, `rename_instrument`, `delete_instrument` | Exact `name`; `definition`, `note`, `output` for create/update; `new_name` for rename |
+| Group | `create_group`, `update_group`, `rename_group`, `delete_group` | Exact `name`; `note`, `members` for create/update; `new_name` for rename |
+| Definition | `create_definition`, `update_definition`, `rename_definition`, `delete_definition` | Exact `name`; `manufacturer`, ordered `parameters`, `default_parameter` for create/update; `new_name` for rename |
+
+Omitted update fields are preserved. Explicit `null` is accepted only for
+`default_parameter`, where it clears the default. Use `output={"backend":"none"}`
+to unpatch. Art-Net uses `backend="artnet"`, `net` 0–127, `subnet` 0–15,
+`universe` 0–15 and the displayed starting `address` 1–512. Validate the complete
+footprint and output namespace, not just the first channel. USB-DMX requires
+`backend="usb"`, exact `device_serial`/`device_name`, `device_universes`, a
+zero-based `universe` and displayed `address`. The supplied identity is saved
+configuration, not device discovery: a missing device can remain unpatched.
+No compatible USB-DMX device has been validated; no physical output is claimed.
+
+New definition parameters are `scalar` or `rgbcolor`. Scalar parameters name
+`two_bytes`, `value_is_percentage` and `home_value`: percentage homes are finite
+0–100 values, including decimals; raw DMX homes are integers 0–255 or 0–65535
+when `two_bytes=true`. RGB parameters use three scalar names in `outputs`, in
+red/green/blue order, and consume no extra physical slots. Other existing
+recognized parameter variants are preserved; no new encoding is inferred.
+Updating shared definitions validates every affected instrument footprint.
+
+For example, after resolving the real workspace UUID:
+
+```json
+{
+  "workspace_id": "11111111-1111-4111-8111-111111111111",
+  "operations": [
+    {
+      "action": "create_definition",
+      "name": "Example Dimmer",
+      "manufacturer": "Example",
+      "parameters": [
+        {"type": "scalar", "name": "intensity", "home_value": 0}
+      ],
+      "default_parameter": "intensity"
+    },
+    {
+      "action": "create_instrument",
+      "name": "Example Roof",
+      "definition": "Example Dimmer",
+      "output": {"backend": "none"}
+    },
+    {"action": "create_group", "name": "Example Front", "members": ["Example Roof"]}
+  ],
+  "dry_run": true
+}
+```
+
+Review `changes`, `summary`, `warnings`, `affected_cues` and empty
+`executed_operations`. Repeat the same workspace/operations with
+`dry_run=false` and the returned `confirm_token`. The five-minute, single-use,
+process-bound `confirm:lightPatch:v1:` token binds the complete batch and its
+source file/native baseline. Any drift requires a fresh preview. `needs_save`
+means save all pending changes through `qlab_save_workspace`, then preview
+again; the Light Patch preview never saves, closes or writes. A `no_op` result
+does not rewrite or close the workspace.
+
+Renaming updates references inside the patch. Deleting an instrument/group
+removes its group memberships; deleting a group preserves its instruments.
+Deleting a used definition requires reassigning or deleting its consumers in
+the same batch. The final patch must resolve definitions and members without
+cycles or overlaps. Light cues remain unchanged even when references become
+unresolved; `affected_cues` is partial guidance, not a complete dependency audit
+or a reason to silently repair cues. Repair them later through their own tools.
+Dashboard MIDI and the global Light Library are not edited.
+
+One execution closes the clean target, checks and replaces its original path,
+then reopens that workspace while preserving other open documents. A private
+sibling recovery directory retains the preceding file and journal; subsequent
+successful transactions reuse that bounded location. An unresolved recovery
+blocks a new edit. These files contain private document contents and paths.
+The public `qlab_open_workspace` still requires no workspaces open; the patch
+transaction has its own narrowly guarded internal reopen.
+
+Check `file_replaced`, `document_reopened`, `native_patch_verified` and `status`
+independently. File readback verifies the planned saved patch. Current native
+OSC readback checks instrument names, notes, used definition manufacturers,
+defaults and parameter semantics, patched state and group names/memberships;
+it cannot establish full routing or unused definitions. USB patched state is not required because
+the configured device may be absent. `verified` applies to those combined,
+explicitly limited checks, not physical output. Reopening can affect lighting.
+The result reports `document_modified_after_reopen` if QLab marks the document
+dirty while reopening. No automatic post-open Save is performed; inspect and
+save separately before another patch plan. Native reopen has at least a
+30-second acknowledgement budget. A lost acknowledgement can be confirmed
+through fresh state without resending Open.
+Only file replacement is atomic; the full lifecycle is not. If an event or
+verification fails, inspect `phase`, the file and QLab state, and the returned
+`recovery_path`. Do not retry automatically or restore over later changes.
+
 ## Move Cue Lists and Carts
 
 Use `qlab_move_cue_lists` to reorder 1–50 root Cue Lists or Cue Carts within

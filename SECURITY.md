@@ -5,6 +5,8 @@
 QLab MCP is a local FastMCP server that inspects QLab 5 workspaces and exposes
 narrowly gated cue-editing workflows over OSC. The supported deployment is on
 the operator's machine, with QLab reachable through `QLAB_HOST`.
+Local Light Patch editing additionally crosses a filesystem boundary: it
+rewrites the saved `.qlab5` document and uses fixed native close/reopen events.
 
 This policy covers the shipped MCP server, its OSC transport, read profiles,
 workspace/cue/settings resolution, input validation, and gated write paths. It
@@ -187,6 +189,47 @@ inconclusive. The zero-activity gate is a conservative MCP safety policy, not
 an asserted QLab requirement. The current activity reader cannot prove
 workspace-wide Audition state, so Audition must remain disabled by operator
 policy.
+
+### Local Light Patch files
+
+`qlab_edit_light_patch` requires local QLab 5.5.10/build 5510, existing-workspace
+write readiness, a clean inactive document in Edit Mode, disabled start-on-open/
+start-on-close settings, and a five-minute,
+single-use `confirm:lightPatch:v1:` token bound to source bytes, file identity,
+native inventory and operations. Dirty documents return `needs_save`; previews
+never save, close or write. Arguments permit typed operations only, not arbitrary
+archive keys or scripts. File access follows the MCP user's permissions.
+
+The writer is limited to owned single-link regular `.qlab5` files, at most
+64 MiB, with bounded archive objects and traversal. Packages, ambiguous paths,
+unsupported formats and unsafe links are rejected. Other documents must retain
+their inventory and are never closed by this operation. Public Open keeps its
+existing empty-inventory restriction; transaction reopening is a fixed private
+operation bound to the verified file identity.
+
+The transaction preserves an original-byte recovery and durable journal in one
+private sibling recovery directory. An unresolved transaction blocks reuse.
+Recovery files can contain the complete document, including scripts, settings
+and local paths; do not publish them. Replacement preserves original metadata,
+but only file replacement is atomic. Native close/reopen and filesystem events
+are not a single atomic transaction. Hostile local writers are outside the
+coordination guarantee; hash checks and locks do not prevent every external race.
+
+Failure retains the phase and recovery location without automatic retries or
+rollback over newer edits. Native readback checks OSC-visible identity and
+properties; saved routing and definitions also require archive verification.
+USB-DMX stores an explicit supplied identity; a disconnected or unknown device
+may remain unpatched in QLab. No compatible USB device has been validated, and
+configuration does not establish availability or DMX output. New definition
+parameters are scalar or RGB; unsupported existing data is preserved rather
+than treated as permission to manufacture its schema.
+
+By explicit product policy, Light cues are not rewritten or used to block a
+patch rename/delete. Reference warnings are partial. Resulting cue references
+can be unresolved until repaired separately; this is an accepted workflow
+consequence, not evidence of cue preservation failure. Patch-internal references
+must remain coherent. Reopening can affect lighting output even without a GO
+command; archive/native acceptance does not prove hardware silence or behavior.
 
 ### Move
 

@@ -333,3 +333,7 @@ def test_fixed_bridge_passes_untrusted_path_only_as_json_argv(tmp_path, monkeypa
     assert argv[:2] == ["/usr/bin/osascript", "-"]
     assert json.loads(argv[2])["path"] == path
     assert options["input"] == docs.SCRIPT and "shell" not in options
+
+
+def test_native_event_canonicalizes_target_like_inventory():
+    assert 'set targetPath to my canonicalPath((payload\'s objectForKey:"path") as text)' in docs.SCRIPT

@@ -18,6 +18,8 @@ from pydantic import Field, StrictBool, StrictInt, StrictStr, TypeAdapter
 
 from . import __version__
 from .media import search_media_files
+from .light_patch.models import LightPatchOperations
+from .light_patch.transaction import edit_light_patch
 from .audio_analysis_models import AudioAnalysisRequest, AudioAnalysisResult, Resolution
 from .errors import QLabMcpError
 from .models import (
@@ -305,7 +307,7 @@ mcp = FastMCP(
         get_prompt_settings={"enabled": False},
     )],
     instructions="""
-QLab MCP exposes forty-nine read-only tools plus thirty gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
+QLab MCP exposes forty-nine read-only tools plus thirty-one gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
 Existing-workspace writes require QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; they remain dry-run first. Native document Open has its separate empty-inventory preflight, write-enable setting, file fingerprint and document token; no existing workspace is available for OSC readiness.
 This server does not expose GO, stop, panic, playback, audition, /live writes, arbitrary AppleScript, or raw OSC passthrough. Load loadTime, Target assignedNumber and documented cue Triggers use fixed local AppleScript reads/writes. Native Trigger reads require include_native_triggers=true; configuration requires disabled triggers, activation requires disarmed/no continuation/no skip, and Hotkey enabling is blocked without key/modifier readback.
 
@@ -333,6 +335,40 @@ def qlab_get_workspace_document(workspace_id: CanonicalWorkspaceUUID) -> dict[st
     Readback includes the full native inventory, including other open documents' paths and names.
     """
     return _run_tool(lambda reader: get_workspace_document(reader, str(workspace_id)))
+
+
+@mcp.tool(title="Edit QLab Light Patch", tags={"qlab", "workspace", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
+def qlab_edit_light_patch(
+    workspace_id: CanonicalWorkspaceUUID,
+    operations: LightPatchOperations,
+    dry_run: StrictBool = True,
+    confirm_token: StrictStr | None = None,
+) -> dict[str, Any]:
+    """Plan or apply 1–100 typed Light Patch operations in an exact local workspace.
+
+    Supports the validated QLab 5.5.10 archive format only. Read the current patch with
+    qlab_get_workspace_light_settings first. A dry_run never saves, closes or writes;
+    a dirty document returns needs_save: use qlab_save_workspace and obtain a fresh plan.
+    Execution requires write readiness and the fresh signed single-use confirmation token.
+
+    Creates, edits, renames or deletes instruments, groups and workspace definitions as
+    one batch, preserving omitted fields. Output types and parameter variants remain
+    subject to archive capability validation. Light cues are never changed: affected
+    references are reported as pending and must be repaired separately. Dashboard MIDI
+    and the global Light Library are preserved.
+
+    Execution closes the clean target, replaces the same path with bounded recovery,
+    reopens it and requires fresh file/native patch readback. Other open documents are
+    preserved. The full lifecycle is non-atomic; recovery state is retained on failure.
+    Do not retry after timeout or ambiguity. Reopening may affect physical lighting;
+    successful archive readback does not verify DMX hardware output.
+    """
+    return _run_tool(lambda reader: edit_light_patch(
+        reader, str(workspace_id),
+        [operation.model_dump(exclude_unset=True) for operation in operations],
+        dry_run, confirm_token,
+    ))
 
 
 @mcp.tool(title="Open QLab Workspace", tags={"qlab", "workspace", "gated-write"},

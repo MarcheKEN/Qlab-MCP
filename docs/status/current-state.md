@@ -1,16 +1,41 @@
-# Current Project State — 2026-10-17
+# Current Project State — 2026-10-20
 
-## Version 0.4.0 — release preparation
+## Light Patch authoring — PR #19
+
+Current source exposes **80 tools: 49 reads and 31 gated writes**.
+`qlab_edit_light_patch` adds signed batches of 1–100 typed operations for
+instruments, groups and workspace definitions, including rename/delete. It
+edits the original local document through clean-close, verified file replacement
+with bounded recovery, reopen and OSC-visible readback on QLab 5.5.10/build 5510.
+Preview has no native/file side effects; dirty documents require the existing
+Save flow and a fresh preview.
+
+Light cues, Dashboard MIDI and the global Library are preserved. Cue references
+may need later repair and are reported with partial-analysis warnings. Art-Net
+and unpatched assignments plus explicit USB-DMX identities are enabled as saved
+configuration. USB discovery, compatible-device availability and output remain
+unvalidated. New definition parameters are scalar/RGB only;
+existing other parameter data is preserved where recognized.
+
+File verification covers saved routing and definitions. Current OSC-visible
+verification checks instrument names, notes, used definition parameters/defaults,
+patched state and group names/memberships; routing and unused definitions remain
+archive-only checks. USB patched state is not required for an absent device. No hardware-output claim follows from a verified result.
+The [native acceptance record](../development/runtime-validation/2026-10-20-light-patch-authoring.md)
+covers original-path batches, all twelve actions and preserving another open
+document. Hardware output and additional parameter encodings remain unvalidated.
+Earlier registry counts and test totals below retain their dated scope.
+
+## Version 0.4.0 — October 17 release preparation
 
 The package, MCP initialization version and current user guidance now identify
-this development branch as **0.4.0**. PR #18 prepares that version; no tag or
-GitHub Release has been published. Earlier 0.3.0 reports and validation counts
+this development branch as **0.4.0**. PR #18 prepared that version. Earlier 0.3.0 reports and validation counts
 below retain their original version: the version bump does not rerun or rename
 historical runtime evidence.
 
-## Latest validation — 2026-10-17
+## Earlier validation — 2026-10-17
 
-The development branch exposes **79 tools: 49 reads and 30 gated writes**.
+At that validation point, the branch exposed **79 tools: 49 reads and 30 gated writes**.
 The documentation reconciliation and code cleanup are included in PR #18.
 At `9a346bc`, the local suite passed **1,942 tests and 61 subtests**, with
 35 skips; GitHub CI, lockfile verification and artifact builds passed.
@@ -36,7 +61,7 @@ current restrictions.
 
 ## Documentation reconciliation — 2026-10-17
 
-Current source exposes 79 tools (49 reads, 30 gated writes). The [roadmap](roadmap.md)
+At that review, source exposed 79 tools (49 reads, 30 gated writes). The [roadmap](roadmap.md)
 now separates implemented contracts from remaining runtime cases; [architecture](../development/architecture.md)
 reflects native document/Trigger operations and actual UDP/TCP behavior.
 Existing-workspace writes require OSC readiness. Native Open instead uses its

@@ -2,6 +2,16 @@
 
 ## 0.4.0 (Unreleased)
 
+- Add `qlab_edit_light_patch`: typed batches of 1–100 create/edit/rename/delete
+  operations for instruments, groups and workspace Light Definitions. On local
+  QLab 5.5.10/build 5510 it previews a source-bound plan, then closes the clean
+  document, replaces the same path with bounded recovery and reopens for
+  archive/OSC-visible readback. Cues, Dashboard MIDI and the global Light
+  Library remain untouched; cue-reference warnings are partial. Art-Net and
+  unpatched output and explicit USB-DMX identities are supported as saved
+  configuration; compatible-device availability and output remain unvalidated. New definition parameters are scalar or RGB. Percentage
+  home values use 0–100 display units; raw DMX homes use the 8/16-bit range.
+  Public surface becomes 80 tools: 49 reads and 31 gated writes.
 - Reuse existing reader normalization and inherited cue model fields, and
   simplify equivalent settings/creation branches without changing MCP contracts.
 - Evidence capture now redacts confirmation tokens embedded in JSON-quoted

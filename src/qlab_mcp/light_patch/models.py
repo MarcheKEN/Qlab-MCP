@@ -1,0 +1,196 @@
+"""Strict, bounded public inputs for batched Light Patch edits."""
+from __future__ import annotations
+
+from typing import Annotated, Literal, Union
+import unicodedata
+
+from pydantic import (
+    BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr,
+    AfterValidator, model_validator,
+)
+
+
+def _name(value: str) -> str:
+    if value != value.strip() or any(unicodedata.category(char).startswith("C") for char in value):
+        raise ValueError("Names must not contain control characters or surrounding whitespace.")
+    return value
+
+
+def _patch_name(value: str) -> str:
+    _name(value)
+    if not all(char.isalnum() or char == " " for char in value):
+        raise ValueError("New instrument and group names permit letters, numbers and spaces only.")
+    return value
+
+
+Name = Annotated[StrictStr, Field(min_length=1, max_length=256), AfterValidator(_name)]
+NewPatchName = Annotated[StrictStr, Field(min_length=1, max_length=128), AfterValidator(_patch_name)]
+Note = Annotated[StrictStr, Field(max_length=16_384)]
+Address = Annotated[StrictInt, Field(ge=1, le=512)]
+Universe = Annotated[StrictInt, Field(ge=0, le=15)]
+
+
+class Input(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    @model_validator(mode="after")
+    def reject_explicit_null(self):
+        # Omitted update fields preserve state; only default_parameter accepts an explicit null.
+        for name in self.model_fields_set - {"default_parameter"}:
+            if getattr(self, name) is None:
+                raise ValueError(f"{name} must be omitted instead of null.")
+        return self
+
+
+class UnpatchedOutput(Input):
+    backend: Literal["none"]
+
+
+class ArtNetOutput(Input):
+    backend: Literal["artnet"]
+    net: Annotated[StrictInt, Field(ge=0, le=127)]
+    subnet: Universe
+    universe: Universe
+    address: Address = Field(description="First DMX address as displayed in QLab (1–512).")
+
+
+class USBOutput(Input):
+    backend: Literal["usb"]
+    device_serial: Name = Field(description="Exact USB-DMX device serial, not a guessed display name.")
+    device_name: Name
+    device_universes: Annotated[StrictInt, Field(ge=1, le=512)]
+    universe: Annotated[StrictInt, Field(ge=0, le=511)]
+    address: Address
+
+    @model_validator(mode="after")
+    def device_universe_exists(self):
+        if self.universe >= self.device_universes:
+            raise ValueError("USB universe must be less than device_universes.")
+        return self
+
+
+LightOutput = Annotated[Union[UnpatchedOutput, ArtNetOutput, USBOutput], Field(discriminator="backend")]
+
+
+class ScalarParameter(Input):
+    type: Literal["scalar"]
+    name: NewPatchName
+    two_bytes: StrictBool = False
+    value_is_percentage: StrictBool = True
+    home_value: Annotated[StrictInt | StrictFloat, Field(ge=0, le=65535, allow_inf_nan=False)] = Field(
+        default=0, description="Home in percent (0–100, decimals allowed) when value_is_percentage; otherwise integer DMX (0–255 or 0–65535 for two_bytes).")
+
+    @model_validator(mode="after")
+    def home_fits_width(self):
+        if self.value_is_percentage:
+            if self.home_value > 100:
+                raise ValueError("Percentage home_value must not exceed 100.")
+        elif type(self.home_value) is not int or self.home_value > (65535 if self.two_bytes else 255):
+            raise ValueError("DMX home_value must be an integer within the parameter's 8/16-bit range.")
+        return self
+
+
+class RGBParameter(Input):
+    type: Literal["rgbcolor"]
+    name: NewPatchName
+    outputs: Annotated[list[Name], Field(min_length=3, max_length=3)] = Field(
+        description="Physical scalar parameter names in red, green, blue order.")
+
+    @model_validator(mode="after")
+    def distinct_outputs(self):
+        if len(set(self.outputs)) != 3:
+            raise ValueError("RGB outputs must name three distinct scalar parameters.")
+        return self
+
+
+DefinitionParameter = Annotated[Union[ScalarParameter, RGBParameter], Field(discriminator="type")]
+Parameters = Annotated[list[DefinitionParameter], Field(min_length=1, max_length=512)]
+Members = Annotated[list[Name], Field(max_length=4096)]
+
+
+class CreateInstrument(Input):
+    action: Literal["create_instrument"]
+    name: NewPatchName
+    definition: Name
+    note: Note = ""
+    output: LightOutput | None = None
+
+
+class UpdateInstrument(Input):
+    action: Literal["update_instrument"]
+    name: Name = Field(description="Exact existing instrument name.")
+    definition: Name | None = None
+    note: Note | None = None
+    output: LightOutput | None = None
+
+
+class RenameInstrument(Input):
+    action: Literal["rename_instrument"]
+    name: Name
+    new_name: NewPatchName
+
+
+class DeleteInstrument(Input):
+    action: Literal["delete_instrument"]
+    name: Name
+
+
+class CreateGroup(Input):
+    action: Literal["create_group"]
+    name: NewPatchName
+    note: Note = ""
+    members: Members = Field(default_factory=list)
+
+
+class UpdateGroup(Input):
+    action: Literal["update_group"]
+    name: Name
+    note: Note | None = None
+    members: Members | None = None
+
+
+class RenameGroup(Input):
+    action: Literal["rename_group"]
+    name: Name
+    new_name: NewPatchName
+
+
+class DeleteGroup(Input):
+    action: Literal["delete_group"]
+    name: Name
+
+
+class CreateDefinition(Input):
+    action: Literal["create_definition"]
+    name: Name
+    manufacturer: Name
+    parameters: Parameters
+    default_parameter: Name | None = Field(
+        default=None, description="Exact default parameter name; null selects no default.")
+
+
+class UpdateDefinition(Input):
+    action: Literal["update_definition"]
+    name: Name
+    manufacturer: Name | None = None
+    parameters: Parameters | None = None
+    default_parameter: Name | None = None
+
+
+class RenameDefinition(Input):
+    action: Literal["rename_definition"]
+    name: Name
+    new_name: Name
+
+
+class DeleteDefinition(Input):
+    action: Literal["delete_definition"]
+    name: Name
+
+
+LightPatchOperation = Annotated[Union[
+    CreateInstrument, UpdateInstrument, RenameInstrument, DeleteInstrument,
+    CreateGroup, UpdateGroup, RenameGroup, DeleteGroup,
+    CreateDefinition, UpdateDefinition, RenameDefinition, DeleteDefinition,
+], Field(discriminator="action")]
+LightPatchOperations = Annotated[list[LightPatchOperation], Field(min_length=1, max_length=100, strict=True)]

@@ -5,11 +5,13 @@
 QLab MCP **0.4.0** connects an MCP-compatible agent to QLab 5, primarily through
 OSC. It can organize cues, configure supported properties and inspect workspace
 settings. Selected local functions use fixed AppleScript bridges on macOS.
+The Light Patch editor also edits the saved local workspace archive under a
+guarded close, replace and reopen workflow.
 
 **Developed and tested with QLab 5.5.10 on macOS.** Other QLab versions may
 behave differently and have not been validated by this project.
 
-The server provides **79 tools: 49 read-only and 30 gated writes**.
+The server provides **80 tools: 49 read-only and 31 gated writes**.
 Writes are disabled by default and require a reviewed preview and confirmation.
 
 [Capabilities](#capabilities) · [Installation](#installation) ·
@@ -26,12 +28,17 @@ Writes are disabled by default and require a reviewed preview and confirmation.
 | Organize | Create cues, edit names/numbers, move cues and reorder Lists/Carts. |
 | Configure | Edit supported Audio, Video, Light, Text, MIDI and other cue settings. |
 | Workspace settings | Read six settings domains; edit selected General, Audio and Video properties. |
+| Light Patch | Batch create, edit, rename and delete instruments, groups and workspace definitions; Art-Net, explicit USB-DMX identity or unpatched output. |
 | Local documents | Inspect documents; open, save or clean-close under specific safeguards. |
 | Local media | Find authorized files and analyze audio without playing it. |
 
 AppleScript covers local document operations, Load Time, Target assigned number
 and selected native triggers. It requires a running `/Applications/QLab.app`
 and macOS Automation permission for the MCP host. Ordinary cue access uses OSC.
+Light Patch file editing requires local QLab **5.5.10/build 5510**. USB-DMX
+assignments store the supplied device identity; they do not discover a device
+or prove it is connected. New definition parameters are limited to scalar and RGB. See the [Light Patch workflow](docs/user/agent-workflows.md#edit-the-light-patch)
+for recovery and readback limits.
 
 ### What it does not do
 
@@ -347,7 +354,7 @@ saved state and do not execute cues.
 </details>
 
 <details>
-<summary><strong>Workspace settings</strong> — 14 tools</summary>
+<summary><strong>Workspace settings</strong> — 15 tools</summary>
 
 | Tool | What it does |
 | --- | --- |
@@ -355,6 +362,7 @@ saved state and do not execute cues.
 | `qlab_get_workspace_audio_settings` | Read Audio patches and an optional selected matrix level. |
 | `qlab_get_workspace_video_settings` | List Video inputs, stages and output routes. |
 | `qlab_get_workspace_light_settings` | Read the Light Patch summary. |
+| `qlab_edit_light_patch` | Preview or apply a batch to the saved local Light Patch; close, replace and reopen the same workspace. |
 | `qlab_get_workspace_midi_settings` | Read MIDI patches or one exact patch. |
 | `qlab_get_workspace_network_settings` | Read Network patches or one exact patch. |
 | `qlab_get_video_stage` | Read one stage and its regions. |

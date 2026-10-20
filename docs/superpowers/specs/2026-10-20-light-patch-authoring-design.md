@@ -1,13 +1,14 @@
 # Light Patch authoring design
 
-Status: proposed implementation; no public tool or archive writer is added by this document.
+Status: implemented in PR #19 with the bounded capabilities below.
+See the [native acceptance record](../../development/runtime-validation/2026-10-20-light-patch-authoring.md).
 Date: 2026-10-20.
 
 ## Goal
 
 Let an agent turn an explicit lighting patch into instruments, groups, output
 assignments and workspace Light Definitions in the existing `.qlab5` document.
-The intended tool name is `qlab_edit_light_patch`.
+The tool is `qlab_edit_light_patch`.
 
 The owner has approved automatic save, close and reopen of the same workspace
 as the design for this feature. That decision does not authorize unrelated
@@ -17,15 +18,16 @@ document changes or live lighting output during development.
 
 | Area | Intended support | Release condition |
 |---|---|---|
-| Instruments | Create; edit notes, definition and patch | Reproducible IDs and native reopen/readback |
-| Groups | Create and set members, including nested groups | Validated names/ranges and dependency checks |
+| Instruments | Create, update, rename, delete | Native batch and reopen/readback accepted |
+| Groups | Create, update, rename, delete; nested memberships | Native batches accepted; existing member ranges preserved |
 | Addresses | Explicit start address and footprint validation | Captures establish native encoding and boundaries |
 | Art-Net | Net, Sub-Net and Universe | Independent nonzero-value reference captures |
-| USB-DMX | Exact device and device universe | QLab-generated backend/identity samples |
-| Workspace Light Definitions | Create; explicitly update shared definitions | Validated channel and parameter schemas |
+| USB-DMX | Explicit serial, label and device universe | Native serialization and synthetic-identity reopen accepted; no compatible device detected |
+| Workspace Light Definitions | Create/update/rename/delete; scalar 8/16-bit and RGB | Native parameter interpretation checked for used definitions |
 
-Light Dashboard MIDI edits, global Light Library edits, playback, stage editing,
-instrument/group renaming and deletion are excluded. Existing excluded data
+Light Dashboard MIDI edits, global Light Library edits, playback, stage editing
+and cue edits are excluded. Rename/delete are included; cue references may
+remain pending for later repair. Existing excluded data
 must survive unchanged. Omitting an object from a request never deletes it.
 
 All requested output types remain part of the goal. A type with insufficient
@@ -43,8 +45,9 @@ cause. This proves a concrete feasibility case, not a reusable writer.
 Read-only inspection of three retained archives on 2026-10-20 found Art-Net
 backend classes but no USB backend example. The accepted archive had 329 inner
 objects and ten active `itemList` entries; counting class instances would
-incorrectly include inactive objects. No new native reopen or hardware test
-was performed for this design.
+incorrectly include inactive objects. That initial design pass performed no new native reopen or hardware test.
+The linked implementation acceptance record supersedes the writer/reopen gaps;
+hardware output remains unverified.
 
 Retained private evidence fingerprints, for matching locally held artifacts:
 
@@ -59,12 +62,12 @@ are not proposed for publication. These hashes identify historical evidence;
 they are not committed regression fixtures or a substitute for reproducible
 acceptance evidence.
 
-## Proposed interface
+## Interface
 
 Inputs are an exact workspace UUID, typed operations, `dry_run=true` by default,
 and a fresh signed single-use confirmation token for execution. There is no
 arbitrary archive-key mapping, script input, raw OSC or alternate output path.
-Finalize strict operation models only after their archive encodings are known.
+The strict discriminated operation models are in `light_patch/models.py`.
 
 The agent resolves missing manufacturer, model, mode, channel map, numbering
 convention and USB identity before planning. It must not invent a personality
@@ -77,7 +80,8 @@ no duplicate objects, file rewrite or document lifecycle events.
 Validation must reject:
 
 - Ambiguous or duplicate names and unresolved definition/group references.
-- Group cycles and changes that leave existing Light cue references dangling.
+- Group cycles and unresolved references inside the final patch. Cue references
+  are warnings only; Light cues are never rewritten or used to block a patch edit.
 - Address footprints outside a universe or overlapping another instrument on
   the same output address space, including instruments outside the request.
 - Shared-definition updates without including every affected consumer in the
@@ -101,8 +105,10 @@ unknown fields and unreachable objects. Inventory follows root reachability
 through `LightPatch.itemList`, not all instances in `$objects`.
 
 Observed group members use names/ranges; `lightOutputID` is distinct from DMX
-address. Neither ID allocation nor all group encodings are established.
-Do not generate IDs from addresses, copy a sample constant or assume `max + 1`.
+address. Normal instrument decoding in QLab allocates runtime IDs; native reopen/save
+confirmed regeneration. New archived instruments use a provisional zero ID;
+identity is the exact name bound to the source snapshot, never a runtime ID.
+Do not derive an identity from an address or assume `max + 1`.
 Do not ship a generic `plistlib.dumps` rewrite as an accepted writer without
 native acceptance evidence.
 
@@ -144,8 +150,8 @@ remain open. Preserve that public contract.
 
 The eventual feature needs a narrowly scoped internal reopen with parsed file
 UUID, exact path/hash, collision checks and unchanged other-document inventory.
-Until that path is validated, reject the operation when other documents are
-open; do not close them automatically.
+The internal path was accepted with another document open and its inventory
+unchanged. Never close another document automatically.
 
 ### Recovery
 
@@ -160,11 +166,10 @@ physical silence. Native acceptance and hardware validation are distinct gates.
 
 ## Delivery and acceptance
 
-The [implementation plan](../plans/2026-10-20-light-patch-authoring.md) tracks
-evidence, writer, planner, lifecycle and public contract separately. Keep the
-implementation PR in draft until supported write paths have repeatable native
-acceptance and recovery evidence. Do not increment tool counts or advertise
-availability while this remains a design-only change.
+The [implementation plan](../plans/2026-10-20-light-patch-authoring.md) records
+implementation and acceptance. The public contract now exposes 80 tools
+(49 reads and 31 gated writes). Acceptance is bounded to the recorded paths and
+QLab version; no hardware or unimplemented parameter-type claim is made.
 
 ## Official references
 

@@ -39,8 +39,8 @@ message, output, fade, or target mode, then rechecks identity and selector.
 Failures in secondary reads preserve confirmed identity as partial data.
 Sensitive Network text and Script source require the technical profile.
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 79 decorated tools
-(49 read-only and 30 gated writes),
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 80 decorated tools
+(49 read-only and 31 gated writes),
 their schemas, annotations, timeouts, and result models. QLab-backed calls
 create a fresh `QLabReader` and close it after the operation; local media tools
 do not use that reader. `qlab-mcp` maps to

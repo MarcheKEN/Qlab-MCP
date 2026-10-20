@@ -67,7 +67,7 @@ on run argv
   if actionName is "inventory" then
    output's setObject:(my inventory()) forKey:"documents"
   else
-   set targetPath to (payload's objectForKey:"path") as text
+   set targetPath to my canonicalPath((payload's objectForKey:"path") as text)
    tell application "/Applications/QLab.app"
     if actionName is "open" then
      set currentRows to my inventory()

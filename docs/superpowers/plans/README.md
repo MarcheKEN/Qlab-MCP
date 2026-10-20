@@ -1,9 +1,8 @@
 # Implementation plans
 
-## Proposed work
+## Current implementation records
 
-- [Light Patch authoring](2026-10-20-light-patch-authoring.md) — design and
-  acceptance gates; no public tool or writer implemented yet.
+- [Light Patch authoring](2026-10-20-light-patch-authoring.md) — implemented in PR #19; native acceptance and explicit capability limits.
 
 ## Historical plans
 

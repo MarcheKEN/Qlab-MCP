@@ -1,4 +1,11 @@
-# Implementation plan history
+# Implementation plans
+
+## Proposed work
+
+- [Light Patch authoring](2026-10-20-light-patch-authoring.md) — design and
+  acceptance gates; no public tool or writer implemented yet.
+
+## Historical plans
 
 These plans are historical designs, not instructions or authorization to implement features. The roadmap and current schemas take precedence.
 

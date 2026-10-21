@@ -93,13 +93,16 @@ class ScalarParameter(Input):
 class RGBParameter(Input):
     type: Literal["rgbcolor"]
     name: NewPatchName
-    outputs: Annotated[list[Name], Field(min_length=3, max_length=3)] = Field(
-        description="Physical scalar parameter names in red, green, blue order.")
+    outputs: Annotated[list[Name], Field(min_length=3, max_length=3)] | dict[Literal['red', 'green', 'blue', 'white', 'warmwhite', 'amber'], Name] = Field(
+        description="Physical scalar names in RGB order, or native RGB plus optional white/warmwhite/amber outputs.")
 
     @model_validator(mode="after")
     def distinct_outputs(self):
-        if len(set(self.outputs)) != 3:
-            raise ValueError("RGB outputs must name three distinct scalar parameters.")
+        values = list(self.outputs.values()) if isinstance(self.outputs, dict) else self.outputs
+        if isinstance(self.outputs, dict) and not {'red', 'green', 'blue'} <= self.outputs.keys():
+            raise ValueError("RGB outputs require red, green and blue.")
+        if len(set(values)) != len(values):
+            raise ValueError("RGB outputs must name distinct scalar parameters.")
         return self
 
 
@@ -191,6 +194,24 @@ class DeleteDefinition(Input):
 LightPatchOperation = Annotated[Union[
     CreateInstrument, UpdateInstrument, RenameInstrument, DeleteInstrument,
     CreateGroup, UpdateGroup, RenameGroup, DeleteGroup,
-    CreateDefinition, UpdateDefinition, RenameDefinition, DeleteDefinition,
 ], Field(discriminator="action")]
 LightPatchOperations = Annotated[list[LightPatchOperation], Field(min_length=1, max_length=100, strict=True)]
+
+
+class ImportDefinition(Input):
+    action: Literal['import_definition']
+    definition_id: Annotated[StrictStr, Field(min_length=1, max_length=256)]
+    name: Name | None = None
+
+
+DefinitionOperation = Annotated[Union[
+    CreateDefinition, UpdateDefinition, RenameDefinition, DeleteDefinition, ImportDefinition,
+], Field(discriminator='action')]
+DefinitionOperations = Annotated[list[DefinitionOperation], Field(min_length=1, max_length=100, strict=True)]
+# Internal archive planner retains mixed operations for fixture construction and migrations.
+ArchiveOperation = Annotated[Union[
+    CreateInstrument, UpdateInstrument, RenameInstrument, DeleteInstrument,
+    CreateGroup, UpdateGroup, RenameGroup, DeleteGroup,
+    CreateDefinition, UpdateDefinition, RenameDefinition, DeleteDefinition,
+], Field(discriminator='action')]
+ArchiveOperations = Annotated[list[ArchiveOperation], Field(min_length=1, max_length=100, strict=True)]

@@ -25,7 +25,7 @@ Inspect definitions without connecting to QLab:
 uv run --locked --no-editable --extra dev fastmcp inspect fastmcp.json --skip-env
 ```
 
-Expect 79 tools, including 49 reads and 30 gated writes. Definitions alone do
+Expect 82 tools, including 50 reads and 32 gated writes. Definitions alone do
 not establish QLab reachability. Use `qlab_check_connection` for live read access,
 resolve one returned workspace UUID, then request a bounded overview.
 

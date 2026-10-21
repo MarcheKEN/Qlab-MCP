@@ -580,10 +580,8 @@ The tool accepts 1–100 strict operations:
 | --- | --- | --- |
 | Instrument | `create_instrument`, `update_instrument`, `rename_instrument`, `delete_instrument` | Exact `name`; `definition`, `note`, `output` for create/update; `new_name` for rename |
 | Group | `create_group`, `update_group`, `rename_group`, `delete_group` | Exact `name`; `note`, `members` for create/update; `new_name` for rename |
-| Definition | `create_definition`, `update_definition`, `rename_definition`, `delete_definition` | Exact `name`; `manufacturer`, ordered `parameters`, `default_parameter` for create/update; `new_name` for rename |
 
-Omitted update fields are preserved. Explicit `null` is accepted only for
-`default_parameter`, where it clears the default. Use `output={"backend":"none"}`
+Omitted update fields are preserved. Use `output={"backend":"none"}`
 to unpatch. Art-Net uses `backend="artnet"`, `net` 0–127, `subnet` 0–15,
 `universe` 0–15 and the displayed starting `address` 1–512. Validate the complete
 footprint and output namespace, not just the first channel. USB-DMX requires
@@ -592,29 +590,13 @@ zero-based `universe` and displayed `address`. The supplied identity is saved
 configuration, not device discovery: a missing device can remain unpatched.
 No compatible USB-DMX device has been validated; no physical output is claimed.
 
-New definition parameters are `scalar` or `rgbcolor`. Scalar parameters name
-`two_bytes`, `value_is_percentage` and `home_value`: percentage homes are finite
-0–100 values, including decimals; raw DMX homes are integers 0–255 or 0–65535
-when `two_bytes=true`. RGB parameters use three scalar names in `outputs`, in
-red/green/blue order, and consume no extra physical slots. Other existing
-recognized parameter variants are preserved; no new encoding is inferred.
-Updating shared definitions validates every affected instrument footprint.
-
-For example, after resolving the real workspace UUID:
+For example, after creating `Example Dimmer` with `qlab_edit_light_definitions`
+and resolving the real workspace UUID:
 
 ```json
 {
   "workspace_id": "11111111-1111-4111-8111-111111111111",
   "operations": [
-    {
-      "action": "create_definition",
-      "name": "Example Dimmer",
-      "manufacturer": "Example",
-      "parameters": [
-        {"type": "scalar", "name": "intensity", "home_value": 0}
-      ],
-      "default_parameter": "intensity"
-    },
     {
       "action": "create_instrument",
       "name": "Example Roof",
@@ -638,8 +620,8 @@ does not rewrite or close the workspace.
 
 Renaming updates references inside the patch. Deleting an instrument/group
 removes its group memberships; deleting a group preserves its instruments.
-Deleting a used definition requires reassigning or deleting its consumers in
-the same batch. The final patch must resolve definitions and members without
+Definition operations are accepted only by `qlab_edit_light_definitions`.
+Reassign or remove consumers with the patch tool before deleting a used definition. The final patch must resolve definitions and members without
 cycles or overlaps. Light cues remain unchanged even when references become
 unresolved; `affected_cues` is partial guidance, not a complete dependency audit
 or a reason to silently repair cues. Repair them later through their own tools.
@@ -1407,3 +1389,82 @@ Then use existing cue editors with their dry run/confirmation/readback protocol.
 Computer Use can contrast the file path and duration, but a waveform screenshot
 cannot validate frequency ratios, LUFS or beats. Lyrics, transcription, key,
 downbeats, event classifiers and execution remain outside this tool.
+
+
+## Light Definitions
+
+`qlab_get_light_definitions` is read-only. It lists the bundled manufacturers,
+personal `.qlablight` files, and last-saved workspace definitions. By default
+`source="all"` returns compact pages; supply `workspace_id` to include the workspace.
+Use `source="bundled"`, `"personal"` or `"workspace"` to restrict the source.
+`query` matches name/manufacturer text; `manufacturer` is an exact case-insensitive
+filter. `offset`/`limit` page results (default 100, maximum 1,000; 2 MiB response).
+Follow `next_request`; a truncated page is not the complete catalogue.
+
+Select a returned `definition_id` to get its parameters: zero-based physical
+channels, 8/16-bit widths, percentage/DMX homes, default parameter and known
+virtual bindings. Mode is null unless explicitly supplied by the source; names
+are not parsed to invent a mode. Identical names from different sources retain
+different IDs. Workspace reads include saved-file hash, dirty state and freshness;
+no save, close or open is performed. Sources fail independently. Unknown variants
+remain inspectable and report why import is blocked.
+
+`qlab_edit_light_definitions` accepts 1–100 definition-only operations:
+
+| Action | Fields |
+| --- | --- |
+| `import_definition` | Exact bundled/personal `definition_id`; optional destination `name` |
+| `create_definition` | `name`, `manufacturer`, ordered `parameters`, optional `default_parameter` |
+| `update_definition` | Exact `name`; optional `manufacturer`, replacement `parameters`, `default_parameter` |
+| `rename_definition` | Exact `name`, `new_name` |
+| `delete_definition` | Exact unused `name` |
+
+The initial writer supports scalar 8/16-bit channels and RGB virtual controls,
+including validated white, warm-white and amber bindings. Other variants
+such as pan/tilt, muxer, CMY and HSI remain visible but blocked for import until
+native acceptance. Unknown metadata also blocks import rather than being dropped.
+Native imports preserve physical channel positions/gaps, complete known metadata,
+default parameter and all validated output bindings. Custom creation assigns
+physical channels in the supplied order; 16-bit parameters consume two slots.
+RGB controls use no physical slot. Their `outputs` accepts three names in RGB
+order or a mapping with `red`, `green`, `blue` and optional `white`, `warmwhite`,
+`amber`, each referencing a distinct scalar. `home_value` is 0–100 percent
+or integral DMX 0–255/65535 depending on units and width.
+
+Omitted updates preserve values. `parameters` replaces the entire parameter
+list; explicitly set `default_parameter=null` to clear it. Reordering parameters
+preserves the previous default by name unless explicitly changed. Conflicting
+creation/import names are rejected; use a new destination name or explicit update.
+Renaming updates instrument references. Deleting an in-use definition is blocked:
+first reassign/remove its instruments through `qlab_edit_light_patch`. Changing
+shared definitions rechecks every instrument footprint and overlap.
+
+Example creation request to `qlab_edit_light_definitions`:
+
+```json
+{
+  "workspace_id": "11111111-1111-4111-8111-111111111111",
+  "operations": [{
+    "action": "create_definition", "name": "Example Dimmer", "manufacturer": "Example",
+    "parameters": [{"type": "scalar", "name": "intensity", "home_value": 0}],
+    "default_parameter": "intensity"
+  }],
+  "dry_run": true
+}
+```
+
+Review the plan and repeat with `dry_run=false` and its single-use, five-minute
+`confirm:lightDefinitions:v1:` token. The same-path file transaction requires
+local QLab 5.5.10/build 5510, write readiness, clean inactive Edit Mode and disabled
+automatic open/close cues. `needs_save` requires a separate explicit Save and a
+fresh preview. `no_op` never closes or rewrites. Imports bind the selected source
+content/hash and recheck it before closing. Global and personal library files are
+never changed. Recovery and uncertainty follow the Light Patch transaction;
+never automatically retry or restore over newer edits. Unused definitions are
+verified in the saved archive, because OSC exposes assigned definitions only.
+Light cues are never repaired; reference warnings are explicitly partial.
+Neither successful import nor saved output configuration proves physical DMX.
+
+Workflow: catalogue → exact detail → import/create definitions → edit instruments
+and groups → edit Light cues → fresh reads. **Breaking change:** definition CRUD
+was removed from `qlab_edit_light_patch`; old mixed batches must be split.

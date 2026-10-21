@@ -6,7 +6,7 @@ import plistlib
 import re
 
 from pydantic import TypeAdapter
-from .models import LightPatchOperations
+from .models import ArchiveOperations
 from typing import Any
 from uuid import UUID
 
@@ -124,14 +124,17 @@ class Patch:
         if set(self.definition_order) != set(self.definitions) or len(self.definition_order) != len(self.definitions):
             raise ValueError('Definition dictionary/order mismatch.')
 
+    def parameter_entries(self, reference):
+        value = self.archive.ref(reference)
+        return self.archive.mapping(reference) if 'NS.keys' in value else dict(enumerate(self.archive.array(reference)))
+
     def snapshot(self):
         a = self.archive
         instruments, groups, definitions = [], [], []
         for name in self.definition_order:
             value = a.ref(self.definitions[name])
             parameters = value.get('parameters')
-            p = a.ref(parameters)
-            entries = a.mapping(parameters) if 'NS.keys' in p else dict(enumerate(a.array(parameters)))
+            entries = self.parameter_entries(parameters)
             if any(type(key) is not int for key in entries):
                 raise ValueError('Unsupported definition channel keys.')
             ordered = sorted(entries,key=lambda key:(key < 0,key if key >= 0 else -key))
@@ -200,7 +203,7 @@ class Patch:
                     valueIsPercentage=value.get('value_is_percentage',True) if scalar else None,
                     homeValue=int(home) if scalar else None,homeValueDouble=float(home) if scalar else None,
                     channel=channel if scalar else virtual,
-                    **({} if scalar else {'outputs':dict(zip(('red','green','blue'),value['outputs']))})))
+                    **({} if scalar else {'outputs':value['outputs'] if isinstance(value['outputs'], dict) else dict(zip(('red','green','blue'),value['outputs']))})))
                 if scalar: channel += 2 if value.get('two_bytes') else 1
                 else: virtual -= 1
             parameters.sort(key=lambda p:(p['channel'] < 0,p['channel'] if p['channel'] >= 0 else -p['channel']))
@@ -264,10 +267,11 @@ class Patch:
                 key = channel
                 channel += 2 if two else 1
             else:
-                if not set(p['outputs']) <= scalar_names:
+                outputs = p['outputs'] if isinstance(p['outputs'], dict) else dict(zip(('red','green','blue'),p['outputs']))
+                if not set(outputs.values()) <= scalar_names:
                     raise ValueError('RGB outputs must resolve to physical scalar parameters.')
                 value.update({'$class':a.cls('LightCueInstrumentDefinitionParameterRGBColor', ('LightCueInstrumentDefinitionParameter',)),
-                    'outputs':a.make_dict({color:a.add(name) for color,name in zip(('red','green','blue'),p['outputs'])})})
+                    'outputs':a.make_dict({color:a.add(name) for color,name in outputs.items()})})
                 key = virtual
                 virtual -= 1
             values[key] = a.add(value)
@@ -318,7 +322,7 @@ class Patch:
                 if 'manufacturer' in op:
                     item['manufacturer'] = a.add(op['manufacturer'])
                 if verb == 'update' and 'parameters' in op:
-                    old_parameters = a.mapping(item['parameters'])
+                    old_parameters = self.parameter_entries(item['parameters'])
                     old_default = old_parameters.get(item.get('defaultParameter',-1))
                     old_name = a.ref(a.ref(old_default)['name']) if old_default is not None else None
                     self.set_parameters(item,op['parameters'])
@@ -328,7 +332,7 @@ class Patch:
                             raise ValueError('Replacing parameters removed the default; supply default_parameter explicitly.')
                         item['defaultParameter'] = found[0]
                 if 'default_parameter' in op:
-                    params = a.mapping(item['parameters'])
+                    params = self.parameter_entries(item['parameters'])
                     found = [key for key,value in params.items() if a.ref(a.ref(value)['name']) == op['default_parameter']]
                     if op['default_parameter'] is not None and len(found) != 1:
                         raise ValueError('Default parameter must resolve exactly once.')
@@ -471,12 +475,18 @@ def _affected_cues(patch, operations):
     return result
 
 
-def plan_patch(source: bytes, operations: list[dict[str, Any]]) -> dict:
+def plan_patch(source: bytes, operations: list[dict[str, Any]], *, native_imports: dict | None = None) -> dict:
     patch = Patch(source)
     before = patch.snapshot()
-    normalized = [op.model_dump(exclude_unset=True) for op in TypeAdapter(LightPatchOperations).validate_python(operations)] if operations else []
+    normalized = [op.model_dump(exclude_unset=True) for op in TypeAdapter(ArchiveOperations).validate_python(operations)] if operations else []
     for op in normalized:
+        if native_imports and op['name'] in native_imports and op['action'] == 'create_definition':
+            patch.name_free(op['name'], 'definition')
         patch.apply(op)
+        if native_imports and op['name'] in native_imports and op['action'] == 'create_definition':
+            # Keep the complete validated native record, including channel gaps.
+            from .definitions import install_native_definition
+            install_native_definition(patch, op['name'], native_imports[op['name']])
     after = patch.snapshot()
     if normalized:
         _validate(after)

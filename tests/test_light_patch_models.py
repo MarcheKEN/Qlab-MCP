@@ -16,6 +16,10 @@ def validate(value):
     return TypeAdapter(models().LightPatchOperations).validate_python(value)
 
 
+def validate_definitions(value):
+    return TypeAdapter(models().DefinitionOperations).validate_python(value)
+
+
 def test_typed_batch_preserves_omitted_update_fields():
     result = validate([{"action": "update_instrument", "name": "Existing + name", "note": "Updated"}])
     assert result[0].model_dump(exclude_unset=True) == {
@@ -39,7 +43,7 @@ def test_typed_batch_preserves_omitted_update_fields():
 ])
 def test_all_supported_actions_have_discriminated_models(action, fields):
     operation = {"action": action, "name": "Existing", **fields}
-    parsed = validate([operation])[0]
+    parsed = (validate_definitions if action.endswith("_definition") else validate)([operation])[0]
     assert parsed.action == action
     assert parsed.model_dump(exclude_unset=True) == operation
 
@@ -99,7 +103,7 @@ def test_outputs_include_explicit_unpatch_and_exact_usb_identity():
 ])
 def test_parameter_shapes_and_widths_are_strict(parameter):
     with pytest.raises(ValidationError):
-        validate([{"action": "create_definition", "name": "D", "manufacturer": "M", "parameters": [parameter]}])
+        validate_definitions([{"action": "create_definition", "name": "D", "manufacturer": "M", "parameters": [parameter]}])
 
 
 def test_definition_parameter_order_and_explicit_default_clear_are_preserved():
@@ -108,7 +112,7 @@ def test_definition_parameter_order_and_explicit_default_clear_are_preserved():
                        {"type": "scalar", "name": "green"}, {"type": "scalar", "name": "blue"},
                        {"type": "rgbcolor", "name": "color", "outputs": ["red", "green", "blue"]}],
         "default_parameter": None}
-    assert validate([operation])[0].model_dump(exclude_unset=True) == operation
+    assert validate_definitions([operation])[0].model_dump(exclude_unset=True) == operation
 
 
 @pytest.mark.parametrize("value", [0, 12.5, 100])

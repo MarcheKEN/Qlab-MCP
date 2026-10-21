@@ -1,5 +1,24 @@
 # Current Project State — 2026-10-21
 
+## Separate Light Definition tools — PR #19
+
+Current source exposes **82 tools: 50 reads and 32 gated writes**.
+`qlab_get_light_definitions` lists bundled/personal and last-saved workspace
+sources with exact detail, source-bound IDs, filters and pagination.
+`qlab_edit_light_definitions` imports native definitions or performs workspace
+CRUD using the existing guarded document transaction and a dedicated token.
+Public `qlab_edit_light_patch` now accepts instrument/group actions only;
+definition actions moved to the dedicated tool (breaking change).
+Initial import encodings cover scalar 8/16-bit and RGB with extended outputs;
+other native variants remain readable with explicit import blocks.
+No global library or Dashboard writes. [Native acceptance](../development/runtime-validation/2026-10-21-light-definitions.md)
+confirmed extended RGB import, manufacturer import, 16-bit creation, edits,
+rename/reference updates and in-use deletion blocking on temporary test copies.
+The original workspace was reopened with unchanged bytes; no physical output
+was tested. The transaction now resets the authenticated OSC session after
+reopen, before readback. Verification: **2,120 passed, 61 subtests passed,
+35 skipped**; FastMCP inspection reports 82 tools (50 reads, 32 writes).
+
 ## Combined Light Patch inspection — PR #19
 
 `qlab_get_workspace_light_settings` now returns current OSC data together with
@@ -14,7 +33,7 @@ for live and retained-file evidence and remaining limits.
 
 ## Light Patch authoring — PR #19
 
-Current source exposes **80 tools: 49 reads and 31 gated writes**.
+At the original patch-authoring validation, source exposed **80 tools: 49 reads and 31 gated writes**.
 `qlab_edit_light_patch` adds signed batches of 1–100 typed operations for
 instruments, groups and workspace definitions, including rename/delete. It
 edits the original local document through clean-close, verified file replacement

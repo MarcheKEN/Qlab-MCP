@@ -11,7 +11,7 @@ guarded close, replace and reopen workflow.
 **Developed and tested with QLab 5.5.10 on macOS.** Other QLab versions may
 behave differently and have not been validated by this project.
 
-The server provides **80 tools: 49 read-only and 31 gated writes**.
+The server provides **82 tools: 50 read-only and 32 gated writes**.
 Writes are disabled by default and require a reviewed preview and confirmation.
 
 [Capabilities](#capabilities) · [Installation](#installation) ·
@@ -28,7 +28,7 @@ Writes are disabled by default and require a reviewed preview and confirmation.
 | Organize | Create cues, edit names/numbers, move cues and reorder Lists/Carts. |
 | Configure | Edit supported Audio, Video, Light, Text, MIDI and other cue settings. |
 | Workspace settings | Read six settings domains; edit selected General, Audio and Video properties. |
-| Light Patch | Read current OSC data and saved local patch configuration in one call; batch create, edit, rename and delete instruments, groups and workspace definitions. |
+| Light Patch | Read current OSC data and saved local patch configuration in one call; batch create, edit, rename and delete instruments and groups. Manage definitions with a separate catalogue and editor. |
 | Local documents | Inspect documents; open, save or clean-close under specific safeguards. |
 | Local media | Find authorized files and analyze audio without playing it. |
 
@@ -37,7 +37,9 @@ and selected native triggers. It requires a running `/Applications/QLab.app`
 and macOS Automation permission for the MCP host. Ordinary cue access uses OSC.
 Light Patch file editing requires local QLab **5.5.10/build 5510**. USB-DMX
 assignments store the supplied device identity; they do not discover a device
-or prove it is connected. New definition parameters are limited to scalar and RGB. See the [Light Patch workflow](docs/user/agent-workflows.md#edit-the-light-patch)
+or prove it is connected. Definition creation/import initially supports scalar and validated RGB variants;
+other native variants remain inspectable with explicit import blocks. See the
+[definition workflow](docs/user/agent-workflows.md#light-definitions) and [Light Patch workflow](docs/user/agent-workflows.md#edit-the-light-patch)
 for recovery and readback limits.
 
 ### What it does not do
@@ -363,6 +365,8 @@ saved state and do not execute cues.
 | `qlab_get_workspace_video_settings` | List Video inputs, stages and output routes. |
 | `qlab_get_workspace_light_settings` | Read current OSC data plus saved local patch addresses, outputs, groups and workspace definitions; large results expose follow-up pages. |
 | `qlab_edit_light_patch` | Preview or apply a batch to the saved local Light Patch; close, replace and reopen the same workspace. |
+| `qlab_get_light_definitions` | Browse bundled, personal and saved-workspace definitions; filter the catalogue or select exact channel/virtual-control detail. |
+| `qlab_edit_light_definitions` | Import, create, update, rename or delete workspace definitions with preview and confirmation; global libraries remain unchanged. |
 | `qlab_get_workspace_midi_settings` | Read MIDI patches or one exact patch. |
 | `qlab_get_workspace_network_settings` | Read Network patches or one exact patch. |
 | `qlab_get_video_stage` | Read one stage and its regions. |

@@ -135,7 +135,7 @@ def test_fastmcp_tools(monkeypatch):
     async def run():
         async with Client(server.mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-            assert len(tools) == 80
+            assert len(tools) == 82
             for name in ("qlab_get_control_cues", "qlab_get_control_cue_details"):
                 assert tools[name].annotations.readOnlyHint and tools[name].outputSchema
             inventory = await client.call_tool("qlab_get_control_cues", {"workspace_id": WS, "cue_list_id": LIST})

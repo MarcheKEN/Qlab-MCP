@@ -493,3 +493,29 @@ ffprobe limit: ten seconds. Cache: four blocks, 128 MiB, ten-minute TTL.
 Stat identity is checked across phases and before returning; it does not provide
 cryptographic content integrity against an adversary capable of spoofing the
 filesystem metadata. Returned paths/tables describe the authorized source.
+
+
+### Light Definition catalogue and editor
+
+`qlab_get_light_definitions` reads fixed local bundled/personal library locations
+and optionally the exact saved workspace. It accepts no arbitrary file path.
+Bundled LZ4 decompression and keyed archives are bounded to 64 MiB; individual
+JSON definitions to 1 MiB, at most 20,000 records per source. Reads reject symlink
+files and unstable identities. Sources have independent availability; personal
+files are not executed. Pages contain at most 1,000 records and 2 MiB of JSON.
+Only exact detail requests include parameters; no raw archive graph is returned.
+Catalogue identity hashes source, origin and content. Duplicate names do not
+select another source implicitly. Dirty workspace data remains last-saved.
+
+`qlab_edit_light_definitions` uses the same document transaction, recovery and
+activity checks as the patch editor, with a separate single-use
+`confirm:lightDefinitions:v1:` token. Source fingerprints and original requests
+are bound to the token; imports revalidate sources before Close. Only validated
+scalar/RGB encodings are enabled, including known extended RGB outputs. Unknown
+variants and metadata block import rather than being silently discarded.
+Definition rename updates patch instrument references; delete in use is blocked.
+Shared definition updates revalidate DMX footprints and overlaps. Light cues are
+not changed and reference analysis is partial. Unused definitions have archive
+verification only, not OSC or physical-output validation. Global/personal
+libraries and Dashboard MIDI are never written. Definition actions have been
+removed from public `qlab_edit_light_patch` batches.

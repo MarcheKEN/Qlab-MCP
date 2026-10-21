@@ -409,3 +409,12 @@ def test_missing_fcntl_does_not_break_remote_read_server_import(monkeypatch):
     module=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert module.fcntl is None
+
+
+def test_reopen_discards_authenticated_osc_session_before_readback(state, monkeypatch):
+    events = []
+    state.reader.client.close = lambda: events.append(tuple(state.calls))
+    preview = edit(state)
+    result = edit(state, False, preview['confirm_token'])
+    assert result['ok']
+    assert events == [('close', 'open')]

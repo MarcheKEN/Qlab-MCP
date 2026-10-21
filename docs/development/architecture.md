@@ -39,8 +39,8 @@ message, output, fade, or target mode, then rechecks identity and selector.
 Failures in secondary reads preserve confirmed identity as partial data.
 Sensitive Network text and Script source require the technical profile.
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 80 decorated tools
-(49 read-only and 31 gated writes),
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 82 decorated tools
+(50 read-only and 32 gated writes),
 their schemas, annotations, timeouts, and result models. QLab-backed calls
 create a fresh `QLabReader` and close it after the operation; local media tools
 do not use that reader. `qlab-mcp` maps to
@@ -192,3 +192,17 @@ is an agent obligation; the server cannot verify it. OS access checks remain.
   failed observations do not override current source or establish new proof.
 - Agent-facing contract research:
   [`2026-08-13-mcp-agent-ux-and-edit-cleanup.md`](research/2026-08-13-mcp-agent-ux-and-edit-cleanup.md).
+
+### Light Definition catalogues and authoring
+
+`light_patch/catalogue.py` reads the bounded local bundled LZ4/keyed archive and
+personal `.qlablight` JSON sources. Source/content IDs disambiguate identical
+names. Workspace catalogue entries reuse stable last-saved inspection. Compact
+pages exclude parameters; an exact definition ID selects full details.
+
+`light_patch/definitions.py` owns definition-only batches and validated native
+imports. It reuses the archive planner and document transaction, with a separate
+`lightDefinitions` token family and catalogue fingerprint dependencies rechecked
+before Close. Public patch batches contain instruments/groups only. Native
+channel positions and extended RGB outputs are retained; unsupported variants
+remain visible but blocked. Libraries are never written.

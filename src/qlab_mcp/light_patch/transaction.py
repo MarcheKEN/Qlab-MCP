@@ -148,10 +148,10 @@ def _live(reader: Any, ws: str, summary: dict) -> dict:
     return payload
 
 
-def _reserve(token: str | None, baseline: dict) -> None:
+def _reserve(token: str | None, baseline: dict, family: str = 'lightPatch') -> None:
     if not isinstance(token, str):
         raise ValueError('A fresh Light Patch confirmation token is required.')
-    payload, error = decode_confirm_token(token, 'lightPatch', 1, _SECRET)
+    payload, error = decode_confirm_token(token, family, 1, _SECRET)
     if error or payload is None:
         raise ValueError(f'Invalid Light Patch confirmation token: {error}.')
     expiry = payload.get('expires_at')
@@ -176,19 +176,24 @@ def _result(ok: bool, status: str, **values: Any) -> dict:
 
 
 def edit_light_patch(reader: Any, workspace_id: str, operations: list[dict],
-                     dry_run: bool = True, confirm_token: str | None = None) -> dict:
+                     dry_run: bool = True, confirm_token: str | None = None, *,
+                     planner=None, dependencies: dict | None = None, token_family: str = 'lightPatch',
+                     dependency_check=None) -> dict:
     """Plan a complete patch batch or execute its one-use same-path transaction."""
     # Share the native document lock so Save/Close/Open cannot interleave locally.
     with docs._LOCK:
         try:
-            return _edit(reader, workspace_id, operations, dry_run, confirm_token)
+            return _edit(reader, workspace_id, operations, dry_run, confirm_token,
+                         planner, dependencies, token_family, dependency_check)
         except Exception as exc:
             return _result(False, 'blocked', error=str(exc))
 
 
 def _edit(reader: Any, workspace_id: str, operations: list[dict],
-          dry_run: bool, confirm_token: str | None) -> dict:
+          dry_run: bool, confirm_token: str | None, planner=None,
+          dependencies: dict | None = None, token_family: str = 'lightPatch', dependency_check=None) -> dict:
     from .archive import plan_patch
+    planner = planner or plan_patch
     ws = docs._uuid(workspace_id)
     if fcntl is None:
         raise ValueError('Native Light Patch editing requires filesystem locking on the QLab host.')
@@ -214,8 +219,8 @@ def _edit(reader: Any, workspace_id: str, operations: list[dict],
     path = Path(row['path'])
     _recovery_state(path)
     source, identity = _read(path)
-    original = plan_patch(source, [])
-    plan = plan_patch(source, normalized)
+    original = planner(source, [])
+    plan = planner(source, normalized)
     if original['workspace_id'].upper() != ws or plan['workspace_id'].upper() != ws:
         raise ValueError('Saved workspace UUID does not match the native document.')
     _live(reader, ws, original['summary'])
@@ -230,20 +235,25 @@ def _edit(reader: Any, workspace_id: str, operations: list[dict],
     baseline = dict(workspace_id=ws, inventory=inventory, identity=identity,
                     source_sha256=_digest(source), output_sha256=_digest(plan['output_bytes']),
                     operations=normalized)
+    if dependencies is not None:
+        baseline['dependencies'] = dependencies
     if dry_run:
-        result['confirm_token'] = encode_confirm_token('lightPatch', 1,
+        result['confirm_token'] = encode_confirm_token(token_family, 1,
             dict(baseline=baseline, expires_at=time.time() + 300, nonce=secrets.token_hex(16)), _SECRET)
         return result
-    _reserve(confirm_token, baseline)
+    _reserve(confirm_token, baseline, token_family)
     # Recheck after all planning/reads, before creating recovery or a native event.
     if _app_build() != ('5.5.10', '5510') or docs._inventory(reader) != inventory or _read(path) != (source, identity):
         raise ValueError('Workspace state changed before the transaction.')
-    return _execute(reader, ws, path, source, identity, inventory, plan, result)
+    if dependency_check is not None:
+        dependency_check()
+    return _execute(reader, ws, path, source, identity, inventory, plan, result, planner)
 
 
 def _execute(reader: Any, ws: str, path: Path, source: bytes, identity: list[int],
-             inventory: dict, plan: dict, result: dict) -> dict:
+             inventory: dict, plan: dict, result: dict, planner=None) -> dict:
     from .archive import plan_patch
+    planner = planner or plan_patch
     directory = _recovery_path(path)
     descriptor = None
     journal_started = False
@@ -278,7 +288,7 @@ def _execute(reader: Any, ws: str, path: Path, source: bytes, identity: list[int
         if _read(path) != (source, identity):
             raise ValueError('Workspace file changed after Close; newer bytes were not replaced.')
         output = plan['output_bytes']
-        if plan_patch(output, [])['summary'] != plan['summary']:
+        if planner(output, [])['summary'] != plan['summary']:
             raise ValueError('Generated file readback does not match the plan.')
         temporary = directory / 'result.qlab5'
         _write_new(temporary, b'')
@@ -328,6 +338,10 @@ def _execute(reader: Any, ws: str, path: Path, source: bytes, identity: list[int
         result['document_modified_after_reopen'] = row['modified']
         if row['modified']:
             result['warnings'] = [*result['warnings'], 'The reopened document has unsaved changes. QLab may normalize it on open; no automatic save was performed.']
+        # Closing QLab's document invalidates its authenticated OSC session.
+        close_session = getattr(reader.client, 'close', None)
+        if callable(close_session):
+            close_session()
         _live(reader, ws, plan['summary'])
         result['native_patch_verified'] = True
         result.update(ok=True, status='verified')

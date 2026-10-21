@@ -2,6 +2,16 @@
 
 ## 0.4.0 (Unreleased)
 
+- Add `qlab_get_light_definitions`: source-aware paged catalogue of bundled, personal
+  and last-saved workspace definitions, with exact channel/control detail.
+- Add `qlab_edit_light_definitions`: dedicated workspace-only import and definition
+  CRUD using source-bound confirmations and the existing document transaction.
+  Preserve native channel positions and extended RGB bindings; unknown variants
+  remain readable and blocked for import. No global library writes.
+- **Breaking:** remove definition operations from `qlab_edit_light_patch`; use the
+  definition editor first, then create/reassign instruments. Public surface is
+  82 tools: 50 read-only and 32 gated writes.
+
 - Enrich `qlab_get_workspace_light_settings` with typed saved-file instruments,
   addresses, Art-Net/USB configuration, groups and workspace definitions alongside
   current OSC data. Dirty documents remain unsaved and sources retain explicit
@@ -9,7 +19,7 @@
   archive inspection initially supports QLab 5.5.10/build 5510. Internal cue-editor
   dependency reads and all write gates remain unchanged.
 - Add `qlab_edit_light_patch`: typed batches of 1–100 create/edit/rename/delete
-  operations for instruments, groups and workspace Light Definitions. On local
+  operations for instruments and groups. Workspace definitions use the dedicated editor. On local
   QLab 5.5.10/build 5510 it previews a source-bound plan, then closes the clean
   document, replaces the same path with bounded recovery and reopens for
   archive/OSC-visible readback. Cues, Dashboard MIDI and the global Light
@@ -17,7 +27,7 @@
   unpatched output and explicit USB-DMX identities are supported as saved
   configuration; compatible-device availability and output remain unvalidated. New definition parameters are scalar or RGB. Percentage
   home values use 0–100 display units; raw DMX homes use the 8/16-bit range.
-  Public surface becomes 80 tools: 49 reads and 31 gated writes.
+  The original patch-editor addition exposed 80 tools; the separate definition tools bring the current surface to 82.
 - Reuse existing reader normalization and inherited cue model fields, and
   simplify equivalent settings/creation branches without changing MCP contracts.
 - Evidence capture now redacts confirmation tokens embedded in JSON-quoted

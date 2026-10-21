@@ -724,8 +724,8 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {'qlab_get_fonts': {
                                                        'idempotentHint': True,
                                                        'openWorldHint': True,
                                                        'readOnlyHint': True},
-                                       'input_schema_hash': 'cfd70c189348699a8f4f7e24a2dd2c81fc85b3aeeda35d9ff8ac4e00f607a495',
-                                       'output_schema_hash': '93e4e2e0895dd0c773398ac9771cf0a32fef26a54bfc06e9ee10a9ff5e8319b9',
+                                       'input_schema_hash': '559090e392266a76208b74bde37b5943d8b2ff0ff8e6da817111502e5d7513d0',
+                                       'output_schema_hash': '2d221d4f6c52f40bf75f2366683ef9031b10479f207c9982649b3447a5a02dc9',
                                        'tags': ['light',
                                                 'patches',
                                                 'qlab',
@@ -1103,7 +1103,7 @@ def test_read_tool_call_shapes_remain_explicit() -> None:
         "qlab_get_workspace_video_settings": {"workspace_id"},
         "qlab_get_video_stage": {"workspace_id", "stage_id", "profile"},
         "qlab_get_video_output_route": {"workspace_id", "route_id", "profile"},
-        "qlab_get_workspace_light_settings": {"workspace_id", "profile"},
+        "qlab_get_workspace_light_settings": {"workspace_id", "profile", "section", "offset", "limit"},
         "qlab_get_workspace_network_settings": {"workspace_id", "ref", "profile"},
         "qlab_get_workspace_midi_settings": {"workspace_id", "ref", "profile"},
         "qlab_query_cues": {"workspace_id", "primary_filter", "primary_value", "optional_filters", "profile", "max_results", "max_cues_scanned"},
@@ -1898,9 +1898,11 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         assert "data" in settings.outputSchema["properties"]
         assert "domain" in settings.outputSchema["properties"]
         assert "coverage" in settings.outputSchema["properties"]
-        assert {"section", "mode", "sections", "requests", "kind"}.isdisjoint(
+        assert {"mode", "sections", "requests", "kind"}.isdisjoint(
             settings.inputSchema["properties"]
         )
+        if settings is not settings_tools["qlab_get_workspace_light_settings"]:
+            assert "section" not in settings.inputSchema["properties"]
 
     audio_settings = settings_tools["qlab_get_workspace_audio_settings"]
     assert audio_settings.title == "Get QLab Workspace Audio Settings"
@@ -2539,7 +2541,7 @@ def test_public_read_tools_redact_internal_exception_paths(monkeypatch) -> None:
         serialized = json.dumps(payload)
         assert payload["ok"] is False
         assert payload["status"] == "error"
-        assert payload["partial"] is False
+        assert payload["partial"] is (payload.get("domain") == "light")
         assert payload["error_code"] == "validation_failed"
         assert payload["message"] == "[redacted_internal_path]"
         assert "/qlab-mcp-osc/" not in serialized

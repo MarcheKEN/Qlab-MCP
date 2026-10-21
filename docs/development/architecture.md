@@ -52,6 +52,14 @@ another public start command.
 
 ## Read path
 
+The public Light settings tool supplements its OSC result through
+`light_patch/reader.py`. It resolves only the requested local document, reads
+stable saved bytes and delegates known archive fields to `light_patch/inspection.py`.
+The decoder reuses `Archive` without invoking writer preconditions or modifying
+the document. Typed saved data and OSC data retain distinct source/freshness
+metadata; section pagination bounds the final serialized model. The internal
+OSC results used by cue editors and their signed dependencies are not enriched.
+
 `QLabReader` is the reader facade composed from focused mixins:
 
 - `runtime/connection.py` — discovery, authentication, mode, and readiness;

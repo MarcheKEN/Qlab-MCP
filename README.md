@@ -28,7 +28,7 @@ Writes are disabled by default and require a reviewed preview and confirmation.
 | Organize | Create cues, edit names/numbers, move cues and reorder Lists/Carts. |
 | Configure | Edit supported Audio, Video, Light, Text, MIDI and other cue settings. |
 | Workspace settings | Read six settings domains; edit selected General, Audio and Video properties. |
-| Light Patch | Batch create, edit, rename and delete instruments, groups and workspace definitions; Art-Net, explicit USB-DMX identity or unpatched output. |
+| Light Patch | Read current OSC data and saved local patch configuration in one call; batch create, edit, rename and delete instruments, groups and workspace definitions. |
 | Local documents | Inspect documents; open, save or clean-close under specific safeguards. |
 | Local media | Find authorized files and analyze audio without playing it. |
 
@@ -361,7 +361,7 @@ saved state and do not execute cues.
 | `qlab_get_workspace_general_settings` | Read minimum GO time and selection/playhead lock. |
 | `qlab_get_workspace_audio_settings` | Read Audio patches and an optional selected matrix level. |
 | `qlab_get_workspace_video_settings` | List Video inputs, stages and output routes. |
-| `qlab_get_workspace_light_settings` | Read the Light Patch summary. |
+| `qlab_get_workspace_light_settings` | Read current OSC data plus saved local patch addresses, outputs, groups and workspace definitions; large results expose follow-up pages. |
 | `qlab_edit_light_patch` | Preview or apply a batch to the saved local Light Patch; close, replace and reopen the same workspace. |
 | `qlab_get_workspace_midi_settings` | Read MIDI patches or one exact patch. |
 | `qlab_get_workspace_network_settings` | Read Network patches or one exact patch. |

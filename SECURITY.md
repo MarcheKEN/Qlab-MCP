@@ -192,6 +192,26 @@ policy.
 
 ### Local Light Patch files
 
+`qlab_get_workspace_light_settings` supplements current OSC data with a
+read-only inspection of the exact local workspace's saved archive. It resolves
+the document by UUID, checks the archived UUID, bounds the read and checks for
+document/file changes. Only the requested document's metadata is returned;
+the native inventory of other documents is not exposed by this tool. Saved
+enrichment initially supports QLab 5.5.10/build 5510. Remote QLab, absent
+Automation permission, a document without a saved path or an unsupported file leaves the
+available OSC result with an explicit saved-section coverage status.
+
+A dirty document can be inspected: its disk data is labelled as the last saved
+configuration and may differ from current OSC data. These sources are never
+silently merged into an asserted current state. A detected change during the
+read discards inconsistent saved enrichment. Dirty flags and file checks do
+not establish an atomic snapshot of QLab memory and disk. This read requires no
+write enablement or Edit Mode and never saves, closes or reopens the document.
+It excludes the raw archive graph, global Light Library and Dashboard MIDI.
+Configured device identities are not hardware detection. Results are bounded
+to 1,000 records per section and 2 MiB serialized JSON; truncation and subsequent
+requests are explicit, including for technical payloads.
+
 `qlab_edit_light_patch` requires local QLab 5.5.10/build 5510, existing-workspace
 write readiness, a clean inactive document in Edit Mode, disabled start-on-open/
 start-on-close settings, and a five-minute,

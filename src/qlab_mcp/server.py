@@ -20,6 +20,7 @@ from . import __version__
 from .media import search_media_files
 from .light_patch.models import LightPatchOperations
 from .light_patch.transaction import edit_light_patch
+from .light_patch.reader import enrich_light_settings
 from .audio_analysis_models import AudioAnalysisRequest, AudioAnalysisResult, Resolution
 from .errors import QLabMcpError
 from .models import (
@@ -627,6 +628,7 @@ def _run_workspace_settings_domain(
     exact_video: bool = False,
     detail_options: dict[str, Any] | None = None,
     validation_error: str | None = None,
+    result_transform: Callable[[QLabReader, dict[str, Any]], dict[str, Any]] | None = None,
 ) -> WorkspaceDomainResultT:
     try:
         if validation_error is not None:
@@ -635,35 +637,44 @@ def _run_workspace_settings_domain(
             raise ValueError("ref is not allowed when view='overview'")
 
         def read(reader: QLabReader) -> WorkspaceDomainResultT:
-            if exact_video:
-                payload = reader.get_video_setting(
-                    workspace_id=workspace_id, kind=detail_kind, ref=ref, profile=profile,
-                )
-            elif detail_kind is None:
-                payload = reader.get_workspace_settings(
-                    workspace_id=workspace_id,
-                    mode="summary",
-                    sections=[domain],
-                    profile=profile,
-                )
-            else:
-                payload = reader.get_workspace_setting_details(
-                    workspace_id=workspace_id,
-                    section=domain,
-                    kind=detail_kind,
-                    ref=ref,
-                    profile=profile,
-                    **(detail_options or {}),
-                )
-            return result_model.model_validate(
-                _workspace_domain_payload(
+            try:
+                if exact_video:
+                    payload = reader.get_video_setting(
+                        workspace_id=workspace_id, kind=detail_kind, ref=ref, profile=profile,
+                    )
+                elif detail_kind is None:
+                    payload = reader.get_workspace_settings(
+                        workspace_id=workspace_id,
+                        mode="summary",
+                        sections=[domain],
+                        profile=profile,
+                    )
+                else:
+                    payload = reader.get_workspace_setting_details(
+                        workspace_id=workspace_id,
+                        section=domain,
+                        kind=detail_kind,
+                        ref=ref,
+                        profile=profile,
+                        **(detail_options or {}),
+                    )
+            except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
+                if result_transform is None:
+                    raise
+                payload = dict(ok=False, status="error", partial=True,
+                               workspace_id=str(workspace_id), profile=profile,
+                               error_code="validation_failed", message=sanitize_exception_message(exc),
+                               errors={"light.patch": sanitize_exception_message(exc)})
+            normalized = _workspace_domain_payload(
                     payload,
                     domain=domain,
                     view=view,
                     ref=ref,
                     profile=profile,
                 )
-            )
+            if result_transform is not None:
+                normalized = result_transform(reader, normalized)
+            return result_model.model_validate(normalized)
 
         return _run_tool(read, timeout=WORKSPACE_SETTINGS_TIMEOUT, translate_errors=False)
     except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
@@ -1153,10 +1164,18 @@ def qlab_get_video_region(
 def qlab_get_workspace_light_settings(
     workspace_id: WorkspaceId,
     profile: WorkspaceSettingsProfile = "safe",
+    section: Literal["all", "instruments", "groups", "definitions"] = "all",
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 1000,
 ) -> WorkspaceLightSettingsResult:
     """Return a safe summary or redacted technical payload for the workspace Light Patch.
 
     The Light Patch is the only documented read surface for the larger Light settings panel.
+    Also reads the local saved patch (QLab 5.5.10/build 5510), including addresses,
+    outputs, groups and workspace definitions. Unsaved changes are not saved;
+    OSC and the last saved file have separate provenance and freshness.
+    Responses are bounded to 1,000 records per section and 2 MiB; follow next_requests
+    if pagination reports truncation. No save, close, reopen or output is performed.
     """
     return _run_workspace_settings_domain(
         workspace_id,
@@ -1167,6 +1186,9 @@ def qlab_get_workspace_light_settings(
         detail_kind="light_patch",
         result_model=WorkspaceLightSettingsResult,
         allowed={"profile": ["safe", "technical", "exhaustive"]},
+        result_transform=lambda reader, result: enrich_light_settings(
+            reader, str(workspace_id), result, profile, section, offset, limit,
+        ),
     )
 
 

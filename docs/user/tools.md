@@ -46,7 +46,7 @@ annotations, and result models.
 | `qlab_get_video_stage` | Exact stage UUID and its regions, safe or technical | Stage mutation or name selection | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_video_output_route` | Exact output route UUID and destination, safe or technical | Independent device inventory or mutation | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_video_region` | Exact OSC bounds, grid/guide and optional one control point | Full point scan or UI-coordinate conversion | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_workspace_light_settings` | Light Patch summary or redacted technical payload | Light Definitions or Dashboard settings | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_light_settings` | Current OSC patch plus saved local instruments, groups, outputs and workspace definitions | Global Light Library, Dashboard MIDI or hardware detection | [Light Patch read](agent-workflows.md#read-the-light-patch) |
 | `qlab_edit_light_patch` | One signed batch of 1–100 instrument, group and workspace-definition operations, with same-path close/edit/reopen | Cue repair, global Library, Dashboard MIDI, USB device discovery/hardware proof or unvalidated parameter creation | [Light Patch](agent-workflows.md#edit-the-light-patch) |
 | `qlab_get_workspace_network_settings` | Network Patch inventory or exact patch | The complete Network panel | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_workspace_midi_settings` | MIDI Patch inventory or exact patch | The complete MIDI panel | [Read](agent-workflows.md#read-sequence) |

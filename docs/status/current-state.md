@@ -1,4 +1,16 @@
-# Current Project State — 2026-10-20
+# Current Project State — 2026-10-21
+
+## Combined Light Patch inspection — PR #19
+
+`qlab_get_workspace_light_settings` now returns current OSC data together with
+typed `saved_patch` configuration: addresses, outputs, direct group membership
+and all stored workspace definitions. The saved source supports local QLab
+5.5.10/build 5510. Dirty documents are labelled potentially stale and never
+saved. Unavailable sources and unknown fields retain explicit coverage gaps.
+Default requests cover up to 1,000 records per section, with a 2 MiB response
+budget and exact continuation requests. Internal OSC readers and write guards
+are unchanged. See the [inspection validation record](../development/runtime-validation/2026-10-21-light-patch-inspection.md)
+for live and retained-file evidence and remaining limits.
 
 ## Light Patch authoring — PR #19
 

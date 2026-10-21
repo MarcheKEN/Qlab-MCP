@@ -2,6 +2,12 @@
 
 ## 0.4.0 (Unreleased)
 
+- Enrich `qlab_get_workspace_light_settings` with typed saved-file instruments,
+  addresses, Art-Net/USB configuration, groups and workspace definitions alongside
+  current OSC data. Dirty documents remain unsaved and sources retain explicit
+  freshness/coverage. Add bounded section pagination and a 2 MiB response budget;
+  archive inspection initially supports QLab 5.5.10/build 5510. Internal cue-editor
+  dependency reads and all write gates remain unchanged.
 - Add `qlab_edit_light_patch`: typed batches of 1–100 create/edit/rename/delete
   operations for instruments, groups and workspace Light Definitions. On local
   QLab 5.5.10/build 5510 it previews a source-bound plan, then closes the clean

@@ -101,7 +101,7 @@ Load and Target cue properties. Local imported OSC copy:
 | Inventory Video inputs, stages, and output routes | `qlab_get_workspace_video_settings` | Exact object detail |
 | Inspect one stage and its regions by UUID | `qlab_get_video_stage` | Name selection or mutation |
 | Inspect one output route and destination by UUID | `qlab_get_video_output_route` | Independent device inventory or mutation |
-| Read the Light Patch | `qlab_get_workspace_light_settings` | Light Definitions or Dashboard settings |
+| Read the Light Patch and saved workspace definitions | `qlab_get_workspace_light_settings` | Global Light Library or Dashboard MIDI |
 | Read Network Patch inventory or one exact patch | `qlab_get_workspace_network_settings` | The complete Network panel |
 | Read MIDI Patch inventory or one exact patch | `qlab_get_workspace_midi_settings` | The complete MIDI panel |
 | Find a bounded set of cues with filters | `qlab_query_cues` | Full Inspector payloads |
@@ -533,9 +533,41 @@ status and never resend automatically. Native Get, Save preview and dirty-Close/
 nonempty-Open blocking have [bounded live evidence](../development/runtime-validation/2026-10-17-installed-mcp-acceptance.md);
 actual Open/Save/Close events remain unvalidated by these reports.
 
+## Read the Light Patch
+
+Call `qlab_get_workspace_light_settings` with the exact workspace UUID. The
+default profile returns the existing OSC detail together with `saved_patch`,
+which describes the last saved local `.qlab5` configuration. Instruments refer
+to workspace definitions returned once, including unused definitions. Saved
+details include notes, addresses and calculable DMX ranges, Art-Net settings,
+configured USB identities, direct group members and known definition parameters.
+The global Light Library, Dashboard MIDI and raw archive graph are excluded.
+
+Keep the sources distinct: OSC describes QLab's current patch; `saved_patch`
+describes bytes on disk. With unsaved changes, both are returned and the saved
+data is marked as potentially stale. Compare only shared observable properties;
+OSC cannot establish saved addresses or output identities. USB identity is
+configuration, not proof of a connected device. Unknown variants and broken
+references are reported as coverage gaps rather than interpreted as empty data.
+
+Saved enrichment requires local QLab, macOS Automation access and a readable
+saved file in the supported QLab **5.5.10/build 5510** format. If these are
+unavailable, inspect the OSC result and the saved-section status. If the file or
+document changes during reading, `changed_during_read` prevents its data being
+presented as consistent. The query never saves, closes or opens a document,
+requires no write readiness and exposes no other open documents' inventory.
+
+Defaults are `section="all"`, `offset=0`, `limit=1000`, with at most 1,000
+records per section and a 2 MiB serialized response budget. Normal patches fit
+in one call. For a larger patch, inspect counts, truncation and `next_requests`;
+follow those exact arguments with the same tool. `section` can narrow the page
+to `instruments`, `groups` or `definitions`. Coverage and source information
+accompany each page. `technical` and `exhaustive` retain a redacted OSC
+`technical_payload`; they do not bypass the response budget.
+
 ## Edit the Light Patch
 
-Use `qlab_get_workspace_light_settings` to orient the patch, then
+Use the [Light Patch read](#read-the-light-patch) to orient the patch, then
 `qlab_edit_light_patch` to preview and apply one complete batch. This edits
 instruments, light groups and workspace Light Definitions, not Light cues.
 It requires local QLab **5.5.10/build 5510**, write readiness and a clean inactive

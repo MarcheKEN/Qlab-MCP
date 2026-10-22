@@ -21,6 +21,7 @@ from .media import search_media_files
 from .light_patch.models import LightPatchOperations, DefinitionOperations
 from .light_patch.catalogue import get_light_definitions
 from .light_patch.definitions import edit_light_definitions
+from .light_patch.curves import LightCueCurveOperations, edit_light_cue_curves
 from .light_patch.transaction import edit_light_patch
 from .light_patch.reader import enrich_light_settings
 from .audio_analysis_models import AudioAnalysisRequest, AudioAnalysisResult, Resolution
@@ -310,7 +311,7 @@ mcp = FastMCP(
         get_prompt_settings={"enabled": False},
     )],
     instructions="""
-QLab MCP exposes fifty read-only tools plus thirty-two gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
+QLab MCP exposes fifty read-only tools plus thirty-three gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
 Existing-workspace writes require QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; they remain dry-run first. Native document Open has its separate empty-inventory preflight, write-enable setting, file fingerprint and document token; no existing workspace is available for OSC readiness.
 This server does not expose GO, stop, panic, playback, audition, /live writes, arbitrary AppleScript, or raw OSC passthrough. Load loadTime, Target assignedNumber and documented cue Triggers use fixed local AppleScript reads/writes. Native Trigger reads require include_native_triggers=true; configuration requires disabled triggers, activation requires disarmed/no continuation/no skip, and Hotkey enabling is blocked without key/modifier readback.
 
@@ -425,6 +426,31 @@ def qlab_edit_light_definitions(
     """
     return _run_tool(lambda reader: edit_light_definitions(
         reader, str(workspace_id), [op.model_dump(exclude_unset=True) for op in operations],
+        dry_run, confirm_token))
+
+
+@mcp.tool(title="Edit QLab Light Cue Curves", tags={"qlab", "light", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
+def qlab_edit_light_cue_curves(
+    workspace_id: CanonicalWorkspaceUUID,
+    operations: LightCueCurveOperations,
+    dry_run: StrictBool = True,
+    confirm_token: StrictStr | None = None,
+) -> dict[str, Any]:
+    """Edit ascending and descending curves on 1–50 exact Light cue UUIDs.
+
+    Requires QLab 5.5.10/build 5510 and a clean inactive local document. Preview
+    first; execute with its fresh single-use confirmation token. The same path
+    close/edit/reopen transaction preserves a recovery file. Omitted fields and
+    sides are preserved; points explicitly replace a Custom curve's normalized
+    point list. Supported types: custom, s_curve, parametric, linear. Mirrored
+    curves and unrecognized archive variants are blocked. needs_save requires
+    qlab_save_workspace then a new preview. Verification reads the saved archive
+    after reopening; OSC does not expose curve values. No playback or physical
+    DMX output is verified. Do not retry an uncertain write.
+    """
+    return _run_tool(lambda reader: edit_light_cue_curves(
+        reader, str(workspace_id), [op.model_dump(mode="json", exclude_unset=True) for op in operations],
         dry_run, confirm_token))
 
 

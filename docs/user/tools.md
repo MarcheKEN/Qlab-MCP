@@ -1,6 +1,6 @@
 # Public MCP Tools
 
-QLab MCP exposes exactly 82 tools on the current development branch: 50 reads and 32 gated writes. This page is a compact human
+QLab MCP exposes exactly 83 tools on the current development branch: 50 reads and 33 gated writes. This page is a compact human
 catalogue; decorated functions, generated schemas, and
 `tests/test_server_tools.py` remain the source of truth for exact parameters,
 annotations, and result models.
@@ -71,6 +71,7 @@ annotations, and result models.
 | `qlab_edit_audio_cues` | Typed Audio Basics, Triggers and saved family settings, 1–50 UUIDs | Audio Maps, Audio FX, Trim, playback or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_mic_cues` | Typed Mic Basics, Triggers and saved family settings, 1–50 UUIDs | Audio Maps, Audio FX, Trim, playback or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_light_cues` | Typed Light Basics, Triggers and saved family settings, 1–50 UUIDs | Playback, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
+| `qlab_edit_light_cue_curves` | Saved ascending/descending Custom, S-Curve, Parametric and Linear curves on exact Light cue UUIDs | Live output, mirrored curves, OSC curve readback | [Light curves](agent-workflows.md#light-cue-curves) |
 | `qlab_edit_fade_cues` | Typed Fade Basics, Triggers and saved family settings, 1–50 UUIDs | Playback, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_network_cues` | Typed Network Basics, Triggers and saved family settings, 1–50 UUIDs | Sending messages, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_midi_cues` | Typed MIDI Basics, Triggers and saved family settings, 1–50 UUIDs | Sending MIDI, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |

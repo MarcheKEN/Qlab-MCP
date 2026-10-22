@@ -71,7 +71,7 @@ def test_workspace_settings_tools_replace_generic_surface() -> None:
     assert expected <= tool_names
     assert "qlab_get_workspace_settings" not in tool_names
     assert "qlab_get_workspace_setting_details" not in tool_names
-    assert len(tool_names) == 82
+    assert len(tool_names) == 83
 
 
 def test_network_destination_absence_is_unknown() -> None:

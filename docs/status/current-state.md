@@ -1,8 +1,47 @@
-# Current Project State — 2026-10-21
+# Current Project State — 2026-10-22
 
-## Separate Light Definition tools — PR #19
+## Lighting authoring implementation — PR #19
 
-Current source exposes **82 tools: 50 reads and 32 gated writes**.
+Current source exposes **83 tools: 50 reads and 33 gated writes**.
+`qlab_edit_light_cue_curves` adds separate saved-file ascending/descending curve
+edits with source-bound confirmations, recovery and saved-archive postconditions.
+Custom, S-Curve, Parametric and Linear were accepted on two new disarmed cues in
+QLab 5.5.10/build 5510, including adding/removing points, no-op and consumed-token
+rejection. OSC cannot read curve values; native visual checks are separately recorded.
+
+The Light command analyzer models `all = home`, lists, matching-prefix ranges,
+bracket selectors and dynamic cue pulls with proportional factors. Source hashes,
+number resolution, cycles and same-batch conflicts are checked before setters;
+the resulting dynamic look is not calculated. Native text/readback acceptance
+confirmed a proportional pull with `pass`, with no cue errors or warnings.
+
+Definition creation/import now covers CMY, HSI, Pan/Tilt, acyclic One-to-Many
+and RGB lime alongside scalar 8/16-bit parameters. A native batch imported four
+manufacturer examples, created combined/nested controls and assigned them to
+five unpatched test instruments. Both file and OSC-visible verification passed;
+QLab's native editor confirmed the virtual bindings. Global/personal libraries
+and Dashboard MIDI are unchanged. No physical-output claim follows.
+
+Verification: **2,183 passed, 61 subtests passed, 35 skipped**; FastMCP reports
+83 tools. Test additions were removed and the original patch snapshot restored.
+
+See [October 22 acceptance](../development/runtime-validation/2026-10-22-light-authoring-completion.md).
+Earlier counts, blocked capabilities and test totals below retain their dated scope.
+
+## October 21 lighting authoring research — PR #19
+
+The [2026-10-21 research](../development/research/2026-10-21-light-authoring-expansion.md)
+records native LCL acceptance, definition variant coverage and an accepted
+same-path Light cue Custom control-point file edit in QLab 5.5.10. The shared
+analyzer now models reserved `all = home` correctly and ignores only known
+group-member parameter mismatches. Instrument lists, matching-prefix numeric
+ranges and ad-hoc selectors are supported with bounded expansion. This is not complete LCL or curve authoring:
+the proposed curve tool is not registered, and unvalidated definition variants
+remain blocked. No playback or physical output was tested.
+
+## October 21 separate Light Definition tools — PR #19
+
+At the October 21 validation, source exposed **82 tools: 50 reads and 32 gated writes**.
 `qlab_get_light_definitions` lists bundled/personal and last-saved workspace
 sources with exact detail, source-bound IDs, filters and pagination.
 `qlab_edit_light_definitions` imports native definitions or performs workspace

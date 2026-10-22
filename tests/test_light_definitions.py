@@ -11,6 +11,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from qlab_mcp.light_patch import catalogue as cat, definitions as defs, transaction as tx
 from qlab_mcp.light_patch.archive import Patch, plan_patch
+from qlab_mcp.light_patch.inspection import inspect_saved_patch
 from qlab_mcp.light_patch.models import DefinitionOperations, LightPatchOperations
 from test_light_patch_archive import workspace
 
@@ -25,6 +26,27 @@ def native(name='Example RGBW'):
         red='red', green='green', blue='blue', white='white', warmwhite='warm white', amber='amber'))
     return dict(name=name, manufacturer='Example', definitionVersion=2,
                 defaultParameter=-2, parameters=parameters)
+
+
+def native_virtuals(name='Example Virtuals'):
+    names = ('cyan', 'magenta', 'yellow', 'hue', 'saturation', 'intensity',
+             'pan', 'tilt', 'red', 'green', 'blue', 'lime')
+    parameters = {str(channel): dict(type='scalar', name=parameter, twoBytes=False,
+                                     valueIsPercentage=True, homeValue=0)
+                  for channel, parameter in enumerate(names)}
+    parameters.update({
+        '-2': dict(name='cmy', type='cmycolor', outputs={
+            'cyan': 'cyan', 'magenta': 'magenta', 'yellow': 'yellow'}),
+        '-3': dict(name='hsi', type='hsicolor', outputs={
+            'hue': 'hue', 'saturation': 'saturation', 'intensity': 'intensity'}),
+        '-4': dict(name='position', type='pantilt', outputs={
+            'pan': 'pan', 'tilt': 'tilt'}),
+        '-5': dict(name='rgb', type='rgbcolor', outputs={
+            'red': 'red', 'green': 'green', 'blue': 'blue', 'lime': 'lime'}),
+        '-6': dict(name='controls', type='muxer', outputs=['cmy', 'rgb', 'intensity']),
+    })
+    return dict(name=name, manufacturer='Example', definitionVersion=2,
+                defaultParameter=-3, parameters=parameters)
 
 
 def library(records):
@@ -96,7 +118,146 @@ def test_unknown_variant_is_visible_but_not_importable(catalogues):
     assert any(p['type'] == 'pantilt' for p in detail['parameters'])
 
 
-@pytest.mark.parametrize('change', ['missing_output', 'overlap', 'default', 'home', 'duplicate', 'unknown_field'])
+def test_native_virtual_variants_validate_and_do_not_add_dmx_footprint():
+    detail = defs.inspect_native(native_virtuals())
+    assert detail['importable']
+    assert detail['dmx_footprint'] == 12
+    assert {p['type'] for p in detail['parameters']} == {
+        'scalar', 'rgbcolor', 'cmycolor', 'hsicolor', 'pantilt', 'muxer'}
+
+
+def test_native_muxer_cycles_and_unresolved_outputs_are_not_importable():
+    value = native_virtuals()
+    value['parameters']['-6']['outputs'] = ['other']
+    value['parameters']['-7'] = dict(name='other', type='muxer', outputs=['controls'])
+    detail = defs.inspect_native(value)
+    assert not detail['importable']
+    assert any('cycle' in note for note in detail['compatibility_notes'])
+
+    value = native_virtuals()
+    value['parameters']['-6']['outputs'] = ['missing']
+    assert not defs.inspect_native(value)['importable']
+
+
+def test_rgb_extra_emitter_stays_blocked_except_lime():
+    value = native_virtuals()
+    value['parameters']['-5']['outputs']['ultraviolet'] = 'ultraviolet'
+    value['parameters']['12'] = dict(type='scalar', name='ultraviolet', twoBytes=False,
+                                     valueIsPercentage=True, homeValue=0)
+    assert not defs.inspect_native(value)['importable']
+
+
+def test_native_16bit_channel_cannot_cross_universe_end():
+    value = native_virtuals()
+    channel = value['parameters'].pop('11')
+    channel['twoBytes'] = True
+    value['parameters']['511'] = channel
+    assert not defs.inspect_native(value)['importable']
+
+
+def test_typed_definition_inputs_accept_all_supported_virtual_bindings():
+    operation = dict(action='create_definition', name='Typed Virtuals', manufacturer='Example',
+        default_parameter='controls', parameters=[
+            dict(type='scalar', name='cyan'), dict(type='scalar', name='magenta'),
+            dict(type='scalar', name='yellow'), dict(type='scalar', name='hue'),
+            dict(type='scalar', name='saturation'), dict(type='scalar', name='intensity'),
+            dict(type='scalar', name='pan'), dict(type='scalar', name='tilt'),
+            dict(type='scalar', name='red'), dict(type='scalar', name='green'),
+            dict(type='scalar', name='blue'), dict(type='scalar', name='lime'),
+            dict(type='cmycolor', name='cmy', outputs={'cyan': 'cyan', 'magenta': 'magenta', 'yellow': 'yellow'}),
+            dict(type='hsicolor', name='hsi', outputs={'hue': 'hue', 'saturation': 'saturation', 'intensity': 'intensity'}),
+            dict(type='pantilt', name='position', outputs={'pan': 'pan', 'tilt': 'tilt'}),
+            dict(type='rgbcolor', name='rgb', outputs={'red': 'red', 'green': 'green', 'blue': 'blue', 'lime': 'lime'}),
+            dict(type='muxer', name='controls', outputs=['cmy', 'rgb', 'intensity']),
+        ])
+    validated = TypeAdapter(DefinitionOperations).validate_python([operation])[0]
+    assert [parameter.type for parameter in validated.parameters[-5:]] == [
+        'cmycolor', 'hsicolor', 'pantilt', 'rgbcolor', 'muxer']
+
+
+def test_typed_virtual_definition_uses_native_subclasses_and_bindings():
+    operation = dict(action='create_definition', name='Typed Virtuals', manufacturer='Example',
+        default_parameter='controls', parameters=[
+            dict(type='scalar', name='cyan'), dict(type='scalar', name='magenta'),
+            dict(type='scalar', name='yellow'), dict(type='scalar', name='hue'),
+            dict(type='scalar', name='saturation'), dict(type='scalar', name='intensity'),
+            dict(type='scalar', name='pan'), dict(type='scalar', name='tilt'),
+            dict(type='scalar', name='red'), dict(type='scalar', name='green'),
+            dict(type='scalar', name='blue'), dict(type='scalar', name='lime'),
+            dict(type='cmycolor', name='cmy', outputs={'cyan': 'cyan', 'magenta': 'magenta', 'yellow': 'yellow'}),
+            dict(type='hsicolor', name='hsi', outputs={'hue': 'hue', 'saturation': 'saturation', 'intensity': 'intensity'}),
+            dict(type='pantilt', name='position', outputs={'pan': 'pan', 'tilt': 'tilt'}),
+            dict(type='rgbcolor', name='rgb', outputs={'red': 'red', 'green': 'green', 'blue': 'blue', 'lime': 'lime'}),
+            dict(type='muxer', name='controls', outputs=['cmy', 'rgb', 'intensity']),
+        ])
+    planned = plan_patch(workspace(), [operation])
+    patch = Patch(planned['output_bytes'])
+    definition = patch.archive.ref(patch.find('Typed Virtuals', 'definition'))
+    parameters = patch.parameter_entries(definition['parameters'])
+    class_names = {channel: patch.archive.kind(ref) for channel, ref in parameters.items()}
+    assert class_names == {
+        **{channel: 'LightCueInstrumentDefinitionParameterScalar' for channel in range(12)},
+        -2: 'LightCueInstrumentDefinitionParameterCMYColor',
+        -3: 'LightCueInstrumentDefinitionParameterHSIColor',
+        -4: 'LightCueInstrumentDefinitionParameterPanTilt',
+        -5: 'LightCueInstrumentDefinitionParameterRGBColor',
+        -6: 'LightCueInstrumentDefinitionParameterMuxer',
+    }
+    summary = next(item for item in planned['summary']['definitions'] if item['name'] == 'Typed Virtuals')
+    assert summary['default_parameter'] == -6
+    assert summary['parameters'][-1]['outputs'] == ['cmy', 'rgb', 'intensity']
+
+
+def test_update_definition_encodes_virtuals_and_inspection_reads_all_bindings():
+    value = native_virtuals('Dimmer')
+    parameters = []
+    for channel in range(12):
+        name = value['parameters'][str(channel)]['name']
+        parameters.append(dict(type='scalar', name=name))
+    for channel in ('-2', '-3', '-4', '-5', '-6'):
+        parameter = value['parameters'][channel]
+        parameters.append(dict(type=parameter['type'], name=parameter['name'], outputs=parameter['outputs']))
+    planned = plan_patch(workspace(), [dict(action='update_definition', name='Dimmer',
+        parameters=parameters, default_parameter='hsi')])
+    saved = inspect_saved_patch(planned['output_bytes'])
+    assert saved['coverage'] == 'complete'
+    definition = saved['definitions'][0]
+    assert definition['dmx_footprint'] == 12
+    assert definition['default_parameter'] == -3
+    assert {parameter['type'] for parameter in definition['parameters']} == {
+        'scalar', 'rgbcolor', 'cmycolor', 'hsicolor', 'pantilt', 'muxer'}
+    assert next(p for p in definition['parameters'] if p['type'] == 'muxer')['outputs'] == [
+        'cmy', 'rgb', 'intensity']
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_native_virtual_import_preserves_unknown_json_metadata_and_classes(version):
+    value = native_virtuals()
+    value["definitionVersion"] = version
+    value['vendorPayload'] = {'revision': 3, 'labels': ['native', 'preserved']}
+    value['parameters']['-2']['futureCalibration'] = {'range': [0, 127]}
+    operation = dict(action='create_definition', name=value['name'], manufacturer=value['manufacturer'],
+                     parameters=[dict(type='scalar', name='placeholder')])
+    assert defs.inspect_native(value)['importable']
+    planned = plan_patch(workspace(), [operation], native_imports={value['name']: value})
+    patch = Patch(planned['output_bytes'])
+    archive = patch.archive
+    definition = archive.ref(patch.find(value['name'], 'definition'))
+    assert archive.ref(definition['definitionVersion']) == version
+    payload = archive.mapping(definition['vendorPayload'])
+    assert archive.ref(payload['revision']) == 3
+    assert [archive.ref(ref) for ref in archive.array(payload['labels'])] == ['native', 'preserved']
+    cmy_ref = patch.parameter_entries(definition['parameters'])[-2]
+    cmy = archive.ref(cmy_ref)
+    assert archive.kind(cmy_ref) == 'LightCueInstrumentDefinitionParameterCMYColor'
+    calibration = archive.mapping(cmy['futureCalibration'])
+    assert [archive.ref(ref) for ref in archive.array(calibration['range'])] == [0, 127]
+    imported = next(d for d in inspect_saved_patch(planned['output_bytes'])['definitions']
+                    if d['name'] == value['name'])
+    assert imported['dmx_footprint'] == 12
+
+
+@pytest.mark.parametrize('change', ['missing_output', 'overlap', 'default', 'home', 'duplicate'])
 def test_native_import_validation(change):
     value = native()
     if change == 'missing_output': value['parameters']['-2']['outputs']['red'] = 'missing'
@@ -104,7 +265,6 @@ def test_native_import_validation(change):
     if change == 'default': value['defaultParameter'] = 50
     if change == 'home': value['parameters']['0']['homeValue'] = 101
     if change == 'duplicate': value['parameters']['1']['name'] = 'red'
-    if change == 'unknown_field': value['future'] = {'unknown': True}
     assert not defs.inspect_native(value)['importable']
 
 

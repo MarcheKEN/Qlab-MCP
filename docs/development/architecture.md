@@ -39,8 +39,8 @@ message, output, fade, or target mode, then rechecks identity and selector.
 Failures in secondary reads preserve confirmed identity as partial data.
 Sensitive Network text and Script source require the technical profile.
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 82 decorated tools
-(50 read-only and 32 gated writes),
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 83 decorated tools
+(50 read-only and 33 gated writes),
 their schemas, annotations, timeouts, and result models. QLab-backed calls
 create a fresh `QLabReader` and close it after the operation; local media tools
 do not use that reader. `qlab-mcp` maps to
@@ -206,3 +206,12 @@ imports. It reuses the archive planner and document transaction, with a separate
 before Close. Public patch batches contain instruments/groups only. Native
 channel positions and extended RGB outputs are retained; unsupported variants
 remain visible but blocked. Libraries are never written.
+
+### Light cue curves
+
+`light_patch/curves.py` plans bounded, exact-UUID edits against active cue-list
+containment. Changed Fade/shape branches and point chains use copy-on-write;
+non-containment cue references do not make residual objects active. The separate
+public tool shares the document transaction but has its own token family and a
+saved-archive postcondition checked before replacement and after reopening.
+OSC-visible patch verification remains separate from curve verification.

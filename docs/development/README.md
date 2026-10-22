@@ -1,5 +1,7 @@
 # Development
 
+- [October 22 lighting authoring completion](runtime-validation/2026-10-22-light-authoring-completion.md)
+
 - [Light Patch authoring design](../superpowers/specs/2026-10-20-light-patch-authoring-design.md)
   and [implementation plan](../superpowers/plans/2026-10-20-light-patch-authoring.md)
   — implemented in PR #19; see the [native acceptance record](runtime-validation/2026-10-20-light-patch-authoring.md).

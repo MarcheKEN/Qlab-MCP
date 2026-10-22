@@ -1,5 +1,7 @@
 # Runtime validation records
 
+- [October 22 lighting authoring completion](2026-10-22-light-authoring-completion.md)
+
 Each report proves only its named QLab version, fixture and operation. Automated checks are separate from real playback and hardware output. JSON files with matching stems retain capture evidence.
 
 Use the [current tool catalogue](../../user/tools.md) and

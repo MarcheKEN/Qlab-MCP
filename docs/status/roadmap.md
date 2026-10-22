@@ -1,8 +1,8 @@
-# Roadmap — 2026-10-20
+# Roadmap — 2026-10-22
 
 ## Current contract
 
-QLab MCP **0.4.0** exposes 80 tools: 49 reads and 31 gated writes. The [tool catalogue](../user/tools.md)
+QLab MCP **0.4.0** exposes 83 tools: 50 reads and 33 gated writes. The [tool catalogue](../user/tools.md)
 and generated schemas define their arguments; [architecture](../development/architecture.md)
 describes implementation. Generic `qlab_edit_cues` and `qlab_edit_workspace_settings`
 are retired. Use the typed cue-family and scoped workspace-settings editors.
@@ -33,9 +33,10 @@ closed by tool invocation alone. The pass changed no code and tested no playback
 | Other cue families | Audio/Mic/Light/Fade/Network/MIDI/MIDI File/Timecode/Script typed editors | The [completion report](../development/runtime-validation/2026-10-05-remaining-cue-completion.md) records individual live gaps. Unknown device/command/range metadata blocks MSC/Device Definition operations. Script source/compilation is excluded. |
 | Native cue fields | Fixed local Load Time, assigned number and opt-in native Triggers | [Field](../development/runtime-validation/2026-10-10-control-applescript.md) and [Trigger](../development/runtime-validation/2026-10-10-native-triggers.md) proof is bounded. Hotkey enabling/assignment needs key/modifier identity; weekdays, capture and arbitrary scripts remain excluded. |
 | Workspace Settings | General, Audio output patch, Video route/stage/region edits | [September 29](../development/runtime-validation/2026-09-29-workspace-settings.md) gives limited reversible proof; the October 17 pass repeats one operation through each of the five editors. Audio Maps and Network/MIDI settings writers remain excluded. Light Patch uses the separate local archive workflow below. |
-| Light Patch | Local 5.5.10/build 5510 batch instrument/group/definition create, edit, rename and delete; Art-Net, explicit USB-DMX identity or unpatched assignments | USB-DMX device discovery, compatible-device availability and output remain unvalidated. New definition parameters are scalar/RGB; other variants remain uncreated. Cues are preserved with partial reference warnings. File routing verification and limited OSC-visible readback are distinct; hardware output is unclaimed. See the [workflow](../user/agent-workflows.md#edit-the-light-patch). |
+| Light Patch | Local 5.5.10/build 5510 instrument/group edits and separate definition CRUD; Art-Net, explicit USB-DMX identity or unpatched assignments | USB-DMX device discovery, compatible-device availability and output remain unvalidated. Definition parameters include scalar, RGB/lime, CMY, HSI, Pan/Tilt and acyclic One-to-Many; unknown variants remain blocked. Cues are preserved with partial reference warnings. File routing verification and limited OSC-visible readback are distinct; hardware output is unclaimed. See the [workflow](../user/agent-workflows.md#edit-the-light-patch). |
 | Native documents | Exact local inventory, bounded Open/Save/clean-Close | Document Get, Save preview and dirty-Close/nonempty-Open blocking were observed in the October 17 pass. Actual Open/Save/Close events remain unvalidated by these reports. |
 | Local analysis | Consent-based media search and optional paged audio analysis | Optional Python dependencies and FFmpeg/ffprobe are required for real decoding. Measurements are source-relative; they do not classify lyrics or establish playback/hardware behavior. |
+| Light curves | Separate guarded saved-file Custom/S-Curve/Parametric/Linear up/down editor | QLab 5.5.10/build 5510; mirrored/unknown shapes are blocked. Saved archive postconditions and bounded native visual acceptance do not prove playback or DMX. |
 
 ## Active validation
 

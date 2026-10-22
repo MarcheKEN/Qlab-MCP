@@ -93,8 +93,8 @@ class ScalarParameter(Input):
 class RGBParameter(Input):
     type: Literal["rgbcolor"]
     name: NewPatchName
-    outputs: Annotated[list[Name], Field(min_length=3, max_length=3)] | dict[Literal['red', 'green', 'blue', 'white', 'warmwhite', 'amber'], Name] = Field(
-        description="Physical scalar names in RGB order, or native RGB plus optional white/warmwhite/amber outputs.")
+    outputs: Annotated[list[Name], Field(min_length=3, max_length=3)] | dict[Literal['red', 'green', 'blue', 'white', 'warmwhite', 'amber', 'lime'], Name] = Field(
+        description="Physical scalar names in RGB order, or native RGB plus optional white/warmwhite/amber/lime outputs.")
 
     @model_validator(mode="after")
     def distinct_outputs(self):
@@ -106,7 +106,57 @@ class RGBParameter(Input):
         return self
 
 
-DefinitionParameter = Annotated[Union[ScalarParameter, RGBParameter], Field(discriminator="type")]
+class CMYParameter(Input):
+    type: Literal["cmycolor"]
+    name: NewPatchName
+    outputs: dict[Literal['cyan', 'magenta', 'yellow'], Name]
+
+    @model_validator(mode="after")
+    def complete_outputs(self):
+        if set(self.outputs) != {'cyan', 'magenta', 'yellow'} or len(set(self.outputs.values())) != 3:
+            raise ValueError("CMY outputs require distinct cyan, magenta and yellow parameters.")
+        return self
+
+
+class HSIParameter(Input):
+    type: Literal["hsicolor"]
+    name: NewPatchName
+    outputs: dict[Literal['hue', 'saturation', 'intensity'], Name]
+
+    @model_validator(mode="after")
+    def complete_outputs(self):
+        if set(self.outputs) != {'hue', 'saturation', 'intensity'} or len(set(self.outputs.values())) != 3:
+            raise ValueError("HSI outputs require distinct hue, saturation and intensity parameters.")
+        return self
+
+
+class PanTiltParameter(Input):
+    type: Literal["pantilt"]
+    name: NewPatchName
+    outputs: dict[Literal['pan', 'tilt'], Name]
+
+    @model_validator(mode="after")
+    def complete_outputs(self):
+        if set(self.outputs) != {'pan', 'tilt'} or len(set(self.outputs.values())) != 2:
+            raise ValueError("Pan/Tilt outputs require distinct pan and tilt parameters.")
+        return self
+
+
+class MuxerParameter(Input):
+    type: Literal["muxer"]
+    name: NewPatchName
+    outputs: Annotated[list[Name], Field(min_length=1, max_length=512)]
+
+    @model_validator(mode="after")
+    def distinct_outputs(self):
+        if len(set(self.outputs)) != len(self.outputs):
+            raise ValueError("Muxer outputs must name distinct parameters.")
+        return self
+
+
+DefinitionParameter = Annotated[Union[
+    ScalarParameter, RGBParameter, CMYParameter, HSIParameter, PanTiltParameter, MuxerParameter,
+], Field(discriminator="type")]
 Parameters = Annotated[list[DefinitionParameter], Field(min_length=1, max_length=512)]
 Members = Annotated[list[Name], Field(max_length=4096)]
 

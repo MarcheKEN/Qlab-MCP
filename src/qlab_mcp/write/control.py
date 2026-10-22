@@ -402,6 +402,35 @@ def _family_preflight(reader, ws, item, family="control", *, _core=False):
     return before, changes, operations, dependencies
 
 
+def _batch_dependency_conflict(bindings):
+    for binding in bindings:
+        dependencies = binding['dependencies']
+        for cue, values in dependencies.get('cues', {}).items():
+            other = next((candidate for candidate in bindings
+                          if candidate['cue_id'] == cue and candidate is not binding), None)
+            if other and values.keys() & other['properties'].keys():
+                return 'Separate edits to cues used as batch dependencies.'
+        for cue, values in dependencies.get('light_pull_sources', {}).items():
+            other = next((candidate for candidate in bindings
+                          if candidate['cue_id'] == cue and candidate is not binding), None)
+            if other:
+                changed_source_fields = {'number'}
+                if 'text_sha256' in values:
+                    changed_source_fields.add('lightCommandText')
+                if changed_source_fields & other['properties'].keys():
+                    return 'Separate edits to cues used as batch dependencies.'
+        pull_numbers = set(dependencies.get('light_pull_number_index', {}).get('numbers', ()))
+        if pull_numbers:
+            for candidate in bindings:
+                changes = candidate['properties']
+                if 'number' in changes and any(
+                    str(value) in pull_numbers
+                    for value in (candidate['before'].get('number'), changes['number'])
+                ):
+                    return 'Separate cue number changes that affect Light cue pulls.'
+    return None
+
+
 def edit_control_cues(reader, workspace_id, updates, dry_run=None, *, _family="control"):
     deadline = time.monotonic() + UPDATE_REAL_WRITE_SOFT_BUDGET_SECONDS
     input_model, _, _, profile, tool = _FAMILIES[_family]
@@ -458,10 +487,6 @@ def edit_control_cues(reader, workspace_id, updates, dry_run=None, *, _family="c
                         "args": op["args"], "status": "planned"}
                 if op.get("transport") == "applescript":
                     plan["transport"] = "applescript"
-                if dry:
-                    payload = {**binding, "property": op.get("key", op["property"]), "expires_at": int(time.time()) + _TTL,
-                               "nonce": secrets.token_urlsafe(12)}
-                    plan["confirm_token"] = encode_confirm_token("controlCue", 1, payload, _SECRET)
                 result["planned_operations"].append(plan)
             result["status"] = "dry_run" if dry else "planned"
         except Exception as exc:
@@ -473,15 +498,22 @@ def edit_control_cues(reader, workspace_id, updates, dry_run=None, *, _family="c
         if assigned and any(b["cue_id"] == str(assigned["uniqueID"]).upper() and "number" in b["properties"] for b in bindings):
             results[0].update(status="preflight_failed", errors={"dependencies": "Renumber assigned cues separately, then run a new dry run."})
             return finish("preflight_failed")
-    if dry:
-        return finish("dry_run")
     if remaining_family:
-        for binding in bindings:
-            for cue, values in binding["dependencies"].get("cues", {}).items():
-                other = next((b for b in bindings if b["cue_id"] == cue and b is not binding), None)
-                if other and values.keys() & other["properties"].keys():
-                    results[0].update(status="preflight_failed", errors={"dependencies": "Separate edits to cues used as batch dependencies."})
-                    return finish("preflight_failed")
+        conflict = _batch_dependency_conflict(bindings)
+        if conflict:
+            results[0].update(status="preflight_failed", errors={"dependencies": conflict})
+            return finish("preflight_failed")
+    if dry:
+        for result, binding in zip(results, bindings, strict=True):
+            for plan in result["planned_operations"]:
+                payload = {
+                    **binding,
+                    "property": plan.get("key", plan["property"]),
+                    "expires_at": int(time.time()) + _TTL,
+                    "nonce": secrets.token_urlsafe(12),
+                }
+                plan["confirm_token"] = encode_confirm_token("controlCue", 1, payload, _SECRET)
+        return finish("dry_run")
     tokens = []
     try:
         for item, result, binding in zip(items, results, bindings, strict=True):

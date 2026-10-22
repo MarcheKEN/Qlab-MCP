@@ -11,7 +11,7 @@ guarded close, replace and reopen workflow.
 **Developed and tested with QLab 5.5.10 on macOS.** Other QLab versions may
 behave differently and have not been validated by this project.
 
-The server provides **82 tools: 50 read-only and 32 gated writes**.
+The server provides **83 tools: 50 read-only and 33 gated writes**.
 Writes are disabled by default and require a reviewed preview and confirmation.
 
 [Capabilities](#capabilities) · [Installation](#installation) ·
@@ -37,8 +37,9 @@ and selected native triggers. It requires a running `/Applications/QLab.app`
 and macOS Automation permission for the MCP host. Ordinary cue access uses OSC.
 Light Patch file editing requires local QLab **5.5.10/build 5510**. USB-DMX
 assignments store the supplied device identity; they do not discover a device
-or prove it is connected. Definition creation/import initially supports scalar and validated RGB variants;
-other native variants remain inspectable with explicit import blocks. See the
+or prove it is connected. Definition creation/import supports scalar 8/16-bit channels, RGB (including lime),
+CMY, HSI, Pan/Tilt and acyclic One-to-Many controls. Unknown variants retain explicit
+import blocks. The separate curve tool edits saved ascending/descending Light curves. See the
 [definition workflow](docs/user/agent-workflows.md#light-definitions) and [Light Patch workflow](docs/user/agent-workflows.md#edit-the-light-patch)
 for recovery and readback limits.
 
@@ -297,13 +298,14 @@ saved state and do not execute cues.
 </details>
 
 <details>
-<summary><strong>Light and Group cues</strong> — 6 tools</summary>
+<summary><strong>Light and Group cues</strong> — 7 tools</summary>
 
 | Tool | What it does |
 | --- | --- |
 | `qlab_get_light_cues` | List Light cues within one Cue List. |
 | `qlab_get_light_cue_details` | Read saved Light commands and cue settings. |
 | `qlab_edit_light_cues` | Edit supported Light commands and cue settings. |
+| `qlab_edit_light_cue_curves` | Edit ascending/descending Light curves through a confirmed saved-file transaction; reopen and verify the saved archive. |
 | `qlab_get_group_cues` | List Groups within one Cue List. |
 | `qlab_get_group_cue_details` | Read Group mode, Playlist settings and bounded children. |
 | `qlab_edit_group_cues` | Edit Group properties, mode and supported Playlist settings. |
@@ -356,7 +358,7 @@ saved state and do not execute cues.
 </details>
 
 <details>
-<summary><strong>Workspace settings</strong> — 15 tools</summary>
+<summary><strong>Workspace settings</strong> — 17 tools</summary>
 
 | Tool | What it does |
 | --- | --- |

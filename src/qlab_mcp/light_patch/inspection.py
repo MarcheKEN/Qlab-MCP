@@ -63,10 +63,13 @@ def inspect_saved_patch(source: bytes) -> dict:
             entry[public] = scalar(value.get(saved))
         if 'outputs' in value:
             outputs = a.ref(value['outputs'])
-            if not isinstance(outputs, dict):
+            if isinstance(outputs, dict):
+                entry['outputs'] = ({str(key): scalar(ref) for key, ref in a.mapping(value['outputs']).items()}
+                                    if 'NS.keys' in outputs else [scalar(ref) for ref in a.array(value['outputs'])])
+            elif isinstance(outputs, list):
+                entry['outputs'] = [scalar(ref) for ref in outputs]
+            else:
                 raise ValueError('Unsupported virtual parameter outputs.')
-            entry['outputs'] = ({str(key): scalar(ref) for key, ref in a.mapping(value['outputs']).items()}
-                                if 'NS.keys' in outputs else [scalar(ref) for ref in a.array(value['outputs'])])
         return entry
 
     library = {}
@@ -102,11 +105,11 @@ def inspect_saved_patch(source: bytes) -> dict:
                 try:
                     entry = parameter(channel, ref, name)
                     parameters.append(entry)
-                    if entry['type'] not in {'scalar', 'rgbcolor'}:
+                    if entry['type'] not in {'scalar', 'rgbcolor', 'cmycolor', 'hsicolor', 'pantilt', 'muxer'}:
                         complete = False
                         diagnostic('definitions', 'unsupported_parameter', 'Parameter subtype is only partially interpreted.', name=name)
                     elif ((entry['type'] == 'scalar' and not 0 <= entry['channel'] <= 511)
-                          or (entry['type'] == 'rgbcolor' and entry['channel'] >= 0)):
+                          or (entry['type'] != 'scalar' and entry['channel'] > -2)):
                         complete = False
                         diagnostic('definitions', 'invalid_parameter_channel', 'Parameter channel does not match its known subtype.', name=name)
                 except (KeyError, TypeError, AttributeError, ValueError):

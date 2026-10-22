@@ -240,8 +240,8 @@ rollback over newer edits. Native readback checks OSC-visible identity and
 properties; saved routing and definitions also require archive verification.
 USB-DMX stores an explicit supplied identity; a disconnected or unknown device
 may remain unpatched in QLab. No compatible USB device has been validated, and
-configuration does not establish availability or DMX output. New definition
-parameters are scalar or RGB; unsupported existing data is preserved rather
+configuration does not establish availability or DMX output. New definitions support validated scalar, RGB/lime, CMY, HSI, Pan/Tilt and
+acyclic One-to-Many encodings; unsupported existing data is preserved rather
 than treated as permission to manufacture its schema.
 
 By explicit product policy, Light cues are not rewritten or used to block a
@@ -510,12 +510,37 @@ select another source implicitly. Dirty workspace data remains last-saved.
 `qlab_edit_light_definitions` uses the same document transaction, recovery and
 activity checks as the patch editor, with a separate single-use
 `confirm:lightDefinitions:v1:` token. Source fingerprints and original requests
-are bound to the token; imports revalidate sources before Close. Only validated
-scalar/RGB encodings are enabled, including known extended RGB outputs. Unknown
-variants and metadata block import rather than being silently discarded.
+are bound to the token; imports revalidate sources before Close. Only validated scalar, RGB/lime, CMY, HSI, Pan/Tilt and acyclic One-to-Many
+encodings are enabled. Unknown variants and unpreservable metadata block import.
+Preservable unknown JSON metadata retains a semantic-coverage warning. Virtual
+controls do not add physical channels; their references, cycles, defaults and
+existing instrument footprints are validated.
 Definition rename updates patch instrument references; delete in use is blocked.
 Shared definition updates revalidate DMX footprints and overlaps. Light cues are
 not changed and reference analysis is partial. Unused definitions have archive
 verification only, not OSC or physical-output validation. Global/personal
 libraries and Dashboard MIDI are never written. Definition actions have been
 removed from public `qlab_edit_light_patch` batches.
+
+### Saved Light cue curves
+
+`qlab_edit_light_cue_curves` has a separate `confirm:lightCueCurves:v1:` token
+family and reuses the clean/inactive QLab 5.5.10/build 5510 document transaction,
+identity checks and bounded recovery. It edits only requested up/down shapes,
+copying changed graph branches and preserving unrelated data and omitted fields.
+Point replacements require normalized, ordered fixed-endpoint data with bounded
+counts. Mirrored curves, unknown types and unsupported metadata changes block.
+The generated result and reopened saved archive must satisfy curve postconditions.
+`saved_curve_verified` is archive evidence; OSC patch readback is separate and
+does not prove native curve rendering, playback, hardware silence or DMX output.
+
+### Dynamic Light cue references
+
+The Light command editor preserves `cue NUMBER` references and optional numeric
+factors. Exact uniquely numbered Light sources and their transitive graph are
+bounded (100 sources, depth 32); self-reference and cycles block preflight.
+Confirmations bind source UUID/type/number and text SHA-256 plus a fingerprint
+of all candidates for referenced numbers. Rechecks detect source edits and new
+number collisions. A batch cannot edit source text/numbers or introduce a number
+collision while another item depends on that resolution. Failed previews emit
+no setter tokens. The analysis identifies dependencies, not resulting DMX levels.

@@ -839,15 +839,24 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_light_definitions'] = {'title': 'Edit
                  'idempotentHint': False,
                  'openWorldHint': True},
  'tags': ['gated-write', 'light', 'qlab'],
- 'input_schema_hash': 'c0a1c21e3067208215e9f4945daf13d29dc776252f18f0b366d6102553abb435',
+ 'input_schema_hash': 'aa2dc94ec70bd79dc292cbf96b607420406450a131cf376e49904a697557dcb3',
  'output_schema_hash': '82ef96cebaf5fbe16269fd18b0240d78f5b9b90a4155a17eb797115b09148ecf'}
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_light_cue_curves'] = {
+    'title': 'Edit QLab Light Cue Curves', 'timeout': 120.0,
+    'annotations': {'readOnlyHint': False, 'destructiveHint': True,
+                    'idempotentHint': False, 'openWorldHint': True},
+    'tags': ['gated-write', 'light', 'qlab'],
+    'input_schema_hash': '4c40157d91e40e42344856ab0b58e43ca0e9db014c672c6683e66ec9cd7e1927',
+    'output_schema_hash': '82ef96cebaf5fbe16269fd18b0240d78f5b9b90a4155a17eb797115b09148ecf',
+}
 ADDED_TOOL_NAMES = {
     "qlab_get_video_effect_catalogue", "qlab_get_workspace_document",
     "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace",
 }
 EXPECTED_TOOL_NAMES = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) | ADDED_TOOL_NAMES
 
-EXPECTED_TOOL_CONCEPTS = {"qlab_get_light_definitions": ("catalogue", "definition_id", "No save", "2 MiB"),
+EXPECTED_TOOL_CONCEPTS = {"qlab_edit_light_cue_curves": ("single-use", "5.5.10", "saved archive", "Do not retry"),
+    "qlab_get_light_definitions": ("catalogue", "definition_id", "No save", "2 MiB"),
     "qlab_edit_light_definitions": ("single-use", "Light cues are never changed", "Do not retry", "5.5.10"),
     "qlab_get_fonts": ("PostScript", "TCP", "family/style"),
     "qlab_get_video_effect_catalogue": ("documented FX names", "paged static catalogue", "never grants permission"),
@@ -1207,7 +1216,7 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
     tools = asyncio.run(list_tools())
     tool_names = {tool.name for tool in tools}
 
-    assert len(tools) == 82
+    assert len(tools) == 83
     assert tool_names == EXPECTED_TOOL_NAMES
     assert "qlab_create_cue" not in tool_names
     forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
@@ -1537,7 +1546,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    write_tools = {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_create_cue_lists", "qlab_edit_cue_lists", "qlab_create_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch", "qlab_edit_light_definitions"}
+    write_tools = {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_create_cue_lists", "qlab_edit_cue_lists", "qlab_create_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch", "qlab_edit_light_definitions", "qlab_edit_light_cue_curves"}
     read_only_tools = EXPECTED_TOOL_NAMES - write_tools
 
     for tool_name in read_only_tools:
@@ -1548,7 +1557,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
 
     for tool_name in write_tools:
         assert tools[tool_name].annotations.readOnlyHint is False, f"{tool_name} was marked read-only"
-        if tool_name in {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_cue_lists", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch", "qlab_edit_light_definitions"}:
+        if tool_name in {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_cue_lists", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch", "qlab_edit_light_definitions", "qlab_edit_light_cue_curves"}:
             assert tools[tool_name].annotations.destructiveHint is True
         else:
             assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
@@ -1774,6 +1783,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_edit_light_patch",
         "qlab_get_light_definitions",
         "qlab_edit_light_definitions",
+        "qlab_edit_light_cue_curves",
         "qlab_edit_audio_cues",
         "qlab_edit_mic_cues",
         "qlab_edit_light_cues",
@@ -2901,7 +2911,7 @@ def test_move_delete_capture_records_full_mcp_envelopes_and_redacts_secrets(monk
     async def calls():
         async with Client(mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-            assert len(tools) == 82
+            assert len(tools) == 83
             assert tools["qlab_delete_cues"].inputSchema["properties"]["delete_container"]["default"] is False
             for name in ("qlab_move_cues", "qlab_delete_cues"):
                 assert {"pending_cue_ids", "uncertain_cue_ids"} <= tools[name].outputSchema["properties"].keys()
@@ -3039,3 +3049,22 @@ def test_definition_actions_are_excluded_from_public_patch_before_reader(monkeyp
                     'workspace_id':'11111111-1111-4111-8111-111111111111',
                     'operations':[{'action':'delete_definition','name':'Example'}]})
     asyncio.run(rejected())
+
+
+def test_light_curve_tool_delegates_typed_request(monkeypatch):
+    received = []
+    def edit(reader, workspace_id, operations, dry_run, confirm_token):
+        received.append((workspace_id, operations, dry_run, confirm_token))
+        return {"ok": True, "status": "planned"}
+    monkeypatch.setattr(server_module, "edit_light_cue_curves", edit)
+    monkeypatch.setattr(server_module, "_run_tool", lambda callback: callback(object()))
+    async def invoke():
+        async with Client(mcp) as client:
+            result = await client.call_tool("qlab_edit_light_cue_curves", {
+                "workspace_id": "11111111-1111-4111-8111-111111111111",
+                "operations": [{"cue_id": "22222222-2222-4222-8222-222222222222",
+                                "up": {"type": "linear"}}], "dry_run": True})
+            assert result.data["ok"] is True
+    asyncio.run(invoke())
+    assert received == [("11111111-1111-4111-8111-111111111111",
+        [{"cue_id": "22222222-2222-4222-8222-222222222222", "up": {"type": "linear"}}], True, None)]

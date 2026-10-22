@@ -27,9 +27,68 @@ Resolve workspace and Cue List UUIDs, then call `qlab_get_light_cues` or
 Both accept safe/technical; technical adds notes. Light commands are included in
 safe, never executed or interpreted as live output. Patch configuration belongs
 to `qlab_get_workspace_light_settings`.
+For Light command edits, `all` is the reserved group of all instruments.
+`all = home` refers to every known parameter, whereas `all.red = home` refers
+only to red. Group members without an explicitly requested parameter are ignored
+by QLab; unresolved member references still block a fully validated plan.
+The analyzer also accepts instrument lists, matching-prefix numeric ranges such
+as `Frontal 1 - Frontal 3`, and bracketed versions with an optional parameter.
+Endpoints and every expanded instrument must resolve; arbitrary name ordering
+and descending ranges are not enabled. `target = cue NUMBER` and optional
+`* SCALE` preserve dynamic references to one uniquely numbered Light cue. Sources
+and transitive references must resolve without cycles (100 sources, depth 32).
+Previews bind source identity, number and command-text hashes plus number-resolution
+candidates; changes invalidate execution. Edit source commands/numbers separately
+from their dependants. The analyzer does not compute the resulting dynamic look. The combined
+affected-parameter expansion is capped at 2,000; exceeding it blocks the plan
+instead of returning a successful partial analysis.
+The analyzer remains a bounded subset: do not equate native command-language
+support with public MCP write support. See the
+[lighting expansion evidence](../development/research/2026-10-21-light-authoring-expansion.md)
+for tested syntax and [Light cue curves](#light-cue-curves) for the separate file editor.
 Group reads Playlist only in Playlist mode. max_depth=2 (0..5) and max_cues=1000
 (1..5000) bound child summaries; depth zero reads no children. Inspect partial
 errors and contents.truncated; use each child's family tool for its full detail.
+
+## Light cue curves
+
+Use `qlab_edit_light_cue_curves` separately from the OSC Light command editor.
+Resolve exact Light cue UUIDs, check write readiness, then preview 1–50 operations:
+
+```json
+{
+  "workspace_id": "11111111-1111-4111-8111-111111111111",
+  "operations": [{
+    "cue_id": "22222222-2222-4222-8222-222222222222",
+    "up": {"type": "custom", "points": [
+      {"t": 0, "v": 0}, {"t": 0.4, "v": 0.8}, {"t": 1, "v": 1}
+    ]},
+    "down": {"type": "parametric", "parameter": 2.5}
+  }],
+  "dry_run": true
+}
+```
+
+Review `changes` and `curve_summary`; execute the same request with
+`dry_run=false` and its five-minute single-use `confirm:lightCueCurves:v1:` token.
+The local document must be clean, inactive, in Edit Mode, with automatic
+open/close cues disabled, on QLab 5.5.10/build 5510. `needs_save` requires the
+separate Save flow and a new preview. Execution closes, edits and reopens the
+same path with recovery. `no_op` does not close or rewrite the file. Never retry
+an uncertain write automatically.
+
+Types are `custom`, `s_curve`, `parametric` and `linear`. Omitted sides and fields
+retain their values; explicit null is invalid. `parameter` must be finite and
+positive; native acceptance covers 2.5, not every possible boundary. A supplied
+`points` list explicitly replaces the Custom curve's points. Times and values
+are normalized 0–1, times strictly increase, and endpoints are fixed: up
+(0,0)→(1,1), down (0,1)→(1,0). Each side allows 2–4,096 points, with 8,192 supplied
+points across a batch. Mirrored/unknown curve structures are blocked.
+
+`saved_curve_verified` checks the saved archive after reopening. QLab's documented
+OSC surface does not expose curve values; patch readback alone does not verify
+curves, playback or physical DMX output. Commands, patch, other cues and Dashboard
+MIDI remain outside the requested curve changes.
 
 ## Tool selection
 
@@ -1419,17 +1478,29 @@ remain inspectable and report why import is blocked.
 | `rename_definition` | Exact `name`, `new_name` |
 | `delete_definition` | Exact unused `name` |
 
-The initial writer supports scalar 8/16-bit channels and RGB virtual controls,
-including validated white, warm-white and amber bindings. Other variants
-such as pan/tilt, muxer, CMY and HSI remain visible but blocked for import until
-native acceptance. Unknown metadata also blocks import rather than being dropped.
+The writer supports scalar 8/16-bit channels, RGB (including white, warm-white,
+amber and lime), CMY, HSI, Pan/Tilt and One-to-Many (`muxer`) controls. Unknown
+variants and JSON metadata that cannot be preserved are blocked. Uninterpreted
+preservable metadata carries an explicit semantic-coverage warning.
 Native imports preserve physical channel positions/gaps, complete known metadata,
-default parameter and all validated output bindings. Custom creation assigns
-physical channels in the supplied order; 16-bit parameters consume two slots.
-RGB controls use no physical slot. Their `outputs` accepts three names in RGB
-order or a mapping with `red`, `green`, `blue` and optional `white`, `warmwhite`,
-`amber`, each referencing a distinct scalar. `home_value` is 0–100 percent
-or integral DMX 0–255/65535 depending on units and width.
+default parameter and validated output bindings. Custom creation assigns physical
+channels in supplied order; 16-bit parameters consume two slots. Virtual controls
+consume no physical slots.
+
+Virtual `outputs` fields:
+
+| Type | Shape and references |
+| --- | --- |
+| `rgbcolor` | Three scalar names in RGB order, or map with `red`, `green`, `blue` and optional `white`, `warmwhite`, `amber`, `lime` |
+| `cmycolor` | Map with `cyan`, `magenta`, `yellow`, each naming a distinct scalar |
+| `hsicolor` | Map with `hue`, `saturation`, `intensity`, each naming a distinct scalar |
+| `pantilt` | Map with `pan`, `tilt`, each naming a distinct scalar |
+| `muxer` | Nonempty ordered list of distinct parameter names, including virtual controls; cycles are rejected |
+
+`home_value` is 0–100 percent or integral DMX 0–255/65535 depending on units and
+width. Nested One-to-Many controls retain their references, rather than becoming
+additional DMX channels. Known type support does not make every manufacturer
+record importable: invalid defaults, references or unknown variants still block.
 
 Omitted updates preserve values. `parameters` replaces the entire parameter
 list; explicitly set `default_parameter=null` to clear it. Reordering parameters

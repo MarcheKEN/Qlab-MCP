@@ -178,20 +178,21 @@ def _result(ok: bool, status: str, **values: Any) -> dict:
 def edit_light_patch(reader: Any, workspace_id: str, operations: list[dict],
                      dry_run: bool = True, confirm_token: str | None = None, *,
                      planner=None, dependencies: dict | None = None, token_family: str = 'lightPatch',
-                     dependency_check=None) -> dict:
+                     dependency_check=None, postcondition=None) -> dict:
     """Plan a complete patch batch or execute its one-use same-path transaction."""
     # Share the native document lock so Save/Close/Open cannot interleave locally.
     with docs._LOCK:
         try:
             return _edit(reader, workspace_id, operations, dry_run, confirm_token,
-                         planner, dependencies, token_family, dependency_check)
+                         planner, dependencies, token_family, dependency_check, postcondition)
         except Exception as exc:
             return _result(False, 'blocked', error=str(exc))
 
 
 def _edit(reader: Any, workspace_id: str, operations: list[dict],
           dry_run: bool, confirm_token: str | None, planner=None,
-          dependencies: dict | None = None, token_family: str = 'lightPatch', dependency_check=None) -> dict:
+          dependencies: dict | None = None, token_family: str = 'lightPatch', dependency_check=None,
+          postcondition=None) -> dict:
     from .archive import plan_patch
     planner = planner or plan_patch
     ws = docs._uuid(workspace_id)
@@ -223,11 +224,16 @@ def _edit(reader: Any, workspace_id: str, operations: list[dict],
     plan = planner(source, normalized)
     if original['workspace_id'].upper() != ws or plan['workspace_id'].upper() != ws:
         raise ValueError('Saved workspace UUID does not match the native document.')
+    if postcondition is not None and postcondition(plan['output_bytes'], plan) is not True:
+        raise ValueError('Generated workspace does not satisfy its saved-archive postcondition.')
     _live(reader, ws, original['summary'])
     result = _result(True, 'planned', workspace_id=ws, path=str(path),
         source_sha256=_digest(source), output_sha256=_digest(plan['output_bytes']),
         changes=plan['changes'], warnings=plan['warnings'], affected_cues=plan['affected_cues'],
         summary=plan['summary'])
+    for field in ('curve_summary', 'curve_verification_scope'):
+        if field in plan:
+            result[field] = plan[field]
     result['planned_operations'] = plan['changes']
     if not plan['changes']:
         result['status'] = 'no_op'
@@ -247,11 +253,11 @@ def _edit(reader: Any, workspace_id: str, operations: list[dict],
         raise ValueError('Workspace state changed before the transaction.')
     if dependency_check is not None:
         dependency_check()
-    return _execute(reader, ws, path, source, identity, inventory, plan, result, planner)
+    return _execute(reader, ws, path, source, identity, inventory, plan, result, planner, postcondition)
 
 
 def _execute(reader: Any, ws: str, path: Path, source: bytes, identity: list[int],
-             inventory: dict, plan: dict, result: dict, planner=None) -> dict:
+             inventory: dict, plan: dict, result: dict, planner=None, postcondition=None) -> dict:
     from .archive import plan_patch
     planner = planner or plan_patch
     directory = _recovery_path(path)
@@ -290,6 +296,8 @@ def _execute(reader: Any, ws: str, path: Path, source: bytes, identity: list[int
         output = plan['output_bytes']
         if planner(output, [])['summary'] != plan['summary']:
             raise ValueError('Generated file readback does not match the plan.')
+        if postcondition is not None and postcondition(output, plan) is not True:
+            raise ValueError('Generated workspace does not satisfy its saved-archive postcondition.')
         temporary = directory / 'result.qlab5'
         _write_new(temporary, b'')
         # macOS cp preserves ACLs/xattrs that this Python runtime cannot expose.
@@ -328,6 +336,11 @@ def _execute(reader: Any, ws: str, path: Path, source: bytes, identity: list[int
         # A lost acknowledgement may follow a successful Open. Read once, never resend.
         if _read(path)[0] != output:
             raise ValueError('Workspace file changed during reopen.')
+        if postcondition is not None:
+            if postcondition(_read(path)[0], plan) is not True:
+                raise ValueError('Reopened workspace failed its saved-archive postcondition.')
+            result['postcondition_verified'] = True
+            result['postcondition_verification_scope'] = 'Caller-supplied saved-archive postcondition; not an OSC or UI readback.'
         current = docs._inventory(reader)
         row = docs._document(current, ws)
         if row['path'] != str(path) or not row['edit_mode'] or row['show_mode'] or row['active_cue_ids']:

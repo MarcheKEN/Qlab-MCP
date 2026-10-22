@@ -160,7 +160,7 @@ def test_public_tools_each_callable(monkeypatch):
     async def run():
         async with Client(server.mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-            assert len(tools) == 82
+            assert len(tools) == 83
             for family, kind in [("fade", "Fade"), ("network", "Network"), ("midi", "MIDI"), ("timecode", "Timecode"), ("script", "Script")]:
                 osc = control_fixture(kind)
                 osc.cell_values[FIRST].update(messageType=1, outputType=0, fadeType=1, targetMode=1)

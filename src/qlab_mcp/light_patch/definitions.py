@@ -10,7 +10,26 @@ from .archive import plan_patch
 from .models import DefinitionOperations, Name
 from .transaction import edit_light_patch
 
-_RGB_OUTPUTS = {'red', 'green', 'blue', 'white', 'warmwhite', 'amber'}
+_RGB_OUTPUTS = {'red', 'green', 'blue', 'white', 'warmwhite', 'amber', 'lime'}
+_VIRTUAL_OUTPUTS = {
+    'rgbcolor': _RGB_OUTPUTS,
+    'cmycolor': {'cyan', 'magenta', 'yellow'},
+    'hsicolor': {'hue', 'saturation', 'intensity'},
+    'pantilt': {'pan', 'tilt'},
+}
+_VIRTUAL_REQUIRED_OUTPUTS = {
+    'rgbcolor': {'red', 'green', 'blue'},
+    'cmycolor': _VIRTUAL_OUTPUTS['cmycolor'],
+    'hsicolor': _VIRTUAL_OUTPUTS['hsicolor'],
+    'pantilt': _VIRTUAL_OUTPUTS['pantilt'],
+}
+_VIRTUAL_CLASSES = {
+    'rgbcolor': 'LightCueInstrumentDefinitionParameterRGBColor',
+    'cmycolor': 'LightCueInstrumentDefinitionParameterCMYColor',
+    'hsicolor': 'LightCueInstrumentDefinitionParameterHSIColor',
+    'pantilt': 'LightCueInstrumentDefinitionParameterPanTilt',
+    'muxer': 'LightCueInstrumentDefinitionParameterMuxer',
+}
 _NAME = TypeAdapter(Name)
 
 
@@ -29,11 +48,38 @@ def _entries(native):
     return entries
 
 
+def _check_preservable_json(native):
+    """Reject values that cannot be represented safely in the keyed archive."""
+    stack, visited = [(native, 0)], 0
+    while stack:
+        value, depth = stack.pop()
+        visited += 1
+        if visited > 50_000 or depth > 32:
+            raise ValueError('Definition metadata exceeds serialization limits.')
+        if isinstance(value, dict):
+            if any(not isinstance(key, str) for key in value):
+                raise ValueError('Definition metadata keys must be strings.')
+            stack.extend((child, depth + 1) for child in value.values())
+        elif isinstance(value, list):
+            stack.extend((child, depth + 1) for child in value)
+        elif isinstance(value, str) or type(value) is bool:
+            continue
+        elif type(value) is int:
+            if not -(2 ** 63) <= value < 2 ** 63:
+                raise ValueError('Definition metadata integer is outside the archive range.')
+        elif type(value) is float:
+            if not math.isfinite(value):
+                raise ValueError('Definition metadata contains a non-finite number.')
+        else:
+            raise ValueError('Definition metadata contains a value that cannot be preserved.')
+
+
 def inspect_native(native: dict) -> dict:
-    """Describe all known fields; only scalar and RGB variants are write-enabled."""
-    parameters, notes, unknown = [], [], []
+    """Describe native definitions and verify all fields can survive import."""
+    parameters, notes, unknown, warnings = [], [], [], []
     footprint = 0
     try:
+        _check_preservable_json(native)
         _NAME.validate_python(native.get('name'))
         _NAME.validate_python(native.get('manufacturer'))
         if type(native.get('definitionVersion', 1)) is not int or native.get('definitionVersion', 1) not in {1, 2}:
@@ -72,19 +118,57 @@ def inspect_native(native: dict) -> dict:
                 if not value['valueIsPercentage'] and home != int(home):
                     raise ValueError('DMX home value must be integral.')
                 footprint = max(footprint, channel + width)
-            elif kind == 'rgbcolor':
+            elif kind in _VIRTUAL_CLASSES:
                 if channel > -2:
                     raise ValueError('Virtual channel must be <= -2.')
                 outputs = value.get('outputs')
-                if not isinstance(outputs, dict) or not {'red', 'green', 'blue'} <= outputs.keys() or not outputs.keys() <= _RGB_OUTPUTS:
-                    raise ValueError('Unsupported RGB outputs.')
+                if kind == 'muxer':
+                    if not isinstance(outputs, list) or not outputs:
+                        raise ValueError('Muxer outputs must be a nonempty list.')
+                    if any(not isinstance(target, str) for target in outputs) or len(outputs) != len(set(outputs)):
+                        raise ValueError('Muxer outputs must be distinct parameter names.')
+                else:
+                    required = _VIRTUAL_REQUIRED_OUTPUTS[kind]
+                    if not isinstance(outputs, dict) or not required <= outputs.keys():
+                        raise ValueError(f'{kind} outputs must provide {sorted(required)}.')
+                    if not outputs.keys() <= _VIRTUAL_OUTPUTS[kind]:
+                        raise ValueError(f'Unsupported {kind} outputs.')
+                    if any(not isinstance(target, str) for target in outputs.values()):
+                        raise ValueError(f'{kind} outputs must name parameters.')
+                    if len(outputs.values()) != len(set(outputs.values())):
+                        raise ValueError(f'{kind} outputs must name distinct parameters.')
             else:
                 notes.append(f'Parameter variant {kind!r} is readable but not validated for import.')
+        by_name = {value['name']: value.get('type', 'scalar') for value in entries.values() if isinstance(value, dict)}
+        virtual_graph = {}
         for value in entries.values():
-            if value.get('type', 'scalar') == 'rgbcolor':
-                outputs = list(value['outputs'].values())
-                if any(not isinstance(name, str) for name in outputs) or len(outputs) != len(set(outputs)) or not set(outputs) <= scalars:
-                    raise ValueError('Virtual outputs must reference distinct physical scalar parameters.')
+            if not isinstance(value, dict):
+                continue
+            kind = value.get('type', 'scalar')
+            if kind not in _VIRTUAL_CLASSES:
+                continue
+            outputs = value.get('outputs')
+            targets = list(outputs) if kind == 'muxer' and isinstance(outputs, list) else list(outputs.values()) if isinstance(outputs, dict) else []
+            expected = None if kind == 'muxer' else 'scalar'
+            if any(target not in by_name for target in targets):
+                raise ValueError('Virtual outputs must resolve to existing parameters.')
+            if expected and any(by_name[target] != expected for target in targets):
+                raise ValueError(f'{kind} outputs must resolve to physical scalar parameters.')
+            if kind == 'muxer':
+                virtual_graph[value['name']] = [target for target in targets if by_name[target] in _VIRTUAL_CLASSES]
+        done, visiting = set(), set()
+        def visit(name):
+            if name in visiting:
+                raise ValueError('Muxer parameter references contain a cycle.')
+            if name in done:
+                return
+            visiting.add(name)
+            for target in virtual_graph.get(name, []):
+                visit(target)
+            visiting.remove(name)
+            done.add(name)
+        for name in virtual_graph:
+            visit(name)
         default = native.get('defaultParameter', -1)
         if type(default) is not int or default != -1 and default not in entries:
             raise ValueError('Default parameter does not exist.')
@@ -92,42 +176,26 @@ def inspect_native(native: dict) -> dict:
             raise ValueError('Definition has no physical channels.')
         unknown.extend(key for key in native if key not in {'name', 'manufacturer', 'definitionVersion', 'defaultParameter', 'parameters', 'mode'})
         if unknown:
-            notes.append('Uninterpreted fields require native validation before import.')
+            warnings.append('Uninterpreted JSON metadata is preserved structurally; its application semantics are unknown.')
     except (ValueError, TypeError, KeyError, OverflowError) as exc:
         notes.append(str(exc))
     return dict(parameters=parameters, dmx_footprint=footprint or None,
-                importable=not notes, compatibility_notes=notes, uninterpreted_fields=unknown)
+                importable=not notes, compatibility_notes=notes + warnings, uninterpreted_fields=unknown)
 
 
 def install_native_definition(patch, name: str, native: dict) -> None:
-    """Encode known native JSON without losing channel positions or output bindings."""
+    """Install a validated native definition without losing metadata or channels."""
     info = inspect_native(native)
     if not info['importable']:
         raise ValueError('Native definition is not importable: ' + '; '.join(info['compatibility_notes']))
     a = patch.archive
     item = a.ref(patch.find(name, 'definition'))
-    def encode(value):
-        if isinstance(value, str):
-            return a.add(value)
-        if isinstance(value, dict):
-            return a.make_dict({key: encode(val) for key, val in value.items()})
-        if isinstance(value, list):
-            return a.make_array([encode(val) for val in value])
-        return value
-    parameters = {}
-    for channel, value in _entries(native).items():
-        kind = value.get('type', 'scalar')
-        cls = 'LightCueInstrumentDefinitionParameterScalar' if kind == 'scalar' else 'LightCueInstrumentDefinitionParameterRGBColor'
-        record = {key: encode(val) for key, val in value.items()}
-        record.update({'$class': a.cls(cls, ('LightCueInstrumentDefinitionParameter',)), 'type': a.add(kind)})
-        if kind == 'scalar' and 'homeValueDouble' not in record:
-            record['homeValueDouble'] = float(value['homeValue'])
-        parameters[channel] = a.add(record)
     item.clear()
-    item.update({key: encode(value) for key, value in native.items() if key != 'parameters'})
+    item.update({key: patch.encode_json_value(value) for key, value in native.items()
+                 if key not in {'name', 'parameters'}})
     item.update({'$class': a.cls('LightCueInstrumentDefinition'), 'name': a.add(name),
-                 'defaultParameter': native.get('defaultParameter', -1),
-                 'parameters': a.make_dict(parameters)})
+                 'defaultParameter': native.get('defaultParameter', -1)})
+    patch.encode_parameters(item, _entries(native))
 
 
 def edit_light_definitions(reader, workspace_id, operations, dry_run=True, confirm_token=None):

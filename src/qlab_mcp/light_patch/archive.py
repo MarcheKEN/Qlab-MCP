@@ -203,7 +203,9 @@ class Patch:
                     valueIsPercentage=value.get('value_is_percentage',True) if scalar else None,
                     homeValue=int(home) if scalar else None,homeValueDouble=float(home) if scalar else None,
                     channel=channel if scalar else virtual,
-                    **({} if scalar else {'outputs':value['outputs'] if isinstance(value['outputs'], dict) else dict(zip(('red','green','blue'),value['outputs']))})))
+                    **({} if scalar else {'outputs':value['outputs'] if isinstance(value['outputs'], dict)
+                         else dict(zip(('red','green','blue'),value['outputs'])) if value['type'] == 'rgbcolor'
+                         else value['outputs']})))
                 if scalar: channel += 2 if value.get('two_bytes') else 1
                 else: virtual -= 1
             parameters.sort(key=lambda p:(p['channel'] < 0,p['channel'] if p['channel'] >= 0 else -p['channel']))
@@ -247,37 +249,69 @@ class Patch:
                                     'backendType':backend, 'backendInfo':a.add(info)})
         item['address'] = output['address'] - 1
 
-    def set_parameters(self, item, parameters):
+    def encode_json_value(self, value, depth=0):
+        """Encode bounded native JSON values into keyed-archive objects."""
         a = self.archive
+        if depth > 32:
+            raise ValueError('Definition metadata nesting exceeds limit.')
+        if isinstance(value, str):
+            return a.add(value)
+        if isinstance(value, dict):
+            if any(not isinstance(key, str) for key in value):
+                raise ValueError('Definition metadata keys must be strings.')
+            return a.make_dict({key: self.encode_json_value(val, depth + 1) for key, val in value.items()})
+        if isinstance(value, list):
+            return a.make_array([self.encode_json_value(val, depth + 1) for val in value])
+        if value is None or type(value) not in (bool, int, float):
+            raise ValueError('Definition metadata contains an unsupported value.')
+        return value
+
+    def encode_parameters(self, item, entries):
+        """Encode native parameter records once for typed edits and catalogue imports."""
+        a = self.archive
+        from .definitions import _VIRTUAL_CLASSES
+
+        classes = {'scalar': 'LightCueInstrumentDefinitionParameterScalar', **_VIRTUAL_CLASSES}
+        values = {}
+        for channel, parameter in entries.items():
+            kind = parameter.get('type', 'scalar')
+            if kind not in classes:
+                raise ValueError(f'Unsupported definition parameter type {kind!r}.')
+            record = {key: self.encode_json_value(value) for key, value in parameter.items()}
+            record['$class'] = a.cls(classes[kind], ('LightCueInstrumentDefinitionParameter',))
+            record['type'] = a.add(kind)
+            if kind == 'scalar' and 'homeValueDouble' not in record:
+                record['homeValueDouble'] = float(parameter['homeValue'])
+            values[channel] = a.add(record)
+        item['parameters'] = a.make_dict(values)
+
+    def set_parameters(self, item, parameters):
         names = [p['name'] for p in parameters]
         if len(names) != len(set(names)):
             raise ValueError('Definition parameter names must be unique.')
-        scalar_names = {p['name'] for p in parameters if p['type'] == 'scalar'}
-        values = {}
+        entries = {}
         channel, virtual = 0, -2
-        for p in parameters:
-            kind = p['type']
-            value = {'name':a.add(p['name']), 'type':a.add(kind)}
+        for parameter in parameters:
+            kind = parameter['type']
+            value = {'name': parameter['name'], 'type': kind}
             if kind == 'scalar':
-                two = p.get('two_bytes',False)
-                home = p.get('home_value',0)
-                value.update({'$class':a.cls('LightCueInstrumentDefinitionParameterScalar', ('LightCueInstrumentDefinitionParameter',)),
-                    'twoBytes':two,'valueIsPercentage':p.get('value_is_percentage',True),
-                    'homeValue':int(home),'homeValueDouble':float(home)})
-                key = channel
-                channel += 2 if two else 1
+                two_bytes = parameter.get('two_bytes', False)
+                home = parameter.get('home_value', 0)
+                value.update({'twoBytes': two_bytes,
+                              'valueIsPercentage': parameter.get('value_is_percentage', True),
+                              'homeValue': int(home), 'homeValueDouble': float(home)})
+                entries[channel] = value
+                channel += 2 if two_bytes else 1
             else:
-                outputs = p['outputs'] if isinstance(p['outputs'], dict) else dict(zip(('red','green','blue'),p['outputs']))
-                if not set(outputs.values()) <= scalar_names:
-                    raise ValueError('RGB outputs must resolve to physical scalar parameters.')
-                value.update({'$class':a.cls('LightCueInstrumentDefinitionParameterRGBColor', ('LightCueInstrumentDefinitionParameter',)),
-                    'outputs':a.make_dict({color:a.add(name) for color,name in outputs.items()})})
-                key = virtual
+                outputs = parameter['outputs']
+                if isinstance(outputs, list) and kind == 'rgbcolor':
+                    outputs = dict(zip(('red', 'green', 'blue'), outputs))
+                value['outputs'] = outputs
+                entries[virtual] = value
                 virtual -= 1
-            values[key] = a.add(value)
         if not 1 <= channel <= 512:
             raise ValueError('Definition footprint must be within 1..512.')
-        item['parameters'] = a.make_dict(values)
+        self.encode_parameters(item, entries)
         item['definitionVersion'] = 2
 
     def apply(self, op):
@@ -451,6 +485,33 @@ def _validate(summary):
             occupied[key] = item['name']
 
 
+def _validate_edited_definitions(summary, names):
+    if not names:
+        return
+    from .definitions import inspect_native
+    for definition in summary['definitions']:
+        if definition['name'] not in names:
+            continue
+        parameters = {}
+        for parameter in definition['parameters']:
+            value = {'name': parameter['name'], 'type': parameter['type']}
+            if parameter['type'] == 'scalar':
+                value.update(twoBytes=parameter['twoBytes'],
+                             valueIsPercentage=parameter['valueIsPercentage'])
+                if parameter['homeValue'] is not None:
+                    value['homeValue'] = parameter['homeValue']
+                if parameter['homeValueDouble'] is not None:
+                    value['homeValueDouble'] = parameter['homeValueDouble']
+            elif parameter.get('outputs') is not None:
+                value['outputs'] = parameter['outputs']
+            parameters[str(parameter['channel'])] = value
+        detail = inspect_native(dict(name=definition['name'], manufacturer=definition['manufacturer'],
+            defaultParameter=definition['default_parameter'], definitionVersion=2, parameters=parameters))
+        if not detail['importable']:
+            raise ValueError(f"Invalid final definition {definition['name']!r}: " +
+                             '; '.join(detail['compatibility_notes']))
+
+
 def _affected_cues(patch, operations):
     names = {op['name'] for op in operations if op['action'].startswith(('rename_','delete_'))}
     result = []
@@ -479,10 +540,19 @@ def plan_patch(source: bytes, operations: list[dict[str, Any]], *, native_import
     patch = Patch(source)
     before = patch.snapshot()
     normalized = [op.model_dump(exclude_unset=True) for op in TypeAdapter(ArchiveOperations).validate_python(operations)] if operations else []
+    edited_parameter_definitions = set()
     for op in normalized:
         if native_imports and op['name'] in native_imports and op['action'] == 'create_definition':
             patch.name_free(op['name'], 'definition')
         patch.apply(op)
+        if op['action'] == 'create_definition' or (
+                op['action'] == 'update_definition' and 'parameters' in op):
+            edited_parameter_definitions.add(op['name'])
+        elif op['action'] == 'rename_definition' and op['name'] in edited_parameter_definitions:
+            edited_parameter_definitions.remove(op['name'])
+            edited_parameter_definitions.add(op['new_name'])
+        elif op['action'] == 'delete_definition':
+            edited_parameter_definitions.discard(op['name'])
         if native_imports and op['name'] in native_imports and op['action'] == 'create_definition':
             # Keep the complete validated native record, including channel gaps.
             from .definitions import install_native_definition
@@ -490,6 +560,7 @@ def plan_patch(source: bytes, operations: list[dict[str, Any]], *, native_import
     after = patch.snapshot()
     if normalized:
         _validate(after)
+        _validate_edited_definitions(after, edited_parameter_definitions)
     changed = before != after
     warnings = []
     if any(item['output']['backend'] == 'usb' for item in after['instruments']):

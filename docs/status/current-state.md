@@ -1,16 +1,111 @@
-# Current Project State — 2026-10-17
+# Current Project State — 2026-10-22
 
-## Version 0.4.0 — release preparation
+## Lighting authoring implementation — PR #19
+
+Current source exposes **83 tools: 50 reads and 33 gated writes**.
+`qlab_edit_light_cue_curves` adds separate saved-file ascending/descending curve
+edits with source-bound confirmations, recovery and saved-archive postconditions.
+Custom, S-Curve, Parametric and Linear were accepted on two new disarmed cues in
+QLab 5.5.10/build 5510, including adding/removing points, no-op and consumed-token
+rejection. OSC cannot read curve values; native visual checks are separately recorded.
+
+The Light command analyzer models `all = home`, lists, matching-prefix ranges,
+bracket selectors and dynamic cue pulls with proportional factors. Source hashes,
+number resolution, cycles and same-batch conflicts are checked before setters;
+the resulting dynamic look is not calculated. Native text/readback acceptance
+confirmed a proportional pull with `pass`, with no cue errors or warnings.
+
+Definition creation/import now covers CMY, HSI, Pan/Tilt, acyclic One-to-Many
+and RGB lime alongside scalar 8/16-bit parameters. A native batch imported four
+manufacturer examples, created combined/nested controls and assigned them to
+five unpatched test instruments. Both file and OSC-visible verification passed;
+QLab's native editor confirmed the virtual bindings. Global/personal libraries
+and Dashboard MIDI are unchanged. No physical-output claim follows.
+
+Verification: **2,183 passed, 61 subtests passed, 35 skipped**; FastMCP reports
+83 tools. Test additions were removed and the original patch snapshot restored.
+
+See [October 22 acceptance](../development/runtime-validation/2026-10-22-light-authoring-completion.md).
+Earlier counts, blocked capabilities and test totals below retain their dated scope.
+
+## October 21 lighting authoring research — PR #19
+
+The [2026-10-21 research](../development/research/2026-10-21-light-authoring-expansion.md)
+records native LCL acceptance, definition variant coverage and an accepted
+same-path Light cue Custom control-point file edit in QLab 5.5.10. The shared
+analyzer now models reserved `all = home` correctly and ignores only known
+group-member parameter mismatches. Instrument lists, matching-prefix numeric
+ranges and ad-hoc selectors are supported with bounded expansion. This is not complete LCL or curve authoring:
+the proposed curve tool is not registered, and unvalidated definition variants
+remain blocked. No playback or physical output was tested.
+
+## October 21 separate Light Definition tools — PR #19
+
+At the October 21 validation, source exposed **82 tools: 50 reads and 32 gated writes**.
+`qlab_get_light_definitions` lists bundled/personal and last-saved workspace
+sources with exact detail, source-bound IDs, filters and pagination.
+`qlab_edit_light_definitions` imports native definitions or performs workspace
+CRUD using the existing guarded document transaction and a dedicated token.
+Public `qlab_edit_light_patch` now accepts instrument/group actions only;
+definition actions moved to the dedicated tool (breaking change).
+Initial import encodings cover scalar 8/16-bit and RGB with extended outputs;
+other native variants remain readable with explicit import blocks.
+No global library or Dashboard writes. [Native acceptance](../development/runtime-validation/2026-10-21-light-definitions.md)
+confirmed extended RGB import, manufacturer import, 16-bit creation, edits,
+rename/reference updates and in-use deletion blocking on temporary test copies.
+The original workspace was reopened with unchanged bytes; no physical output
+was tested. The transaction now resets the authenticated OSC session after
+reopen, before readback. Verification: **2,120 passed, 61 subtests passed,
+35 skipped**; FastMCP inspection reports 82 tools (50 reads, 32 writes).
+
+## Combined Light Patch inspection — PR #19
+
+`qlab_get_workspace_light_settings` now returns current OSC data together with
+typed `saved_patch` configuration: addresses, outputs, direct group membership
+and all stored workspace definitions. The saved source supports local QLab
+5.5.10/build 5510. Dirty documents are labelled potentially stale and never
+saved. Unavailable sources and unknown fields retain explicit coverage gaps.
+Default requests cover up to 1,000 records per section, with a 2 MiB response
+budget and exact continuation requests. Internal OSC readers and write guards
+are unchanged. See the [inspection validation record](../development/runtime-validation/2026-10-21-light-patch-inspection.md)
+for live and retained-file evidence and remaining limits.
+
+## Light Patch authoring — PR #19
+
+At the original patch-authoring validation, source exposed **80 tools: 49 reads and 31 gated writes**.
+`qlab_edit_light_patch` adds signed batches of 1–100 typed operations for
+instruments, groups and workspace definitions, including rename/delete. It
+edits the original local document through clean-close, verified file replacement
+with bounded recovery, reopen and OSC-visible readback on QLab 5.5.10/build 5510.
+Preview has no native/file side effects; dirty documents require the existing
+Save flow and a fresh preview.
+
+Light cues, Dashboard MIDI and the global Library are preserved. Cue references
+may need later repair and are reported with partial-analysis warnings. Art-Net
+and unpatched assignments plus explicit USB-DMX identities are enabled as saved
+configuration. USB discovery, compatible-device availability and output remain
+unvalidated. New definition parameters are scalar/RGB only;
+existing other parameter data is preserved where recognized.
+
+File verification covers saved routing and definitions. Current OSC-visible
+verification checks instrument names, notes, used definition parameters/defaults,
+patched state and group names/memberships; routing and unused definitions remain
+archive-only checks. USB patched state is not required for an absent device. No hardware-output claim follows from a verified result.
+The [native acceptance record](../development/runtime-validation/2026-10-20-light-patch-authoring.md)
+covers original-path batches, all twelve actions and preserving another open
+document. Hardware output and additional parameter encodings remain unvalidated.
+Earlier registry counts and test totals below retain their dated scope.
+
+## Version 0.4.0 — October 17 release preparation
 
 The package, MCP initialization version and current user guidance now identify
-this development branch as **0.4.0**. PR #18 prepares that version; no tag or
-GitHub Release has been published. Earlier 0.3.0 reports and validation counts
+this development branch as **0.4.0**. PR #18 prepared that version. Earlier 0.3.0 reports and validation counts
 below retain their original version: the version bump does not rerun or rename
 historical runtime evidence.
 
-## Latest validation — 2026-10-17
+## Earlier validation — 2026-10-17
 
-The development branch exposes **79 tools: 49 reads and 30 gated writes**.
+At that validation point, the branch exposed **79 tools: 49 reads and 30 gated writes**.
 The documentation reconciliation and code cleanup are included in PR #18.
 At `9a346bc`, the local suite passed **1,942 tests and 61 subtests**, with
 35 skips; GitHub CI, lockfile verification and artifact builds passed.
@@ -36,7 +131,7 @@ current restrictions.
 
 ## Documentation reconciliation — 2026-10-17
 
-Current source exposes 79 tools (49 reads, 30 gated writes). The [roadmap](roadmap.md)
+At that review, source exposed 79 tools (49 reads, 30 gated writes). The [roadmap](roadmap.md)
 now separates implemented contracts from remaining runtime cases; [architecture](../development/architecture.md)
 reflects native document/Trigger operations and actual UDP/TCP behavior.
 Existing-workspace writes require OSC readiness. Native Open instead uses its

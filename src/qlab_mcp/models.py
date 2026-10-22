@@ -605,9 +605,127 @@ class LightPatchDetail(BaseModel):
     technical_payloads_omitted: list[str] = Field(default_factory=list)
 
 
+class SavedLightParameter(BaseModel):
+    name: JsonValue = None
+    type: JsonValue = None
+    channel: int
+    two_bytes: JsonValue = None
+    value_is_percentage: JsonValue = None
+    home_value: JsonValue = None
+    home_value_double: JsonValue = None
+    outputs: JsonValue = None
+
+
+class SavedLightOutput(BaseModel):
+    backend: str
+    backend_type: JsonValue = None
+    backend_class: str | None = None
+    net: int | None = None
+    subnet: int | None = None
+    universe: int | None = None
+    address: int | None = None
+    device_serial: str | None = None
+    device_name: str | None = None
+    device_universes: int | None = None
+
+
+class SavedLightInstrument(BaseModel):
+    name: str
+    note: str
+    definition: str
+    order: int
+    output: SavedLightOutput
+    dmx_address_start: int | None = None
+    dmx_address_end: int | None = None
+    dmx_footprint: int | None = None
+
+
+class SavedLightGroup(BaseModel):
+    name: str
+    note: str
+    order: int
+    members: list[str] = Field(default_factory=list)
+
+
+class SavedLightDefinition(BaseModel):
+    name: str
+    manufacturer: str
+    version: JsonValue = None
+    default_parameter: JsonValue = None
+    parameters: list[SavedLightParameter] = Field(default_factory=list)
+    dmx_footprint: int | None = None
+    used_by: list[str] = Field(default_factory=list)
+
+
+class LightReadDiagnostic(BaseModel):
+    section: str
+    code: str
+    message: str
+    index: int | None = None
+    name: str | None = None
+
+
+class SavedLightPatch(BaseModel):
+    status: str
+    source: Literal["saved_archive"] = "saved_archive"
+    workspace_id: str | None = None
+    version: str | None = None
+    build: int | None = None
+    sha256: str | None = None
+    document_modified: bool | None = None
+    freshness: str
+    message: str | None = None
+    coverage: str = "partial"
+    instruments: list[SavedLightInstrument] = Field(default_factory=list)
+    groups: list[SavedLightGroup] = Field(default_factory=list)
+    definitions: list[SavedLightDefinition] = Field(default_factory=list)
+    diagnostics: list[LightReadDiagnostic] = Field(default_factory=list)
+
+
+class LightSourceStatus(BaseModel):
+    live_osc: str
+    saved_archive: str
+    comparison: str
+    comparison_scope: list[str] = Field(default_factory=list)
+    differences: list[str] = Field(default_factory=list)
+    atomic_snapshot: Literal[False] = False
+
+
+class LightPageSection(BaseModel):
+    live_total: int
+    saved_total: int
+    live_returned: int
+    saved_returned: int
+    truncated: bool
+
+
+class LightNextRequest(BaseModel):
+    workspace_id: str
+    profile: str
+    section: str
+    offset: int
+    limit: int
+
+
+class LightPagination(BaseModel):
+    section: str
+    offset: int
+    limit: int
+    effective_limit: int
+    byte_limit: int
+    truncated: bool
+    byte_truncated: bool
+    sections: dict[str, LightPageSection]
+    next_requests: list[LightNextRequest] = Field(default_factory=list)
+    omitted_fields: list[str] = Field(default_factory=list)
+
+
 class WorkspaceLightSettingsData(BaseModel):
     detail: LightPatchDetail | None = None
     technical_payload: JsonValue | None = None
+    saved_patch: SavedLightPatch | None = None
+    source_status: LightSourceStatus | None = None
+    pagination: LightPagination | None = None
 
 
 class NetworkPatchSummary(SettingsItemIdentity):

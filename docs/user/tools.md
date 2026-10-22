@@ -1,6 +1,6 @@
 # Public MCP Tools
 
-QLab MCP exposes exactly 79 tools on the current development branch. This page is a compact human
+QLab MCP exposes exactly 83 tools on the current development branch: 50 reads and 33 gated writes. This page is a compact human
 catalogue; decorated functions, generated schemas, and
 `tests/test_server_tools.py` remain the source of truth for exact parameters,
 annotations, and result models.
@@ -46,7 +46,10 @@ annotations, and result models.
 | `qlab_get_video_stage` | Exact stage UUID and its regions, safe or technical | Stage mutation or name selection | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_video_output_route` | Exact output route UUID and destination, safe or technical | Independent device inventory or mutation | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_video_region` | Exact OSC bounds, grid/guide and optional one control point | Full point scan or UI-coordinate conversion | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_workspace_light_settings` | Light Patch summary or redacted technical payload | Light Definitions or Dashboard settings | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_light_settings` | Current OSC patch plus saved local instruments, groups, outputs and workspace definitions | Global Light Library, Dashboard MIDI or hardware detection | [Light Patch read](agent-workflows.md#read-the-light-patch) |
+| `qlab_get_light_definitions` | Paged bundled/personal/workspace catalogue and exact native parameter details | Global library writes or physical fixture detection | [Definitions](agent-workflows.md#light-definitions) |
+| `qlab_edit_light_definitions` | Import or manage workspace definitions, 1–100 operations | Dashboard, global library writes, unsupported native variants | [Definitions](agent-workflows.md#light-definitions) |
+| `qlab_edit_light_patch` | One signed batch of 1–100 instrument and group operations, with same-path close/edit/reopen | Cue repair, global Library, Dashboard MIDI, USB device discovery/hardware proof or unvalidated parameter creation | [Light Patch](agent-workflows.md#edit-the-light-patch) |
 | `qlab_get_workspace_network_settings` | Network Patch inventory or exact patch | The complete Network panel | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_workspace_midi_settings` | MIDI Patch inventory or exact patch | The complete MIDI panel | [Read](agent-workflows.md#read-sequence) |
 | `qlab_query_cues` | Bounded filtered cue discovery | Full Inspector payloads | [Read](agent-workflows.md#read-sequence) |
@@ -68,6 +71,7 @@ annotations, and result models.
 | `qlab_edit_audio_cues` | Typed Audio Basics, Triggers and saved family settings, 1–50 UUIDs | Audio Maps, Audio FX, Trim, playback or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_mic_cues` | Typed Mic Basics, Triggers and saved family settings, 1–50 UUIDs | Audio Maps, Audio FX, Trim, playback or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_light_cues` | Typed Light Basics, Triggers and saved family settings, 1–50 UUIDs | Playback, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
+| `qlab_edit_light_cue_curves` | Saved ascending/descending Custom, S-Curve, Parametric and Linear curves on exact Light cue UUIDs | Live output, mirrored curves, OSC curve readback | [Light curves](agent-workflows.md#light-cue-curves) |
 | `qlab_edit_fade_cues` | Typed Fade Basics, Triggers and saved family settings, 1–50 UUIDs | Playback, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_network_cues` | Typed Network Basics, Triggers and saved family settings, 1–50 UUIDs | Sending messages, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_midi_cues` | Typed MIDI Basics, Triggers and saved family settings, 1–50 UUIDs | Sending MIDI, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
@@ -94,7 +98,8 @@ annotations, and result models.
   instead requires write-enable, an empty local inventory, a bounded fingerprint
   and a document token; it cannot run existing-workspace OSC readiness.
 - Edit confirmation is per planned operation; Create, Move, Delete, and
-  Workspace Settings Edit tools use dedicated confirmation flows.
+  Workspace Settings Edit tools use dedicated confirmation flows. Light Patch
+  uses one source-bound `confirm:lightPatch:v1:` token for the complete batch.
 - Batches are sequential/non-transactional unless a tool description says
   otherwise. Timeout or identity ambiguity means inspect first; do not retry.
 - `destructiveHint` is MCP metadata, not authorization. Runtime gates remain

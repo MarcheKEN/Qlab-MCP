@@ -604,6 +604,27 @@ def check_dependencies(reader, ws, uid, dependencies):
         current = read(reader, ws, cue, list(baseline))
         if any(not control._same(current.get(k), v) for k, v in baseline.items()):
             raise ValueError('Cue dependency changed; run a new dry run.')
+    for cue, baseline in dependencies.get('light_pull_sources', {}).items():
+        current = read(reader, ws, cue, ['number', 'lightCommandText'])
+        text = current.get('lightCommandText')
+        observed = {
+            'uniqueID': str(current.get('uniqueID', '')).upper(),
+            'number': current.get('number'),
+            'type': current.get('type'),
+            'text_sha256': hashlib.sha256(text.encode('utf-8')).hexdigest() if isinstance(text, str) else None,
+        }
+        if not control._same(observed, baseline):
+            raise ValueError('Light cue pull source changed; run a new dry run.')
+    number_index = dependencies.get('light_pull_number_index')
+    if number_index is not None:
+        from .moves import _read_snapshot
+        from .remaining_context import _light_pull_number_index
+
+        if not isinstance(number_index, dict) or not isinstance(number_index.get('numbers'), list):
+            raise ValueError('Light cue pull number snapshot is invalid; run a new dry run.')
+        current_index = _light_pull_number_index(_read_snapshot(reader, ws), number_index['numbers'])
+        if _fingerprint(current_index) != number_index.get('fingerprint'):
+            raise ValueError('Light cue pull number resolution changed; run a new dry run.')
     selector = dependencies.get('selector')
     if selector and not control._same(selector_snapshot(reader, ws, uid, selector['family'], selector['property']), selector['snapshot']):
         raise ValueError('Selector-dependent state changed after dry run.')

@@ -38,7 +38,7 @@ def test_catalogue_reuses_schemas_but_tool_calls_stay_fresh(monkeypatch):
             first = await client.list_tools()
             second = await client.list_tools()
             assert [tool.model_dump() for tool in first] == [tool.model_dump() for tool in second]
-            assert len(first) == 79
+            assert len(first) == 83
             for expected in (1, 2):
                 result = await client.call_tool("qlab_search_media_files", {"query": "fixture"})
                 assert result.structured_content["scanned_entries"] == expected

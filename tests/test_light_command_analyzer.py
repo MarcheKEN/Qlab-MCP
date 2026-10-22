@@ -51,6 +51,21 @@ def analyze(command: str, light_patch: dict) -> dict:
     return analyze_light_command_text(command, light_patch)["results"][0]
 
 
+def named_fixtures(prefix: str, count: int, parameters: list[str] | None = None) -> dict:
+    parameters = parameters or ["intensity"]
+    return {
+        "instruments": [
+            {
+                "name": f"{prefix} {index}",
+                "parameter_names": parameters,
+                "definition": {"default_parameter_name": parameters[0]},
+            }
+            for index in range(1, count + 1)
+        ],
+        "groups": [],
+    }
+
+
 def test_light_command_text_byte_limit_rejects_without_truncation(light_patch: dict) -> None:
     accepted = "x" * 65_536
     analyze_light_command_text(accepted, light_patch)
@@ -107,12 +122,25 @@ def test_instrument_uses_explicit_or_default_parameter(
 def test_group_explicit_parameter_skips_incompatible_members(light_patch: dict) -> None:
     result = analyze("Back.red = 50", light_patch)
 
-    assert result["status"] == "warning"
+    assert result["status"] == "valid"
     assert result["affected"] == [{"instrument": "Red Fixture", "parameter": "red"}]
     assert result["skipped_members"] == [
         {"instrument": "Dimmer Only", "reason": "parameter_unavailable"},
         {"instrument": "No Default", "reason": "parameter_unavailable"},
     ]
+    assert result["warnings"] == []
+
+
+def test_group_explicit_parameter_warns_on_unresolved_member(light_patch: dict) -> None:
+    light_patch["groups"][0]["instrument_names"].append("Missing Fixture")
+
+    result = analyze("Back.red = 50", light_patch)
+
+    assert result["status"] == "warning"
+    assert result["skipped_members"][-1] == {
+        "instrument": "Missing Fixture",
+        "reason": "instrument_unavailable",
+    }
     assert result["warnings"][0]["code"] == "group_members_skipped"
 
 
@@ -145,15 +173,161 @@ def test_hyphenated_target_name_is_not_treated_as_range(light_patch: dict) -> No
     assert result["target"]["resolved_name"] == "Front-Left"
 
 
-def test_all_is_only_resolved_when_group_exists(light_patch: dict) -> None:
+def test_all_is_reserved_and_includes_all_instruments(light_patch: dict) -> None:
     present = analyze("All = 0", light_patch)
-    missing = analyze("All = 0", {"instruments": light_patch["instruments"], "groups": []})
+    missing = analyze("all = 0", {"instruments": light_patch["instruments"], "groups": []})
 
     assert present["status"] == "warning"
     assert present["target"]["resolved_name"] == "all"
     assert present["target"]["normalized_match"] is True
-    assert missing["status"] == "invalid"
-    assert missing["errors"][0]["code"] == "unknown_target"
+    assert {item["instrument"] for item in present["affected"]} == {
+        "Front", "Red Fixture", "Dimmer Only", "Front-Left"
+    }
+    assert missing["status"] == "warning"
+    assert {item["instrument"] for item in missing["affected"]} == {
+        "Front", "Red Fixture", "Dimmer Only", "Front-Left"
+    }
+
+
+def test_all_home_expands_to_every_parameter(light_patch: dict) -> None:
+    result = analyze("all = home", light_patch)
+
+    assert result["status"] == "valid"
+    assert result["affected"] == [
+        {"instrument": "Front", "parameter": "intensity"},
+        {"instrument": "Red Fixture", "parameter": "intensity"},
+        {"instrument": "Red Fixture", "parameter": "red"},
+        {"instrument": "Dimmer Only", "parameter": "intensity"},
+        {"instrument": "No Default", "parameter": "color"},
+        {"instrument": "Front-Left", "parameter": "intensity"},
+    ]
+
+
+def test_all_home_expansion_is_bounded_without_partial_results() -> None:
+    result = analyze("all = home", named_fixtures("Fixture", 2_001))
+
+    assert result["status"] == "unsupported"
+    assert result["errors"][0]["code"] == "target_expansion_limit"
+    assert result["affected"] == []
+
+
+def test_expansion_budget_is_shared_across_all_home_lines() -> None:
+    results = analyze_light_command_text(
+        "all = home\nall = home", named_fixtures("Fixture", 1_001)
+    )["results"]
+
+    assert results[0]["status"] == "valid"
+    assert len(results[0]["affected"]) == 1_001
+    assert results[1]["status"] == "unsupported"
+    assert results[1]["errors"][0]["code"] == "target_expansion_limit"
+    assert results[1]["affected"] == []
+
+
+def test_all_parameter_home_only_affects_that_parameter(light_patch: dict) -> None:
+    result = analyze("all.red = home", light_patch)
+
+    assert result["status"] == "valid"
+    assert result["affected"] == [{"instrument": "Red Fixture", "parameter": "red"}]
+
+
+def test_named_numeric_range_expands_inclusive_targets() -> None:
+    patch = named_fixtures("Frontal", 3)
+
+    result = analyze("Frontal 1 - Frontal 3 = 25", patch)
+
+    assert result["status"] == "valid"
+    assert result["target"]["kind"] == "range"
+    assert [item["instrument"] for item in result["affected"]] == ["Frontal 1", "Frontal 2", "Frontal 3"]
+
+
+def test_named_numeric_range_crosses_digit_width_without_padding() -> None:
+    patch = named_fixtures("Frontal", 10)
+
+    result = analyze("Frontal 9 - Frontal 10 = 25", patch)
+
+    assert result["status"] == "valid"
+    assert [item["instrument"] for item in result["affected"]] == ["Frontal 9", "Frontal 10"]
+
+
+def test_zero_padded_range_preserves_width() -> None:
+    patch = {
+        "instruments": [
+            {
+                "name": f"Frontal {index:02d}",
+                "parameter_names": ["intensity"],
+                "definition": {"default_parameter_name": "intensity"},
+            }
+            for index in range(1, 4)
+        ],
+        "groups": [],
+    }
+
+    result = analyze("Frontal 01 - Frontal 03 = 25", patch)
+
+    assert result["status"] == "valid"
+    assert [item["instrument"] for item in result["affected"]] == ["Frontal 01", "Frontal 02", "Frontal 03"]
+
+
+def test_named_target_list_expands_explicit_members() -> None:
+    patch = named_fixtures("Frontal", 5)
+
+    result = analyze("Frontal 4, Frontal 5 = 50", patch)
+
+    assert result["status"] == "valid"
+    assert result["target"]["kind"] == "list"
+    assert [item["instrument"] for item in result["affected"]] == ["Frontal 4", "Frontal 5"]
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        ("[LED 1 - LED 3].red = 20", ["LED 1", "LED 2", "LED 3"]),
+        ("[LED 4, LED 5].blue = 30", ["LED 4", "LED 5"]),
+    ],
+)
+def test_adhoc_group_expands_named_numeric_targets(command: str, expected: list[str]) -> None:
+    patch = named_fixtures("LED", 5, ["intensity", "red", "blue"])
+
+    result = analyze(command, patch)
+
+    assert result["status"] == "valid"
+    assert result["target"]["kind"] == "ad_hoc_group"
+    assert [item["instrument"] for item in result["affected"]] == expected
+    assert {item["parameter"] for item in result["affected"]} == {"red" if ".red" in command else "blue"}
+
+
+def test_target_range_requires_matching_numeric_suffix_prefix() -> None:
+    patch = named_fixtures("Frontal", 3)
+
+    result = analyze("Frontal 1 - LED 3 = 25", patch)
+
+    assert result["status"] == "unsupported"
+    assert result["errors"][0]["code"] == "range_or_list"
+
+
+def test_target_selectors_are_limited_to_known_instruments() -> None:
+    patch = named_fixtures("Frontal", 3)
+
+    result = analyze("Frontal 1 - Frontal 3 = 25", {**patch, "groups": [{"name": "Frontal 2", "instrument_names": []}]})
+
+    assert result["status"] == "invalid"
+    assert result["errors"][0]["code"] == "ambiguous_target"
+
+
+def test_target_expansion_is_bounded_to_two_thousand() -> None:
+    patch = named_fixtures("Frontal", 2_001)
+
+    single_range = analyze("Frontal 1 - Frontal 2001 = 1", patch)
+    cumulative = analyze_light_command_text(
+        "Frontal 1 - Frontal 1000 = 1\nFrontal 1001 - Frontal 2001 = 1", patch
+    )["results"]
+
+    assert single_range["status"] == "unsupported"
+    assert single_range["errors"][0]["code"] == "target_expansion_limit"
+    assert cumulative[0]["status"] == "valid"
+    assert len(cumulative[0]["affected"]) == 1_000
+    assert cumulative[1]["status"] == "unsupported"
+    assert cumulative[1]["errors"][0]["code"] == "target_expansion_limit"
 
 
 @pytest.mark.parametrize(
@@ -204,13 +378,34 @@ def test_line_numbers_and_source_are_preserved(light_patch: dict) -> None:
     ]
 
 
+def test_cue_pull_syntax_is_parsed_and_resolved_without_expansion(light_patch: dict) -> None:
+    source_id = "00000000-0000-0000-0000-000000000101"
+    result = analyze_light_command_text(
+        "Front = cue 101 * 0.5",
+        light_patch,
+        cue_references={"101": {"uniqueID": source_id, "number": "101", "type": "Light"}},
+    )["results"][0]
+
+    assert result["status"] == "valid"
+    assert result["value"]["kind"] == "cue_pull"
+    assert result["value"]["scale"] == 0.5
+    assert result["value"]["source"] == {"cue_id": source_id, "number": "101", "type": "Light"}
+    assert result["affected"] == [{"instrument": "Front", "parameter": "intensity"}]
+
+
+def test_cue_pull_without_unique_reference_is_invalid(light_patch: dict) -> None:
+    result = analyze("Front = cue 404", light_patch)
+
+    assert result["status"] == "invalid"
+    assert result["errors"][0]["code"] == "unknown_cue_reference"
+    assert result["affected"] == []
+
+
 @pytest.mark.parametrize(
     ("command", "error_code"),
     [
-        ("1 - 3 = 50", "range_or_list"),
-        ("1, 2 = 50", "range_or_list"),
-        ("[1 - 3] = 50", "ad_hoc_group"),
-        ("Front = cue A", "cue_pull"),
+        ("[Front] = 50", "range_or_list"),
+        ("Front = cue", "cue_pull_syntax"),
         ("Front = rgb(1, 2, 3)", "compound_value"),
         ("Front = 50 + 10", "expression"),
         ("Front = 1 = 2", "multiple_assignments"),

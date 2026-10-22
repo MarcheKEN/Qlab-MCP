@@ -5,6 +5,8 @@
 QLab MCP is a local FastMCP server that inspects QLab 5 workspaces and exposes
 narrowly gated cue-editing workflows over OSC. The supported deployment is on
 the operator's machine, with QLab reachable through `QLAB_HOST`.
+Local Light Patch editing additionally crosses a filesystem boundary: it
+rewrites the saved `.qlab5` document and uses fixed native close/reopen events.
 
 This policy covers the shipped MCP server, its OSC transport, read profiles,
 workspace/cue/settings resolution, input validation, and gated write paths. It
@@ -187,6 +189,67 @@ inconclusive. The zero-activity gate is a conservative MCP safety policy, not
 an asserted QLab requirement. The current activity reader cannot prove
 workspace-wide Audition state, so Audition must remain disabled by operator
 policy.
+
+### Local Light Patch files
+
+`qlab_get_workspace_light_settings` supplements current OSC data with a
+read-only inspection of the exact local workspace's saved archive. It resolves
+the document by UUID, checks the archived UUID, bounds the read and checks for
+document/file changes. Only the requested document's metadata is returned;
+the native inventory of other documents is not exposed by this tool. Saved
+enrichment initially supports QLab 5.5.10/build 5510. Remote QLab, absent
+Automation permission, a document without a saved path or an unsupported file leaves the
+available OSC result with an explicit saved-section coverage status.
+
+A dirty document can be inspected: its disk data is labelled as the last saved
+configuration and may differ from current OSC data. These sources are never
+silently merged into an asserted current state. A detected change during the
+read discards inconsistent saved enrichment. Dirty flags and file checks do
+not establish an atomic snapshot of QLab memory and disk. This read requires no
+write enablement or Edit Mode and never saves, closes or reopens the document.
+It excludes the raw archive graph, global Light Library and Dashboard MIDI.
+Configured device identities are not hardware detection. Results are bounded
+to 1,000 records per section and 2 MiB serialized JSON; truncation and subsequent
+requests are explicit, including for technical payloads.
+
+`qlab_edit_light_patch` requires local QLab 5.5.10/build 5510, existing-workspace
+write readiness, a clean inactive document in Edit Mode, disabled start-on-open/
+start-on-close settings, and a five-minute,
+single-use `confirm:lightPatch:v1:` token bound to source bytes, file identity,
+native inventory and operations. Dirty documents return `needs_save`; previews
+never save, close or write. Arguments permit typed operations only, not arbitrary
+archive keys or scripts. File access follows the MCP user's permissions.
+
+The writer is limited to owned single-link regular `.qlab5` files, at most
+64 MiB, with bounded archive objects and traversal. Packages, ambiguous paths,
+unsupported formats and unsafe links are rejected. Other documents must retain
+their inventory and are never closed by this operation. Public Open keeps its
+existing empty-inventory restriction; transaction reopening is a fixed private
+operation bound to the verified file identity.
+
+The transaction preserves an original-byte recovery and durable journal in one
+private sibling recovery directory. An unresolved transaction blocks reuse.
+Recovery files can contain the complete document, including scripts, settings
+and local paths; do not publish them. Replacement preserves original metadata,
+but only file replacement is atomic. Native close/reopen and filesystem events
+are not a single atomic transaction. Hostile local writers are outside the
+coordination guarantee; hash checks and locks do not prevent every external race.
+
+Failure retains the phase and recovery location without automatic retries or
+rollback over newer edits. Native readback checks OSC-visible identity and
+properties; saved routing and definitions also require archive verification.
+USB-DMX stores an explicit supplied identity; a disconnected or unknown device
+may remain unpatched in QLab. No compatible USB device has been validated, and
+configuration does not establish availability or DMX output. New definitions support validated scalar, RGB/lime, CMY, HSI, Pan/Tilt and
+acyclic One-to-Many encodings; unsupported existing data is preserved rather
+than treated as permission to manufacture its schema.
+
+By explicit product policy, Light cues are not rewritten or used to block a
+patch rename/delete. Reference warnings are partial. Resulting cue references
+can be unresolved until repaired separately; this is an accepted workflow
+consequence, not evidence of cue preservation failure. Patch-internal references
+must remain coherent. Reopening can affect lighting output even without a GO
+command; archive/native acceptance does not prove hardware silence or behavior.
 
 ### Move
 
@@ -430,3 +493,54 @@ ffprobe limit: ten seconds. Cache: four blocks, 128 MiB, ten-minute TTL.
 Stat identity is checked across phases and before returning; it does not provide
 cryptographic content integrity against an adversary capable of spoofing the
 filesystem metadata. Returned paths/tables describe the authorized source.
+
+
+### Light Definition catalogue and editor
+
+`qlab_get_light_definitions` reads fixed local bundled/personal library locations
+and optionally the exact saved workspace. It accepts no arbitrary file path.
+Bundled LZ4 decompression and keyed archives are bounded to 64 MiB; individual
+JSON definitions to 1 MiB, at most 20,000 records per source. Reads reject symlink
+files and unstable identities. Sources have independent availability; personal
+files are not executed. Pages contain at most 1,000 records and 2 MiB of JSON.
+Only exact detail requests include parameters; no raw archive graph is returned.
+Catalogue identity hashes source, origin and content. Duplicate names do not
+select another source implicitly. Dirty workspace data remains last-saved.
+
+`qlab_edit_light_definitions` uses the same document transaction, recovery and
+activity checks as the patch editor, with a separate single-use
+`confirm:lightDefinitions:v1:` token. Source fingerprints and original requests
+are bound to the token; imports revalidate sources before Close. Only validated scalar, RGB/lime, CMY, HSI, Pan/Tilt and acyclic One-to-Many
+encodings are enabled. Unknown variants and unpreservable metadata block import.
+Preservable unknown JSON metadata retains a semantic-coverage warning. Virtual
+controls do not add physical channels; their references, cycles, defaults and
+existing instrument footprints are validated.
+Definition rename updates patch instrument references; delete in use is blocked.
+Shared definition updates revalidate DMX footprints and overlaps. Light cues are
+not changed and reference analysis is partial. Unused definitions have archive
+verification only, not OSC or physical-output validation. Global/personal
+libraries and Dashboard MIDI are never written. Definition actions have been
+removed from public `qlab_edit_light_patch` batches.
+
+### Saved Light cue curves
+
+`qlab_edit_light_cue_curves` has a separate `confirm:lightCueCurves:v1:` token
+family and reuses the clean/inactive QLab 5.5.10/build 5510 document transaction,
+identity checks and bounded recovery. It edits only requested up/down shapes,
+copying changed graph branches and preserving unrelated data and omitted fields.
+Point replacements require normalized, ordered fixed-endpoint data with bounded
+counts. Mirrored curves, unknown types and unsupported metadata changes block.
+The generated result and reopened saved archive must satisfy curve postconditions.
+`saved_curve_verified` is archive evidence; OSC patch readback is separate and
+does not prove native curve rendering, playback, hardware silence or DMX output.
+
+### Dynamic Light cue references
+
+The Light command editor preserves `cue NUMBER` references and optional numeric
+factors. Exact uniquely numbered Light sources and their transitive graph are
+bounded (100 sources, depth 32); self-reference and cycles block preflight.
+Confirmations bind source UUID/type/number and text SHA-256 plus a fingerprint
+of all candidates for referenced numbers. Rechecks detect source edits and new
+number collisions. A batch cannot edit source text/numbers or introduce a number
+collision while another item depends on that resolution. Failed previews emit
+no setter tokens. The analysis identifies dependencies, not resulting DMX levels.

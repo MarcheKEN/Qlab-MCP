@@ -2,6 +2,45 @@
 
 ## 0.4.0 (Unreleased)
 
+- Add `qlab_edit_light_cue_curves`: separate bounded ascending/descending curve
+  batches with same-path close/edit/reopen, recovery and saved-archive verification
+  on QLab 5.5.10/build 5510. Preserve omitted fields and reject mirrored/unknown
+  structures; no documented OSC curve readback or physical-output claim.
+- Extend bounded Light command analysis with reserved `all = home`, instrument
+  lists, matching-prefix ranges, bracket selectors and dynamic cue pulls with
+  proportional factors. Bind source hashes and number uniqueness, reject cycles
+  and conflicting batches, and preserve textual references. No playback.
+- Extend definition creation/import to CMY, HSI, Pan/Tilt, acyclic One-to-Many
+  controls and RGB lime, preserving native channels, bindings and metadata.
+  Virtual controls consume no physical DMX channels. Current surface: **83 tools,
+  50 reads and 33 gated writes**.
+
+- Add `qlab_get_light_definitions`: source-aware paged catalogue of bundled, personal
+  and last-saved workspace definitions, with exact channel/control detail.
+- Add `qlab_edit_light_definitions`: dedicated workspace-only import and definition
+  CRUD using source-bound confirmations and the existing document transaction.
+  Preserve native channel positions and extended RGB bindings; unknown variants
+  remain readable and blocked for import. No global library writes.
+- **Breaking:** remove definition operations from `qlab_edit_light_patch`; use the
+  definition editor first, then create/reassign instruments. Public surface is
+  83 tools: 50 read-only and 33 gated writes.
+
+- Enrich `qlab_get_workspace_light_settings` with typed saved-file instruments,
+  addresses, Art-Net/USB configuration, groups and workspace definitions alongside
+  current OSC data. Dirty documents remain unsaved and sources retain explicit
+  freshness/coverage. Add bounded section pagination and a 2 MiB response budget;
+  archive inspection initially supports QLab 5.5.10/build 5510. Internal cue-editor
+  dependency reads and all write gates remain unchanged.
+- Add `qlab_edit_light_patch`: typed batches of 1–100 create/edit/rename/delete
+  operations for instruments and groups. Workspace definitions use the dedicated editor. On local
+  QLab 5.5.10/build 5510 it previews a source-bound plan, then closes the clean
+  document, replaces the same path with bounded recovery and reopens for
+  archive/OSC-visible readback. Cues, Dashboard MIDI and the global Light
+  Library remain untouched; cue-reference warnings are partial. Art-Net and
+  unpatched output and explicit USB-DMX identities are supported as saved
+  configuration; compatible-device availability and output remain unvalidated. Definition parameters use the separately validated encodings above. Percentage
+  home values use 0–100 display units; raw DMX homes use the 8/16-bit range.
+  The original patch-editor addition exposed 80 tools; the separate definition tools originally brought the surface to 82, before the curve tool.
 - Reuse existing reader normalization and inherited cue model fields, and
   simplify equivalent settings/creation branches without changing MCP contracts.
 - Evidence capture now redacts confirmation tokens embedded in JSON-quoted

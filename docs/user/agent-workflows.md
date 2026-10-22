@@ -27,9 +27,68 @@ Resolve workspace and Cue List UUIDs, then call `qlab_get_light_cues` or
 Both accept safe/technical; technical adds notes. Light commands are included in
 safe, never executed or interpreted as live output. Patch configuration belongs
 to `qlab_get_workspace_light_settings`.
+For Light command edits, `all` is the reserved group of all instruments.
+`all = home` refers to every known parameter, whereas `all.red = home` refers
+only to red. Group members without an explicitly requested parameter are ignored
+by QLab; unresolved member references still block a fully validated plan.
+The analyzer also accepts instrument lists, matching-prefix numeric ranges such
+as `Frontal 1 - Frontal 3`, and bracketed versions with an optional parameter.
+Endpoints and every expanded instrument must resolve; arbitrary name ordering
+and descending ranges are not enabled. `target = cue NUMBER` and optional
+`* SCALE` preserve dynamic references to one uniquely numbered Light cue. Sources
+and transitive references must resolve without cycles (100 sources, depth 32).
+Previews bind source identity, number and command-text hashes plus number-resolution
+candidates; changes invalidate execution. Edit source commands/numbers separately
+from their dependants. The analyzer does not compute the resulting dynamic look. The combined
+affected-parameter expansion is capped at 2,000; exceeding it blocks the plan
+instead of returning a successful partial analysis.
+The analyzer remains a bounded subset: do not equate native command-language
+support with public MCP write support. See the
+[lighting expansion evidence](../development/research/2026-10-21-light-authoring-expansion.md)
+for tested syntax and [Light cue curves](#light-cue-curves) for the separate file editor.
 Group reads Playlist only in Playlist mode. max_depth=2 (0..5) and max_cues=1000
 (1..5000) bound child summaries; depth zero reads no children. Inspect partial
 errors and contents.truncated; use each child's family tool for its full detail.
+
+## Light cue curves
+
+Use `qlab_edit_light_cue_curves` separately from the OSC Light command editor.
+Resolve exact Light cue UUIDs, check write readiness, then preview 1–50 operations:
+
+```json
+{
+  "workspace_id": "11111111-1111-4111-8111-111111111111",
+  "operations": [{
+    "cue_id": "22222222-2222-4222-8222-222222222222",
+    "up": {"type": "custom", "points": [
+      {"t": 0, "v": 0}, {"t": 0.4, "v": 0.8}, {"t": 1, "v": 1}
+    ]},
+    "down": {"type": "parametric", "parameter": 2.5}
+  }],
+  "dry_run": true
+}
+```
+
+Review `changes` and `curve_summary`; execute the same request with
+`dry_run=false` and its five-minute single-use `confirm:lightCueCurves:v1:` token.
+The local document must be clean, inactive, in Edit Mode, with automatic
+open/close cues disabled, on QLab 5.5.10/build 5510. `needs_save` requires the
+separate Save flow and a new preview. Execution closes, edits and reopens the
+same path with recovery. `no_op` does not close or rewrite the file. Never retry
+an uncertain write automatically.
+
+Types are `custom`, `s_curve`, `parametric` and `linear`. Omitted sides and fields
+retain their values; explicit null is invalid. `parameter` must be finite and
+positive; native acceptance covers 2.5, not every possible boundary. A supplied
+`points` list explicitly replaces the Custom curve's points. Times and values
+are normalized 0–1, times strictly increase, and endpoints are fixed: up
+(0,0)→(1,1), down (0,1)→(1,0). Each side allows 2–4,096 points, with 8,192 supplied
+points across a batch. Mirrored/unknown curve structures are blocked.
+
+`saved_curve_verified` checks the saved archive after reopening. QLab's documented
+OSC surface does not expose curve values; patch readback alone does not verify
+curves, playback or physical DMX output. Commands, patch, other cues and Dashboard
+MIDI remain outside the requested curve changes.
 
 ## Tool selection
 
@@ -101,7 +160,7 @@ Load and Target cue properties. Local imported OSC copy:
 | Inventory Video inputs, stages, and output routes | `qlab_get_workspace_video_settings` | Exact object detail |
 | Inspect one stage and its regions by UUID | `qlab_get_video_stage` | Name selection or mutation |
 | Inspect one output route and destination by UUID | `qlab_get_video_output_route` | Independent device inventory or mutation |
-| Read the Light Patch | `qlab_get_workspace_light_settings` | Light Definitions or Dashboard settings |
+| Read the Light Patch and saved workspace definitions | `qlab_get_workspace_light_settings` | Global Light Library or Dashboard MIDI |
 | Read Network Patch inventory or one exact patch | `qlab_get_workspace_network_settings` | The complete Network panel |
 | Read MIDI Patch inventory or one exact patch | `qlab_get_workspace_midi_settings` | The complete MIDI panel |
 | Find a bounded set of cues with filters | `qlab_query_cues` | Full Inspector payloads |
@@ -532,6 +591,124 @@ Readback can confirm a timed-out or errored attempted event; inspect the explici
 status and never resend automatically. Native Get, Save preview and dirty-Close/
 nonempty-Open blocking have [bounded live evidence](../development/runtime-validation/2026-10-17-installed-mcp-acceptance.md);
 actual Open/Save/Close events remain unvalidated by these reports.
+
+## Read the Light Patch
+
+Call `qlab_get_workspace_light_settings` with the exact workspace UUID. The
+default profile returns the existing OSC detail together with `saved_patch`,
+which describes the last saved local `.qlab5` configuration. Instruments refer
+to workspace definitions returned once, including unused definitions. Saved
+details include notes, addresses and calculable DMX ranges, Art-Net settings,
+configured USB identities, direct group members and known definition parameters.
+The global Light Library, Dashboard MIDI and raw archive graph are excluded.
+
+Keep the sources distinct: OSC describes QLab's current patch; `saved_patch`
+describes bytes on disk. With unsaved changes, both are returned and the saved
+data is marked as potentially stale. Compare only shared observable properties;
+OSC cannot establish saved addresses or output identities. USB identity is
+configuration, not proof of a connected device. Unknown variants and broken
+references are reported as coverage gaps rather than interpreted as empty data.
+
+Saved enrichment requires local QLab, macOS Automation access and a readable
+saved file in the supported QLab **5.5.10/build 5510** format. If these are
+unavailable, inspect the OSC result and the saved-section status. If the file or
+document changes during reading, `changed_during_read` prevents its data being
+presented as consistent. The query never saves, closes or opens a document,
+requires no write readiness and exposes no other open documents' inventory.
+
+Defaults are `section="all"`, `offset=0`, `limit=1000`, with at most 1,000
+records per section and a 2 MiB serialized response budget. Normal patches fit
+in one call. For a larger patch, inspect counts, truncation and `next_requests`;
+follow those exact arguments with the same tool. `section` can narrow the page
+to `instruments`, `groups` or `definitions`. Coverage and source information
+accompany each page. `technical` and `exhaustive` retain a redacted OSC
+`technical_payload`; they do not bypass the response budget.
+
+## Edit the Light Patch
+
+Use the [Light Patch read](#read-the-light-patch) to orient the patch, then
+`qlab_edit_light_patch` to preview and apply one complete batch. This edits
+instruments, light groups and workspace Light Definitions, not Light cues.
+It requires local QLab **5.5.10/build 5510**, write readiness and a clean inactive
+document in Edit Mode, with start-on-open and start-on-close disabled. The saved file must be an owned, single-link regular
+`.qlab5` bounded to 64 MiB; packages and unsupported archive forms are rejected.
+
+The tool accepts 1–100 strict operations:
+
+| Element | Actions | Fields |
+| --- | --- | --- |
+| Instrument | `create_instrument`, `update_instrument`, `rename_instrument`, `delete_instrument` | Exact `name`; `definition`, `note`, `output` for create/update; `new_name` for rename |
+| Group | `create_group`, `update_group`, `rename_group`, `delete_group` | Exact `name`; `note`, `members` for create/update; `new_name` for rename |
+
+Omitted update fields are preserved. Use `output={"backend":"none"}`
+to unpatch. Art-Net uses `backend="artnet"`, `net` 0–127, `subnet` 0–15,
+`universe` 0–15 and the displayed starting `address` 1–512. Validate the complete
+footprint and output namespace, not just the first channel. USB-DMX requires
+`backend="usb"`, exact `device_serial`/`device_name`, `device_universes`, a
+zero-based `universe` and displayed `address`. The supplied identity is saved
+configuration, not device discovery: a missing device can remain unpatched.
+No compatible USB-DMX device has been validated; no physical output is claimed.
+
+For example, after creating `Example Dimmer` with `qlab_edit_light_definitions`
+and resolving the real workspace UUID:
+
+```json
+{
+  "workspace_id": "11111111-1111-4111-8111-111111111111",
+  "operations": [
+    {
+      "action": "create_instrument",
+      "name": "Example Roof",
+      "definition": "Example Dimmer",
+      "output": {"backend": "none"}
+    },
+    {"action": "create_group", "name": "Example Front", "members": ["Example Roof"]}
+  ],
+  "dry_run": true
+}
+```
+
+Review `changes`, `summary`, `warnings`, `affected_cues` and empty
+`executed_operations`. Repeat the same workspace/operations with
+`dry_run=false` and the returned `confirm_token`. The five-minute, single-use,
+process-bound `confirm:lightPatch:v1:` token binds the complete batch and its
+source file/native baseline. Any drift requires a fresh preview. `needs_save`
+means save all pending changes through `qlab_save_workspace`, then preview
+again; the Light Patch preview never saves, closes or writes. A `no_op` result
+does not rewrite or close the workspace.
+
+Renaming updates references inside the patch. Deleting an instrument/group
+removes its group memberships; deleting a group preserves its instruments.
+Definition operations are accepted only by `qlab_edit_light_definitions`.
+Reassign or remove consumers with the patch tool before deleting a used definition. The final patch must resolve definitions and members without
+cycles or overlaps. Light cues remain unchanged even when references become
+unresolved; `affected_cues` is partial guidance, not a complete dependency audit
+or a reason to silently repair cues. Repair them later through their own tools.
+Dashboard MIDI and the global Light Library are not edited.
+
+One execution closes the clean target, checks and replaces its original path,
+then reopens that workspace while preserving other open documents. A private
+sibling recovery directory retains the preceding file and journal; subsequent
+successful transactions reuse that bounded location. An unresolved recovery
+blocks a new edit. These files contain private document contents and paths.
+The public `qlab_open_workspace` still requires no workspaces open; the patch
+transaction has its own narrowly guarded internal reopen.
+
+Check `file_replaced`, `document_reopened`, `native_patch_verified` and `status`
+independently. File readback verifies the planned saved patch. Current native
+OSC readback checks instrument names, notes, used definition manufacturers,
+defaults and parameter semantics, patched state and group names/memberships;
+it cannot establish full routing or unused definitions. USB patched state is not required because
+the configured device may be absent. `verified` applies to those combined,
+explicitly limited checks, not physical output. Reopening can affect lighting.
+The result reports `document_modified_after_reopen` if QLab marks the document
+dirty while reopening. No automatic post-open Save is performed; inspect and
+save separately before another patch plan. Native reopen has at least a
+30-second acknowledgement budget. A lost acknowledgement can be confirmed
+through fresh state without resending Open.
+Only file replacement is atomic; the full lifecycle is not. If an event or
+verification fails, inspect `phase`, the file and QLab state, and the returned
+`recovery_path`. Do not retry automatically or restore over later changes.
 
 ## Move Cue Lists and Carts
 
@@ -1271,3 +1448,94 @@ Then use existing cue editors with their dry run/confirmation/readback protocol.
 Computer Use can contrast the file path and duration, but a waveform screenshot
 cannot validate frequency ratios, LUFS or beats. Lyrics, transcription, key,
 downbeats, event classifiers and execution remain outside this tool.
+
+
+## Light Definitions
+
+`qlab_get_light_definitions` is read-only. It lists the bundled manufacturers,
+personal `.qlablight` files, and last-saved workspace definitions. By default
+`source="all"` returns compact pages; supply `workspace_id` to include the workspace.
+Use `source="bundled"`, `"personal"` or `"workspace"` to restrict the source.
+`query` matches name/manufacturer text; `manufacturer` is an exact case-insensitive
+filter. `offset`/`limit` page results (default 100, maximum 1,000; 2 MiB response).
+Follow `next_request`; a truncated page is not the complete catalogue.
+
+Select a returned `definition_id` to get its parameters: zero-based physical
+channels, 8/16-bit widths, percentage/DMX homes, default parameter and known
+virtual bindings. Mode is null unless explicitly supplied by the source; names
+are not parsed to invent a mode. Identical names from different sources retain
+different IDs. Workspace reads include saved-file hash, dirty state and freshness;
+no save, close or open is performed. Sources fail independently. Unknown variants
+remain inspectable and report why import is blocked.
+
+`qlab_edit_light_definitions` accepts 1–100 definition-only operations:
+
+| Action | Fields |
+| --- | --- |
+| `import_definition` | Exact bundled/personal `definition_id`; optional destination `name` |
+| `create_definition` | `name`, `manufacturer`, ordered `parameters`, optional `default_parameter` |
+| `update_definition` | Exact `name`; optional `manufacturer`, replacement `parameters`, `default_parameter` |
+| `rename_definition` | Exact `name`, `new_name` |
+| `delete_definition` | Exact unused `name` |
+
+The writer supports scalar 8/16-bit channels, RGB (including white, warm-white,
+amber and lime), CMY, HSI, Pan/Tilt and One-to-Many (`muxer`) controls. Unknown
+variants and JSON metadata that cannot be preserved are blocked. Uninterpreted
+preservable metadata carries an explicit semantic-coverage warning.
+Native imports preserve physical channel positions/gaps, complete known metadata,
+default parameter and validated output bindings. Custom creation assigns physical
+channels in supplied order; 16-bit parameters consume two slots. Virtual controls
+consume no physical slots.
+
+Virtual `outputs` fields:
+
+| Type | Shape and references |
+| --- | --- |
+| `rgbcolor` | Three scalar names in RGB order, or map with `red`, `green`, `blue` and optional `white`, `warmwhite`, `amber`, `lime` |
+| `cmycolor` | Map with `cyan`, `magenta`, `yellow`, each naming a distinct scalar |
+| `hsicolor` | Map with `hue`, `saturation`, `intensity`, each naming a distinct scalar |
+| `pantilt` | Map with `pan`, `tilt`, each naming a distinct scalar |
+| `muxer` | Nonempty ordered list of distinct parameter names, including virtual controls; cycles are rejected |
+
+`home_value` is 0–100 percent or integral DMX 0–255/65535 depending on units and
+width. Nested One-to-Many controls retain their references, rather than becoming
+additional DMX channels. Known type support does not make every manufacturer
+record importable: invalid defaults, references or unknown variants still block.
+
+Omitted updates preserve values. `parameters` replaces the entire parameter
+list; explicitly set `default_parameter=null` to clear it. Reordering parameters
+preserves the previous default by name unless explicitly changed. Conflicting
+creation/import names are rejected; use a new destination name or explicit update.
+Renaming updates instrument references. Deleting an in-use definition is blocked:
+first reassign/remove its instruments through `qlab_edit_light_patch`. Changing
+shared definitions rechecks every instrument footprint and overlap.
+
+Example creation request to `qlab_edit_light_definitions`:
+
+```json
+{
+  "workspace_id": "11111111-1111-4111-8111-111111111111",
+  "operations": [{
+    "action": "create_definition", "name": "Example Dimmer", "manufacturer": "Example",
+    "parameters": [{"type": "scalar", "name": "intensity", "home_value": 0}],
+    "default_parameter": "intensity"
+  }],
+  "dry_run": true
+}
+```
+
+Review the plan and repeat with `dry_run=false` and its single-use, five-minute
+`confirm:lightDefinitions:v1:` token. The same-path file transaction requires
+local QLab 5.5.10/build 5510, write readiness, clean inactive Edit Mode and disabled
+automatic open/close cues. `needs_save` requires a separate explicit Save and a
+fresh preview. `no_op` never closes or rewrites. Imports bind the selected source
+content/hash and recheck it before closing. Global and personal library files are
+never changed. Recovery and uncertainty follow the Light Patch transaction;
+never automatically retry or restore over newer edits. Unused definitions are
+verified in the saved archive, because OSC exposes assigned definitions only.
+Light cues are never repaired; reference warnings are explicitly partial.
+Neither successful import nor saved output configuration proves physical DMX.
+
+Workflow: catalogue → exact detail → import/create definitions → edit instruments
+and groups → edit Light cues → fresh reads. **Breaking change:** definition CRUD
+was removed from `qlab_edit_light_patch`; old mixed batches must be split.

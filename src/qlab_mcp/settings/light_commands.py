@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import re
+import math
 from typing import Any
 
 from ..errors import UnsafeWriteOperationError
 
 
 _NUMBER = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)")
+_CUE_PULL = re.compile(r"cue\s+([^\s*]+)(?:\s*\*\s*(" + _NUMBER.pattern + r"))?", re.IGNORECASE)
 _LINE_BREAK = re.compile(r"\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]")
 MAX_LIGHT_COMMAND_TEXT_BYTES = 65_536
 MAX_LIGHT_COMMAND_LINES = 2_000
@@ -45,10 +47,31 @@ def _unsupported(result: dict[str, Any], code: str, message: str) -> dict[str, A
     return result
 
 
+def _expansion_limit(result: dict[str, Any]) -> None:
+    result["affected"].clear()
+    result["parameter"]["exists"] = False
+    result["status"] = "unsupported"
+    result["errors"].append(
+        _issue("target_expansion_limit", f"Affected targets exceed the {MAX_LIGHT_ANALYSIS_RESULTS}-item analysis limit.")
+    )
+
+
 def _parse_value(raw: str) -> dict[str, Any] | None:
     normalized = raw.casefold()
     if normalized in {"home", "pass"}:
         return {"kind": normalized, "raw": raw, "number": None}
+    pull = _CUE_PULL.fullmatch(raw)
+    if pull:
+        scale = float(pull.group(2)) if pull.group(2) is not None else 1.0
+        if not math.isfinite(scale):
+            return None
+        return {
+            "kind": "cue_pull",
+            "raw": raw,
+            "number": None,
+            "cue_number": pull.group(1),
+            "scale": scale,
+        }
     if not _NUMBER.fullmatch(raw):
         return None
     number: int | float = float(raw)
@@ -58,12 +81,10 @@ def _parse_value(raw: str) -> dict[str, Any] | None:
 
 
 def _unsupported_syntax(result: dict[str, Any], left: str, right: str) -> dict[str, Any] | None:
-    if "[" in left or "]" in left:
-        return _unsupported(result, "ad_hoc_group", "Ad-hoc groups are outside the MVP grammar.")
-    if "," in left or re.fullmatch(r"\d+\s*-\s*\d+", left):
-        return _unsupported(result, "range_or_list", "Ranges and target lists are outside the MVP grammar.")
-    if right == "cue" or right.startswith("cue "):
-        return _unsupported(result, "cue_pull", "Pulling values from another cue is outside the MVP grammar.")
+    if _parse_value(right) is not None:
+        return None
+    if re.match(r"cue(?:\s|$)", right, re.IGNORECASE) and _parse_value(right) is None:
+        return _unsupported(result, "cue_pull_syntax", "Cue pulls must use 'cue NUMBER' with an optional '* SCALE'.")
     if "(" in right or ")" in right:
         return _unsupported(result, "compound_value", "Functions and compound values are outside the MVP grammar.")
     if not _NUMBER.fullmatch(right) and (
@@ -71,6 +92,66 @@ def _unsupported_syntax(result: dict[str, Any], left: str, right: str) -> dict[s
     ):
         return _unsupported(result, "expression", "Expressions and operators are outside the MVP grammar.")
     return None
+
+
+def _selector(left: str) -> tuple[str | None, list[str] | None, str | None, str | None]:
+    """Parse documented target lists/ranges using exact instrument names."""
+    explicit_parameter = None
+    ad_hoc = left.startswith("[")
+    if ad_hoc:
+        end = left.find("]")
+        if end < 0 or "]" in left[end + 1 :]:
+            return None, None, None, "Malformed ad-hoc group."
+        expression = left[1:end].strip()
+        suffix = left[end + 1 :].strip()
+        if suffix:
+            if not suffix.startswith(".") or not suffix[1:].strip():
+                return None, None, None, "Ad-hoc group parameter syntax is invalid."
+            explicit_parameter = suffix[1:].strip()
+    else:
+        if left.count(".") > 1:
+            return None, None, None, None
+        expression, separator, parameter = left.partition(".")
+        if separator:
+            explicit_parameter = parameter.strip()
+            if not explicit_parameter:
+                return None, None, None, "Target and parameter names cannot be empty."
+        expression = expression.strip()
+
+    if "," in expression:
+        names = [name.strip() for name in expression.split(",")]
+        if not names or any(not name for name in names):
+            return None, None, None, "Target list contains an empty name."
+        kind = "ad_hoc_group" if ad_hoc else "list"
+        return kind, names, explicit_parameter, None
+
+    range_parts = re.split(r"\s+-\s+", expression)
+    if len(range_parts) == 2:
+        start = re.fullmatch(r"(.*?)(\d+)", range_parts[0].strip())
+        end = re.fullmatch(r"(.*?)(\d+)", range_parts[1].strip())
+        if not start or not end or start.group(1) != end.group(1):
+            return None, None, None, "Only ranges with matching names and numeric suffixes are supported."
+        try:
+            first, last = int(start.group(2)), int(end.group(2))
+        except ValueError:
+            return None, None, None, "Target range indices are outside the supported numeric size."
+        padded_start = len(start.group(2)) > len(str(first))
+        padded_end = len(end.group(2)) > len(str(last))
+        if padded_start != padded_end or (padded_start and len(start.group(2)) != len(end.group(2))):
+            return None, None, None, "Zero-padded target range endpoints must use the same numeric width."
+        if first > last:
+            return None, None, None, "Descending target ranges are not supported."
+        if last - first + 1 > MAX_LIGHT_ANALYSIS_RESULTS:
+            return None, None, None, f"Target expansion exceeds the {MAX_LIGHT_ANALYSIS_RESULTS}-target analysis limit."
+        kind = "ad_hoc_group" if ad_hoc else "range"
+        width = len(start.group(2)) if padded_start else 0
+        return kind, [f"{start.group(1)}{number:0{width}d}" for number in range(first, last + 1)], explicit_parameter, None
+
+    if ad_hoc:
+        return None, None, None, "Ad-hoc groups require a range or list."
+    if len(range_parts) > 2:
+        return None, None, None, "Target range syntax is invalid."
+    return None, None, None, None
 
 
 def _targets(light_patch: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
@@ -115,6 +196,7 @@ def _analyze_instrument(
     result: dict[str, Any],
     instrument: dict[str, Any],
     explicit_parameter: str | None,
+    expansion_budget: int,
 ) -> None:
     parameter = explicit_parameter or _default_parameter(instrument)
     if not parameter or parameter not in _parameter_names(instrument):
@@ -128,6 +210,9 @@ def _analyze_instrument(
         result["errors"].append(_issue(code, message))
         return
     result["parameter"]["exists"] = True
+    if len(result["affected"]) >= expansion_budget:
+        _expansion_limit(result)
+        return
     result["affected"].append({"instrument": instrument["name"], "parameter": parameter})
 
 
@@ -136,17 +221,34 @@ def _analyze_group(
     group: dict[str, Any],
     explicit_parameter: str | None,
     instruments: dict[str, dict[str, Any]],
+    *,
+    expansion_budget: int,
+    all_home: bool = False,
 ) -> None:
     for member_name in group.get("instrument_names", []):
         instrument = instruments.get(member_name)
         if instrument is None:
             result["skipped_members"].append({"instrument": member_name, "reason": "instrument_unavailable"})
             continue
+        parameters = _parameter_names(instrument)
+        if all_home:
+            if not parameters:
+                result["skipped_members"].append({"instrument": member_name, "reason": "parameters_unavailable"})
+                continue
+            for parameter in sorted(parameters):
+                if len(result["affected"]) >= expansion_budget:
+                    _expansion_limit(result)
+                    return
+                result["affected"].append({"instrument": member_name, "parameter": parameter})
+            continue
         parameter = explicit_parameter or _default_parameter(instrument)
-        if not parameter or parameter not in _parameter_names(instrument):
+        if not parameter or parameter not in parameters:
             reason = "parameter_unavailable" if explicit_parameter else "default_parameter_unavailable"
             result["skipped_members"].append({"instrument": member_name, "reason": reason})
             continue
+        if len(result["affected"]) >= expansion_budget:
+            _expansion_limit(result)
+            return
         result["affected"].append({"instrument": member_name, "parameter": parameter})
 
     result["parameter"]["exists"] = bool(result["affected"])
@@ -154,7 +256,10 @@ def _analyze_group(
         code = "unknown_parameter" if explicit_parameter else "default_parameter_unavailable"
         result["status"] = "invalid"
         result["errors"].append(_issue(code, f"Group {group['name']!r} has no compatible members."))
-    elif result["skipped_members"]:
+    elif result["skipped_members"] and (
+        not explicit_parameter
+        or any(member["reason"] != "parameter_unavailable" for member in result["skipped_members"])
+    ):
         result["status"] = "warning"
         result["warnings"].append(
             _issue("group_members_skipped", "Some group members do not expose the requested parameter.")
@@ -166,6 +271,8 @@ def _analyze_line(
     source: str,
     targets: list[tuple[str, dict[str, Any]]],
     instruments: dict[str, dict[str, Any]],
+    expansion_budget: int,
+    cue_references: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     result = _line_result(line_number, source)
     assignment_count = source.count("=")
@@ -176,13 +283,19 @@ def _analyze_line(
     left, right = (part.strip() for part in source.split("=", 1))
     if not left or not right:
         return _unsupported(result, "unsupported_syntax", "Target and value are required.")
+    selector_kind, selector_names, selector_parameter, selector_error = _selector(left)
+    if selector_error:
+        code = "target_expansion_limit" if selector_error.startswith("Target expansion exceeds") else "range_or_list"
+        return _unsupported(result, code, selector_error)
     unsupported = _unsupported_syntax(result, left, right)
     if unsupported is not None:
         return unsupported
-    if left.count(".") > 1:
+    if selector_kind is None and left.count(".") > 1:
         return _unsupported(result, "unsupported_syntax", "Only one target.parameter separator is supported.")
 
-    if "." in left:
+    if selector_kind is not None:
+        target_input, parameter_input = left, selector_parameter
+    elif "." in left:
         target_input, parameter_input = (part.strip() for part in left.split(".", 1))
         if not target_input or not parameter_input:
             return _unsupported(result, "unsupported_syntax", "Target and parameter names cannot be empty.")
@@ -192,12 +305,76 @@ def _analyze_line(
     value = _parse_value(right)
     if value is None:
         return _unsupported(result, "unsupported_syntax", "Value is outside the MVP grammar.")
+    if value["kind"] == "cue_pull":
+        reference = (cue_references or {}).get(value["cue_number"])
+        if reference is None:
+            result["status"] = "invalid"
+            return _unsupported(result, "unknown_cue_reference", f"Cue {value['cue_number']!r} could not be resolved uniquely.")
+        if reference.get("type") != "Light":
+            result["status"] = "invalid"
+            return _unsupported(result, "cue_reference_type", "A Light command may pull only from another Light cue.")
+        value["source"] = {
+            "cue_id": reference["uniqueID"],
+            "number": reference["number"],
+            "type": reference["type"],
+        }
+        value["dynamic"] = True
 
     result["target"]["input"] = target_input
     result["parameter"].update({"input": parameter_input, "defaulted": parameter_input is None})
     result["value"] = value
 
+    if selector_kind is not None and selector_names is not None:
+        if len(selector_names) > expansion_budget:
+            return _unsupported(
+                result,
+                "target_expansion_limit",
+                f"Target expansion exceeds the {MAX_LIGHT_ANALYSIS_RESULTS}-target analysis limit.",
+            )
+        resolved_targets = []
+        normalized_matches = []
+        for name in selector_names:
+            member_kind, member, normalized, error = _resolve_target(name, targets)
+            if error:
+                result["status"] = "invalid"
+                result["errors"].append(_issue(error, f"Selector target {name!r} could not be resolved."))
+                return result
+            if member_kind != "instrument" or member is None:
+                result["status"] = "unsupported"
+                result["errors"].append(
+                    _issue("selector_requires_instruments", "Selectors may contain only exact instrument targets.")
+                )
+                return result
+            resolved_targets.append(member)
+            normalized_matches.append(normalized)
+        result["status"] = "warning" if any(normalized_matches) else "valid"
+        result["target"].update(
+            {
+                "resolved_name": ", ".join(item["name"] for item in resolved_targets),
+                "kind": selector_kind,
+                "exists": True,
+                "normalized_match": any(normalized_matches),
+            }
+        )
+        if any(normalized_matches):
+            result["warnings"].append(
+                _issue("normalized_target_match", "Selector target matched by case-insensitive comparison.")
+            )
+        for instrument in resolved_targets:
+            _analyze_instrument(result, instrument, parameter_input, expansion_budget)
+            if result["status"] == "unsupported":
+                return result
+        return result
+
+    all_group = None
+    if target_input.casefold() == "all":
+        all_group = {
+            "name": "all",
+            "instrument_names": list(instruments),
+        }
     kind, target, normalized_match, error = _resolve_target(target_input, targets)
+    if all_group is not None:
+        kind, target, normalized_match, error = "group", all_group, target_input != "all", None
     if error:
         result["status"] = "invalid"
         message = (
@@ -224,9 +401,16 @@ def _analyze_line(
         )
 
     if kind == "instrument":
-        _analyze_instrument(result, target, parameter_input)
+        _analyze_instrument(result, target, parameter_input, expansion_budget)
     else:
-        _analyze_group(result, target, parameter_input, instruments)
+        _analyze_group(
+            result,
+            target,
+            parameter_input,
+            instruments,
+            expansion_budget=expansion_budget,
+            all_home=target["name"] == "all" and parameter_input is None and value["kind"] == "home",
+        )
     return result
 
 
@@ -258,7 +442,12 @@ def validate_light_command_text_limits(command_text: str) -> None:
         )
 
 
-def analyze_light_command_text(command_text: str, light_patch: dict[str, Any]) -> dict[str, Any]:
+def analyze_light_command_text(
+    command_text: str,
+    light_patch: dict[str, Any],
+    *,
+    cue_references: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Analyze the MVP LCL subset; ``valid`` means MVP-subset-valid, not QLab execution validity."""
 
     if not isinstance(command_text, str):
@@ -279,9 +468,41 @@ def analyze_light_command_text(command_text: str, light_patch: dict[str, Any]) -
         for kind, instrument in targets
         if kind == "instrument"
     }
-    results = [
-        _analyze_line(line_number, source, targets, instruments)
-        for line_number, source in enumerate(lines, start=1)
-        if source.strip()
-    ]
-    return {"line_count": len(lines), "analyzed_count": len(results), "results": results}
+    results = []
+    expansion_budget = MAX_LIGHT_ANALYSIS_RESULTS
+    for line_number, source in enumerate(lines, start=1):
+        if not source.strip():
+            continue
+        result = _analyze_line(line_number, source, targets, instruments, expansion_budget, cue_references)
+        results.append(result)
+        if result["status"] in {"valid", "warning"}:
+            expansion_budget -= len(result["affected"])
+    has_dynamic_pull = any(result["value"].get("kind") == "cue_pull" for result in results)
+    return {
+        "line_count": len(lines),
+        "analyzed_count": len(results),
+        "results": results,
+        "dynamic_references_present": has_dynamic_pull,
+        "dynamic_look_computed": False if has_dynamic_pull else None,
+    }
+
+
+def light_cue_references(command_text: str) -> list[str]:
+    """Return cue numbers used by the supported pull syntax, preserving spelling."""
+    validate_light_command_text_limits(command_text)
+    references = []
+    for source in command_text.splitlines():
+        if not source.strip():
+            continue
+        if source.count("=") != 1:
+            if re.search(r"\bcue\b", source, re.IGNORECASE):
+                raise UnsafeWriteOperationError("Cue pull syntax must use one assignment per line.")
+            continue
+        _, right = (part.strip() for part in source.split("=", 1))
+        if not re.search(r"\bcue\b", right, re.IGNORECASE):
+            continue
+        value = _parse_value(right)
+        if value is None or value.get("kind") != "cue_pull":
+            raise UnsafeWriteOperationError("Cue pulls must use 'cue NUMBER' with an optional '* SCALE'.")
+        references.append(value["cue_number"])
+    return references

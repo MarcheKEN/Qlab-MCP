@@ -39,8 +39,8 @@ message, output, fade, or target mode, then rechecks identity and selector.
 Failures in secondary reads preserve confirmed identity as partial data.
 Sensitive Network text and Script source require the technical profile.
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 79 decorated tools
-(49 read-only and 30 gated writes),
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 83 decorated tools
+(50 read-only and 33 gated writes),
 their schemas, annotations, timeouts, and result models. QLab-backed calls
 create a fresh `QLabReader` and close it after the operation; local media tools
 do not use that reader. `qlab-mcp` maps to
@@ -51,6 +51,14 @@ do not use that reader. `qlab-mcp` maps to
 another public start command.
 
 ## Read path
+
+The public Light settings tool supplements its OSC result through
+`light_patch/reader.py`. It resolves only the requested local document, reads
+stable saved bytes and delegates known archive fields to `light_patch/inspection.py`.
+The decoder reuses `Archive` without invoking writer preconditions or modifying
+the document. Typed saved data and OSC data retain distinct source/freshness
+metadata; section pagination bounds the final serialized model. The internal
+OSC results used by cue editors and their signed dependencies are not enriched.
 
 `QLabReader` is the reader facade composed from focused mixins:
 
@@ -184,3 +192,26 @@ is an agent obligation; the server cannot verify it. OS access checks remain.
   failed observations do not override current source or establish new proof.
 - Agent-facing contract research:
   [`2026-08-13-mcp-agent-ux-and-edit-cleanup.md`](research/2026-08-13-mcp-agent-ux-and-edit-cleanup.md).
+
+### Light Definition catalogues and authoring
+
+`light_patch/catalogue.py` reads the bounded local bundled LZ4/keyed archive and
+personal `.qlablight` JSON sources. Source/content IDs disambiguate identical
+names. Workspace catalogue entries reuse stable last-saved inspection. Compact
+pages exclude parameters; an exact definition ID selects full details.
+
+`light_patch/definitions.py` owns definition-only batches and validated native
+imports. It reuses the archive planner and document transaction, with a separate
+`lightDefinitions` token family and catalogue fingerprint dependencies rechecked
+before Close. Public patch batches contain instruments/groups only. Native
+channel positions and extended RGB outputs are retained; unsupported variants
+remain visible but blocked. Libraries are never written.
+
+### Light cue curves
+
+`light_patch/curves.py` plans bounded, exact-UUID edits against active cue-list
+containment. Changed Fade/shape branches and point chains use copy-on-write;
+non-containment cue references do not make residual objects active. The separate
+public tool shares the document transaction but has its own token family and a
+saved-archive postcondition checked before replacement and after reopening.
+OSC-visible patch verification remains separate from curve verification.

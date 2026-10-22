@@ -202,6 +202,26 @@ def test_disk_race_after_close_does_not_replace_newer_file(state, monkeypatch):
     assert 'open' not in state.calls
 
 
+def test_pending_save_before_replacement_preserves_newer_bytes_and_recovery(state, monkeypatch):
+    token = edit(state)['confirm_token']
+    newer = json.dumps({'workspace_id': WS, 'patch': {'name': 'autosaved'}}).encode()
+    journal = tx._journal
+
+    def save_pending_bytes(directory, record):
+        journal(directory, record)
+        if record['phase'] == 'replacement_pending':
+            state.path.write_bytes(newer)
+
+    monkeypatch.setattr(tx, '_journal', save_pending_bytes)
+    result = edit(state, False, token)
+
+    assert not result['ok'] and not result['file_replaced']
+    assert state.path.read_bytes() == newer
+    assert state.calls == ['close']
+    recovery = tx._recovery_path(state.path)
+    assert (recovery / 'original.qlab5').read_bytes() == state.source
+
+
 def test_live_readback_mismatch_retains_replaced_file_and_recovery(state):
     token = edit(state)['confirm_token']
     reopen = tx._reopen

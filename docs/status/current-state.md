@@ -1,8 +1,33 @@
-# Current Project State — 2026-10-22
+# Current Project State — 2026-10-25
+
+## Video Settings authoring — PR #19
+
+Four editors now support local saved-archive batches: stage/region, route,
+configured NDI/Syphon device and local/OBS input patch. Stage and route tools
+retain their original single OSC operation form; region OSC edits remain.
+The shared transaction binds the running installation, document, file and
+external dependencies, retains recovery, and closes/reopens only the target.
+Dirty documents require an explicit Save and new preview; dependent deletions
+are blocked. Initial compatibility remains QLab 5.5.10/build 5510.
+
+See [workflow](../user/agent-workflows.md#author-video-settings). Native acceptance
+and limitations are recorded in the [October 25 report](../development/runtime-validation/2026-10-25-video-authoring.md), separately from physical output.
+Source verification: **2,268 passed, 35 skipped, 61 subtests passed**; FastMCP
+inspection exposes 87 tools. The PR remains in draft for review and final
+attached-process acceptance after restart.
+
+## Passive video inventories — PR #19
+
+Two new read-only tools inspect output devices and input patches, alongside the
+extended exact route reader. Local CoreGraphics screens and AVFoundation
+source/format metadata remain distinct from OSC observations and saved virtual
+devices. No capture session, permission request, device activation or network
+finder is created. Coverage is partial for the QLab process registry and network
+sources. Saved configuration remains version-gated to 5.5.10/build 5510.
 
 ## Lighting authoring implementation — PR #19
 
-Current source exposes **83 tools: 50 reads and 33 gated writes**.
+Current source exposes **87 tools: 52 reads and 35 gated writes**.
 `qlab_edit_light_cue_curves` adds separate saved-file ascending/descending curve
 edits with source-bound confirmations, recovery and saved-archive postconditions.
 Custom, S-Curve, Parametric and Linear were accepted on two new disarmed cues in

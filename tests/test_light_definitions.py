@@ -9,7 +9,8 @@ from types import SimpleNamespace
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from qlab_mcp.light_patch import catalogue as cat, definitions as defs, transaction as tx
+from qlab_mcp.light_patch import catalogue as cat, definitions as defs
+from qlab_mcp import workspace_archive as tx
 from qlab_mcp.light_patch.archive import Patch, plan_patch
 from qlab_mcp.light_patch.inspection import inspect_saved_patch
 from qlab_mcp.light_patch.models import DefinitionOperations, LightPatchOperations
@@ -83,6 +84,27 @@ def test_source_identity_filters_pages_and_exact_detail(catalogues):
     assert record['importable'] and record['dmx_footprint'] == 6
     assert next(p for p in record['parameters'] if p['channel'] == -2)['outputs']['warmwhite'] == 'warm white'
     assert record['mode'] is None
+
+
+def test_bundled_catalogue_reuses_parsed_records_until_file_changes(catalogues, monkeypatch):
+    bundled = catalogues[0]
+    bundled.write_bytes(library({'cache.qlablight': native('Cache First')}))
+    calls = []
+    original = cat._record
+
+    def record(*args):
+        calls.append(args)
+        return original(*args)
+
+    monkeypatch.setattr(cat, '_record', record)
+    first, _ = cat.load_catalogue('bundled')
+    second, _ = cat.load_catalogue('bundled')
+    assert first == second and len(calls) == 1
+    assert first[0] is not second[0]
+
+    bundled.write_bytes(library({'cache.qlablight': native('Cache Second')}))
+    changed, _ = cat.load_catalogue('bundled')
+    assert changed[0]['name'] == 'Cache Second' and len(calls) == 2
 
 
 def test_invalid_record_degrades_without_discarding_good_source(catalogues):

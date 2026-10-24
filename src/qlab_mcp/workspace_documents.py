@@ -29,9 +29,10 @@ on canonicalPath(rawPath)
  set p to current application's NSString's stringWithString:rawPath
  return (p's stringByStandardizingPath()'s stringByResolvingSymlinksInPath()) as text
 end canonicalPath
-on inventory()
+on inventory(applicationPath)
  set rows to current application's NSMutableArray's array()
- tell application "/Applications/QLab.app"
+ using terms from application "/Applications/QLab.app"
+ tell application applicationPath
   repeat with w in every workspace
    set workspaceRecord to current application's NSMutableDictionary's dictionary()
    workspaceRecord's setObject:(unique id of w) forKey:"workspace_id"
@@ -50,6 +51,7 @@ on inventory()
    rows's addObject:workspaceRecord
   end repeat
  end tell
+ end using terms from
  return rows
 end inventory
 on run argv
@@ -63,14 +65,31 @@ on run argv
   set appCount to apps's |count|() as integer
   if appCount is 0 then error "No QLab instance is running."
   if appCount is greater than 1 then error "Multiple QLab instances are running."
-  if (((apps's firstObject())'s bundleURL()'s |path|()) as text) is not "/Applications/QLab.app" then error "The running QLab must be /Applications/QLab.app."
-  if actionName is "inventory" then
-   output's setObject:(my inventory()) forKey:"documents"
+  set runningPath to (((apps's firstObject())'s bundleURL()'s |path|()) as text)
+  set bundle to current application's NSBundle's bundleWithPath:runningPath
+  set appInfo to bundle's infoDictionary()
+  set appIdentity to current application's NSMutableDictionary's dictionary()
+  appIdentity's setObject:runningPath forKey:"path"
+  appIdentity's setObject:((apps's firstObject())'s processIdentifier()) forKey:"pid"
+  repeat with infoKey in {"CFBundleIdentifier", "CFBundleShortVersionString", "CFBundleVersion"}
+   appIdentity's setObject:(appInfo's objectForKey:infoKey) forKey:infoKey
+  end repeat
+  if ((appInfo's objectForKey:"CFBundleIdentifier") as text) is not "com.figure53.QLab.5" then error "Unexpected QLab bundle identity."
+  output's setObject:appIdentity forKey:"application"
+  if actionName is not "read_inventory" and actionName is not "inventory" then
+   if ((appInfo's objectForKey:"CFBundleShortVersionString") as text) is not "5.5.10" or ((appInfo's objectForKey:"CFBundleVersion") as text) is not "5510" then error "Native writes require QLab 5.5.10/build 5510."
+   set expectedApp to payload's objectForKey:"expected_application"
+   if expectedApp is missing value then error "Expected application identity is required."
+   if not (appIdentity's isEqualToDictionary:expectedApp) then error "Running QLab identity changed."
+  end if
+  if actionName is "inventory" or actionName is "read_inventory" then
+   output's setObject:(my inventory(runningPath)) forKey:"documents"
   else
    set targetPath to my canonicalPath((payload's objectForKey:"path") as text)
-   tell application "/Applications/QLab.app"
+   using terms from application "/Applications/QLab.app"
+   tell application runningPath
     if actionName is "open" then
-     set currentRows to my inventory()
+     set currentRows to my inventory(runningPath)
      if (currentRows's |count|() as integer) is not 0 then error "Opening requires all existing workspaces to be closed."
      set expectedRows to payload's objectForKey:"expected_inventory"
      if not (currentRows's isEqualToArray:expectedRows) then error "Open workspace inventory changed."
@@ -84,7 +103,7 @@ on run argv
      set matches to every workspace whose unique id is wsid
      if (count of matches) is not 1 then error "Workspace UUID must resolve exactly once."
      set w to item 1 of matches
-     set currentRows to my inventory()
+     set currentRows to my inventory(runningPath)
      set pathMatches to 0
      repeat with existingRow in currentRows
       if targetPath is not "" and ((existingRow's objectForKey:"path") as text) is targetPath then set pathMatches to pathMatches + 1
@@ -108,6 +127,7 @@ on run argv
      error "Unsupported document action."
     end if
    end tell
+   end using terms from
   end if
  on error messageText number errorNumber
   output's setObject:messageText forKey:"error"
@@ -133,7 +153,7 @@ def _local(reader: Any) -> None:
 
 def _native_request(reader: Any, action: str = "inventory", **payload: Any) -> dict:
     _local(reader)
-    if action not in {"inventory", "save", "close", "open"}:
+    if action not in {"inventory", "read_inventory", "save", "close", "open"}:
         raise ValueError("Unsupported document action.")
     timeout = reader.client.config.timeout
     if type(timeout) not in {int, float} or not math.isfinite(timeout) or timeout <= 0:
@@ -149,9 +169,9 @@ def _native_request(reader: Any, action: str = "inventory", **payload: Any) -> d
     return response
 
 
-def _inventory(reader: Any) -> dict:
+def _inventory(reader: Any, *, running_bundle: bool = False) -> dict:
     _local(reader)
-    response = _native_request(reader)
+    response = _native_request(reader, "read_inventory") if running_bundle else _native_request(reader)
     if response.get("error") or not isinstance(response.get("documents"), list):
         raise ValueError(response.get("error") or "Native document inventory is unavailable.")
     documents = []
@@ -170,7 +190,15 @@ def _inventory(reader: Any) -> dict:
             raise ValueError("Native active cue inventory is unavailable.")
         row["active_cue_ids"] = [_uuid(uid) for uid in row["active_cue_ids"]]
         documents.append(row)
-    return {"documents": documents}
+    result = {"documents": documents}
+    if "application" in response:
+        app = response["application"]
+        if (not isinstance(app, dict) or app.get("CFBundleIdentifier") != "com.figure53.QLab.5"
+                or not isinstance(app.get("path"), str) or not Path(app["path"]).is_absolute()
+                or type(app.get("pid")) is not int or app["pid"] <= 0):
+            raise ValueError("Invalid running QLab identity.")
+        result["application"] = app
+    return result
 
 
 def _document(inventory: dict, ws: str) -> dict:
@@ -276,7 +304,7 @@ def _existing(reader: Any, workspace_id: str, action: str, dry_run: bool, confir
             raise ValueError("Workspace must be inactive and in Edit Mode.")
         if action == "close" and row["modified"]:
             raise ValueError("Closing unsaved changes is forbidden; save explicitly first.")
-        baseline = {"document": row}
+        baseline = {"document": row, "application": inventory.get("application")}
         if action == "save":
             baseline["fingerprint"] = _fingerprint(_path(row["path"]))
         operation = {"action": action, "workspace_id": ws, "path": row["path"], "transport": "applescript"}
@@ -313,7 +341,7 @@ def open_workspace(reader: Any, path: str, dry_run: bool = True, confirm_token: 
         rows = inventory["documents"]
         if rows:
             raise ValueError("Opening requires all existing workspaces to be closed; file UUID cannot be verified before open.")
-        baseline = {"path": str(target), "fingerprint": _fingerprint(target), "inventory": rows}
+        baseline = {"path": str(target), "fingerprint": _fingerprint(target), "inventory": rows, "application": inventory.get("application")}
         operation = {"action": "open", "path": str(target), "transport": "applescript"}
         plan = _result(True, "planned", planned_operations=[operation], path=str(target), readback=inventory)
         if dry_run:
@@ -339,7 +367,7 @@ def _execute(reader: Any, action: str, operation: dict, plan: dict, baseline: di
     received_response = False
     timed_out = False
     try:
-        response = _native_request(reader, action, **payload)
+        response = _native_request(reader, action, expected_application=baseline.get("application"), **payload)
         received_response = True
         if isinstance(response, dict):
             if response.get("sent") is False:
@@ -361,6 +389,8 @@ def _execute(reader: Any, action: str, operation: dict, plan: dict, baseline: di
     try:
         inventory = _inventory(reader)
         result["readback"] = inventory
+        if inventory.get("application") != baseline.get("application"):
+            raise ValueError("Running QLab identity changed during the operation.")
         if action == "close":
             confirmed = not any(row["workspace_id"] == payload["workspace_id"] or
                 (payload["path"] and row["path"] == payload["path"]) for row in inventory["documents"])

@@ -134,7 +134,8 @@ def _validate_workspace_setting_payload(command: str, data: Any) -> bool:
         return isinstance(data, list) and all(isinstance(item, dict) for item in data)
     if command == "general/minGoTime":
         return _valid_setting_number(data, nonnegative=True)
-    if command == "general/selectionIsPlayhead" or command.endswith("/enableGuides"):
+    if (command == "general/selectionIsPlayhead" or command.endswith("/enableGuides")
+            or (command.startswith("video/stageID/") and command.endswith(("/enableGrid", "/enableGuide")))):
         return isinstance(data, bool)
     if command in {"audio/maxVolume", "audio/minVolume"}:
         return _valid_setting_number(data)

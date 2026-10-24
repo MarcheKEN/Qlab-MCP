@@ -212,6 +212,29 @@ Configured device identities are not hardware detection. Results are bounded
 to 1,000 records per section and 2 MiB serialized JSON; truncation and subsequent
 requests are explicit, including for technical payloads.
 
+### Saved Video Settings
+
+`qlab_get_workspace_video_settings` combines documented OSC reads with a
+read-only inspection of the requested local workspace's saved `.qlab5` video
+configuration. The saved view is version-gated to QLab 5.5.10/build 5510 and
+is returned with its source and coverage status. It may include nested stages,
+regions, meshes, masks, routes, input patches, and configured destination
+descriptors. Shared objects are represented by identifiers rather than
+duplicated records. Archive traversal and serialized responses are bounded to
+1,000 records per section and 2 MiB; truncation must be explicit and provide
+continuation requests.
+
+Unsaved document changes do not cause a save: OSC state and last-saved archive
+state remain distinct, and comparisons are limited to properties exposed by
+both sources. If document or file identity changes during reading, saved
+enrichment is discarded as inconsistent. Remote QLab, missing Automation
+access, absent saved paths, and unsupported versions retain any available OSC
+result with reduced coverage. This read does not close or reopen the document,
+activate devices, capture video, or modify workspace bytes. Configured
+destinations are not proof that a device is present, that capture/rendering
+works, or that physical video output is active; this tool exposes no independent
+detected-device inventory.
+
 `qlab_edit_light_patch` requires local QLab 5.5.10/build 5510, existing-workspace
 write readiness, a clean inactive document in Edit Mode, disabled start-on-open/
 start-on-close settings, and a five-minute,
@@ -544,3 +567,81 @@ of all candidates for referenced numbers. Rechecks detect source edits and new
 number collisions. A batch cannot edit source text/numbers or introduce a number
 collision while another item depends on that resolution. Failed previews emit
 no setter tokens. The analysis identifies dependencies, not resulting DMX levels.
+
+Video mask aliases expose known saved paths and bookmark presence, never raw
+bookmark bytes. Route-to-virtual-device name/type matches are candidate
+associations, not proof of identity or ownership. Oversized saved stages retain
+a bounded header where possible and identify the exact stage reader. That
+reader pages saved geometry under its own hash guard; compare hashes between
+the overview and detail rather than assuming they are the same snapshot.
+
+Exact Video stage and route reads also expose the corresponding saved object.
+Stage geometry pages use JSON paths and a saved-file SHA-256 continuation guard.
+Dirty documents require an explicitly reviewed Save before relying on a fresh
+archive baseline; the reader never saves. Oversized live geometry is reported
+as omitted, and cannot be treated as the same snapshot as saved geometry.
+
+
+Stage inspection supplements the saved snapshot with bounded current grid/guide
+queries (at most sixteen root regions/shared routes and an eight-second scheduling
+budget; an in-flight OSC transaction retains its configured timeout). These reads
+are not an atomic snapshot. Missing visibility remains null and coverage partial.
+Stage-centered coordinates and readable warp labels retain their source and raw
+values; unknown codes are reported. No reader saves pending changes. UI selection,
+monitor pixels and physical-device availability are not inferred from this data.
+
+### Passive local video metadata
+
+`qlab_get_video_output_devices` and `qlab_get_video_input_patches` add bounded,
+fixed metadata getters for local QLab only. CoreGraphics enumerates online
+screens and current display modes. AVFoundation enumerates device descriptors,
+format descriptions, frame-rate ranges, connected/suspended/in-use flags and
+the observed device format. This format is not attributed to QLab and does not
+prove capture, even when present. Missing getters remain unknown with reasons.
+CoreGraphics active/asleep/mirrored flags describe macOS only. These getters
+never create a capture input or
+session, locks/configures a device, requests camera access or reads frames.
+Metadata can be available with camera authorization not determined. Device
+providers are operated by macOS; the tool does not initialize QLab capture
+coordinators, NDI finders, Syphon scans or Blackmagic capture backends.
+
+The fixed native helper runs in an isolated Python subprocess with a ten-second
+timeout, output/record bounds and no shell/user-provided code. Native failures
+are not retried through an activating fallback. Local metadata, OSC destination
+observations and saved virtual devices remain distinct; matching names never
+establish identity. A saved screen reference also requires its vendor/model/
+serial tuple. Current session display IDs are not persistent hardware UUIDs.
+Supported camera formats and saved mode configuration do not prove effective
+capture, connectivity or physical output. The complete QLab device registry is
+explicitly outside coverage. Read results may expose device names/identifiers,
+saved mode settings and configured source metadata; no credentials are requested.
+
+A saved-file/document change around native inspection discards the saved
+augmentation. Independent source failures preserve other observations. Every
+serialized response remains within 2 MiB, with at most 1,000 returned records
+per section and explicit native-source caps. Inventory pages carry a content
+snapshot ID; callers must restart if it changes between pages. These readers
+never perform document lifecycle actions or setters, and do not require write
+mode. Their OSC readers and saved decoding are independent of editor tokens.
+
+### Video archive authoring
+
+The four video editors share the signed archive transaction with lighting.
+Archive batches require a local clean inactive document in Edit Mode, exact
+UUID, QLab 5.5.10/build 5510, stable file, and a five-minute single-use token.
+Identity includes the unique running application path, bundle/version/build and
+process; a second instance or installation change blocks the transaction.
+Native document Open remains empty-inventory-only; the internal guarded reopen
+preserves other documents. Workspace open/close cue hooks must be disabled.
+
+Video plans preserve unknown objects and shared references; destructive batches
+block removal of used stages, routes, virtual devices and input patches.
+Virtual device refs bind archive hash and object identity, not workspace-level
+`virtualID`. Physical assignments bind hardware metadata. Camera mode/source and
+mask dependencies are rechecked before close; mask bookmark creation reads a
+bounded local file. No global device preferences are modified.
+
+Reopening configured NDI/Syphon or camera patches can initialize QLab backends.
+The MCP does not request capture, receivers, emitters, Monitor, Show or playback.
+Zero active cues does not prove zero device activity. Saved-only properties and
+OSC-verified properties are labelled separately; neither proves physical signal.

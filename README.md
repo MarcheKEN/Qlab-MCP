@@ -11,7 +11,7 @@ guarded close, replace and reopen workflow.
 **Developed and tested with QLab 5.5.10 on macOS.** Other QLab versions may
 behave differently and have not been validated by this project.
 
-The server provides **83 tools: 50 read-only and 33 gated writes**.
+The server provides **87 tools: 52 read-only and 35 gated writes**.
 Writes are disabled by default and require a reviewed preview and confirmation.
 
 [Capabilities](#capabilities) · [Installation](#installation) ·
@@ -217,9 +217,10 @@ Before a real existing-workspace change, the agent must:
 3. Request `dry_run=true` and review the plan, changes and warnings.
 4. Submit the returned fresh confirmation token(s), execute once and read back.
 
-Batches are sequential and non-atomic. Do not retry an uncertain mutation;
-there is no automatic rollback. Keep Audition disabled. Document Open uses a
-separate empty-inventory preflight; Save includes all unsaved edits, and Close
+Batches of OSC cue edits are sequential and non-atomic. The local Light Patch,
+definition and curve editors use a guarded file replacement instead. Do not
+retry an uncertain mutation automatically. Keep Audition disabled. Document
+Open uses a separate empty-inventory preflight; Save includes all unsaved edits, and Close
 refuses dirty documents. See [write workflows](docs/user/agent-workflows.md#common-write-gate).
 
 File search, analysis and assignment require conversational consent for the
@@ -364,7 +365,7 @@ saved state and do not execute cues.
 | --- | --- |
 | `qlab_get_workspace_general_settings` | Read minimum GO time and selection/playhead lock. |
 | `qlab_get_workspace_audio_settings` | Read Audio patches and an optional selected matrix level. |
-| `qlab_get_workspace_video_settings` | List Video inputs, stages and output routes. |
+| `qlab_get_workspace_video_settings` | Read live OSC inventory and saved stages, meshes, masks, routes, input patches and configured destinations, with source status and pagination. |
 | `qlab_get_workspace_light_settings` | Read current OSC data plus saved local patch addresses, outputs, groups and workspace definitions; large results expose follow-up pages. |
 | `qlab_edit_light_patch` | Preview or apply a batch to the saved local Light Patch; close, replace and reopen the same workspace. |
 | `qlab_get_light_definitions` | Browse bundled, personal and saved-workspace definitions; filter the catalogue or select exact channel/virtual-control detail. |
@@ -372,12 +373,16 @@ saved state and do not execute cues.
 | `qlab_get_workspace_midi_settings` | Read MIDI patches or one exact patch. |
 | `qlab_get_workspace_network_settings` | Read Network patches or one exact patch. |
 | `qlab_get_video_stage` | Read one stage and its regions. |
-| `qlab_get_video_output_route` | Read one output route and its destination. |
+| `qlab_get_video_output_route` | Read one route, scaling/layout and saved stage/region references. |
+| `qlab_get_video_output_devices` | Read passive local displays, route destinations and saved NDI/Syphon devices. |
+| `qlab_get_video_input_patches` | Read input patches, saved modes and passive local camera formats. |
 | `qlab_get_video_region` | Read one region and an optional control point. |
 | `qlab_edit_workspace_general_settings` | Edit minimum GO time or selection/playhead lock. |
 | `qlab_edit_audio_output_patch` | Edit patch name, cue outputs, levels or mute/solo settings. |
-| `qlab_edit_video_stage` | Rename an existing stage. |
-| `qlab_edit_video_output_route` | Change an output route’s guide visibility. |
+| `qlab_edit_video_stage` | Create, edit and delete stages, regions, masks, resize and warping in one guarded batch; legacy OSC rename remains available. |
+| `qlab_edit_video_output_route` | Create, edit and delete routes, device assignment, dimensions, rotation, scaling and partial output; legacy OSC guides remain available. |
+| `qlab_edit_video_output_devices` | Manage configured NDI/Syphon devices and update their associated routes. |
+| `qlab_edit_video_input_patches` | Create, edit, order and delete input patches; assign local/OBS sources and Auto or explicit modes. |
 | `qlab_edit_video_region` | Edit supported region geometry, grid, guide or control point. |
 
 </details>

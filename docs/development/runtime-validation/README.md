@@ -9,6 +9,8 @@ Use the [current tool catalogue](../../user/tools.md) and
 
 ## Records
 
+- [Passive video inventories — 2026-10-24](2026-10-24-passive-video-inventories.md)
+
 - [Light Patch authoring — 2026-10-20](2026-10-20-light-patch-authoring.md)
 - [Installed MCP acceptance — 2026-10-17](2026-10-17-installed-mcp-acceptance.md)
 - [Empty Group Delete — QLab MCP 0.3.0](empty-group-delete-2026-08-13.md)
@@ -43,3 +45,6 @@ Use the [current tool catalogue](../../user/tools.md) and
 - [Delete cues runtime validation — 2026-09-26](2026-09-26-delete-cues.md)
 - [Workspace Settings `minGoTime` Runtime Validation](2026-08-15-workspace-settings-min-go-time-live.md)
 - [QLab MCP 0.3.0 live validation report](2026-08-13-qlab-mcp-0-3-0-live.md)
+
+- [Video Settings authoring — October 25](2026-10-25-video-authoring.md): typed
+  four-domain batches, same-path native acceptance, preservation and registry limits.

@@ -1,6 +1,6 @@
 # Public MCP Tools
 
-QLab MCP exposes exactly 83 tools on the current development branch: 50 reads and 33 gated writes. This page is a compact human
+QLab MCP exposes exactly 87 tools on the current development branch: 52 reads and 35 gated writes. This page is a compact human
 catalogue; decorated functions, generated schemas, and
 `tests/test_server_tools.py` remain the source of truth for exact parameters,
 annotations, and result models.
@@ -42,9 +42,11 @@ annotations, and result models.
 | `qlab_get_workspace_status` | Derived cue warnings, known Video Settings problems, and timecode context | A complete QLab Status-window warning total | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_workspace_general_settings` | Minimum GO time and selection/playhead lock | The complete General panel | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_workspace_audio_settings` | Audio overview or exact output/input patch, including exact `name_property`; optional Main/input/output/crosspoint level | Audio Maps or full-matrix scans | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_workspace_video_settings` | Compact Video inputs, routes, and stages | Exact object detail | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_video_stage` | Exact stage UUID and its regions, safe or technical | Stage mutation or name selection | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_video_output_route` | Exact output route UUID and destination, safe or technical | Independent device inventory or mutation | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_video_settings` | OSC overview plus saved local Video configuration: stages, regions, routes, inputs, and configured destinations; paged | Detected-device inventory, live capture, or proof of physical output | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_video_stage` | Exact stage: current OSC, saved geometry, readable coordinates and bounded grid/guide inspection | Stage mutation or name selection | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_video_output_route` | Exact route, current/saved scaling and partial layout, saved stage/region references | Device inventory, mutation or rendered output proof | [Video inventories](agent-workflows.md#passive-video-inventories) |
+| `qlab_get_video_output_devices` | Passive CoreGraphics displays and active/asleep/mirrored state, OSC destination observations and saved virtual devices; optional exact ref | Complete QLab registry, discovery or device activation | [Video inventories](agent-workflows.md#passive-video-inventories) |
+| `qlab_get_video_input_patches` | Input patches, saved source/mode, passive AVFoundation state, observed format and supported formats; optional exact patch UUID | Capture, permission requests, network discovery or effective capture format | [Video inventories](agent-workflows.md#passive-video-inventories) |
 | `qlab_get_video_region` | Exact OSC bounds, grid/guide and optional one control point | Full point scan or UI-coordinate conversion | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_workspace_light_settings` | Current OSC patch plus saved local instruments, groups, outputs and workspace definitions | Global Light Library, Dashboard MIDI or hardware detection | [Light Patch read](agent-workflows.md#read-the-light-patch) |
 | `qlab_get_light_definitions` | Paged bundled/personal/workspace catalogue and exact native parameter details | Global library writes or physical fixture detection | [Definitions](agent-workflows.md#light-definitions) |
@@ -84,8 +86,10 @@ annotations, and result models.
 | `qlab_save_workspace` | Save an exact inactive workspace at its existing path | Save As, selective save, or recovery of earlier contents | [Workspace documents](agent-workflows.md#workspace-documents) |
 | `qlab_close_workspace` | Close an exact inactive, clean workspace | Discarding unsaved edits or implicit save | [Workspace documents](agent-workflows.md#workspace-documents) |
 | `qlab_edit_audio_output_patch` | Patch name, cue output count, one Main/input/output/crosspoint level, mute/solo, or clear | Audio Maps and full matrix scans | [Workspace settings](agent-workflows.md#edit-workspace-settings) |
-| `qlab_edit_video_output_route` | Route guide visibility | Other route properties | [Workspace settings](agent-workflows.md#edit-workspace-settings) |
-| `qlab_edit_video_stage` | Stage name | Stage geometry | [Workspace settings](agent-workflows.md#edit-workspace-settings) |
+| `qlab_edit_video_output_route` | Batched route CRUD, device, dimensions, rotation, scaling and tiles; legacy OSC guides | Physical signal validation | [Video authoring](agent-workflows.md#author-video-settings) |
+| `qlab_edit_video_output_devices` | Batched NDI/Syphon configuration and associated-route updates | Physical display creation or macOS settings | [Video authoring](agent-workflows.md#author-video-settings) |
+| `qlab_edit_video_input_patches` | Batched patch CRUD/order, local/OBS source assignment and validated modes | Capture or new network/Blackmagic sources | [Video authoring](agent-workflows.md#author-video-settings) |
+| `qlab_edit_video_stage` | Batched stage/region CRUD, mask, resize, edge blend, warp and mesh; legacy OSC rename | Editor zoom/selection, Monitor or playback | [Video authoring](agent-workflows.md#author-video-settings) |
 | `qlab_edit_video_region` | Region geometry, one control point, grid/guide | UI coordinates or point scans | [Workspace settings](agent-workflows.md#edit-workspace-settings) |
 | `qlab_move_cue_lists` | Reorder 1–50 root Cue Lists/Carts | Moving Cart cells, cross-workspace moves or root deletion | [Root Move](agent-workflows.md#move-cue-lists-and-carts) |
 | `qlab_move_cues` | Sequential structural moves, 1–50 UUID targets | Playback or unproven Cart writes | [Move](agent-workflows.md#move-existing-cues) |

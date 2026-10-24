@@ -1,8 +1,8 @@
-# Roadmap — 2026-10-22
+# Roadmap — 2026-10-24
 
 ## Current contract
 
-QLab MCP **0.4.0** exposes 83 tools: 50 reads and 33 gated writes. The [tool catalogue](../user/tools.md)
+QLab MCP **0.4.0** exposes 87 tools: 52 reads and 35 gated writes. The [tool catalogue](../user/tools.md)
 and generated schemas define their arguments; [architecture](../development/architecture.md)
 describes implementation. Generic `qlab_edit_cues` and `qlab_edit_workspace_settings`
 are retired. Use the typed cue-family and scoped workspace-settings editors.
@@ -11,8 +11,9 @@ Family editors share signed `confirm:controlCue:v1:` confirmations, exact UUIDs,
 whole-batch preflight, sequential setters and fresh readback. They accept 1–50
 unique cues and supported multiple properties; individual operations impose
 additional restrictions. No automatic mutation retry or rollback is provided.
-Workspace-settings editors use `confirm:workspaceSettings:v1:` and one operation
-per request. Native document operations have a separate token and preflight.
+Legacy workspace-settings setters use `confirm:workspaceSettings:v1:` and one
+operation per request. Video archive editors additionally accept typed batches
+with their own domain-bound confirmation. Native document operations have a separate token and preflight.
 
 The [October 17 installed-MCP pass](../development/runtime-validation/2026-10-17-installed-mcp-acceptance.md)
 invoked the then-current 79 tools and exercised real writes through 26 of the 30 writers.

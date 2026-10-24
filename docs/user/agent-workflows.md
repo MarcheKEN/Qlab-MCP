@@ -157,7 +157,7 @@ Load and Target cue properties. Local imported OSC copy:
 | Read derived cue warnings, known Video Settings problems, and timecode context | `qlab_get_workspace_status` | A complete QLab Workspace Status clone |
 | Read documented General settings | `qlab_get_workspace_general_settings` | The complete General panel |
 | Read Audio settings or one exact output/input patch | `qlab_get_workspace_audio_settings` | Audio Maps or patch mutation |
-| Inventory Video inputs, stages, and output routes | `qlab_get_workspace_video_settings` | Exact object detail |
+| Read Video inputs, stages, output routes, and saved configuration | `qlab_get_workspace_video_settings` | Detected-device inventory, capture, or proof of physical output |
 | Inspect one stage and its regions by UUID | `qlab_get_video_stage` | Name selection or mutation |
 | Inspect one output route and destination by UUID | `qlab_get_video_output_route` | Independent device inventory or mutation |
 | Read the Light Patch and saved workspace definitions | `qlab_get_workspace_light_settings` | Global Light Library or Dashboard MIDI |
@@ -200,12 +200,51 @@ the complete matrix. `(0, 0)` reads Main; `(input, 0)` reads input gain,
 `(0, output)` reads output gain, and two positive channels read a crosspoint.
 Known patch capacity further constrains channels.
 Network and MIDI accept an optional exact `ref`.
-For Video, call `qlab_get_workspace_video_settings(workspace_id)` first, then
-pass a returned UUID as `stage_id` to `qlab_get_video_stage` or as `route_id` to
-`qlab_get_video_output_route`. Both exact tools default to `profile="safe"`;
-use `technical` for the redacted raw payload. The overview has no profile,
-view, or ref parameter. Video input patches expose only name and UUID, and
-device information is limited to destinations assigned to output routes.
+For Video, call `qlab_get_workspace_video_settings(workspace_id)` first. Its
+default `section="all"` response combines the current OSC overview with
+`saved_video`, the last-saved local `.qlab5` configuration. The saved view
+covers stages and their dimensions/layers, viewports and masks, regions and
+their geometry/warping/meshes/points/edge blends, output routes and their
+configuration, input patches, and configured destination descriptors. Shared
+objects are referenced by identifier. Configured destinations describe saved
+workspace assignments; they are not an inventory of currently detected devices.
+
+OSC input patches expose only names and UUIDs. OSC provides no independent
+device inventory. With unsaved changes, current OSC and saved-file data remain
+separate, so the saved view may be stale. Saved enrichment is supported for
+local QLab **5.5.10/build 5510** when Automation access and a readable saved
+path are available. Otherwise, use the available OSC result and its coverage
+status. The tool is read-only and never saves, closes, or reopens the document.
+
+The default section is `all`; optional `section` values are `stages`, `routes`,
+`inputs`, and `destinations`. Use `offset` and `limit` to page a section; the
+limit is at most 1,000 records and each response is bounded to 2 MiB of JSON,
+including inherited fields. Check counts, truncation, and the returned
+continuation requests before treating an inventory as complete. Follow the
+returned arguments exactly. Regions and viewports accompany their stage; use
+`qlab_get_video_stage` for exact stage detail when a nested stage is too large.
+Both exact stage and route readers retain current OSC fields and add their
+last-saved object under `data.saved_video`, with file hash and dirty state.
+Stage `offset`/`limit` page `geometry_entries`: each entry has a `path` of
+object keys/array indices rooted at the stage and its exact `value`. Empty
+objects and arrays are explicit entries. The stage header retains its viewport;
+paths preserve region and nested mesh hierarchy without repeating shared routes.
+Follow `pagination.next_requests` including `expected_sha256`; a changed file
+returns `changed_between_pages` and requires restarting at offset zero. A single
+value too large to fit is an explicit `response_too_large` failure.
+If live OSC geometry exceeds the response cap it is explicitly omitted, rather
+than confused with the saved geometry pages. Route details remain bounded to
+2 MiB and return an explicit error if the saved route cannot fit.
+
+When `saved_video.preparation.status` is `needs_save`, review and confirm
+`qlab_save_workspace` using the established readiness/preview/token workflow,
+then query again before planning edits that depend on the saved configuration.
+Saving includes **all** unsaved workspace edits. Reads never save automatically.
+Route `destination_candidates` are name/type matches, not verified device UUID
+associations; `destination_match` makes that uncertainty explicit.
+`qlab_get_video_stage` and `qlab_get_video_output_route` default to
+`profile="safe"`; use `technical` for their redacted raw OSC payload.
+None of these reads proves capture, rendering, or physical video output.
 Prefer the default profile of each tool; use technical or exhaustive reads only
 when justified. Workspace Status uses `summary` or `technical`, not `safe`.
 
@@ -627,8 +666,9 @@ accompany each page. `technical` and `exhaustive` retain a redacted OSC
 ## Edit the Light Patch
 
 Use the [Light Patch read](#read-the-light-patch) to orient the patch, then
-`qlab_edit_light_patch` to preview and apply one complete batch. This edits
-instruments, light groups and workspace Light Definitions, not Light cues.
+`qlab_edit_light_patch` to preview and apply one complete batch of instruments
+and light groups. Edit workspace Light Definitions separately with
+`qlab_edit_light_definitions`; neither tool edits Light cues.
 It requires local QLab **5.5.10/build 5510**, write readiness and a clean inactive
 document in Edit Mode, with start-on-open and start-on-close disabled. The saved file must be an owned, single-link regular
 `.qlab5` bounded to 64 MiB; packages and unsupported archive forms are rejected.
@@ -1539,3 +1579,210 @@ Neither successful import nor saved output configuration proves physical DMX.
 Workflow: catalogue → exact detail → import/create definitions → edit instruments
 and groups → edit Light cues → fresh reads. **Breaking change:** definition CRUD
 was removed from `qlab_edit_light_patch`; old mixed batches must be split.
+
+
+### Stage inspection coverage
+
+`qlab_get_video_stage.data.inspection` describes live OSC and saved-file provenance,
+non-atomic reads, save readiness, unknown fields, and absent visual/device data.
+It adds Perspective/Linear/Bézier labels without replacing raw warp codes. Unknown
+codes remain `unknown`. `ui_coordinates` uses the stage center as its origin, in
+pixels, for lower-left/upper-right positions and size; the original bounds remain.
+Saved coordinates stay under `saved_video`; `inspection.geometry` describes OSC
+regions, without merging the sources. Dirty saved data remains potentially stale.
+
+Grid/guide visibility is queried for up to sixteen current root regions and their
+shared routes, reading each route only once. Missing flags are null, never false.
+`inspection.visibility` reports partial reads and exact `qlab_get_video_region`
+requests for remaining regions; use route detail requests for complete route data.
+Geometry pagination remains separate and must also be completed. A ready saved
+baseline does not establish complete UI coverage or availability of a physical
+output. Canvas selection/zoom and resize-dialog choices are UI state; monitor pixels,
+mask image contents and complete live device discovery are outside this result.
+
+Saved stage geometry includes `warping_center` for each region. It is a derived
+coordinate in pixels relative to the output route center, using saved control
+points and saved route dimensions. `value` retains fractional pixels (the UI
+may round them). Only rectangular, unsplit Linear/Perspective regions without
+shadow controls are supported; other shapes or missing route dimensions return
+`status: unavailable`, `value: null`, and a reason. This is not a validated
+functional-center calculation for deformed or Bézier regions. Follow all saved
+geometry pages and check document freshness before using this value.
+
+Exact saved stage reads also include the routes referenced by that stage's
+regions and nested mesh regions, once per route UUID in `saved_video.routes`.
+Routes include `guideline_mode` plus `guideline_grid` (width, height and label)
+for the validated QLab 5.5.10 menu tags 0–15. Unknown tags retain their raw value
+and have a null grid. Saved viewport layer 1000 has `layer_label: top`; other
+layer values retain their numeric value without an unverified label.
+
+`inspection.coverage.actions` explains Resize, region creation, reset and grid
+export controls. These are operations, not extra saved stage properties, and
+the reader does not execute them. Selection, Fit/zoom and Move/Draw mode are
+editor presentation state. The Layout aspect lock is also editor-local state
+(`coverage.ui_only`); `coverage.unverified` includes general functional centers.
+A positive technical OSC
+`lockedAspectRatio` must not be interpreted as a verified UI padlock state.
+
+Saved video inspection resolves the single running QLab 5 application by its
+bundle identifier and queries that exact running bundle, including installations
+outside `/Applications`. Multiple instances still make native enrichment
+unavailable. This separate read inventory performs no lifecycle action and
+retains exact workspace UUID, file identity, version and stability checks.
+Document mutation preflights and Save/Close/Open retain their existing
+`/Applications/QLab.app` restriction.
+
+Saved region `warping_center` is derived by evaluating the forward warp at the
+region midpoint, then subtracting half the saved output-route raster. It handles
+known Linear, Perspective, Bézier and nested mesh structures, and reports invalid
+or unsupported geometry as unavailable. Its `native_validation` field records
+the sample-based native acceptance evidence: deformed Linear/Perspective/Bézier
+and divided Perspective centers match the native UI. Arbitrary combinations
+remain explicitly unverified in coverage. The result preserves fractional
+precision, whereas QLab's Center fields round to integer pixels.
+
+## Passive video inventories
+
+Use `qlab_get_workspace_video_settings` for the overall map, then select:
+
+- `qlab_get_video_output_route(workspace_id, route_id)` for one exact route.
+  `inspection.current` labels the OSC scaling mode; the technical profile can
+  include current partial-output layout. `inspection.saved` describes the saved
+  full/partial layout, per-tile dimensions, normalized clip-space scale/center
+  and referencing stages/regions. References are saved, not a current-memory
+  dependency guarantee. Codes 0/1/2/3 mean Center/Stretch/Fill/Fit in 5.5.10.
+  Unknown codes retain their raw value and a null label. Tile row/column are
+  zero-based; display number is one-based. Pixel origin is not asserted.
+- `qlab_get_video_output_devices(workspace_id)` for separate CoreGraphics display
+  records, OSC destination observations and saved virtual destinations. An OSC
+  destination record identifies a route's observed assignment, not a unique
+  physical device. Do not sum these records as a deduplicated hardware count.
+  `device_ref` selects an exact returned opaque reference; names are not IDs.
+  Native screen IDs are session-scoped. Saved display associations require the
+  screen ID and vendor/model/serial tuple; virtual name/type matches remain
+  `candidate_route_ids`, never verified identity links.
+- `qlab_get_video_input_patches(workspace_id)` for patches and separate
+  `available_sources`/`available_formats`. `patch_id` selects one exact patch UUID.
+  Native formats are matched to the saved descriptor's exact device ID, never
+  just its name. `position` reports live and saved positions separately.
+  Empty AVCaptureDevice configuration is labelled automatic; unknown configs
+  stay explicit/unknown. `effective_capture_format` remains null: supported
+  formats and saved selection do not prove the capture format in use.
+
+Local camera sources also report `connected`, `suspended`,
+`in_use_by_another_application` and `observed_format` (dimensions and pixel
+format). `observed_format` is the AVFoundation getter result, can exist while
+no application is using the camera, and carries `qlab_attribution="unverified"`
+and `capture_verified=false`. It does not identify the application using the
+camera or the frame format delivered to QLab. Unsupported/failed getters remain
+null with a field-specific `metadata_errors` reason; null never means idle.
+Display `active`, `asleep` and `mirrored` flags describe macOS state only.
+`local_metadata.observed_at` timestamps the native observation; timestamps are
+excluded from the content snapshot hash, while changes to device state are not.
+Sources shared by several patches remain one source with one format inventory.
+
+Both inventories default to `profile="safe"`, `offset=0`, `limit=1000`. Each
+section is independently sliced using the same offset/limit; `pagination.counts`
+reports its total. Follow the exact `pagination.next_requests` arguments, and
+restart collection if `data.snapshot_id` changes between pages. Native metadata
+has its own bounded enumeration/truncation flag; when that source is capped,
+continuation of returned records does not recover omitted native records.
+The 2 MiB JSON budget includes every response field. One oversized record
+returns an explicit error rather than claiming a complete inventory.
+
+The tools deliberately report partial coverage: these are not the complete
+QLab process registry. Metadata-only AVFoundation enumeration does not request
+camera permission or create a capture input/session, even when authorization is
+not determined. A denial or missing backend leaves configured patch data usable.
+No NDI network finder, Syphon server scan, Blackmagic backend discovery, monitor,
+output sender or device activation is started. No capture frames are requested.
+Remote QLab never uses the MCP Mac's local inventory as its hardware inventory.
+
+OSC, local metadata and saved data have separate provenance and are not one
+atomic snapshot. Unsaved changes retain last-saved configuration with a warning;
+these reads never Save/Close/Open. A detected document/file change around the
+metadata read discards saved records and derived dependencies. File enrichment
+initially supports QLab 5.5.10/build 5510. Independent source failures preserve
+remaining observations with explicit coverage.
+
+## Author Video Settings
+
+Read `qlab_get_workspace_video_settings`, then use the exact stage, route,
+device and input readers for the objects involved. Current OSC, saved workspace
+configuration and passive macOS observations remain distinct sources.
+
+Four editors accept `operations` batches of 1–50 typed operations:
+
+- `qlab_edit_video_stage`: stage and region creation/deletion, properties,
+  mask assignment, Scale or Crop/Pad resize, region order/route, edge blending,
+  Perspective/Linear/Bézier, mesh splits, points, links and reset.
+- `qlab_edit_video_output_route`: route creation/deletion, name, dimensions,
+  rotation, rear projection, Center/Fit/Stretch/Fill, device and full/tiled output.
+- `qlab_edit_video_output_devices`: configured NDI/Syphon creation, update and
+  deletion. Renaming or changing a device updates its associated route descriptors.
+- `qlab_edit_video_input_patches`: patch creation/deletion/order, name, exact
+  local or OBS source assignment/removal, Auto or supported explicit modes.
+
+The stage and route editors retain `operation` with their original exact-ID
+arguments for single OSC setters. Choose that form **or** `operations`; they
+cannot be combined. `qlab_edit_video_region` remains the compatible OSC editor
+for one region property.
+
+For archive batches, use a local, inactive, clean QLab 5.5.10/build 5510 document
+in Edit Mode. Call readiness, preview with `dry_run=true`, inspect affected cues
+and objects, then execute the identical request with its fresh confirmation token.
+Tokens expire after five minutes, are single-use, and bind file, installation,
+operations and dependencies. `needs_save` requires a deliberate document Save
+followed by a new preview. `no_op` never closes or rewrites the document.
+
+Example (substitute the exact workspace UUID):
+
+```json
+{
+  "workspace_id": "WORKSPACE-UUID",
+  "dry_run": true,
+  "operations": [
+    {"kind": "create_stage", "client_ref": "screen", "name": "Front", "width": 1920, "height": 1080},
+    {"kind": "create_region", "stage_id": "@screen", "client_ref": "front-region", "route_id": "EXISTING-ROUTE-UUID", "bounds": {"x": 0, "y": 0, "width": 1920, "height": 1080}}
+  ]
+}
+```
+
+`@client_ref` resolves only objects created earlier in the same batch; execution
+returns permanent identifiers. Each batch belongs to one area. Read fresh
+references before the next area: virtual device refs are bound to the saved
+archive snapshot, **not** to `virtualID` (which scopes the workspace registry).
+Physical display assignments require exact hardware identity; names alone are
+insufficient. Missing fields preserve values; explicit null is supported only
+for removable assignments. Deletions require removal/reassignment of uses first,
+including cue references via the cue editors. Video batches never repair cues.
+
+One execution closes only the target clean document, verifies and prepares its
+archive, retains a recovery, replaces the original path and reopens it through
+the verified running installation. Other open documents are checked and preserved.
+No automatic retry or overwrite-based restoration follows a failure; inspect the
+reported phase, recovery and fresh workspace state first.
+
+Warp type follows QLab's route-wide behavior: all active regions sharing the
+exact route are included. Points may be linked only when already coincident on
+the same route; existing linked groups are retained. Mesh splits are powers of
+two from 1 to 32. Replacing meshes with custom links/unlinked seams requires
+explicit `reset=true`; external links must first be unlinked. Region reset uses
+one-by-one mesh splits. Crop/Pad preserves edited mesh leaves and applies QLab's
+native reset behavior to pristine leaves; it can discard regions outside the
+new stage bounds, visible in the preview.
+
+Verification compares saved bytes and OSC-observable identities, geometry,
+controls, dimensions, tile layout and route destinations. Viewport layer/mask,
+render flags, device parameters and input modes have saved-archive verification
+where OSC does not expose them. Configuration can affect device initialization
+when the document reopens: no cues, Monitor, Show, capture sessions or signal
+checks are requested, and accepted configuration does not prove physical output.
+Blackmagic and assignment of new network input sources remain excluded.
+
+QLab's process-shared Output Devices table can retain stale unreferenced virtual
+entries after repeated reopen, independently of the saved device list. Native
+Save did not duplicate those configured objects during acceptance. Treat that
+registry separately; do not create more devices merely because UI rows disagree
+with the saved inventory. A QLab application restart may clear transient entries,
+but the MCP does not perform that global action automatically.

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ctypes
+from functools import lru_cache
 import hashlib
 import json
 import os
@@ -120,6 +121,18 @@ def _personal_files():
     return paths
 
 
+@lru_cache(maxsize=1)
+def _bundled_records(data: bytes) -> tuple[tuple[dict, ...], tuple[str, ...]]:
+    fingerprint = hashlib.sha256(data).hexdigest()
+    records, errors = [], []
+    for name, payload in decode_library(data).items():
+        try:
+            records.append(_record('bundled', name, payload, fingerprint))
+        except (ValueError, TypeError, KeyError, RecursionError) as exc:
+            errors.append(sanitize_exception_message(exc))
+    return tuple(records), tuple(errors)
+
+
 def load_catalogue(source: str) -> tuple[list[dict], list[dict]]:
     records, statuses = [], []
     for selected in ('bundled', 'personal'):
@@ -128,9 +141,9 @@ def load_catalogue(source: str) -> tuple[list[dict], list[dict]]:
         errors = []
         try:
             if selected == 'bundled':
-                data = read_stable(BUNDLED_PATH)
-                fingerprint = hashlib.sha256(data).hexdigest()
-                items = [(name, payload, fingerprint) for name, payload in decode_library(data).items()]
+                cached, errors = _bundled_records(read_stable(BUNDLED_PATH))
+                records.extend(dict(record) for record in cached)
+                errors = list(errors)
             else:
                 paths = _personal_files()
                 items = []
@@ -147,11 +160,11 @@ def load_catalogue(source: str) -> tuple[list[dict], list[dict]]:
                         errors.append(sanitize_exception_message(exc))
                 if _personal_files() != paths:
                     raise ValueError('Personal library changed during reading.')
-            for name, payload, fingerprint in items:
-                try:
-                    records.append(_record(selected, name, payload, fingerprint))
-                except (ValueError, TypeError, KeyError, RecursionError) as exc:
-                    errors.append(sanitize_exception_message(exc))
+                for name, payload, fingerprint in items:
+                    try:
+                        records.append(_record(selected, name, payload, fingerprint))
+                    except (ValueError, TypeError, KeyError, RecursionError) as exc:
+                        errors.append(sanitize_exception_message(exc))
             statuses.append(dict(source=selected, status='partial' if errors else 'ready',
                                  failed_records=len(errors), errors=errors[:20]))
         except (OSError, ValueError, KeyError, TypeError, AttributeError, RecursionError) as exc:

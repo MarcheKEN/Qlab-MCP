@@ -8,7 +8,7 @@ import sys
 
 import pytest
 
-from qlab_mcp.light_patch import transaction as tx
+from qlab_mcp import workspace_archive as tx
 
 _NATIVE_REOPEN = tx._reopen
 
@@ -222,6 +222,69 @@ def test_pending_save_before_replacement_preserves_newer_bytes_and_recovery(stat
     assert (recovery / 'original.qlab5').read_bytes() == state.source
 
 
+def test_write_after_final_pre_replace_check_is_not_overwritten(state, monkeypatch):
+    token = edit(state)['confirm_token']
+    newer = json.dumps({'workspace_id': WS, 'patch': {'name': 'autosaved'}}).encode()
+    read = tx._read
+    calls = 0
+
+    def save_after_final_check(path):
+        nonlocal calls
+        result = read(path)
+        if path == state.path:
+            calls += 1
+            if calls == 4:
+                state.path.write_bytes(newer)
+        return result
+
+    monkeypatch.setattr(tx, '_read', save_after_final_check)
+    result = edit(state, False, token)
+
+    assert not result['ok'] and not result['file_replaced']
+    assert result['status'] == 'uncertain' and result['phase'] == 'replacement_conflict'
+    assert state.path.read_bytes() == newer
+    assert state.calls == ['close']
+    recovery = tx._recovery_path(state.path)
+    assert (recovery / 'original.qlab5').read_bytes() == state.source
+    assert json.loads((recovery / 'journal.json').read_bytes())['phase'] == 'replacement_conflict'
+    assert not (recovery / 'result.qlab5').exists()
+
+
+def test_failed_race_recovery_keeps_concurrent_bytes_in_recovery(state, monkeypatch):
+    token = edit(state)['confirm_token']
+    newer = json.dumps({'workspace_id': WS, 'patch': {'name': 'autosaved'}}).encode()
+    read = tx._read
+    exchange = tx._exchange
+    reads = 0
+    swaps = 0
+
+    def save_after_final_check(path):
+        nonlocal reads
+        result = read(path)
+        if path == state.path:
+            reads += 1
+            if reads == 4:
+                state.path.write_bytes(newer)
+        return result
+
+    def fail_rollback(first, second):
+        nonlocal swaps
+        swaps += 1
+        if swaps == 2:
+            raise OSError('injected rollback failure')
+        exchange(first, second)
+
+    monkeypatch.setattr(tx, '_read', save_after_final_check)
+    monkeypatch.setattr(tx, '_exchange', fail_rollback)
+    result = edit(state, False, token)
+
+    recovery = tx._recovery_path(state.path)
+    assert not result['ok'] and result['file_replaced']
+    assert state.path.read_bytes() != newer
+    assert (recovery / 'result.qlab5').read_bytes() == newer
+    assert state.calls == ['close']
+
+
 def test_live_readback_mismatch_retains_replaced_file_and_recovery(state):
     token = edit(state)['confirm_token']
     reopen = tx._reopen
@@ -314,7 +377,8 @@ def test_reopen_canonicalizes_other_document_paths_before_native_comparison():
 
 @pytest.mark.skipif(sys.platform != 'darwin', reason='Foundation path normalization is macOS-specific')
 def test_foundation_reopen_inventory_normalizes_private_tmp_alias_without_qlab():
-    canonical_handler = tx.docs.SCRIPT.split('on inventory()')[0]
+    canonical_handler, separator, _ = tx.docs.SCRIPT.partition('on inventory(applicationPath)')
+    assert separator, 'Native inventory handler boundary must exist'
     script = canonical_handler + '''
 on run argv
  set raw to current application's NSString's stringWithString:(item 1 of argv)
@@ -425,7 +489,7 @@ def test_missing_fcntl_does_not_break_remote_read_server_import(monkeypatch):
             raise ImportError('fcntl is unavailable on Windows')
         return original(name,*args,**kwargs)
     monkeypatch.setattr(builtins,'__import__',restricted)
-    spec=importlib.util.spec_from_file_location('qlab_mcp.light_patch.portability_probe',tx.__file__)
+    spec=importlib.util.spec_from_file_location('qlab_mcp.portability_probe',tx.__file__)
     module=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert module.fcntl is None
@@ -438,3 +502,29 @@ def test_reopen_discards_authenticated_osc_session_before_readback(state, monkey
     result = edit(state, False, preview['confirm_token'])
     assert result['ok']
     assert events == [('close', 'open')]
+
+
+def test_shared_archive_uses_domain_verifier_and_checks_dependencies_before_close(state, monkeypatch):
+    planner=sys.modules['qlab_mcp.light_patch.archive'].plan_patch
+    observed=[]
+    def verify(reader,workspace_id,summary):
+        observed.append(summary['name'])
+        assert summary==state.live
+    monkeypatch.setattr(tx,'_live',lambda *a: pytest.fail('Lighting reader used for another archive domain'))
+    kwargs=dict(planner=planner,token_family='videoSettings.routes',live_verifier=verify,dependencies={'snapshot':'a'})
+    p=tx.edit_archive(state.reader,WS,[{'name':'after'}],**kwargs)
+    assert p['ok'] and p['confirm_token'].startswith('confirm:videoSettings.routes:v1:')
+    def changed():raise ValueError('Video dependencies changed')
+    blocked=tx.edit_archive(state.reader,WS,[{'name':'after'}],False,p['confirm_token'],dependency_check=changed,**kwargs)
+    assert not blocked['ok'] and state.calls==[]
+    p=tx.edit_archive(state.reader,WS,[{'name':'after'}],**kwargs)
+    done=tx.edit_archive(state.reader,WS,[{'name':'after'}],False,p['confirm_token'],**kwargs)
+    assert done['ok'] and done['status']=='verified'
+    assert state.calls==['close','open'] and observed[-1]=='after'
+
+
+def test_oversized_generated_archive_is_blocked_before_close(state,monkeypatch):
+    monkeypatch.setattr(tx,'_MAX_BYTES',128)
+    result=tx.edit_light_patch(state.reader,WS,[{'name':'x'*300}])
+    assert not result['ok'] and '64 MiB' in result['error']
+    assert state.calls==[] and state.path.read_bytes()==state.source

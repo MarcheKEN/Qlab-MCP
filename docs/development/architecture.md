@@ -39,8 +39,8 @@ message, output, fade, or target mode, then rechecks identity and selector.
 Failures in secondary reads preserve confirmed identity as partial data.
 Sensitive Network text and Script source require the technical profile.
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 83 decorated tools
-(50 read-only and 33 gated writes),
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 85 decorated tools
+(52 read-only and 35 gated writes),
 their schemas, annotations, timeouts, and result models. QLab-backed calls
 create a fresh `QLabReader` and close it after the operation; local media tools
 do not use that reader. `qlab-mcp` maps to
@@ -215,3 +215,21 @@ non-containment cue references do not make residual objects active. The separate
 public tool shares the document transaction but has its own token family and a
 saved-archive postcondition checked before replacement and after reopening.
 OSC-visible patch verification remains separate from curve verification.
+
+Passive video inventories share the stable saved-video decoder and existing OSC
+summary readers. `video_native.py` isolates fixed CoreGraphics/AVFoundation
+metadata getters in a bounded subprocess, using only the Python standard library
+and system frameworks. It does not open capture sessions or output devices.
+`video_settings.py` retains separate source identities, validates saved stability
+around metadata enumeration and budgets every serialized inventory page. Native
+metadata is never substituted for a remote QLab host's hardware inventory.
+
+### Video archive writes
+
+`video_models.py` defines strict typed batches; `video_archive.py` plans graph
+edits using the existing NSKeyedArchiver decoder. `video_geometry.py` implements
+validated stage/mesh transforms. `video_editing.py` binds passive source/display
+and mask dependencies and checks native OSC readback. `workspace_archive.py`
+contains the shared lock/token/recovery/close/exchange/reopen transaction;
+`light_patch/transaction.py` retains the lighting entry point. Existing single
+stage/route/region OSC setters and internal OSC readers remain independent.

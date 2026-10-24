@@ -127,7 +127,7 @@ def test_public_mcp_tool_schema_and_call(reader, monkeypatch):
     async def calls():
         async with Client(server.mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-            assert len(tools) == 83
+            assert len(tools) == 87
             schema = tools["qlab_move_cue_lists"].inputSchema["properties"]["moves"]
             assert (schema["minItems"], schema["maxItems"]) == (1, 50)
             assert schema["items"]["additionalProperties"] is False

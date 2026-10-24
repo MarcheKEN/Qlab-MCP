@@ -261,7 +261,7 @@ def test_transaction_postcondition_is_checked_before_and_after_reopen(tmp_path, 
     from pathlib import Path
     from types import SimpleNamespace
 
-    from qlab_mcp.light_patch import transaction as tx
+    from qlab_mcp import workspace_archive as tx
 
     path = tmp_path / "Show.qlab5"
     source = json.dumps({"workspace_id": WS, "patch": {"name": "before"}}).encode()

@@ -1,4 +1,4 @@
-"""FastMCP server exposing safe QLab inspection and gated write tools."""
+﻿"""FastMCP server exposing safe QLab inspection and gated write tools."""
 
 from __future__ import annotations
 
@@ -24,6 +24,9 @@ from .light_patch.definitions import edit_light_definitions
 from .light_patch.curves import LightCueCurveOperations, edit_light_cue_curves
 from .light_patch.transaction import edit_light_patch
 from .light_patch.reader import enrich_light_settings
+from .video_settings import enrich_video_settings, enrich_video_detail, enrich_video_inventory
+from .video_editing import edit_video
+from .video_models import RouteOperations, StageOperations, DeviceOperations, InputOperations, VideoArchiveEditResult
 from .audio_analysis_models import AudioAnalysisRequest, AudioAnalysisResult, Resolution
 from .errors import QLabMcpError
 from .models import (
@@ -58,6 +61,7 @@ from .models import (
     WorkspaceVideoSettingsResult,
     VideoStageResult,
     VideoOutputRouteResult,
+    VideoInventoryResult,
     VideoRegionResult,
     CanonicalWorkspaceUUID,
 )
@@ -311,7 +315,7 @@ mcp = FastMCP(
         get_prompt_settings={"enabled": False},
     )],
     instructions="""
-QLab MCP exposes fifty read-only tools plus thirty-three gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
+QLab MCP exposes fifty-two read-only tools plus thirty-five gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
 Existing-workspace writes require QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; they remain dry-run first. Native document Open has its separate empty-inventory preflight, write-enable setting, file fingerprint and document token; no existing workspace is available for OSC readiness.
 This server does not expose GO, stop, panic, playback, audition, /live writes, arbitrary AppleScript, or raw OSC passthrough. Load loadTime, Target assignedNumber and documented cue Triggers use fixed local AppleScript reads/writes. Native Trigger reads require include_native_triggers=true; configuration requires disabled triggers, activation requires disarmed/no continuation/no skip, and Hotkey enabling is blocked without key/modifier readback.
 
@@ -335,7 +339,7 @@ def _reader() -> QLabReader:
 def qlab_get_workspace_document(workspace_id: CanonicalWorkspaceUUID) -> dict[str, Any]:
     """Read exact local workspace UUID, document path, dirty flag and native mode/activity.
 
-    Requires the running /Applications/QLab.app. No save or close; unknown state blocks writes.
+    Requires one verified running QLab installation. No save or close; unknown state blocks writes.
     Readback includes the full native inventory, including other open documents' paths and names.
     """
     return _run_tool(lambda reader: get_workspace_document(reader, str(workspace_id)))
@@ -746,7 +750,7 @@ def _run_workspace_settings_domain(
                 payload = dict(ok=False, status="error", partial=True,
                                workspace_id=str(workspace_id), profile=profile,
                                error_code="validation_failed", message=sanitize_exception_message(exc),
-                               errors={"light.patch": sanitize_exception_message(exc)})
+                               errors={"light.patch" if domain == "light" else domain: sanitize_exception_message(exc)})
             normalized = _workspace_domain_payload(
                     payload,
                     domain=domain,
@@ -1151,11 +1155,18 @@ def qlab_get_workspace_audio_settings(
 )
 def qlab_get_workspace_video_settings(
     workspace_id: WorkspaceId,
+    section: Literal["all", "stages", "routes", "inputs", "destinations"] = "all",
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 1000,
 ) -> WorkspaceVideoSettingsResult:
     """List Video input patches, output routes, and stages with their exact uniqueIDs.
 
     Use qlab_get_video_stage or qlab_get_video_output_route for exact details.
     OSC exposes only names and uniqueIDs for input patches and no independent device inventory.
+    saved_video adds last-saved local QLab 5.5.10/build 5510 configuration, including
+    nested geometry, masks and configured destinations, with separate provenance.
+    Unsaved changes are never saved. Follow pagination next_requests for bounded
+    1,000-record/2 MiB pages. No capture, device activation or output is performed.
     """
     return _run_workspace_settings_domain(
         workspace_id,
@@ -1166,6 +1177,9 @@ def qlab_get_workspace_video_settings(
         detail_kind=None,
         result_model=WorkspaceVideoSettingsResult,
         allowed={},
+        result_transform=lambda reader, result: enrich_video_settings(
+            reader, str(workspace_id), result, section, offset, limit,
+        ),
     )
 
 
@@ -1179,15 +1193,28 @@ def qlab_get_video_stage(
     workspace_id: WorkspaceId,
     stage_id: Annotated[UUID, Field(description="Exact stage uniqueID from qlab_get_workspace_video_settings.")],
     profile: VideoSettingsProfile = "safe",
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 1000,
+    expected_sha256: str | None = None,
 ) -> VideoStageResult:
     """Read one exact Video stage and its regions, geometry, and assigned output routes.
 
     Technical adds the redacted OSC payload, including full control-point and mesh data.
+    saved_video adds the exact last-saved stage header, assigned routes once per UUID,
+    and geometry_entries JSON paths. Saved route guidelines include validated grid labels.
+    Inspection explains freshness/coverage and adds readable warp labels and stage-centered
+    coordinates. Up to sixteen current regions/routes receive supplemental grid/guide reads;
+    missing values and continuation requests remain explicit. Coverage distinguishes
+    UI actions from saved properties and names unverified UI state. Reads never save.
+    Offset/limit page saved geometry entries; follow pagination.next_requests.
+    Unsaved changes require explicit Save preview/confirmation before a fresh file-edit baseline.
     """
     return _run_workspace_settings_domain(
         workspace_id, domain="video", view="stage", ref=str(stage_id), profile=profile,
         detail_kind="stage", result_model=VideoStageResult,
         allowed={"profile": ["safe", "technical"]}, exact_video=True,
+        result_transform=lambda reader, result: enrich_video_detail(
+            reader, str(workspace_id), result, str(stage_id), "stage", offset, limit, expected_sha256),
     )
 
 
@@ -1205,11 +1232,84 @@ def qlab_get_video_output_route(
     """Read one exact Video output route, its destination, geometry, and guides state.
 
     Technical adds the redacted OSC payload and available destination hardware metadata.
+    saved_video adds the exact saved route configuration, separately from current OSC.
+    inspection adds validated scaling names, full/partial layout geometry and
+    saved stage/region references with explicit provenance and freshness.
+    No device activation, saving or output is performed.
     """
     return _run_workspace_settings_domain(
         workspace_id, domain="video", view="route", ref=str(route_id), profile=profile,
         detail_kind="route", result_model=VideoOutputRouteResult,
         allowed={"profile": ["safe", "technical"]}, exact_video=True,
+        result_transform=lambda reader, result: enrich_video_detail(
+            reader, str(workspace_id), result, str(route_id), "route"),
+    )
+
+
+@mcp.tool(
+    title="Get QLab Video Output Devices",
+    tags={"qlab", "settings", "video", "devices", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_video_output_devices(
+    workspace_id: WorkspaceId,
+    device_ref: Annotated[str | None, Field(max_length=256, description="Exact opaque ref returned by this inventory; not a device name.")] = None,
+    profile: VideoSettingsProfile = "safe",
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 1000,
+) -> VideoInventoryResult:
+    """Inspect passive output metadata, including local displays not used by routes.
+
+    Sources remain separate: CoreGraphics displays, OSC route destinations and
+    saved NDI/Syphon configuration. This is not the complete QLab process registry.
+    Display active/asleep/mirrored flags describe macOS, not QLab rendering.
+    device_ref selects an exact returned record. No network discovery, sender,
+    monitor, device activation or document lifecycle action is performed.
+    Saved references may be stale when the document is modified. Follow explicit
+    pagination next_requests; native source truncation is separately reported.
+    """
+    return _run_workspace_settings_domain(
+        workspace_id, domain="video", view="overview", ref=None, profile=profile,
+        detail_kind=None, result_model=VideoInventoryResult,
+        allowed={"profile": ["safe", "technical"]},
+        result_transform=lambda reader, result: enrich_video_inventory(
+            reader, str(workspace_id), result, "devices", device_ref, offset, limit),
+    )
+
+
+@mcp.tool(
+    title="Get QLab Video Input Patches",
+    tags={"qlab", "settings", "video", "inputs", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_video_input_patches(
+    workspace_id: WorkspaceId,
+    patch_id: Annotated[UUID | None, Field(description="Optional exact input patch UUID returned by this inventory.")] = None,
+    profile: VideoSettingsProfile = "safe",
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 1000,
+) -> VideoInventoryResult:
+    """Read input patches, saved source/mode and passive local camera format metadata.
+
+    Without patch_id returns patches, available_sources and available_formats.
+    With patch_id returns its exact UUID and associated source/formats when known.
+    available_sources includes connected/suspended/in-use state and observed_format.
+    Observed AVFoundation format is not attributed to QLab or verified capture.
+    Unknown getters remain null with metadata_errors. Saved configuration is not
+    the effective capture format. OSC, saved archive
+    and AVFoundation metadata have separate provenance; names never establish identity.
+    No capture input/session, permission request, NDI discovery, monitor or Save is
+    performed. Remote QLab never uses this Mac's hardware inventory. Follow
+    pagination next_requests and explicit coverage/truncation limitations.
+    """
+    return _run_workspace_settings_domain(
+        workspace_id, domain="video", view="overview", ref=None, profile=profile,
+        detail_kind=None, result_model=VideoInventoryResult,
+        allowed={"profile": ["safe", "technical"]},
+        result_transform=lambda reader, result: enrich_video_inventory(
+            reader, str(workspace_id), result, "inputs", str(patch_id) if patch_id else None, offset, limit),
     )
 
 
@@ -2757,30 +2857,106 @@ def qlab_edit_audio_output_patch(
     return _edit_object_setting(workspace_id, "audio", {"patch_id": str(patch_id)}, operation, dry_run, confirm_token)
 
 
+def _video_batch(workspace_id, domain, operations, dry_run, confirm_token):
+    from .write.safety import resolve_dry_run
+    normalized = [op.model_dump(exclude_unset=True) if hasattr(op, "model_dump") else op for op in operations]
+    return VideoArchiveEditResult.model_validate(_run_tool(lambda reader: edit_video(
+        reader, str(workspace_id), domain, normalized, resolve_dry_run(reader, dry_run), confirm_token)))
+
+
 @mcp.tool(title="Edit QLab Video Output Route", tags={"qlab", "settings", "video", "gated-write"},
-          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT)
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
 def qlab_edit_video_output_route(
     workspace_id: CanonicalWorkspaceUUID,
-    route_id: CanonicalWorkspaceUUID,
-    operation: VideoRouteOperation,
-    dry_run: bool | None = None,
+    route_id: CanonicalWorkspaceUUID | None = None,
+    operation: VideoRouteOperation | None = None,
+    dry_run: StrictBool | None = None,
     confirm_token: str | None = None,
-) -> WorkspaceSettingsEditResult:
-    """Edit enableGuides on one exact Video output route."""
-    return _edit_object_setting(workspace_id, "route", {"route_id": str(route_id)}, operation, dry_run, confirm_token)
+    operations: RouteOperations | None = None,
+) -> VideoArchiveEditResult:
+    """Edit legacy output route guides (enableGuides), or create/edit/delete 1–50 saved routes in one batch.
+
+    operation plus route_id uses the existing single OSC setter. operations uses
+    a clean local QLab 5.5.10/build 5510 document, preview and single-use token;
+    it closes, replaces and reopens the same file once. Forms are exclusive.
+    Device refs come from the device reader. Shared-region dependencies are
+    reported; deletion in use is blocked. No Monitor, Show or playback command.
+    """
+    if operations is not None:
+        if operation is not None or route_id is not None:
+            raise ToolError("Use either operations, or route_id with operation.")
+        return _video_batch(workspace_id, "routes", operations, dry_run, confirm_token)
+    if route_id is None or operation is None:
+        raise ToolError("route_id and operation are required for the legacy OSC form.")
+    return VideoArchiveEditResult.model_validate(_edit_object_setting(workspace_id, "route", {"route_id": str(route_id)}, operation, dry_run, confirm_token).model_dump())
 
 
 @mcp.tool(title="Edit QLab Video Stage", tags={"qlab", "settings", "video", "gated-write"},
-          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT)
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
 def qlab_edit_video_stage(
     workspace_id: CanonicalWorkspaceUUID,
-    stage_id: CanonicalWorkspaceUUID,
-    operation: VideoStageOperation,
-    dry_run: bool | None = None,
+    stage_id: CanonicalWorkspaceUUID | None = None,
+    operation: VideoStageOperation | None = None,
+    dry_run: StrictBool | None = None,
     confirm_token: str | None = None,
-) -> WorkspaceSettingsEditResult:
-    """Rename one exact Video stage."""
-    return _edit_object_setting(workspace_id, "stage", {"stage_id": str(stage_id)}, operation, dry_run, confirm_token)
+    operations: StageOperations | None = None,
+) -> VideoArchiveEditResult:
+    """Rename a Video stage through legacy OSC, or author a complete stage/region batch.
+
+    operations accepts 1–50 typed stage, mask, resize, region and warp operations.
+    Creation returns UUIDs; @client_ref refers to objects created earlier in the
+    batch. Use exact stage/region IDs for existing objects. Fields omitted are
+    preserved. Deletion in use is blocked. Requires a clean inactive local QLab
+    5.5.10/build 5510 document; preview then confirm once, with same-path recovery
+    and reopen. Unsaved documents return needs_save. Does not execute cues.
+    """
+    if operations is not None:
+        if operation is not None or stage_id is not None:
+            raise ToolError("Use either operations, or stage_id with operation.")
+        return _video_batch(workspace_id, "stages", operations, dry_run, confirm_token)
+    if stage_id is None or operation is None:
+        raise ToolError("stage_id and operation are required for the legacy OSC form.")
+    return VideoArchiveEditResult.model_validate(_edit_object_setting(workspace_id, "stage", {"stage_id": str(stage_id)}, operation, dry_run, confirm_token).model_dump())
+
+
+@mcp.tool(title="Edit QLab Video Output Devices", tags={"qlab", "settings", "video", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
+def qlab_edit_video_output_devices(
+    workspace_id: CanonicalWorkspaceUUID,
+    operations: DeviceOperations,
+    dry_run: StrictBool = True,
+    confirm_token: str | None = None,
+) -> VideoArchiveEditResult:
+    """Create/edit/delete 1–50 configured NDI/Syphon devices with exact saved refs.
+
+    virtualID is workspace registry scope, not per-device identity. Use a fresh
+    saved-virtual reference from the device reader. Renames/configuration changes
+    update exact associated routes; deletion in use is blocked. Physical displays
+    and Blackmagic hardware settings are excluded. Clean QLab 5.5.10/build 5510
+    document, preview and a five-minute one-use token are required. Same-path
+    close/replace/reopen; no sender, Monitor or playback command is invoked.
+    """
+    return _video_batch(workspace_id, "devices", operations, dry_run, confirm_token)
+
+
+@mcp.tool(title="Edit QLab Video Input Patches", tags={"qlab", "settings", "video", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
+def qlab_edit_video_input_patches(
+    workspace_id: CanonicalWorkspaceUUID,
+    operations: InputOperations,
+    dry_run: StrictBool = True,
+    confirm_token: str | None = None,
+) -> VideoArchiveEditResult:
+    """Create/edit/order/delete 1–50 input patches without starting capture.
+
+    Exact patch UUIDs and passive AVFoundation source refs only, including OBS.
+    mode is auto or a supported explicit width/height/pixel-format/frame-rate.
+    Configured mode is not effective capture. Sources cannot be discovered over
+    NDI/Syphon or Blackmagic here. Deletion in use is blocked. Requires a clean
+    inactive QLab 5.5.10/build 5510 document, preview and one-use token; internally
+    closes, replaces and reopens the same workspace, preserving recovery.
+    """
+    return _video_batch(workspace_id, "inputs", operations, dry_run, confirm_token)
 
 
 @mcp.tool(title="Edit QLab Video Region", tags={"qlab", "settings", "video", "gated-write"},

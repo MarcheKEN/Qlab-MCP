@@ -74,9 +74,91 @@ def _check_preservable_json(native):
             raise ValueError('Definition metadata contains a value that cannot be preserved.')
 
 
+def _read_native_parameters(native):
+    source = native.get('parameters')
+    unknown = [key for key in native if key not in {
+        'name', 'manufacturer', 'definitionVersion', 'defaultParameter', 'parameters', 'mode'}]
+    diagnostics = []
+    if not isinstance(source, (dict, list)):
+        return dict(parameters=[], parameter_count=None, readable_parameter_count=0,
+                    unreadable_parameter_count=None, parameters_complete=False,
+                    parameter_diagnostics=['parameters must be a dictionary or array.'],
+                    dmx_footprint=None, uninterpreted_fields=unknown)
+
+    entries = list(enumerate(source)) if isinstance(source, list) else list(source.items())
+    parameters, footprint = [], 0
+    readable_count = 0
+    footprint_complete = True
+    for source_channel, value in entries:
+        if isinstance(source, list):
+            channel = source_channel
+        elif type(source_channel) is int:
+            channel = source_channel
+        elif isinstance(source_channel, str):
+            try:
+                parsed = int(source_channel)
+            except ValueError:
+                parsed = None
+            channel = parsed if parsed is not None and str(parsed) == source_channel else None
+        else:
+            channel = None
+
+        if channel is None:
+            diagnostics.append(f'parameters[{source_channel!r}]: channel is not a canonical integer.')
+        if not isinstance(value, dict):
+            diagnostics.append(f'parameters[{source_channel!r}]: value is not an object.')
+            footprint_complete = False
+            continue
+
+        kind = value.get('type', 'scalar')
+        percentage = value.get('valueIsPercentage')
+        parameters.append(dict(
+            channel=channel,
+            name=value.get('name'),
+            type=kind,
+            two_bytes=value.get('twoBytes'),
+            value_is_percentage=percentage,
+            units=('percent' if percentage else 'dmx')
+            if kind == 'scalar' and type(percentage) is bool else None,
+            home_value=value.get('homeValue'),
+            home_value_double=value.get('homeValueDouble'),
+            outputs=deepcopy(value.get('outputs')),
+            **({'channel_key': source_channel} if channel is None else {}),
+        ))
+        if channel is not None:
+            readable_count += 1
+        unknown.extend(f'parameters[{source_channel!r}].{key}' for key in value if key not in {
+            'name', 'type', 'twoBytes', 'valueIsPercentage', 'homeValue', 'homeValueDouble', 'outputs'})
+
+        if kind == 'scalar':
+            width = value.get('twoBytes')
+            if channel is None or channel < 0 or type(width) is not bool:
+                footprint_complete = False
+            else:
+                footprint = max(footprint, channel + (2 if width else 1))
+        elif not isinstance(kind, str) or kind not in _VIRTUAL_CLASSES:
+            footprint_complete = False
+
+    parameters.sort(key=lambda item: (
+        item['channel'] is None,
+        item['channel'] < 0 if item['channel'] is not None else False,
+        abs(item['channel']) if item['channel'] is not None else 0,
+    ))
+    return dict(parameters=parameters, parameter_count=len(entries),
+                readable_parameter_count=readable_count,
+                unreadable_parameter_count=len(entries) - readable_count,
+                parameters_complete=readable_count == len(entries),
+                parameter_diagnostics=diagnostics,
+                dmx_footprint=footprint if footprint_complete and footprint else None,
+                uninterpreted_fields=unknown)
+
+
 def inspect_native(native: dict) -> dict:
     """Describe native definitions and verify all fields can survive import."""
-    parameters, notes, unknown, warnings = [], [], [], []
+    readable = _read_native_parameters(native)
+    parameters = readable['parameters']
+    unknown = readable['uninterpreted_fields']
+    notes, warnings = [], []
     footprint = 0
     default = native.get('defaultParameter', -1)
     try:
@@ -97,13 +179,6 @@ def inspect_native(native: dict) -> dict:
                 raise ValueError('Duplicate parameter name.')
             names.add(name)
             kind = value.get('type', 'scalar')
-            parameters.append(dict(channel=channel, name=name, type=kind,
-                two_bytes=value.get('twoBytes'), value_is_percentage=value.get('valueIsPercentage'),
-                units=('percent' if value.get('valueIsPercentage') else 'dmx') if kind == 'scalar' else None,
-                home_value=value.get('homeValue'), home_value_double=value.get('homeValueDouble'),
-                outputs=deepcopy(value.get('outputs'))))
-            unknown.extend(f'parameters[{channel}].{key}' for key in value if key not in {
-                'name', 'type', 'twoBytes', 'valueIsPercentage', 'homeValue', 'homeValueDouble', 'outputs'})
             if kind == 'scalar':
                 if type(value.get('twoBytes')) is not bool or type(value.get('valueIsPercentage')) is not bool:
                     raise ValueError('Scalar width and units must be explicit booleans.')
@@ -178,13 +253,19 @@ def inspect_native(native: dict) -> dict:
             raise ValueError('Default parameter does not exist.')
         if footprint < 1:
             raise ValueError('Definition has no physical channels.')
-        unknown.extend(key for key in native if key not in {'name', 'manufacturer', 'definitionVersion', 'defaultParameter', 'parameters', 'mode'})
         if unknown:
-            warnings.append('Uninterpreted JSON metadata is preserved structurally; its application semantics are unknown.')
+            warnings.append(
+                'Uninterpreted JSON metadata is preserved structurally; its application semantics are unknown.')
     except (ValueError, TypeError, KeyError, OverflowError) as exc:
         notes.append(str(exc))
-    return dict(parameters=parameters, default_parameter=default, dmx_footprint=footprint or None,
-                importable=not notes, compatibility_notes=notes + warnings, uninterpreted_fields=unknown)
+    return dict(parameters=parameters, default_parameter=default,
+                dmx_footprint=readable['dmx_footprint'], importable=not notes,
+                compatibility_notes=notes + warnings, uninterpreted_fields=unknown,
+                parameter_count=readable['parameter_count'],
+                readable_parameter_count=readable['readable_parameter_count'],
+                unreadable_parameter_count=readable['unreadable_parameter_count'],
+                parameters_complete=readable['parameters_complete'],
+                parameter_diagnostics=readable['parameter_diagnostics'])
 
 
 def install_native_definition(patch, name: str, native: dict) -> None:

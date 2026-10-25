@@ -9,6 +9,10 @@ Use the [current tool catalogue](../../user/tools.md) and
 
 ## Records
 
+- [Settings follow-up — October 25](2026-10-25-settings-extensions.md): complete
+  readable definition details, root ordering, empty input names, native NDI rates,
+  bounded Syphon directory and type-sensitive archive recovery.
+
 - [Passive video inventories — 2026-10-24](2026-10-24-passive-video-inventories.md)
 
 - [Light Patch authoring — 2026-10-20](2026-10-20-light-patch-authoring.md)

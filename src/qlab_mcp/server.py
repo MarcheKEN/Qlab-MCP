@@ -397,7 +397,9 @@ def qlab_get_light_definitions(
     saved workspace. Supply workspace_id to include its saved definitions and dirty
     flag. definition_id selects full channel and virtual-output detail; IDs are source
     and content bound. No save, close, open or global library writes. Unknown variants
-    remain readable with explicit import compatibility. Maximum response 2 MiB.
+    remain readable with explicit import compatibility. Read coverage and parameter
+    counts remain separate from importability; import rejection does not truncate
+    readable channel details. Maximum response 2 MiB.
     A configured definition does not verify a physical fixture or DMX output.
     """
     return _run_tool(lambda reader: get_light_definitions(
@@ -1295,15 +1297,18 @@ def qlab_get_video_input_patches(
     offset: Annotated[StrictInt, Field(ge=0)] = 0,
     limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 1000,
 ) -> VideoInventoryResult:
-    """Read input patches, saved source/mode and passive local camera format metadata.
+    """Read input patches, saved source/mode, passive camera and local Syphon metadata.
 
     Without patch_id returns patches, available_sources and available_formats.
     With patch_id returns its exact UUID and associated source/formats when known.
     available_sources includes connected/suspended/in-use state and observed_format.
     Observed AVFoundation format is not attributed to QLab or verified capture.
+    Syphon directory records describe local announced servers, not QLab output
+    devices. They have no verified capture format and cannot yet be assigned by
+    the input editor. Directory failure preserves the camera observations.
     Unknown getters remain null with metadata_errors. Saved configuration is not
     the effective capture format. OSC, saved archive
-    and AVFoundation metadata have separate provenance; names never establish identity.
+    and local source metadata have separate provenance; names never establish identity.
     No capture input/session, permission request, NDI discovery, monitor or Save is
     performed. Remote QLab never uses this Mac's hardware inventory. Follow
     pagination next_requests and explicit coverage/truncation limitations.
@@ -2878,8 +2883,9 @@ def qlab_edit_video_output_route(
     confirm_token: str | None = None,
     operations: RouteOperations | None = None,
 ) -> VideoArchiveEditResult:
-    """Edit legacy output route guides (enableGuides), or create/edit/delete 1–50 saved routes in one batch.
+    """Edit legacy output route guides (enableGuides), or create/edit/order/delete 1–50 saved routes.
 
+    reorder_routes requires a complete permutation of the current route IDs.
     operation plus route_id uses the existing single OSC setter. operations uses
     a clean local QLab 5.5.10/build 5510 document, preview and single-use token;
     it closes, replaces and reopens the same file once. Forms are exclusive.
@@ -2908,6 +2914,7 @@ def qlab_edit_video_stage(
     """Rename a Video stage through legacy OSC, or author a complete stage/region batch.
 
     operations accepts 1–50 typed stage, mask, resize, region and warp operations.
+    reorder_stages requires the complete intended stage order; it does not change layers.
     Creation returns UUIDs; @client_ref refers to objects created earlier in the
     batch. Use exact stage/region IDs for existing objects. Fields omitted are
     preserved. Deletion in use is blocked. Requires a clean inactive local QLab
@@ -2939,6 +2946,7 @@ def qlab_edit_video_output_devices(
     and Blackmagic hardware settings are excluded. Clean QLab 5.5.10/build 5510
     document, preview and a five-minute one-use token are required. Same-path
     close/replace/reopen; no sender, Monitor or playback command is invoked.
+    NDI audio sample rates are 22050, 44100, 48000, 88200 and 96000 Hz.
     """
     return _video_batch(workspace_id, "devices", operations, dry_run, confirm_token)
 
@@ -2956,8 +2964,9 @@ def qlab_edit_video_input_patches(
     Exact patch UUIDs and passive AVFoundation source refs only, including OBS.
     mode is auto or a supported explicit width/height/pixel-format/frame-rate.
     Copy pixel_format from available_formats for that exact source; do not guess.
-    Configured mode is not effective capture. Sources cannot be discovered over
-    NDI/Syphon or Blackmagic here. Deletion in use is blocked. Requires a clean
+    An empty name is allowed for a patch. Configured mode is not effective capture.
+    Syphon directory entries are currently read-only candidates; NDI and Blackmagic
+    discovery/assignment are excluded. Deletion in use is blocked. Requires a clean
     inactive QLab 5.5.10/build 5510 document, preview and one-use token; internally
     closes, replaces and reopens the same workspace, preserving recovery.
     """

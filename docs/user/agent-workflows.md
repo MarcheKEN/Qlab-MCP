@@ -1508,6 +1508,13 @@ different IDs. Workspace reads include saved-file hash, dirty state and freshnes
 no save, close or open is performed. Sources fail independently. Unknown variants
 remain inspectable and report why import is blocked.
 
+Import validation does not stop parameter inspection. Exact catalogue details
+include `parameter_count`, `readable_parameter_count`, `unreadable_parameter_count`,
+`parameters_complete` and `parameter_diagnostics`. A blocked definition can still
+return all its channels, including more than 512 total controls when some are
+virtual. These read counts do not relax the editor's separate validation. An
+unreadable channel retains its original key and a null interpreted channel.
+
 `qlab_edit_light_definitions` accepts 1–100 definition-only operations:
 
 | Action | Fields |
@@ -1696,8 +1703,15 @@ The tools deliberately report partial coverage: these are not the complete
 QLab process registry. Metadata-only AVFoundation enumeration does not request
 camera permission or create a capture input/session, even when authorization is
 not determined. A denial or missing backend leaves configured patch data usable.
-No NDI network finder, Syphon server scan, Blackmagic backend discovery, monitor,
-output sender or device activation is started. No capture frames are requested.
+The input reader also consults the public local Syphon server directory for a
+bounded observation. Its records identify announced servers by UUID where
+available and include the application name. They are candidate input sources,
+not QLab Output Devices, and currently report `assignment_supported=false`.
+Missing UUIDs remain unknown rather than being replaced by name-based identity.
+Directory failure preserves camera metadata. An empty observation does not prove
+that no server can appear later. No Syphon client or server is created.
+No NDI network finder, Blackmagic backend discovery, monitor, output sender or
+device activation is started. No capture frames are requested.
 Remote QLab never uses the MCP Mac's local inventory as its hardware inventory.
 
 OSC, local metadata and saved data have separate provenance and are not one
@@ -1717,13 +1731,18 @@ Four editors accept `operations` batches of 1–50 typed operations:
 
 - `qlab_edit_video_stage`: stage and region creation/deletion, properties,
   mask assignment, Scale or Crop/Pad resize, region order/route, edge blending,
-  Perspective/Linear/Bézier, mesh splits, points, links and reset.
+  Perspective/Linear/Bézier, mesh splits, points, links and reset. `reorder_stages`
+  accepts the complete intended root stage order without changing composition layers.
 - `qlab_edit_video_output_route`: route creation/deletion, name, dimensions,
   rotation, rear projection, Center/Fit/Stretch/Fill, device and full/tiled output.
+  `reorder_routes` accepts the complete intended root route order.
 - `qlab_edit_video_output_devices`: configured NDI/Syphon creation, update and
   deletion. Renaming or changing a device updates its associated route descriptors.
+  NDI accepts audio sample rates 22050, 44100, 48000, 88200 and 96000 Hz.
 - `qlab_edit_video_input_patches`: patch creation/deletion/order, name, exact
   local or OBS source assignment/removal, Auto or supported explicit modes.
+  Patch names can be empty; temporary creation references cannot. Syphon directory
+  records are read-only candidates until native descriptor assignment is validated.
   For an explicit mode, copy the selected source’s exact dimensions and
   `available_formats[].pixel_format` code and choose an exact `frame_rates[].min` or `max`
   endpoint that QLab lists; do not infer a pixel code from its display label.
@@ -1731,6 +1750,11 @@ Four editors accept `operations` batches of 1–50 typed operations:
 The `editable_operations` list inside OSC stage/route details describes only the
 legacy single-property setters; it is not the full archive authoring inventory.
 Consult the corresponding editor’s `operations` schema for archive capabilities.
+
+Root order requests must include each active UUID exactly once. Objects created
+earlier in the same batch can use `@client_ref`; deleted objects are excluded from
+the active set. Fresh OSC readback verifies stage, route and input order as well
+as identity after execution.
 
 The stage and route editors retain `operation` with their original exact-ID
 arguments for single OSC setters. Choose that form **or** `operations`; they

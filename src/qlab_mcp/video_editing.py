@@ -137,9 +137,12 @@ def verify_video(reader,workspace_id,summary):
     live=(result.get('sections') or {}).get('video')
     if not isinstance(live,dict):raise ValueError('Fresh OSC video settings are unavailable.')
     for saved_section,live_section in [('stages','stages'),('routes','routes'),('inputs','input_patches')]:
-        actual={str(x.get('uniqueID','')).upper():x for x in _collection_items(live.get(live_section))}
+        rows=_collection_items(live.get(live_section))
+        actual={str(x.get('uniqueID','')).upper():x for x in rows}
         expected={x['id']:x for x in summary[saved_section]}
         if set(actual)!=set(expected):raise ValueError(f'Native video {saved_section} identities do not match the archive.')
+        if [str(x.get('uniqueID','')).upper() for x in rows]!=list(expected):
+            raise ValueError(f'Native video {saved_section} order does not match the archive.')
         for uid,saved in expected.items():
             current=actual[uid]
             if saved_section!='inputs' and current.get('name')!=saved.get('name'):
@@ -193,5 +196,5 @@ def edit_video(reader,workspace_id,domain,operations,dry_run=True,confirm_token=
     result['domain']=domain
     result['native_video_verified']=result.pop('native_patch_verified',False)
     result.pop('native_patch_verification_scope',None)
-    result['verification_scope']='Archive bytes and OSC stage/route identities, geometry, mesh controls, route dimensions, layout and destination. Viewport layer/mask, stage rendering flags, configured virtual-device parameters and input modes are verified in the saved archive only. Capture, rendering and physical signal are not verified.'
+    result['verification_scope']='Archive bytes and OSC stage/route/input identities and order, geometry, mesh controls, route dimensions, layout and destination. Viewport layer/mask, stage rendering flags, configured virtual-device parameters and input modes are verified in the saved archive only. Capture, rendering and physical signal are not verified.'
     return result

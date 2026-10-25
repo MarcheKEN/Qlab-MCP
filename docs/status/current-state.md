@@ -1,5 +1,18 @@
 # Current Project State — 2026-10-25
 
+## Settings follow-up — PR #19
+
+Definition details now expose all interpretable parameters independently of
+import eligibility. Video batches support root stage/route ordering, empty
+input names and five NDI audio sample rates. The native writer preserves the
+floating-point archive encoding of refresh/sample rates. Input inventories
+include a bounded public local Syphon directory observation after framework
+signature verification, without capture or assignment support.
+
+Automated verification: **2,303 passed, 35 skipped, 61 subtests passed**.
+Native acceptance and remaining limits are recorded in the
+[settings follow-up](../development/runtime-validation/2026-10-25-settings-extensions.md).
+
 ## Video Settings authoring — PR #19
 
 Four editors now support local saved-archive batches: stage/region, route,

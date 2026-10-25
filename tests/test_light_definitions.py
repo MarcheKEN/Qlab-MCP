@@ -290,6 +290,79 @@ def test_native_import_validation(change):
     assert not defs.inspect_native(value)['importable']
 
 
+def test_native_inspection_keeps_all_parameters_after_first_import_error():
+    value = native_virtuals()
+    value['parameters']['-1'] = value['parameters'].pop('-2')
+
+    detail = defs.inspect_native(value)
+
+    assert not detail['importable']
+    assert 'Virtual channel must be <= -2.' in detail['compatibility_notes']
+    assert detail['dmx_footprint'] == 12
+    assert detail['parameter_count'] == 17
+    assert detail['readable_parameter_count'] == 17
+    assert detail['unreadable_parameter_count'] == 0
+    assert detail['parameters_complete']
+    assert len(detail['parameters']) == 17
+    assert next(p for p in detail['parameters'] if p['channel'] == 11)['name'] == 'lime'
+
+
+def test_native_inspection_reads_more_than_import_limit():
+    parameters = {str(channel): dict(type='scalar', name=f'channel {channel}',
+                                    twoBytes=False, valueIsPercentage=False, homeValue=0)
+                  for channel in range(667)}
+    value = dict(name='Large', manufacturer='Example', defaultParameter=0,
+                 parameters=parameters)
+
+    detail = defs.inspect_native(value)
+
+    assert not detail['importable']
+    assert 'Definition parameter count is outside 1..512.' in detail['compatibility_notes']
+    assert detail['parameter_count'] == 667
+    assert detail['readable_parameter_count'] == 667
+    assert detail['unreadable_parameter_count'] == 0
+    assert detail['parameters_complete']
+    assert len(detail['parameters']) == 667
+    assert detail['dmx_footprint'] == 667
+
+
+def test_catalogue_detail_exposes_complete_native_parameter_coverage(catalogues):
+    value = native_virtuals()
+    value['parameters']['-1'] = value['parameters'].pop('-2')
+    catalogues[1].write_text(json.dumps(value))
+
+    summary = cat.get_light_definitions(None, source='personal')['definitions'][0]
+    detail = cat.get_light_definitions(None, source='personal',
+                                       definition_id=summary['definition_id'])['definitions'][0]
+
+    assert not detail['importable']
+    assert summary['parameter_count'] == detail['parameter_count'] == 17
+    assert detail['readable_parameter_count'] == 17
+    assert detail['unreadable_parameter_count'] == 0
+    assert detail['parameters_complete']
+    assert len(detail['parameters']) == 17
+    assert detail['dmx_footprint'] == 12
+
+
+def test_native_inspection_reports_parameter_entries_it_cannot_decode():
+    value = native()
+    value['parameters']['bad-channel'] = dict(type='scalar', name='unplaced',
+                                               twoBytes=False, valueIsPercentage=False, homeValue=0)
+    value['parameters']['12'] = 'not a parameter object'
+
+    detail = defs.inspect_native(value)
+
+    assert detail['parameter_count'] == len(value['parameters'])
+    assert detail['readable_parameter_count'] == 7
+    assert detail['unreadable_parameter_count'] == 2
+    assert len(detail['parameters']) == 8
+    assert not detail['parameters_complete']
+    assert any('bad-channel' in item for item in detail['parameter_diagnostics'])
+    assert any('12' in item for item in detail['parameter_diagnostics'])
+    invalid_channel = next(p for p in detail['parameters'] if p['name'] == 'unplaced')
+    assert invalid_channel['channel'] is None and invalid_channel['channel_key'] == 'bad-channel'
+
+
 def test_native_16bit_channel_gap_is_preserved():
     value = native(); value['parameters']['0']['twoBytes'] = True
     value['parameters']['10'] = value['parameters'].pop('1')

@@ -49,6 +49,143 @@ def test_inputs_join_only_by_exact_identity_and_keep_modes_separate(monkeypatch)
     assert any(x['name'] == 'Empty' and x['saved']['descriptor'] is None for x in result['data']['items'])
 
 
+def test_syphon_directory_sources_are_available_without_claiming_qlab_capture(monkeypatch):
+    server = dict(server_uuid='syphon-uuid', name='Program Output', application='OBS',
+                  type='SyphonServer', source='public_SyphonServerDirectory', capture_verified=False,
+                  assignment_supported=False, observed_in_qlab=False)
+    server_without_uuid = dict(server, server_uuid=None, name='Unidentified server')
+    native = dict(status='ready', devices=[], formats=[], syphon_status='ready',
+                  syphon_servers=[server, server_without_uuid], syphon_truncated=False,
+                  syphon_bounded_observation=True, syphon_settle_budget_seconds=1)
+    reader, saved = state(monkeypatch, native=native)
+    result = video.enrich_video_inventory(reader, WS, live(), 'inputs')
+    source = result['data']['available_sources'][0]
+    assert source == dict(server, ref=video._device_ref('macos_syphon_server_directory', 'syphon-uuid'))
+    assert result['data']['available_sources'][1]['server_uuid'] is None
+    assert not any(item.get('source') == 'public_SyphonServerDirectory' for item in result['data']['items'])
+    assert result['data']['coverage']['source_status']['syphon'] == 'ready'
+    assert result['data']['local_metadata']['syphon_status'] == 'ready'
+    assert result['data']['local_metadata']['syphon_bounded_observation'] is True
+    assert result['data']['local_metadata']['syphon_settle_budget_seconds'] == 1
+    from qlab_mcp.models import VideoInventoryResult
+    parsed = VideoInventoryResult.model_validate(result).model_dump()
+    assert parsed['data']['available_sources'][0]['server_uuid'] == 'syphon-uuid'
+    detail = video.enrich_video_inventory(reader, WS, live(), 'inputs', saved['inputs'][0]['id'])
+    assert detail['data']['available_sources'] == []
+
+
+def test_syphon_failure_keeps_avfoundation_inventory(monkeypatch):
+    from qlab_mcp import video_native as native
+    monkeypatch.setattr(native, '_syphon_inventory', lambda *args: (_ for _ in ()).throw(OSError('Syphon unavailable')))
+
+    class Obj:
+        def sel(self, name):
+            return name
+        def cls(self, name):
+            assert name == b'AVCaptureDevice'
+            return 'device-class'
+        def string(self, value):
+            return value
+        def send(self, obj, selector, *args):
+            return {'authorizationStatusForMediaType:': 0, 'devicesWithMediaType:': 'devices',
+                    'uniqueID': 'camera-1', 'localizedName': 'Camera', 'isConnected': True,
+                    'isSuspended': False, 'isInUseByAnotherApplication': False,
+                    'respondsToSelector:': True, 'activeFormat': None, 'formats': 'formats'}[selector]
+        def array(self, obj):
+            return (['device'] if obj == 'devices' else [], 1 if obj == 'devices' else 0)
+        def text(self, value):
+            return value
+
+    monkeypatch.setattr(native, '_Objects', Obj)
+    monkeypatch.setattr(native.C, 'CDLL', lambda *args: object())
+    monkeypatch.setattr(native, '_function', lambda lib, name, *args: (
+        lambda desc: native.Dimensions(1920, 1080)) if name == 'CMVideoFormatDescriptionGetDimensions'
+        else lambda desc: 1111970369)
+    result = native.inputs(include_syphon=True)
+    assert result['status'] == 'ready'
+    assert result['devices'][0]['id'] == 'camera-1'
+    assert result['syphon_status'] == 'unavailable'
+    assert result['syphon_servers'] == []
+
+
+def test_syphon_refuses_truncated_running_application_inventory(monkeypatch):
+    from qlab_mcp import video_native as native
+    monkeypatch.setattr(native.C, 'CDLL', lambda *args: object())
+
+    class Obj:
+        def cls(self, name):
+            return name
+        def send(self, obj, selector, *args):
+            return {'sharedWorkspace': 'workspace', 'runningApplications': 'applications'}[selector]
+        def array(self, obj):
+            assert obj == 'applications'
+            return [], 1001
+
+    with pytest.raises(ValueError, match='truncated'):
+        native._syphon_inventory(Obj())
+
+
+def test_syphon_framework_signature_failure_is_closed(monkeypatch):
+    from types import SimpleNamespace
+    from qlab_mcp import video_native as native
+    calls = []
+    def run(args, **kwargs):
+        calls.append((args, kwargs))
+        return SimpleNamespace(returncode=1)
+    monkeypatch.setattr(native.subprocess, 'run', run)
+    with pytest.raises(ValueError, match='signature'):
+        native._verify_syphon_framework('/sample/Syphon.framework')
+    args, kwargs = calls[0]
+    assert args[:3] == ['/usr/bin/codesign', '--verify', '--strict']
+    assert '7672N4CCJM' in args[-2]
+    assert 'anchor apple generic' in args[-2]
+    assert kwargs['timeout'] == 3
+
+
+def test_syphon_rejects_framework_outside_qlab_before_loading(monkeypatch, tmp_path):
+    import plistlib
+    from qlab_mcp import video_native as native
+    bundle = tmp_path / 'QLab.app'
+    frameworks = bundle / 'Contents' / 'Frameworks'
+    frameworks.mkdir(parents=True)
+    (bundle / 'Contents' / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier': native.QLAB_BUNDLE_ID}))
+    external = tmp_path / 'external.framework'
+    external.mkdir()
+    (external / 'Syphon').write_bytes(b'not code')
+    (frameworks / 'Syphon.framework').symlink_to(external)
+    loaded = []
+    monkeypatch.setattr(native.C, 'CDLL', lambda path: loaded.append(path))
+    monkeypatch.setattr(native, '_verify_syphon_framework', lambda path: pytest.fail('escaped framework verified'))
+    class Obj:
+        def cls(self, name): return name
+        def send(self, obj, selector, *args):
+            return {'sharedWorkspace': 'workspace', 'runningApplications': 'applications',
+                    'bundleIdentifier': native.QLAB_BUNDLE_ID, 'bundleURL': 'url', 'path': str(bundle)}[selector]
+        def array(self, obj): return ['application'], 1
+        def text(self, value): return value
+    with pytest.raises(ValueError, match='outside'):
+        native._syphon_inventory(Obj())
+    assert all('Syphon' not in path for path in loaded)
+
+
+def test_native_main_marks_syphon_byte_truncation(monkeypatch, capsys):
+    import json
+    from qlab_mcp import video_native as native
+    payload = dict(status='ready', devices=[], formats=[], syphon_status='ready', syphon_servers=[
+        dict(server_uuid='server', name='x' * 2000, application='app')], syphon_server_count=1,
+        syphon_truncated=False, syphon_bounded_observation=True, syphon_settle_budget_seconds=1,
+        syphon_source='public_SyphonServerDirectory')
+    monkeypatch.setattr(native.sys, 'platform', 'darwin')
+    monkeypatch.setattr(native.sys, 'argv', ['video_native', 'inputs', '--include-syphon'])
+    monkeypatch.setattr(native, 'inputs', lambda include_syphon=False: payload)
+    monkeypatch.setattr(native, 'MAX_BYTES', 1024)
+    native.main()
+    result = json.loads(capsys.readouterr().out)
+    assert result['syphon_servers'] == []
+    assert result['syphon_truncated'] is True
+    assert result['truncated'] is True
+
+
 def test_remote_never_queries_local_devices(monkeypatch):
     reader, _ = state(monkeypatch)
     reader.client.config.host = '192.0.2.7'
@@ -160,6 +297,7 @@ def test_native_process_timeout_and_invalid_payload_fail_without_retry(monkeypat
 def test_native_input_adapter_uses_metadata_getters_without_capture(monkeypatch, available):
     from qlab_mcp import video_native as native
     calls = []
+    monkeypatch.setattr(native, '_syphon_inventory', lambda *args: pytest.fail('default camera read queried Syphon'))
     class Obj:
         def sel(self, name):
             return name

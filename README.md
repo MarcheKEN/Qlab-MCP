@@ -381,13 +381,13 @@ saved state and do not execute cues.
 | `qlab_get_video_stage` | Read one stage and its regions. |
 | `qlab_get_video_output_route` | Read one route, scaling/layout and saved stage/region references. |
 | `qlab_get_video_output_devices` | Read passive local displays, route destinations and saved NDI/Syphon devices. |
-| `qlab_get_video_input_patches` | Read input patches, saved modes and passive local camera formats. |
+| `qlab_get_video_input_patches` | Read patches, saved modes, camera formats and bounded local Syphon server metadata. |
 | `qlab_get_video_region` | Read one region and an optional control point. |
 | `qlab_edit_workspace_general_settings` | Edit minimum GO time or selection/playhead lock. |
 | `qlab_edit_audio_output_patch` | Edit patch name, cue outputs, levels or mute/solo settings. |
-| `qlab_edit_video_stage` | Create, edit and delete stages, regions, masks, resize and warping in one guarded batch; legacy OSC rename remains available. |
-| `qlab_edit_video_output_route` | Create, edit and delete routes, device assignment, dimensions, rotation, scaling and partial output; legacy OSC guides remain available. |
-| `qlab_edit_video_output_devices` | Manage configured NDI/Syphon devices and update their associated routes. |
+| `qlab_edit_video_stage` | Create, edit, reorder and delete stages; manage regions, masks, resize and warping in a guarded batch. |
+| `qlab_edit_video_output_route` | Create, edit, reorder and delete routes; configure devices, dimensions, rotation, scaling and partial output. |
+| `qlab_edit_video_output_devices` | Manage configured NDI/Syphon devices and associated routes, including five NDI audio sample rates. |
 | `qlab_edit_video_input_patches` | Create, edit, order and delete input patches; assign local/OBS sources and Auto or explicit modes. |
 | `qlab_edit_video_region` | Edit supported region geometry, grid, guide or control point. |
 

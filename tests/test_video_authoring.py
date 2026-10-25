@@ -245,6 +245,80 @@ def test_strict_batch_limits_dimensions_and_explicit_null():
         with pytest.raises(ValidationError):TypeAdapter(adapter).validate_python(ops)
 
 
+@pytest.mark.parametrize('rate',[22050,44100,48000,88200,96000])
+def test_ndi_audio_sample_rate_accepts_qlab_values(rate):
+    from qlab_mcp.video_archive import plan_video
+    from qlab_mcp.video_settings import inspect_saved_video
+    source=video_workspace()
+    existing=inspect_saved_video(source)['destinations'][0]
+    result=plan_video(source,[dict(kind='create_device',client_ref='ndi',name='Rate',device_type='NDI',audio_sample_rate=rate)],domain='devices')
+    device=next(d for d in result['summary']['destinations'] if d['name']=='Rate')
+    assert device['fields']['audioSampleRate']==rate
+    assert type(device['fields']['audioSampleRate']) is float
+    updated=plan_video(source,[dict(kind='update_device',device_ref='saved-virtual:'+existing['id'],audio_sample_rate=rate)],domain='devices')
+    assert next(d for d in updated['summary']['destinations'] if d['name']=='NDI')['fields']['audioSampleRate']==rate
+    assert type(next(d for d in updated['summary']['destinations'] if d['name']=='NDI')['fields']['audioSampleRate']) is float
+    with pytest.raises(ValueError):
+        plan_video(source,[dict(kind='create_device',client_ref='bad',name='Bad',device_type='NDI',audio_sample_rate=32000)],domain='devices')
+
+
+def test_root_route_order_is_exact_and_preserves_route_dependencies():
+    from qlab_mcp.video_archive import VideoArchive,plan_video
+    source=video_workspace();before=Archive(source);before_editor=VideoArchive(source,{})
+    result=plan_video(source,[dict(kind='create_route',client_ref='extra',name='Extra'),
+        dict(kind='reorder_routes',route_ids=['@extra',ROUTE])],domain='routes')
+    assert [route['id'] for route in result['summary']['routes']]==[result['created_refs']['extra'],ROUTE]
+    after=Archive(result['output_bytes']);after_editor=VideoArchive(result['output_bytes'],{})
+    before_video=before.mapping(before.mapping(before.mapping(before.root)['settings'])['Video'])
+    after_video=after.mapping(after.mapping(after.mapping(after.root)['settings'])['Video'])
+    assert [before_editor.ident(before.ref(r)['uniqueID']) for r in before.array(before_video['routes'])]==[ROUTE]
+    assert [after_editor.ident(after.ref(r)['uniqueID']) for r in after.array(after_video['routes'])]==[result['created_refs']['extra'],ROUTE]
+    old=next(r for r in before.array(before_video['routes']) if before_editor.ident(before.ref(r)['uniqueID'])==ROUTE)
+    same=next(r for r in after.array(after_video['routes']) if after_editor.ident(after.ref(r)['uniqueID'])==ROUTE)
+    assert before.ref(old)==after.ref(same)
+    before_stage=before.array(before_video['stages'])[0]
+    after_stage=next(r for r in after.array(after_video['stages']) if after_editor.ident(after.ref(r)['uniqueID'])=='33333333-3333-4333-8333-333333333333')
+    assert before.ref(before.array(before.ref(before_stage)['regions'])[0])==after.ref(after.array(after.ref(after_stage)['regions'])[0])
+    for order in [['@extra'],[ROUTE,ROUTE]]:
+        with pytest.raises(ValueError,match='Route order'):
+            plan_video(source,[dict(kind='create_route',client_ref='extra',name='Extra'),
+                dict(kind='reorder_routes',route_ids=order)],domain='routes')
+
+
+def test_root_stage_order_is_exact_and_does_not_change_viewport_layers():
+    from qlab_mcp.video_archive import VideoArchive,plan_video
+    source=video_workspace();before=Archive(source)
+    result=plan_video(source,[dict(kind='create_stage',client_ref='extra',name='Extra'),
+        dict(kind='reorder_stages',stage_ids=['@extra','33333333-3333-4333-8333-333333333333'])],domain='stages')
+    assert [stage['id'] for stage in result['summary']['stages']]==[result['created_refs']['extra'],'33333333-3333-4333-8333-333333333333']
+    after=Archive(result['output_bytes']);after_editor=VideoArchive(result['output_bytes'],{})
+    before_video=before.mapping(before.mapping(before.mapping(before.root)['settings'])['Video'])
+    after_video=after.mapping(after.mapping(after.mapping(after.root)['settings'])['Video'])
+    old=before.array(before_video['stages'])[0]
+    same=next(r for r in after.array(after_video['stages']) if after_editor.ident(after.ref(r)['uniqueID'])=='33333333-3333-4333-8333-333333333333')
+    assert before.ref(old)==after.ref(same)
+    assert after.ref(after.ref(same)['viewport'])['layer']==1000
+    for order in [['@extra'],['33333333-3333-4333-8333-333333333333','33333333-3333-4333-8333-333333333333']]:
+        with pytest.raises(ValueError,match='Stage order'):
+            plan_video(source,[dict(kind='create_stage',client_ref='extra',name='Extra'),
+                dict(kind='reorder_stages',stage_ids=order)],domain='stages')
+
+
+def test_empty_input_name_is_allowed_without_relaxing_other_names():
+    from qlab_mcp.video_archive import plan_video
+    from qlab_mcp.video_models import InputOperations,RouteOperations
+    from pydantic import TypeAdapter,ValidationError
+    assert TypeAdapter(InputOperations).validate_python([dict(kind='create_input',client_ref='empty',name='')])
+    result=plan_video(video_workspace(),[dict(kind='create_input',client_ref='empty',name='')],domain='inputs')
+    assert result['summary']['inputs'][-1]['name']==''
+    updated=plan_video(video_workspace(),[dict(kind='update_input',patch_id='99999999-9999-4999-8999-999999999999',name='')],domain='inputs')
+    assert updated['summary']['inputs'][0]['name']==''
+    with pytest.raises(ValidationError):
+        TypeAdapter(RouteOperations).validate_python([dict(kind='create_route',client_ref='bad',name='')])
+    with pytest.raises(ValidationError):
+        TypeAdapter(InputOperations).validate_python([dict(kind='create_input',client_ref='bad',name='x'*256)])
+
+
 def test_video_schema_only_advertises_null_for_removable_assignments():
     from qlab_mcp.video_models import StageUpdate,VideoRouteUpdate,InputUpdate,DeviceUpdate
     for model in [StageUpdate,VideoRouteUpdate,InputUpdate,DeviceUpdate]:

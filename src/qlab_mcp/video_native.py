@@ -7,11 +7,27 @@ from __future__ import annotations
 
 import ctypes as C
 import json
+import plistlib
+import subprocess
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 LIMIT = 1000
 MAX_BYTES = 2 * 1024 * 1024
+QLAB_BUNDLE_ID = 'com.figure53.QLab.5'
+SYPHON_SETTLE_SECONDS = 1
+
+
+def _verify_syphon_framework(framework):
+    """Authenticate the code being loaded, rather than trusting a bundle identifier."""
+    requirement = ('=identifier "info.v002.Syphon" and anchor apple generic '
+                   'and certificate leaf[subject.OU] = "7672N4CCJM"')
+    result = subprocess.run(
+        ['/usr/bin/codesign', '--verify', '--strict', '--test-requirement', requirement, str(framework)],
+        capture_output=True, timeout=3, check=False)
+    if result.returncode:
+        raise ValueError('Syphon framework signature could not be verified as Figure 53 code.')
 
 
 class DisplayRect(C.Structure):
@@ -122,7 +138,7 @@ def displays():
                 truncated=total > len(rows), identity_scope='current_macos_display_session')
 
 
-def inputs():
+def inputs(include_syphon=False):
     C.CDLL('/System/Library/Frameworks/AVFoundation.framework/AVFoundation')
     cm = C.CDLL('/System/Library/Frameworks/CoreMedia.framework/CoreMedia')
     size = _function(cm, 'CMVideoFormatDescriptionGetDimensions', Dimensions, C.c_void_p)
@@ -172,9 +188,83 @@ def inputs():
                     min=o.send(r, 'minFrameRate', C.c_double), max=o.send(r, 'maxFrameRate', C.c_double)) for r in ranges[:64]],
                 frame_rates_truncated=range_count > 64))
         rows.append(row)
-    return dict(status='ready' if rows or authorization == 3 else 'permission_not_authorized',
-                authorization_status=authorization, devices=rows, formats=formats, device_count=total,
-                truncated=truncated, effective_capture_format_observed=False)
+    result = dict(status='ready' if rows or authorization == 3 else 'permission_not_authorized',
+                  authorization_status=authorization, devices=rows, formats=formats, device_count=total,
+                  truncated=truncated, effective_capture_format_observed=False)
+    if include_syphon:
+        try:
+            syphon = _syphon_inventory(o)
+        except Exception as exc:
+            syphon = dict(status='unavailable', source='public_SyphonServerDirectory', servers=[],
+                          count=0, truncated=False, bounded_observation=False,
+                          settle_budget_seconds=SYPHON_SETTLE_SECONDS, message=str(exc)[:512])
+        result.update(syphon_status=syphon['status'], syphon_servers=syphon['servers'],
+                      syphon_server_count=syphon['count'], syphon_truncated=syphon['truncated'],
+                      syphon_bounded_observation=syphon['bounded_observation'],
+                      syphon_settle_budget_seconds=syphon['settle_budget_seconds'],
+                      syphon_source=syphon['source'],
+                      **({'syphon_message': syphon['message']} if syphon.get('message') else {}))
+    return result
+
+
+def _syphon_inventory(o):
+    """Read the public Syphon directory using an authenticated bundled framework."""
+    C.CDLL('/System/Library/Frameworks/Foundation.framework/Foundation')
+    C.CDLL('/System/Library/Frameworks/AppKit.framework/AppKit')
+    workspace = o.send(o.cls(b'NSWorkspace'), 'sharedWorkspace')
+    applications, total = o.array(o.send(workspace, 'runningApplications'))
+    if total != len(applications):
+        raise ValueError('Running application inventory was truncated; QLab uniqueness cannot be verified.')
+    matches = [application for application in applications
+               if o.text(o.send(application, 'bundleIdentifier')) == QLAB_BUNDLE_ID]
+    if not matches:
+        return dict(status='qlab_not_running', source='public_SyphonServerDirectory', servers=[],
+                    count=0, truncated=False, bounded_observation=False,
+                    settle_budget_seconds=SYPHON_SETTLE_SECONDS)
+    if len(matches) != 1:
+        return dict(status='ambiguous_qlab_processes', source='public_SyphonServerDirectory', servers=[],
+                    count=0, truncated=False, bounded_observation=False,
+                    settle_budget_seconds=SYPHON_SETTLE_SECONDS)
+    path = o.text(o.send(o.send(matches[0], 'bundleURL'), 'path'))
+    if not path:
+        raise ValueError('The running QLab process did not report its bundle URL.')
+    bundle = Path(path).resolve(strict=True)
+    with (bundle / 'Contents' / 'Info.plist').open('rb') as stream:
+        if plistlib.load(stream).get('CFBundleIdentifier') != QLAB_BUNDLE_ID:
+            raise ValueError('Running QLab bundle identity did not match its Info.plist.')
+    framework = (bundle / 'Contents' / 'Frameworks' / 'Syphon.framework').resolve(strict=True)
+    library_path = (framework / 'Syphon').resolve(strict=True)
+    if not library_path.is_file():
+        raise OSError('Syphon.framework is unavailable in the running QLab bundle.')
+    if not framework.is_relative_to(bundle) or not library_path.is_relative_to(bundle):
+        raise ValueError('Syphon framework resolves outside the running QLab bundle.')
+    _verify_syphon_framework(framework)
+    library = C.CDLL(str(library_path))
+    keys = {name: C.c_void_p.in_dll(library, symbol).value for name, symbol in (
+        ('uuid', 'SyphonServerDescriptionUUIDKey'), ('name', 'SyphonServerDescriptionNameKey'),
+        ('application', 'SyphonServerDescriptionAppNameKey'))}
+    pool = o.send(o.cls(b'NSAutoreleasePool'), 'new')
+    try:
+        directory = o.send(o.cls(b'SyphonServerDirectory'), 'sharedDirectory')
+        if not directory:
+            raise ValueError('Public Syphon server directory is unavailable.')
+        loop = o.send(o.cls(b'NSRunLoop'), 'currentRunLoop')
+        until = o.send(o.cls(b'NSDate'), 'dateWithTimeIntervalSinceNow:', C.c_void_p,
+                       (C.c_double, float(SYPHON_SETTLE_SECONDS)))
+        o.send(loop, 'runUntilDate:', None, (C.c_void_p, until))
+        servers, total = o.array(o.send(directory, 'servers'))
+        rows = [dict(server_uuid=o.text(o.send(server, 'objectForKey:', C.c_void_p, (C.c_void_p, keys['uuid']))),
+                     name=o.text(o.send(server, 'objectForKey:', C.c_void_p, (C.c_void_p, keys['name']))),
+                     application=o.text(o.send(server, 'objectForKey:', C.c_void_p, (C.c_void_p, keys['application']))),
+                     type='SyphonServer', source='public_SyphonServerDirectory', capture_verified=False,
+                     assignment_supported=False, observed_in_qlab=False) for server in servers]
+        truncated = total > len(rows)
+        return dict(status='ready', source='public_SyphonServerDirectory', servers=rows, count=total,
+                    truncated=truncated, bounded_observation=True,
+                    settle_budget_seconds=SYPHON_SETTLE_SECONDS)
+    finally:
+        if pool:
+            o.send(pool, 'drain', None)
 
 
 def main():
@@ -183,15 +273,19 @@ def main():
             result = dict(status='unsupported_platform', devices=[], formats=[])
         elif sys.argv[1:] == ['devices']:
             result = displays()
-        elif sys.argv[1:] == ['inputs']:
-            result = inputs()
+        elif sys.argv[1:] in (['inputs'], ['inputs', '--include-syphon']):
+            result = inputs(include_syphon=sys.argv[1:] != ['inputs'])
         else:
             raise ValueError('Expected devices or inputs.')
         result['observed_at'] = datetime.now(timezone.utc).isoformat()
         while len(json.dumps(result, allow_nan=False).encode()) > MAX_BYTES:
             result['truncated'] = True
-            key = 'formats' if result.get('formats') else 'devices'
+            key = next((key for key in ('formats', 'syphon_servers', 'devices') if result.get(key)), None)
+            if key is None:
+                break
             result[key].pop()
+            if key == 'syphon_servers':
+                result['syphon_truncated'] = True
         print(json.dumps(result, allow_nan=False))
     except (OSError, ValueError, AttributeError, OverflowError) as exc:
         print(json.dumps(dict(status='unavailable', devices=[], formats=[], message=str(exc)[:512])))

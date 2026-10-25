@@ -22,6 +22,12 @@ closed by tool invocation alone. The pass changed no code and tested no playback
 
 ## Supported work and remaining gates
 
+The [settings follow-up](../development/runtime-validation/2026-10-25-settings-extensions.md)
+adds full readable definition details, root stage/route ordering, empty input
+names, five NDI audio sample rates and bounded local Syphon candidates. Import
+eligibility remains stricter than readability; the complete QLab process
+registry, NDI discovery and Blackmagic remain outside this delivery.
+
 | Area | Current scope | Remaining evidence or capability limits |
 | --- | --- | --- |
 | Visual geometry | Typed components/aggregates, crop, smooth, aspect ratio, blend, quaternion/reset | [Video geometry](../development/runtime-validation/2026-10-01-visual-cues.md) and [restoration fixes](../development/runtime-validation/2026-10-02-visual-cue-fixes.md) have bounded proof. Camera/Text combinations require their individual evidence; relative rotate, shutter and additional reset actions remain excluded. |

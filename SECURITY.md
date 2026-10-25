@@ -530,6 +530,10 @@ files are not executed. Pages contain at most 1,000 records and 2 MiB of JSON.
 Only exact detail requests include parameters; no raw archive graph is returned.
 Catalogue identity hashes source, origin and content. Duplicate names do not
 select another source implicitly. Dirty workspace data remains last-saved.
+Parameter inspection is independent of import validation: a rejected definition
+still exposes readable entries and explicit counts/diagnostics. Reading more
+than 512 controls, including virtual controls, does not relax import limits or
+authorize a write. Invalid channel keys remain uninterpreted rather than guessed.
 
 `qlab_edit_light_definitions` uses the same document transaction, recovery and
 activity checks as the patch editor, with a separate single-use
@@ -604,7 +608,16 @@ never create a capture input or
 session, locks/configures a device, requests camera access or reads frames.
 Metadata can be available with camera authorization not determined. Device
 providers are operated by macOS; the tool does not initialize QLab capture
-coordinators, NDI finders, Syphon scans or Blackmagic capture backends.
+coordinators, NDI finders or Blackmagic capture backends. The input inventory may
+load the public Syphon framework from the uniquely identified running QLab bundle
+and observe its local server directory for up to one second. Before loading,
+the helper requires an Apple-issued Figure 53 signature (team `7672N4CCJM`,
+identifier `info.v002.Syphon`) and a binary path inside that bundle. Failure or
+verification timeout disables Syphon enrichment without removing camera data.
+This authenticates the loaded framework, not the host process. This creates no
+Syphon client/server and requests no frames. It is a bounded observation, not
+an exhaustive inventory or proof of availability in QLab. UUID-less entries
+cannot establish identity; Syphon candidates are not yet assignable by the writer.
 
 The fixed native helper runs in an isolated Python subprocess with a ten-second
 timeout, output/record bounds and no shell/user-provided code. Native failures

@@ -238,6 +238,11 @@ class VideoArchive:
 
     def apply_route(self,op):
         kind=op['kind']
+        if kind=='reorder_routes':
+            ordered=[self.target('routes',r) for r in op['route_ids']]
+            if len(ordered)!=len(self.refs['routes']) or set(ordered)!=set(self.refs['routes']):raise ValueError('Route order must contain each active route exactly once.')
+            if ordered!=self.refs['routes']:self.refs['routes']=ordered;self.dirty=True
+            return
         if kind=='create_route':
             ref=self.object('F53VideoOutputRoute',uniqueID=self.a.add(self.uuid(op['client_ref'])),name=self.a.add(op['name']),
                 naturalSize=self.a.add(self.geo([op.get('width',1920),op.get('height',1080)])),
@@ -266,6 +271,11 @@ class VideoArchive:
     def apply_stage(self,op):
         from .video_geometry import edit_geometry
         kind=op['kind']
+        if kind=='reorder_stages':
+            ordered=[self.target('stages',r) for r in op['stage_ids']]
+            if len(ordered)!=len(self.refs['stages']) or set(ordered)!=set(self.refs['stages']):raise ValueError('Stage order must contain each active stage exactly once.')
+            if ordered!=self.refs['stages']:self.refs['stages']=ordered;self.dirty=True
+            return
         if kind=='create_stage':
             w,h=op.get('width',1920),op.get('height',1080)
             ref=self.object('VideoStage',uniqueID=self.a.add(self.uuid(op['client_ref'])),name=self.a.add(op['name']),
@@ -347,7 +357,7 @@ class VideoArchive:
         if typ=='Syphon' and any(k in op for k in ['pixel_format','audio_channels','audio_sample_rate','audio_buffer_size']):
             raise ValueError('Syphon has no NDI pixel/audio settings.')
         for field,key in [('name','name'),('frame_rate','refreshRate'),('audio_channels','audioChannels'),('audio_sample_rate','audioSampleRate'),('audio_buffer_size','audioBufferSize')]:
-            if field in op:self.put(ref,key,op[field])
+            if field in op:self.put(ref,key,float(op[field]) if field in {'frame_rate','audio_sample_rate'} else op[field])
         if 'pixel_format' in op:self.put(ref,'pixelFormat',int.from_bytes(op['pixel_format'].encode(),'big'))
         if 'width' in op or 'height' in op:
             w,h=self.geometry(ref,'size',2);self.put(ref,'size',self.geo([op.get('width',w),op.get('height',h)]))

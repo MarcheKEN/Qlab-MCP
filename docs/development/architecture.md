@@ -225,6 +225,12 @@ and system frameworks. It does not open capture sessions or output devices.
 `video_settings.py` retains separate source identities, validates saved stability
 around metadata enumeration and budgets every serialized inventory page. Native
 metadata is never substituted for a remote QLab host's hardware inventory.
+The read-only input inventory additionally observes the public local Syphon
+server directory for one second. Before loading the bundled framework it verifies
+the Figure 53 Developer ID signature; failures preserve AVFoundation results.
+The directory supplies candidates, not QLab assignments or capture evidence.
+Definition detail extraction likewise remains independent of strict import
+validation: readable parameters and diagnostics survive a rejected import.
 
 ### Video archive writes
 

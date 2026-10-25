@@ -964,12 +964,15 @@ def _route_inspection(data, route, stages):
                 rendered_output_verified=False)
 
 
-def _native_metadata(kind):
+def _native_metadata(kind, include_syphon=False):
     """Run only fixed metadata getters; timeout/failure must not trigger fallback capture."""
     import json
     import sys
     try:
-        response = subprocess.run([sys.executable, '-m', 'qlab_mcp.video_native', kind],
+        args = [sys.executable, '-m', 'qlab_mcp.video_native', kind]
+        if include_syphon and kind == 'inputs':
+            args.append('--include-syphon')
+        response = subprocess.run(args,
             capture_output=True, text=True, timeout=10, check=False)
         if response.returncode or len(response.stdout.encode()) > MAX_RESPONSE_BYTES:
             raise ValueError('Native video metadata process failed or exceeded its byte budget.')
@@ -980,6 +983,11 @@ def _native_metadata(kind):
                 or not isinstance(value.get('formats'), list)
                 or any(not isinstance(row, dict) for key in ('devices', 'formats') for row in value[key])):
             raise ValueError('Invalid native video metadata shape.')
+        if include_syphon and (not isinstance(value.get('syphon_servers', []), list)
+                or any(not isinstance(row, dict) for row in value.get('syphon_servers', []))):
+            value.update(syphon_status='unavailable', syphon_servers=[], syphon_server_count=0,
+                         syphon_truncated=False, syphon_bounded_observation=False,
+                         syphon_message='Invalid Syphon metadata shape.')
         return value
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         return dict(status='unavailable', devices=[], formats=[], message=sanitize_exception_message(exc))
@@ -1013,14 +1021,14 @@ def enrich_video_inventory(reader, workspace_id, result, kind, ref=None, offset=
                 _collection_items(technical.get('input_patches')), start=1)])
     saved = _saved(reader, workspace_id)
     usable = saved.get('status') in {'ready', 'partial'}
-    native = dict(status='workspace_not_verified', devices=[], formats=[])
+    native = dict(status='workspace_not_verified', devices=[], formats=[], syphon_status='not_queried')
     try:
         docs._local(reader)
     except ValueError:
-        native['status'] = 'remote_qlab'
+        native.update(status='remote_qlab', syphon_status='not_queried_remote_qlab')
     else:
         if result.get('ok') or usable:
-            native = _native_metadata(kind)
+            native = _native_metadata(kind, kind == 'inputs')
     if usable:
         after = _saved(reader, workspace_id)
         if (after.get('status') not in {'ready', 'partial'} or any(
@@ -1050,6 +1058,14 @@ def enrich_video_inventory(reader, workspace_id, result, kind, ref=None, offset=
             items.append(row)
         else:
             sources.append(row)
+    syphon_status = native.get('syphon_status', 'not_reported') if kind == 'inputs' else 'not_applicable'
+    if kind == 'inputs' and syphon_status == 'ready':
+        for server in native.get('syphon_servers', []):
+            identity = server.get('server_uuid')
+            source = dict(server)
+            if identity:
+                source['ref'] = _device_ref('macos_syphon_server_directory', identity)
+            sources.append(source)
     source_refs = {s['id']: s['ref'] for s in sources if s.get('id')}
     if kind == 'devices':
         for route in overview.get('routes') or []:
@@ -1097,15 +1113,15 @@ def enrich_video_inventory(reader, workspace_id, result, kind, ref=None, offset=
         items = [item for item in items if item['ref'].casefold() == str(ref).casefold()]
         if kind == 'inputs':
             matched = {x['available_source_ref'] for x in items if x.get('available_source_ref')}
-            sources = [s for s in sources if s['ref'] in matched]
+            sources = [s for s in sources if s.get('ref') in matched]
             formats = [f for f in formats if f.get('source_ref') in matched]
     saved_meta = {k: v for k, v in saved.items() if k not in {'stages', 'routes', 'inputs', 'destinations'}}
     osc_observed = any(overview.get(key) is not None for key in ('routes', 'input_patches', 'stages'))
     data = dict(items=[], available_sources=[], available_formats=[], saved_video=saved_meta,
-        local_metadata={k: v for k, v in native.items() if k not in {'devices', 'formats'}},
+        local_metadata={k: v for k, v in native.items() if k not in {'devices', 'formats', 'syphon_servers'}},
         coverage=dict(complete_qlab_device_registry=False, atomic_snapshot=False, passive=True,
             source_status=dict(live_osc=('partial' if result.get('errors') else 'available') if osc_observed else 'unavailable', saved_archive=saved.get('status'),
-                               local_metadata=native.get('status')),
+                               local_metadata=native.get('status'), syphon=syphon_status),
             unavailable=['unobserved_qlab_process_registry', 'network_source_discovery',
                          'Blackmagic_backend_enumeration', 'effective_capture_format', 'rendered_or_physical_output']))
     result.update(data=data, view='output_devices' if kind == 'devices' else 'input_patches', ref=ref)
@@ -1131,7 +1147,7 @@ def enrich_video_inventory(reader, workspace_id, result, kind, ref=None, offset=
             data[key] = rows[offset:offset + effective]
         more = any(offset + effective < n for n in counts.values())
         data['pagination'] = dict(section=result['view'], offset=offset, limit=limit, effective_limit=effective,
-            counts=counts, truncated=more or bool(native.get('truncated')), byte_limit=MAX_RESPONSE_BYTES,
+            counts=counts, truncated=more or bool(native.get('truncated')) or bool(native.get('syphon_truncated')), byte_limit=MAX_RESPONSE_BYTES,
             byte_truncated=effective < limit, next_requests=[dict(
                 tool='qlab_get_video_output_devices' if kind == 'devices' else 'qlab_get_video_input_patches',
                 arguments=dict(workspace_id=workspace_id, profile=result.get('profile', 'safe'),

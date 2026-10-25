@@ -4,6 +4,7 @@ from pydantic.json_schema import SkipJsonSchema
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, JsonValue, model_validator
 
 Name=Annotated[StrictStr,Field(min_length=1,max_length=255)]
+InputName=Annotated[StrictStr,Field(max_length=255)]
 Reference=Annotated[StrictStr,Field(min_length=1,max_length=512)]
 Dimension=Annotated[StrictInt,Field(ge=1,le=16384)]
 RouteDimension=Annotated[StrictInt,Field(ge=1,le=30000)]
@@ -64,6 +65,11 @@ class VideoRouteDelete(StrictModel):
     route_id: Reference
 
 
+class RouteOrder(StrictModel):
+    kind: Literal['reorder_routes']
+    route_ids: Annotated[list[Reference],Field(min_length=1,max_length=1000)]
+
+
 class StageFields(StrictModel):
     name: Name|SkipJsonSchema[None]=None
     layer: Annotated[StrictInt,Field(ge=0,le=1000)]|SkipJsonSchema[None]=None
@@ -89,6 +95,11 @@ class StageUpdate(StageFields):
 class StageDelete(StrictModel):
     kind: Literal['delete_stage']
     stage_id: Reference
+
+
+class StageOrder(StrictModel):
+    kind: Literal['reorder_stages']
+    stage_ids: Annotated[list[Reference],Field(min_length=1,max_length=1000)]
 
 
 class StageResize(StrictModel):
@@ -182,7 +193,7 @@ class DeviceFields(StrictModel):
     frame_rate: Annotated[float,Field(gt=0,le=240,allow_inf_nan=False)]|SkipJsonSchema[None]=None
     pixel_format: Literal['BGRA','2vuy']|SkipJsonSchema[None]=None
     audio_channels: Annotated[StrictInt,Field(ge=0,le=64)]|SkipJsonSchema[None]=None
-    audio_sample_rate: Literal[44100,48000]|SkipJsonSchema[None]=None
+    audio_sample_rate: Literal[22050,44100,48000,88200,96000]|SkipJsonSchema[None]=None
     audio_buffer_size: Literal[128,256,512,1024,2048]|SkipJsonSchema[None]=None
 
 
@@ -215,7 +226,7 @@ class InputFormat(StrictModel):
 
 
 class InputFields(StrictModel):
-    name: Name|SkipJsonSchema[None]=None
+    name: InputName|SkipJsonSchema[None]=None
     source_ref: Reference|None=None
     mode: Literal['auto']|InputFormat|SkipJsonSchema[None]=None
 
@@ -223,7 +234,7 @@ class InputFields(StrictModel):
 class InputCreate(InputFields):
     kind: Literal['create_input']
     client_ref: Name
-    name: Name
+    name: InputName
 
 
 class InputUpdate(InputFields):
@@ -245,8 +256,8 @@ def batch(union):
     return Annotated[list[Annotated[union,Field(discriminator='kind')]],Field(min_length=1,max_length=50)]
 
 
-RouteOperations=batch(VideoRouteCreate|VideoRouteUpdate|VideoRouteDelete)
-StageOperations=batch(StageCreate|StageUpdate|StageDelete|StageResize|RegionCreate|RegionUpdate|RegionDelete|RegionOrder|RegionMesh|RegionReset|PointEdit|PointLinks)
+RouteOperations=batch(VideoRouteCreate|VideoRouteUpdate|VideoRouteDelete|RouteOrder)
+StageOperations=batch(StageCreate|StageUpdate|StageDelete|StageOrder|StageResize|RegionCreate|RegionUpdate|RegionDelete|RegionOrder|RegionMesh|RegionReset|PointEdit|PointLinks)
 DeviceOperations=batch(DeviceCreate|DeviceUpdate|DeviceDelete)
 InputOperations=batch(InputCreate|InputUpdate|InputDelete|InputOrder)
 OPERATIONS={'routes':RouteOperations,'stages':StageOperations,'devices':DeviceOperations,'inputs':InputOperations}

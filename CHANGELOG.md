@@ -2,6 +2,13 @@
 
 ## 0.4.0 (Unreleased)
 
+- Keep Light Definition parameter inspection independent of import validation;
+  return complete readable details and explicit counts/diagnostics for rejected definitions.
+- Add root stage/route reorder batches, input-only empty names and all five
+  QLab NDI audio sample rates; verify native stage/route/input order after writes.
+- Add bounded public local Syphon server-directory observations to input sources,
+  preserving camera metadata on failure and keeping Syphon assignment unavailable.
+
 - Extended stage and route editors with typed 1–50-operation archive batches,
   retaining their original single-property OSC forms.
 - Added guarded NDI/Syphon output-device and local/OBS input-patch editors.

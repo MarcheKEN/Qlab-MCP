@@ -2,6 +2,27 @@
 
 ## 0.4.0 (Unreleased)
 
+- Extended stage and route editors with typed 1–50-operation archive batches,
+  retaining their original single-property OSC forms.
+- Added guarded NDI/Syphon output-device and local/OBS input-patch editors.
+- Added stage masks, explicit resize, regions, edge blends and validated
+  warp/mesh/point operations with dependency-aware deletion.
+- Bound virtual device refs to their archive object/snapshot; callers must refresh
+  saved virtual references after document changes. `virtualID` remains registry
+  scope and is not a device identifier.
+- Verified the exact running QLab installation and reused the archive transaction
+  for video, preserving the lighting compatibility adapter.
+
+- Restricted explicit input FPS to QLab 5.5.10 selectable range endpoints.
+  Interior AVFoundation rates could be saved but displayed as Auto in QLab.
+
+- Fixed import of native Light Definitions with canonical numeric-string default
+  parameter indices; catalogue and archive imports now agree without changing the
+  source payload/hash. Invalid or missing indices remain blocked.
+- Aligned video update schemas with explicit-null rules: omission preserves values;
+  only removable assignments advertise null. Current surface: **87 tools —
+  52 read-only and 35 gated writes**.
+
 - Enrich passive video inventories with camera connected/suspended/in-use state,
   unverified AVFoundation observed format, macOS display active/asleep/mirrored
   flags, field-specific unknown reasons and timestamp-independent content hashes.
@@ -30,8 +51,8 @@
   and conflicting batches, and preserve textual references. No playback.
 - Extend definition creation/import to CMY, HSI, Pan/Tilt, acyclic One-to-Many
   controls and RGB lime, preserving native channels, bindings and metadata.
-  Virtual controls consume no physical DMX channels. Current surface: **85 tools,
-  52 reads and 33 gated writes**.
+  Virtual controls consume no physical DMX channels. Historical checkpoint before
+  the video editors: **85 tools, 52 reads and 33 gated writes**.
 
 - Add `qlab_get_light_definitions`: source-aware paged catalogue of bundled, personal
   and last-saved workspace definitions, with exact channel/control detail.
@@ -448,16 +469,3 @@
 
 Earlier development plans and phase records are available in
 [`docs/archive/`](docs/archive/README.md).
-
-### Video Settings authoring (development)
-
-- Extend stage and route editors with typed 1–50-operation archive batches,
-  retaining their original single-property OSC forms.
-- Add guarded NDI/Syphon output-device and local/OBS input-patch editors.
-- Support stage masks, explicit resize, regions, edge blends and validated
-  warp/mesh/point operations with dependency-aware deletion.
-- Bind virtual device refs to their archive object/snapshot; callers must refresh
-  saved virtual references after document changes. `virtualID` remains registry
-  scope and is not a device identifier.
-- Verify the exact running QLab installation and reuse the archive transaction
-  for video, preserving the lighting compatibility adapter.

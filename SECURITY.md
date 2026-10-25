@@ -104,8 +104,9 @@ The native `modified` flag is not a revision counter: edits made while it is
 already true cannot be detected by comparing that flag. Save therefore can
 include edits made after its dry run. Opening beside an already open document
 is blocked because this bridge cannot prove unique internal workspace identity
-before QLab assigns the new UUID. These lifecycle tools require exactly one
-running `/Applications/QLab.app`; they do not control a remote instance.
+before QLab assigns the new UUID. These lifecycle tools verify exactly one running local QLab bundle and target
+that installation; they do not control a remote instance. The installed
+`/Applications/QLab.app` dictionary supplies compile-time terminology only.
 
 Native Trigger reads are opt-in (`include_native_triggers=true`). A complete
 snapshot includes all supported Trigger fields, MIDI display/numeric aliases,

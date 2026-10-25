@@ -48,3 +48,5 @@ Use the [current tool catalogue](../../user/tools.md) and
 
 - [Video Settings authoring — October 25](2026-10-25-video-authoring.md): typed
   four-domain batches, same-path native acceptance, preservation and registry limits.
+- [Attached Light/Video audit — October 25](2026-10-25-light-video-audit.md):
+  restarted-MCP calls, native UI contrast, catalogue/FPS fixes and exact UI gaps.

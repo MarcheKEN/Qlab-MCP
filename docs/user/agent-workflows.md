@@ -1629,8 +1629,10 @@ bundle identifier and queries that exact running bundle, including installations
 outside `/Applications`. Multiple instances still make native enrichment
 unavailable. This separate read inventory performs no lifecycle action and
 retains exact workspace UUID, file identity, version and stability checks.
-Document mutation preflights and Save/Close/Open retain their existing
-`/Applications/QLab.app` restriction.
+Document Save/Close/Open and archive transactions target that same verified
+running installation. AppleScript dictionary compilation uses the installed
+`/Applications/QLab.app` dictionary; this is not the target document path. Separate
+cue-native helpers retain their own installation restrictions.
 
 Saved region `warping_center` is derived by evaluating the forward warp at the
 region midpoint, then subtracting half the saved output-route raster. It handles
@@ -1722,6 +1724,13 @@ Four editors accept `operations` batches of 1–50 typed operations:
   deletion. Renaming or changing a device updates its associated route descriptors.
 - `qlab_edit_video_input_patches`: patch creation/deletion/order, name, exact
   local or OBS source assignment/removal, Auto or supported explicit modes.
+  For an explicit mode, copy the selected source’s exact dimensions and
+  `available_formats[].pixel_format` code and choose an exact `frame_rates[].min` or `max`
+  endpoint that QLab lists; do not infer a pixel code from its display label.
+
+The `editable_operations` list inside OSC stage/route details describes only the
+legacy single-property setters; it is not the full archive authoring inventory.
+Consult the corresponding editor’s `operations` schema for archive capabilities.
 
 The stage and route editors retain `operation` with their original exact-ID
 arguments for single OSC setters. Choose that form **or** `operations`; they

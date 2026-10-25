@@ -852,7 +852,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_video_stage'] = {'title': 'Edit QLab 
                  'idempotentHint': False,
                  'openWorldHint': True},
  'tags': ['gated-write', 'qlab', 'settings', 'video'],
- 'input_schema_hash': 'd158f73c438657affeef92e32102e4548a133fc94ad3c0ab4dc90b823f7eca89',
+ 'input_schema_hash': '3fb3c20b73f5b3385ae2deeea0d1d5a6700b2779f4d01def8b461171778d6c7d',
  'output_schema_hash': 'ab828b2706fb68016618a8e57c58982d56c780719689ac1a54678d16dfa0f408'}
 EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_video_output_route'] = {'title': 'Edit QLab Video Output Route',
  'timeout': 120.0,
@@ -861,7 +861,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_video_output_route'] = {'title': 'Edi
                  'idempotentHint': False,
                  'openWorldHint': True},
  'tags': ['gated-write', 'qlab', 'settings', 'video'],
- 'input_schema_hash': 'e32405e767f6cd13f51a7c59c8cb11c9e97956ece30bdff4cd15ddab129ce0d1',
+ 'input_schema_hash': 'bbc1a368dc3b5f17f4119e154548f988a0db4031c0dd1aeb71f49705d01bd407',
  'output_schema_hash': 'ab828b2706fb68016618a8e57c58982d56c780719689ac1a54678d16dfa0f408'}
 EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_video_output_devices'] = {'title': 'Edit QLab Video Output Devices',
  'timeout': 120.0,
@@ -870,7 +870,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_video_output_devices'] = {'title': 'E
                  'idempotentHint': False,
                  'openWorldHint': True},
  'tags': ['gated-write', 'qlab', 'settings', 'video'],
- 'input_schema_hash': '38fd0003d057ac124e04e3c3aa548e9a0aa0bdba4a540c2f6ada86be55ebfc83',
+ 'input_schema_hash': '65cfc6f0d3fc4cb99555d9e10409c424d6f8dc22564322ae446307dbfd51f45a',
  'output_schema_hash': 'ab828b2706fb68016618a8e57c58982d56c780719689ac1a54678d16dfa0f408'}
 EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_video_input_patches'] = {'title': 'Edit QLab Video Input Patches',
  'timeout': 120.0,
@@ -879,7 +879,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_video_input_patches'] = {'title': 'Ed
                  'idempotentHint': False,
                  'openWorldHint': True},
  'tags': ['gated-write', 'qlab', 'settings', 'video'],
- 'input_schema_hash': '4e038cd35bc850feb9c2a70a547c51a35698651f07f0c77bd7954ee0bb25be73',
+ 'input_schema_hash': 'a1b3ae27015631ef820c7bfa6ea6614e9ff02c77917008406f67f640dec700b8',
  'output_schema_hash': 'ab828b2706fb68016618a8e57c58982d56c780719689ac1a54678d16dfa0f408'}
 ADDED_TOOL_NAMES = {
     "qlab_get_video_effect_catalogue", "qlab_get_workspace_document",

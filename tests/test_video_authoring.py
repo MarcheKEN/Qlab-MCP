@@ -212,12 +212,12 @@ def test_link_merges_existing_groups_without_detaching_unselected_peers():
     assert a==second['mesh_subregions'][0]['control_points'][0]['link_id']
 
 
-def test_manual_input_accepts_interior_of_supported_frame_rate_range():
+def test_manual_input_rejects_interior_rate_not_listed_by_qlab():
     from qlab_mcp.video_archive import plan_video
-    p=plan_video(video_workspace(),[dict(kind='update_input',patch_id='99999999-9999-4999-8999-999999999999',
-        mode=dict(width=1280,height=720,pixel_format=875704438,frame_rate=24))],domain='inputs',context={
-        'formats':{'camera-1':[dict(width=1280,height=720,pixel_format=875704438,frame_rates=[dict(min=15,max=30)])]}})
-    assert p['summary']['inputs'][0]['descriptor']['config']['AVCaptureFormat']['framesPerSecond']==24
+    with pytest.raises(ValueError,match='not present'):
+        plan_video(video_workspace(),[dict(kind='update_input',patch_id='99999999-9999-4999-8999-999999999999',
+            mode=dict(width=1280,height=720,pixel_format=875704438,frame_rate=24))],domain='inputs',context={
+            'formats':{'camera-1':[dict(width=1280,height=720,pixel_format=875704438,frame_rates=[dict(min=15,max=30)])]}})
 
 
 def test_stale_virtual_reference_and_unknown_replaced_mesh_data_block():
@@ -243,3 +243,16 @@ def test_strict_batch_limits_dimensions_and_explicit_null():
                         ([dict(kind='update_stage',stage_id=ROUTE,name=None)],StageOperations),
                         ([dict(kind='split_region',stage_id=ROUTE,region_id=ROUTE,width=3,height=1)],StageOperations)]:
         with pytest.raises(ValidationError):TypeAdapter(adapter).validate_python(ops)
+
+
+def test_video_schema_only_advertises_null_for_removable_assignments():
+    from qlab_mcp.video_models import StageUpdate,VideoRouteUpdate,InputUpdate,DeviceUpdate
+    for model in [StageUpdate,VideoRouteUpdate,InputUpdate,DeviceUpdate]:
+        contract=model.model_json_schema()
+        schema=contract['properties']
+        for name,field in schema.items():
+            nullable=any(branch.get('type')=='null' for branch in field.get('anyOf',[]))
+            if name in {'mask_path','device_ref','source_ref','route_id'} and name not in contract.get('required',[]):
+                assert nullable
+            else:
+                assert not nullable,(model.__name__,name)

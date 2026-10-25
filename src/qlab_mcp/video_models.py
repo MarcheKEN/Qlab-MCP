@@ -1,5 +1,6 @@
 """Strict operations for version-gated video document authoring."""
 from typing import Annotated, Literal
+from pydantic.json_schema import SkipJsonSchema
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, JsonValue, model_validator
 
 Name=Annotated[StrictStr,Field(min_length=1,max_length=255)]
@@ -32,17 +33,17 @@ class Bounds(StrictModel):
 
 
 class RouteFields(StrictModel):
-    name: Name|None=None
-    width: RouteDimension|None=None
-    height: RouteDimension|None=None
-    rotation: Literal[0,90,180,270]|None=None
-    scaling: Literal['center','fit','stretch','fill']|None=None
-    rear: StrictBool|None=None
+    name: Name|SkipJsonSchema[None]=None
+    width: RouteDimension|SkipJsonSchema[None]=None
+    height: RouteDimension|SkipJsonSchema[None]=None
+    rotation: Literal[0,90,180,270]|SkipJsonSchema[None]=None
+    scaling: Literal['center','fit','stretch','fill']|SkipJsonSchema[None]=None
+    rear: StrictBool|SkipJsonSchema[None]=None
     device_ref: Reference|None=None
-    layout_wide: Annotated[StrictInt,Field(ge=1,le=4)]|None=None
-    layout_high: Annotated[StrictInt,Field(ge=1,le=4)]|None=None
-    layout_index: Annotated[StrictInt,Field(ge=0,le=15)]|None=None
-    guideline_mode: Annotated[StrictInt,Field(ge=0,le=15)]|None=None
+    layout_wide: Annotated[StrictInt,Field(ge=1,le=4)]|SkipJsonSchema[None]=None
+    layout_high: Annotated[StrictInt,Field(ge=1,le=4)]|SkipJsonSchema[None]=None
+    layout_index: Annotated[StrictInt,Field(ge=0,le=15)]|SkipJsonSchema[None]=None
+    guideline_mode: Annotated[StrictInt,Field(ge=0,le=15)]|SkipJsonSchema[None]=None
 
 
 class VideoRouteUpdate(RouteFields):
@@ -64,12 +65,12 @@ class VideoRouteDelete(StrictModel):
 
 
 class StageFields(StrictModel):
-    name: Name|None=None
-    layer: Annotated[StrictInt,Field(ge=0,le=1000)]|None=None
-    keep_rendering: StrictBool|None=None
+    name: Name|SkipJsonSchema[None]=None
+    layer: Annotated[StrictInt,Field(ge=0,le=1000)]|SkipJsonSchema[None]=None
+    keep_rendering: StrictBool|SkipJsonSchema[None]=None
     mask_path: Reference|None=None
-    grid_is_dark: StrictBool|None=None
-    grid_bypasses_edge_blends: StrictBool|None=None
+    grid_is_dark: StrictBool|SkipJsonSchema[None]=None
+    grid_bypasses_edge_blends: StrictBool|SkipJsonSchema[None]=None
 
 
 class StageCreate(StageFields):
@@ -113,16 +114,16 @@ class RegionUpdate(StrictModel):
     stage_id: Reference
     region_id: Reference
     route_id: Reference|None=None
-    bounds: Bounds|None=None
-    warp: Literal['perspective','linear','bezier']|None=None
-    auto_edge_blends: StrictBool|None=None
-    edge_top: Annotated[float,Field(ge=0,le=16384,allow_inf_nan=False)]|None=None
-    edge_bottom: Annotated[float,Field(ge=0,le=16384,allow_inf_nan=False)]|None=None
-    edge_left: Annotated[float,Field(ge=0,le=16384,allow_inf_nan=False)]|None=None
-    edge_right: Annotated[float,Field(ge=0,le=16384,allow_inf_nan=False)]|None=None
-    blend_gamma: Annotated[float,Field(gt=0,le=10,allow_inf_nan=False)]|None=None
-    blend_power: Annotated[float,Field(gt=0,le=10,allow_inf_nan=False)]|None=None
-    center_luminance: Annotated[float,Field(ge=0,le=1,allow_inf_nan=False)]|None=None
+    bounds: Bounds|SkipJsonSchema[None]=None
+    warp: Literal['perspective','linear','bezier']|SkipJsonSchema[None]=None
+    auto_edge_blends: StrictBool|SkipJsonSchema[None]=None
+    edge_top: Annotated[float,Field(ge=0,le=16384,allow_inf_nan=False)]|SkipJsonSchema[None]=None
+    edge_bottom: Annotated[float,Field(ge=0,le=16384,allow_inf_nan=False)]|SkipJsonSchema[None]=None
+    edge_left: Annotated[float,Field(ge=0,le=16384,allow_inf_nan=False)]|SkipJsonSchema[None]=None
+    edge_right: Annotated[float,Field(ge=0,le=16384,allow_inf_nan=False)]|SkipJsonSchema[None]=None
+    blend_gamma: Annotated[float,Field(gt=0,le=10,allow_inf_nan=False)]|SkipJsonSchema[None]=None
+    blend_power: Annotated[float,Field(gt=0,le=10,allow_inf_nan=False)]|SkipJsonSchema[None]=None
+    center_luminance: Annotated[float,Field(ge=0,le=1,allow_inf_nan=False)]|SkipJsonSchema[None]=None
 
 
 class RegionDelete(StrictModel):
@@ -175,14 +176,14 @@ class PointLinks(StrictModel):
 
 
 class DeviceFields(StrictModel):
-    name: Name|None=None
-    width: Dimension|None=None
-    height: Dimension|None=None
-    frame_rate: Annotated[float,Field(gt=0,le=240,allow_inf_nan=False)]|None=None
-    pixel_format: Literal['BGRA','2vuy']|None=None
-    audio_channels: Annotated[StrictInt,Field(ge=0,le=64)]|None=None
-    audio_sample_rate: Literal[44100,48000]|None=None
-    audio_buffer_size: Literal[128,256,512,1024,2048]|None=None
+    name: Name|SkipJsonSchema[None]=None
+    width: Dimension|SkipJsonSchema[None]=None
+    height: Dimension|SkipJsonSchema[None]=None
+    frame_rate: Annotated[float,Field(gt=0,le=240,allow_inf_nan=False)]|SkipJsonSchema[None]=None
+    pixel_format: Literal['BGRA','2vuy']|SkipJsonSchema[None]=None
+    audio_channels: Annotated[StrictInt,Field(ge=0,le=64)]|SkipJsonSchema[None]=None
+    audio_sample_rate: Literal[44100,48000]|SkipJsonSchema[None]=None
+    audio_buffer_size: Literal[128,256,512,1024,2048]|SkipJsonSchema[None]=None
 
 
 class DeviceCreate(DeviceFields):
@@ -206,16 +207,17 @@ class DeviceDelete(StrictModel):
 
 
 class InputFormat(StrictModel):
+    """Exact source dimensions/pixel code and a QLab-selectable FPS range endpoint."""
     width: Dimension
     height: Dimension
-    pixel_format: Annotated[StrictInt,Field(ge=0,le=2**32-1)]
-    frame_rate: Annotated[float,Field(gt=0,le=240,allow_inf_nan=False)]
+    pixel_format: Annotated[StrictInt,Field(ge=0,le=2**32-1,description='Exact available_formats[].pixel_format code for the selected source; do not infer it from a display label.')]
+    frame_rate: Annotated[float,Field(gt=0,le=240,allow_inf_nan=False,description="Exact frame_rates[].min or max from the selected format; QLab does not list arbitrary interior rates.")]
 
 
 class InputFields(StrictModel):
-    name: Name|None=None
+    name: Name|SkipJsonSchema[None]=None
     source_ref: Reference|None=None
-    mode: Literal['auto']|InputFormat|None=None
+    mode: Literal['auto']|InputFormat|SkipJsonSchema[None]=None
 
 
 class InputCreate(InputFields):
@@ -248,6 +250,7 @@ StageOperations=batch(StageCreate|StageUpdate|StageDelete|StageResize|RegionCrea
 DeviceOperations=batch(DeviceCreate|DeviceUpdate|DeviceDelete)
 InputOperations=batch(InputCreate|InputUpdate|InputDelete|InputOrder)
 OPERATIONS={'routes':RouteOperations,'stages':StageOperations,'devices':DeviceOperations,'inputs':InputOperations}
+
 
 
 class VideoArchiveEditResult(BaseModel):

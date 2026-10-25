@@ -105,7 +105,7 @@ def _record(source, origin, payload, fingerprint):
                 dmx_footprint=detail['dmx_footprint'], importable=detail['importable'],
                 compatibility_notes=detail['compatibility_notes'],
                 source_sha256=fingerprint, parameters=detail['parameters'],
-                default_parameter=native.get('defaultParameter', -1),
+                default_parameter=detail['default_parameter'],
                 definition_version=native.get('definitionVersion'),
                 uninterpreted_fields=detail['uninterpreted_fields'], _native=native)
 

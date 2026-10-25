@@ -1206,6 +1206,8 @@ def qlab_get_video_stage(
     coordinates. Up to sixteen current regions/routes receive supplemental grid/guide reads;
     missing values and continuation requests remain explicit. Coverage distinguishes
     UI actions from saved properties and names unverified UI state. Reads never save.
+    editable_operations inside OSC detail lists legacy setters only; the stage
+    editor operations schema defines archive capabilities.
     Offset/limit page saved geometry entries; follow pagination.next_requests.
     Unsaved changes require explicit Save preview/confirmation before a fresh file-edit baseline.
     """
@@ -1235,6 +1237,8 @@ def qlab_get_video_output_route(
     saved_video adds the exact saved route configuration, separately from current OSC.
     inspection adds validated scaling names, full/partial layout geometry and
     saved stage/region references with explicit provenance and freshness.
+    editable_operations inside OSC detail lists legacy setters only; consult the
+    route editor operations schema for archive authoring capabilities.
     No device activation, saving or output is performed.
     """
     return _run_workspace_settings_domain(
@@ -2951,6 +2955,7 @@ def qlab_edit_video_input_patches(
 
     Exact patch UUIDs and passive AVFoundation source refs only, including OBS.
     mode is auto or a supported explicit width/height/pixel-format/frame-rate.
+    Copy pixel_format from available_formats for that exact source; do not guess.
     Configured mode is not effective capture. Sources cannot be discovered over
     NDI/Syphon or Blackmagic here. Deletion in use is blocked. Requires a clean
     inactive QLab 5.5.10/build 5510 document, preview and one-use token; internally

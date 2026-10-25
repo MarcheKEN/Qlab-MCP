@@ -5,8 +5,8 @@
 QLab MCP **0.4.0** connects an MCP-compatible agent to QLab 5, primarily through
 OSC. It can organize cues, configure supported properties and inspect workspace
 settings. Selected local functions use fixed AppleScript bridges on macOS.
-The Light Patch editor also edits the saved local workspace archive under a
-guarded close, replace and reopen workflow.
+Light Patch/Definition, Light curve and Video Settings batches also edit the
+saved local archive under a guarded close, replace and reopen workflow.
 
 **Developed and tested with QLab 5.5.10 on macOS.** Other QLab versions may
 behave differently and have not been validated by this project.
@@ -28,13 +28,16 @@ Writes are disabled by default and require a reviewed preview and confirmation.
 | Organize | Create cues, edit names/numbers, move cues and reorder Lists/Carts. |
 | Configure | Edit supported Audio, Video, Light, Text, MIDI and other cue settings. |
 | Workspace settings | Read six settings domains; edit selected General, Audio and Video properties. |
+| Video Settings | Inspect current/saved stages, routes, devices and inputs; batch edit supported stages/regions, routes, NDI/Syphon devices and local/OBS input patches. |
 | Light Patch | Read current OSC data and saved local patch configuration in one call; batch create, edit, rename and delete instruments and groups. Manage definitions with a separate catalogue and editor. |
 | Local documents | Inspect documents; open, save or clean-close under specific safeguards. |
 | Local media | Find authorized files and analyze audio without playing it. |
 
 AppleScript covers local document operations, Load Time, Target assigned number
-and selected native triggers. It requires a running `/Applications/QLab.app`
-and macOS Automation permission for the MCP host. Ordinary cue access uses OSC.
+and selected native triggers. Document/archive bridges verify the unique running
+QLab installation, including installations outside `/Applications`; some
+cue-native helpers retain their `/Applications/QLab.app` requirement. macOS
+Automation permission belongs to the MCP host. Ordinary cue access uses OSC.
 Light Patch file editing requires local QLab **5.5.10/build 5510**. USB-DMX
 assignments store the supplied device identity; they do not discover a device
 or prove it is connected. Definition creation/import supports scalar 8/16-bit channels, RGB (including lime),
@@ -48,6 +51,9 @@ for recovery and readback limits.
 - Execute cues: no GO, playback, stop, panic or Audition tools.
 - Send arbitrary OSC, run arbitrary AppleScript or perform `/live` writes.
 - Expose every QLab Inspector setting, Audio Maps or Script compilation.
+- Reproduce all Settings UI controls: Light Dashboard/global-library writes,
+  USB device discovery, Blackmagic/new network input assignment, the full QLab
+  device registry and the unlicensed “Video output for all cues” selector are outside scope.
 - Delete root Cue Lists/Carts or execute Cart cell moves.
 - Guarantee playback or physical output from a successful configuration change.
 

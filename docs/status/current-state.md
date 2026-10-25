@@ -12,9 +12,14 @@ are blocked. Initial compatibility remains QLab 5.5.10/build 5510.
 
 See [workflow](../user/agent-workflows.md#author-video-settings). Native acceptance
 and limitations are recorded in the [October 25 report](../development/runtime-validation/2026-10-25-video-authoring.md), separately from physical output.
-Source verification: **2,268 passed, 35 skipped, 61 subtests passed**; FastMCP
-inspection exposes 87 tools. The PR remains in draft for review and final
-attached-process acceptance after restart.
+Source verification: **2,281 passed, 35 skipped, 61 subtests passed**; FastMCP
+exposes 87 tools. The [attached audit](../development/runtime-validation/2026-10-25-light-video-audit.md)
+now records real restarted-MCP calls and native UI agreement, including fixes for
+string default indices and camera modes not selectable by QLab. This is supported
+settings coverage, not full UI parity. Approved temporary objects were removed;
+final reads confirm the original Light/video inventories and a clean inactive
+workspace. The interrupted operation’s recovery remains retained separately.
+The PR remains in draft for review.
 
 ## Passive video inventories — PR #19
 

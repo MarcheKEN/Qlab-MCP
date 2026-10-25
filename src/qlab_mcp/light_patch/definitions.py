@@ -78,6 +78,7 @@ def inspect_native(native: dict) -> dict:
     """Describe native definitions and verify all fields can survive import."""
     parameters, notes, unknown, warnings = [], [], [], []
     footprint = 0
+    default = native.get('defaultParameter', -1)
     try:
         _check_preservable_json(native)
         _NAME.validate_python(native.get('name'))
@@ -169,7 +170,10 @@ def inspect_native(native: dict) -> dict:
             done.add(name)
         for name in virtual_graph:
             visit(name)
-        default = native.get('defaultParameter', -1)
+        if isinstance(default, str):
+            channel = int(default)
+            if str(channel) == default:
+                default = channel
         if type(default) is not int or default != -1 and default not in entries:
             raise ValueError('Default parameter does not exist.')
         if footprint < 1:
@@ -179,7 +183,7 @@ def inspect_native(native: dict) -> dict:
             warnings.append('Uninterpreted JSON metadata is preserved structurally; its application semantics are unknown.')
     except (ValueError, TypeError, KeyError, OverflowError) as exc:
         notes.append(str(exc))
-    return dict(parameters=parameters, dmx_footprint=footprint or None,
+    return dict(parameters=parameters, default_parameter=default, dmx_footprint=footprint or None,
                 importable=not notes, compatibility_notes=notes + warnings, uninterpreted_fields=unknown)
 
 
@@ -194,7 +198,7 @@ def install_native_definition(patch, name: str, native: dict) -> None:
     item.update({key: patch.encode_json_value(value) for key, value in native.items()
                  if key not in {'name', 'parameters'}})
     item.update({'$class': a.cls('LightCueInstrumentDefinition'), 'name': a.add(name),
-                 'defaultParameter': native.get('defaultParameter', -1)})
+                 'defaultParameter': info['default_parameter']})
     patch.encode_parameters(item, _entries(native))
 
 

@@ -400,8 +400,9 @@ class VideoArchive:
                 config_values.pop('AVCaptureFormat',None);config=self.a.make_dict(config_values)
             elif isinstance(mode,dict):
                 uid=self.a.ref(values['uniqueID']);available=self.context.get('formats',{}).get(uid,[])
+                # QLab 5.5.10 lists range endpoints, not arbitrary supported FPS.
                 if not any(f['width']==mode['width'] and f['height']==mode['height'] and f['pixel_format']==mode['pixel_format'] and
-                    any(rate['min']<=mode['frame_rate']<=rate['max'] for rate in f['frame_rates']) for f in available):
+                    any(mode['frame_rate'] in {rate['min'],rate['max']} for rate in f['frame_rates']) for f in available):
                     raise ValueError('Manual input mode is not present in the current source format metadata.')
                 fmt=self.object('F53VideoAVCaptureFormat',pixelWidth=mode['width'],pixelHeight=mode['height'],
                     pixelFormat=mode['pixel_format'],framesPerSecond=mode['frame_rate'])

@@ -1,5 +1,8 @@
 # Video Settings authoring — 2026-10-25
 
+The later [attached-MCP audit](2026-10-25-light-video-audit.md) supersedes the
+restart/FPS follow-up status below; this report retains the initial source test.
+
 ## Scope and environment
 
 Source FastMCP acceptance in QLab **5.5.10/build 5510**, running from the Desktop
@@ -74,7 +77,8 @@ no real archive, vendor payload, credentials or native bookmarks are committed.
 - Typed schemas retain both batch outputs and legacy setter output fields.
   Legacy stage/route forms and batch forms are mutually exclusive.
 - An independent read-only review identified route-readback, shared-route warp,
-  linked-group and supported-FPS issues; each was corrected with regression tests.
+  linked-group and supported-FPS issues. The later attached audit corrected the
+  initial FPS-range assumption to QLab-selectable endpoints, with native evidence.
 
 ## Explicit limits
 

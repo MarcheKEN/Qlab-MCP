@@ -172,7 +172,9 @@ package entries/symlinks rejected. Document tokens expire after five minutes
 and are single-use/process-bound. Every attempted event requires fresh native
 readback; a no-send acknowledgement is blocked and an unacknowledged response
 stays uncertain. No automatic event retry is performed. The native bridge
-requires the running local `/Applications/QLab.app` and Automation permission.
+verifies and targets the unique running local QLab installation and requires
+Automation permission. Its compile-time terminology uses the installed
+`/Applications/QLab.app` dictionary; cue-native helpers retain their own guards.
 
 `media.py` searches home by filename with entry/time/result bounds and skips
 symlinks. `audio_analysis.py` resolves an authorized file, lazily loads optional

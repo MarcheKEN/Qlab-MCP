@@ -466,3 +466,23 @@ def test_oversized_detail_reports_unrecoverable_record(catalogues, monkeypatch):
     result = cat.get_light_definitions(None, source='personal', definition_id=record['definition_id'])
     assert not result['ok'] and result['status'] == 'partial' and result['truncated']
     assert any('exceeds the response budget' in warning for warning in result['warnings'])
+
+
+@pytest.mark.parametrize('default',['0','-2','-1',0,-2,-1])
+def test_native_decimal_string_default_is_normalized_for_catalogue_and_archive(default):
+    value=native();value['defaultParameter']=default
+    detail=defs.inspect_native(value)
+    assert detail['importable']
+    assert detail['default_parameter']==int(default)
+    record=cat._record('bundled','example',json.dumps(value).encode(),'hash')
+    assert record['default_parameter']==int(default)
+    op=dict(action='create_definition',name=value['name'],manufacturer=value['manufacturer'],parameters=[dict(type='scalar',name='placeholder')])
+    result=plan_patch(workspace(),[op],native_imports={value['name']:value})
+    assert next(d for d in result['summary']['definitions'] if d['name']==value['name'])['default_parameter']==int(default)
+    assert value['defaultParameter']==default
+
+
+@pytest.mark.parametrize('default',['00',' 0','0.0','+0',True,'99'])
+def test_native_invalid_or_missing_default_channel_stays_blocked(default):
+    value=native();value['defaultParameter']=default
+    assert not defs.inspect_native(value)['importable']

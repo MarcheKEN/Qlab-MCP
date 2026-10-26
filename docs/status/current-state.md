@@ -1,5 +1,24 @@
 # Current Project State — 2026-10-26
 
+## Cue settings completion — PR #19
+
+The source contract now contains **88 tools: 52 reads and 36 gated writes**.
+`qlab_edit_saved_cue_settings` adds disabled Hotkey assignment, separate guarded
+activation, Wall Clock weekdays, Video audio-track selection, integrated audio
+fade points and native LinearKey/DropShadow insertion. Detail tools return typed
+saved settings with provenance and dirty-state freshness. Existing OSC editors
+retain channel/slice operations and add guarded NDI audio assignment and silent
+moving-video timing; Light command analysis covers multiparameter cue pulls and
+validated compound values.
+
+Native acceptance, the corrected prototype failure/recovery, verification limits
+and research-only Trim findings are recorded in the
+[cue settings report](../development/runtime-validation/2026-10-26-cue-settings-completion.md).
+Final automated verification: **2,390 passed, 35 skipped, 61 subtests passed**.
+The test workspace retains an Audit NDI stage because existing cues refer to it;
+see the cleanup outcome in the report. Earlier test/tool counts below describe
+their dated validation passes.
+
 ## Light cue audit follow-up — PR #19
 
 Light cue details now include bounded last-saved ascending/descending curves,

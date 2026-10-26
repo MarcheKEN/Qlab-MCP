@@ -133,6 +133,7 @@ TYPE_SPECIFIC_PROPERTIES = {
     "audioOutputPatchNumber",
     "audioOutputPatchID",
     "audioTrackFormats",
+    "audioTrackID",
     "audioInputPatchName",
     "audioInputPatchNumber",
     "audioInputPatchID",

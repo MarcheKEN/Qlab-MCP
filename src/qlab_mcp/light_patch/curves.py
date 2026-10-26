@@ -355,7 +355,7 @@ def _operations(value: Any, *, allow_empty: bool = False) -> list[dict]:
     return result
 
 
-def _reachable_cues(archive: Archive) -> tuple[dict[str, tuple[dict, int]], dict[int, int]]:
+def _reachable_cues(archive: Archive, kinds=("LightCue",)) -> tuple[dict[str, tuple[dict, int]], dict[int, int]]:
     root = archive.data.get("$top", {}).get("root")
     if root is None:
         raise ValueError("Cue-list archive has no root object.")
@@ -380,7 +380,7 @@ def _reachable_cues(archive: Archive) -> tuple[dict[str, tuple[dict, int]], dict
             if "cues" not in value:
                 raise ValueError("Active Group cue has no supported child inventory.")
             pending.extend(archive.array(value["cues"]))
-        elif kind == "LightCue":
+        elif kind in kinds:
             cue_id = archive.ref(value.get("uniqueID"))
             if isinstance(cue_id, str):
                 matches.setdefault(cue_id.upper(), []).append((value, uid))
@@ -390,7 +390,7 @@ def _reachable_cues(archive: Archive) -> tuple[dict[str, tuple[dict, int]], dict
     cues = {}
     for cue_id, found in matches.items():
         if len(found) != 1 or found[0][1] is None:
-            raise ValueError("Reachable Light cue UUIDs must identify one archived object.")
+            raise ValueError("Reachable cue UUIDs must identify one archived object.")
         cues[cue_id] = found[0]
     return cues, incoming
 

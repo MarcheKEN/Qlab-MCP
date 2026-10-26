@@ -2,6 +2,18 @@
 
 ## 0.4.0 (Unreleased)
 
+- Add `qlab_edit_saved_cue_settings` for confirmed saved Hotkey configuration and
+  activation, Wall Clock weekdays, Video audio-track selection, integrated audio
+  envelopes and native LinearKey/DropShadow insertion. Current surface: **88 tools,
+  52 reads and 36 gated writes**. Objects, Audio Maps and Audio FX remain excluded;
+  Trim is investigated without a public writer.
+- Enrich Light/Video detail with typed saved settings and freshness; expose Video
+  track identifiers/formats and sparse channel-name/gang metadata.
+- Read Fade & Stop Others integer scopes and missing slices through fixed native
+  getters. Admit guarded `ndi-output` routing and timing edits for silent videos.
+- Correct multi-parameter Light cue-pull previews and validate RGB, CMY, HSI and
+  Pan/Tilt compound values against each parameter's current native prototype.
+
 - Add last-saved Light cue curves to the existing detail reader, with stable-file
   identity, explicit freshness and bounded point coverage; permit Linear point edits.
 - Accept compact Light command ranges while preserving exact legacy names.

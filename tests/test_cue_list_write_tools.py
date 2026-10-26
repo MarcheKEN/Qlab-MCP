@@ -171,7 +171,7 @@ def test_public_tool_schemas(monkeypatch):
     async def calls():
         async with Client(server.mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-            assert len(tools) == 87
+            assert len(tools) == 88
             create = tools["qlab_create_cue_lists"].inputSchema["properties"]["container_types"]
             assert (create["minItems"], create["maxItems"]) == (1, 50)
             edit = tools["qlab_edit_cue_lists"].inputSchema["properties"]["updates"]

@@ -538,7 +538,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {'qlab_get_fonts': {
                                                 'openWorldHint': True,
                                                 'readOnlyHint': True},
                                 'input_schema_hash': '7cc4a31b024156fd175127df7ab00976bac24f1bac335360075ad7633fbd82d6',
-                                'output_schema_hash': '8387737cbe8589c81e4e599db754c7716a12423524f583b71577783e7cbd38c6',
+                                'output_schema_hash': '69b929f08999f4b743148731b076e86a3afb7977817f75559f40cf0765888ea1',
                                 'tags': ['details', 'light', 'qlab', 'safe-read'],
                                 'timeout': 20.0,
                                 'title': 'Get QLab Light Cue Details'},
@@ -664,7 +664,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {'qlab_get_fonts': {
                                                 'openWorldHint': True,
                                                 'readOnlyHint': True},
                                'input_schema_hash': '2734838d3ecd4fe7a5d412e08777007dbe199ecc318f119cfe86999b266920ae',
-                                'output_schema_hash': 'ed65196d4e43c7b5902e21c9abebf8d621c8baded2f6850ee243db5ee622c935',
+                                'output_schema_hash': 'c7b0afc6954479b41d782791a329ee69db7fb0c5f71bfba8be3d38312ab1ad9b',
                                 'tags': ['details', 'qlab', 'safe-read', 'video'],
                                 'timeout': 20.0,
                                 'title': 'Get QLab Video Cue Details'},
@@ -881,6 +881,15 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_video_input_patches'] = {'title': 'Ed
  'tags': ['gated-write', 'qlab', 'settings', 'video'],
  'input_schema_hash': '72a4e68b9497a92f4bc8adc04a7883a56fe6b343e7df23442f4a1b96b8136aa2',
  'output_schema_hash': 'ab828b2706fb68016618a8e57c58982d56c780719689ac1a54678d16dfa0f408'}
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_saved_cue_settings'] = {'title': 'Edit QLab Saved Cue Settings',
+ 'timeout': 180.0,
+ 'annotations': {'readOnlyHint': False,
+                 'destructiveHint': True,
+                 'idempotentHint': False,
+                 'openWorldHint': True},
+ 'tags': ['cue-edit', 'gated-write', 'qlab', 'workspace-document'],
+ 'input_schema_hash': 'efb80ebc07b69b03c1a5568b2455da8f9fdc9b28a349f5268a2daef2a91a2903',
+ 'output_schema_hash': '428675286213e7e62e173a0d31d7a7bcf57736a18337d096de203a17c18ee6f3'}
 ADDED_TOOL_NAMES = {
     "qlab_get_video_effect_catalogue", "qlab_get_workspace_document",
     "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace",
@@ -888,6 +897,7 @@ ADDED_TOOL_NAMES = {
 EXPECTED_TOOL_NAMES = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) | ADDED_TOOL_NAMES
 
 EXPECTED_TOOL_CONCEPTS = {
+    "qlab_edit_saved_cue_settings": ("five-minute", "recovery", "Hotkey", "5.5.10"),
     "qlab_edit_video_output_devices": ("one-use", "NDI", "Syphon"),
     "qlab_edit_video_input_patches": ("one-use", "auto", "capture"),
     "qlab_get_video_output_devices": ("passive", "CoreGraphics", "not the complete", "pagination"),
@@ -1254,7 +1264,7 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
     tools = asyncio.run(list_tools())
     tool_names = {tool.name for tool in tools}
 
-    assert len(tools) == 87
+    assert len(tools) == 88
     assert tool_names == EXPECTED_TOOL_NAMES
     assert "qlab_create_cue" not in tool_names
     forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
@@ -1585,7 +1595,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
     write_tools = {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_create_cue_lists", "qlab_edit_cue_lists", "qlab_create_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch", "qlab_edit_light_definitions", "qlab_edit_light_cue_curves"}
-    write_tools |= {"qlab_edit_video_output_devices", "qlab_edit_video_input_patches"}
+    write_tools |= {"qlab_edit_video_output_devices", "qlab_edit_video_input_patches", "qlab_edit_saved_cue_settings"}
     read_only_tools = EXPECTED_TOOL_NAMES - write_tools
 
     for tool_name in read_only_tools:
@@ -1596,7 +1606,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
 
     for tool_name in write_tools:
         assert tools[tool_name].annotations.readOnlyHint is False, f"{tool_name} was marked read-only"
-        if tool_name in {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_cue_lists", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch", "qlab_edit_light_definitions", "qlab_edit_light_cue_curves", "qlab_edit_video_output_devices", "qlab_edit_video_input_patches"}:
+        if tool_name in {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_cue_lists", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch", "qlab_edit_light_definitions", "qlab_edit_light_cue_curves", "qlab_edit_video_output_devices", "qlab_edit_video_input_patches", "qlab_edit_saved_cue_settings"}:
             assert tools[tool_name].annotations.destructiveHint is True
         else:
             assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
@@ -1824,6 +1834,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_get_light_definitions",
         "qlab_edit_light_definitions",
         "qlab_edit_light_cue_curves",
+        "qlab_edit_saved_cue_settings",
         "qlab_edit_audio_cues",
         "qlab_edit_mic_cues",
         "qlab_edit_light_cues",
@@ -2953,7 +2964,7 @@ def test_move_delete_capture_records_full_mcp_envelopes_and_redacts_secrets(monk
     async def calls():
         async with Client(mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-            assert len(tools) == 87
+            assert len(tools) == 88
             assert tools["qlab_delete_cues"].inputSchema["properties"]["delete_container"]["default"] is False
             for name in ("qlab_move_cues", "qlab_delete_cues"):
                 assert {"pending_cue_ids", "uncertain_cue_ids"} <= tools[name].outputSchema["properties"].keys()

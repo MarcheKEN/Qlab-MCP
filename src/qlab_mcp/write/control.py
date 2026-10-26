@@ -214,7 +214,15 @@ def _read(reader, ws, uid, keys, family="control", changes=None):
 
 
 def _scalar(reader, ws, uid, key):
-    return reader._request(_workspace_address(ws, f"cue_id/{uid}/{key}"), workspace_id=ws).data
+    try:
+        value = reader._request(_workspace_address(ws, f"cue_id/{uid}/{key}"), workspace_id=ws).data
+    except (OscTimeoutError, QLabReplyError):
+        if key not in control_applescript.COMMON_READ_KEYS:
+            raise
+        value = None
+    if key in control_applescript.COMMON_READ_KEYS:
+        return control_applescript.property_value(reader, ws, uid, key, value)
+    return value
 
 
 def _script_dependencies(reader, ws, uid, before, changes):

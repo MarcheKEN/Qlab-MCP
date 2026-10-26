@@ -45,6 +45,61 @@ def test_visual_batch_all_preflight(reader):
     assert not result["ok"] and not reader.setters
 
 
+def test_ndi_output_is_an_explicit_supported_patch_reference():
+    assert visual.VideoCueEditProperties(audioOutputPatchID="ndi-output").audioOutputPatchID == "ndi-output"
+    with pytest.raises(ValueError):
+        visual.VideoCueEditProperties(stageID="ndi-output")
+
+
+def test_video_without_audio_can_edit_media_timing(reader):
+    reader.values[START].update(fileTarget="/tmp/silent.mov", audioTrackFormats={}, numChannelsIn=0,
+        levels=[], startTime=0, endTime=8, rate=1, playCount=1)
+    result = execute(reader, visual.edit_video_cues, [request(START, startTime=1)])
+    assert result["ok"], result
+    assert reader.values[START]["startTime"] == 1
+
+
+def test_unknown_or_still_media_range_does_not_enable_silent_timing(reader):
+    reader.values[START].update(fileTarget="/tmp/still.png", audioTrackFormats={}, numChannelsIn=0,
+        levels=[], startTime=0, endTime=0, rate=1)
+    result = visual.edit_video_cues(reader, WS, [request(START, rate=2)], True)
+    assert not result["ok"] and not reader.setters
+
+
+def test_ndi_assignment_binds_saved_stage_route_and_audio_channels(reader, monkeypatch):
+    from types import SimpleNamespace
+    from qlab_mcp import video_settings
+    stage, route = str(UUID(int=40)).upper(), str(UUID(int=41)).upper()
+    info = dict(destinationType="NDI", name="NDI")
+    saved = dict(status="ready", document_modified=False, sha256="snapshot",
+        stages=[dict(id=stage, regions=[dict(route_id=route)])],
+        routes=[dict(id=route, destination_type="NDI", destination_info=info, destination_candidates=["snapshot:10"])],
+        destinations=[dict(id="snapshot:10", fields=dict(audioChannels=2))])
+    monkeypatch.setattr(video_settings, "_saved", lambda *a: saved)
+    reader.values[START].update(stageID=stage, audioOutputPatchID="")
+    original = reader._request
+    def get(address, *args, **kwargs):
+        if address.endswith("/settings/video/routeID/" + route):
+            return SimpleNamespace(data=dict(uniqueID=route, destinationInfo=info))
+        return original(address, *args, **kwargs)
+    reader._request = get
+    item = request(START, audioOutputPatchID="ndi-output")
+    plan = visual.edit_video_cues(reader, WS, [item], True)
+    assert plan["ok"], plan
+    item["confirm_gates"] = [op["confirm_token"] for op in plan["results"][0]["planned_operations"]]
+    saved["sha256"] = "changed"
+    result = visual.edit_video_cues(reader, WS, [item], False)
+    assert not result["ok"] and not reader.setters
+
+
+def test_ndi_assignment_blocks_missing_destination(reader, monkeypatch):
+    from qlab_mcp import video_settings
+    monkeypatch.setattr(video_settings, "_saved", lambda *a: dict(status="unavailable"))
+    reader.values[START]["audioOutputPatchID"] = ""
+    result = visual.edit_video_cues(reader, WS, [request(START, audioOutputPatchID="ndi-output")], True)
+    assert not result["ok"] and not reader.setters
+
+
 def test_context_only_read_does_not_repeat_identity_query(reader, monkeypatch):
     original = reader.read_cue_values
     calls = []

@@ -9,6 +9,7 @@ from .family import AudioCrosspoint
 from .list_models import CueListReadResult, CueListState, FiniteNumber
 from .mic import MicBasics, MicSettings, MicTiming
 from .profiles import _video_effects_summary
+from ..saved_cue_settings import SavedCueSettings, enrich_cue_details
 from .control import ControlTriggers
 
 Pair = Annotated[list[FiniteNumber], Field(min_length=2, max_length=2)]
@@ -89,6 +90,31 @@ class VisualMediaBasics(AudioBasics, VisualBasics):
 class VideoTiming(AudioTiming):
     holdLastFrame: StrictBool | None = None
     clockType: Literal["audio", "video"] | None = None
+
+
+class VideoAudioTrack(BaseModel):
+    track_id: StrictStr
+    channels: StrictInt | None = None
+    sampleRate: FiniteNumber | None = None
+    humanFormat: StrictStr | None = None
+    language: StrictStr | None = None
+    channelLayout: StrictStr | None = None
+    channelOrder: list[StrictStr] | None = None
+    fileLengthInSeconds: FiniteNumber | None = None
+
+
+def _audio_tracks(value):
+    if isinstance(value, dict):
+        if len(value) > 128 or any(not isinstance(meta, dict) for meta in value.values()):
+            raise ValueError("Audio tracks require bounded metadata records.")
+        return [{**meta, "track_id": str(track)} for track,meta in value.items()]
+    return value
+
+
+class VideoAudioSettings(AudioSettings):
+    model_config = ConfigDict(populate_by_name=True)
+    audioTrackID: StrictInt | StrictStr | None = None
+    tracks: Annotated[list[VideoAudioTrack], BeforeValidator(_audio_tracks)] | None = Field(default=None, validation_alias="audioTrackFormats")
 
 
 class CameraGeometry(VisualGeometry):
@@ -196,8 +222,9 @@ class VideoCueDetailsResult(VisualDetailsResult):
     identity: VideoCueSummary | None = None
     basics: VisualMediaBasics | None = None
     timing: VideoTiming | None = None
-    audio: AudioSettings | None = None
+    audio: VideoAudioSettings | None = None
     level: AudioCrosspoint | None = None
+    saved_settings: SavedCueSettings | None = None
 
 
 class CameraCueDetailsResult(VisualDetailsResult):
@@ -215,7 +242,7 @@ class TextCueDetailsResult(VisualDetailsResult):
 
 
 VIDEO_MODELS = {"triggers": ControlTriggers, "basics": VisualMediaBasics, "state": CueListState, "timing": VideoTiming,
-                "video": VisualGeometry, "audio": AudioSettings}
+                "video": VisualGeometry, "audio": VideoAudioSettings}
 CAMERA_MODELS = {"triggers": ControlTriggers, "basics": VisualBasics, "state": CueListState, "timing": MicTiming,
                  "video": CameraGeometry, "audio": MicSettings}
 TEXT_MODELS = {"triggers": ControlTriggers, "basics": VisualBasics, "state": CueListState, "timing": MicTiming,
@@ -264,7 +291,7 @@ class VisualCuesMixin:
     def get_video_cue_details(self, workspace_id, cue_id, profile="safe", input_channel=None, output_channel=None, video_effects=None, include_native_triggers=False):
         result = self._get_family_details(workspace_id, cue_id, profile, input_channel, output_channel,
                                          VideoCueDetailsResult, VideoCueSummary, VIDEO_MODELS, include_native_triggers=include_native_triggers)
-        return self._selected_video_effects(result, video_effects)
+        return enrich_cue_details(self, self._selected_video_effects(result, video_effects))
 
     def get_camera_cue_details(self, workspace_id, cue_id, profile="safe", input_channel=None, output_channel=None, video_effects=None, include_native_triggers=False):
         result = self._get_family_details(workspace_id, cue_id, profile, input_channel, output_channel,

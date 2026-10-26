@@ -22,6 +22,7 @@ from .light_patch.models import LightPatchOperations, DefinitionOperations
 from .light_patch.catalogue import get_light_definitions
 from .light_patch.definitions import edit_light_definitions
 from .light_patch.curves import LightCueCurveOperations, edit_light_cue_curves
+from .saved_cue_settings import SavedCueOperations, SavedCueEditResult, edit_saved_cue_settings
 from .light_patch.transaction import edit_light_patch
 from .light_patch.reader import enrich_light_settings
 from .video_settings import enrich_video_settings, enrich_video_detail, enrich_video_inventory
@@ -315,9 +316,9 @@ mcp = FastMCP(
         get_prompt_settings={"enabled": False},
     )],
     instructions="""
-QLab MCP exposes fifty-two read-only tools plus thirty-five gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
+QLab MCP exposes fifty-two read-only tools plus thirty-six gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
 Existing-workspace writes require QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; they remain dry-run first. Native document Open has its separate empty-inventory preflight, write-enable setting, file fingerprint and document token; no existing workspace is available for OSC readiness.
-This server does not expose GO, stop, panic, playback, audition, /live writes, arbitrary AppleScript, or raw OSC passthrough. Load loadTime, Target assignedNumber and documented cue Triggers use fixed local AppleScript reads/writes. Native Trigger reads require include_native_triggers=true; configuration requires disabled triggers, activation requires disarmed/no continuation/no skip, and Hotkey enabling is blocked without key/modifier readback.
+This server does not expose GO, stop, panic, playback, audition, /live writes, arbitrary AppleScript, or raw OSC passthrough. Load loadTime, Target assignedNumber and documented cue Triggers use fixed local AppleScript reads/writes. Native Trigger reads require include_native_triggers=true; configuration requires disabled triggers, activation requires disarmed/no continuation/no skip, and live Hotkey enabling is blocked without key/modifier readback. The separate qlab_edit_saved_cue_settings workflow reads the saved key descriptor and supports guarded assignment/activation on a clean local document.
 
 Orient first with qlab_check_connection, then use a bounded workspace overview/status or the relevant domain-specific settings read, qlab_query_cues, and qlab_get_cue_details as needed. Resolve one exact workspace before an existing-workspace write. Use exact UUIDs for workspace and cue writes; never infer a workspace or target from selection, playhead, or active state.
 
@@ -458,6 +459,32 @@ def qlab_edit_light_cue_curves(
     return _run_tool(lambda reader: edit_light_cue_curves(
         reader, str(workspace_id), [op.model_dump(mode="json", exclude_unset=True) for op in operations],
         dry_run, confirm_token))
+
+
+@mcp.tool(title="Edit QLab Saved Cue Settings",
+          tags={"qlab", "cue-edit", "gated-write", "workspace-document"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=180.0)
+def qlab_edit_saved_cue_settings(workspace_id: CanonicalWorkspaceUUID,
+        operations: SavedCueOperations, dry_run: StrictBool = True,
+        confirm_token: StrictStr | None = None) -> SavedCueEditResult:
+    """Edit saved Light/Video cue properties in one guarded 1–50-operation batch.
+
+    Read cue details and saved_settings first. Requires a clean inactive local
+    QLab 5.5.10/build 5510 document. Preview returns a five-minute one-use token;
+    execute once to close, replace and reopen the same workspace with recovery.
+    Operations cover Hotkey assignment and separate guarded activation, Wall Clock
+    weekdays, exact Video audio track IDs, Custom/Linear integrated envelopes and
+    native LinearKey/DropShadow insertion. Hotkey/Wall Clock must be disabled
+    before configuration. Hotkey activation requires disarmed/no continuation/no skip.
+    Hotkey character is its display character; key_code identifies the physical macOS key. Empty
+    character with code zero and no modifiers clears the assignment.
+    Fields outside each typed operation are preserved. needs_save requires the
+    existing save workflow and a fresh preview. No playback or external trigger
+    is invoked. An uncertain execution must never be retried automatically.
+    """
+    return _run_tool(lambda reader: SavedCueEditResult.model_validate(edit_saved_cue_settings(
+        reader, str(workspace_id), [op.model_dump(mode="json", exclude_unset=True) for op in operations],
+        dry_run, confirm_token)), timeout=180.0)
 
 
 @mcp.tool(title="Open QLab Workspace", tags={"qlab", "workspace", "gated-write"},
@@ -1624,6 +1651,9 @@ def qlab_get_video_cue_details(
     native identity. Only requested parameters are read, and ambiguous identity returns a partial result.
     Inspect coverage and partial errors.
     Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
+    saved_settings separates last-saved Hotkey/weekdays and Video audio-track,
+    channel-name overrides, gangs and integrated audio-fade points from current OSC.
+    Dirty-state freshness and unavailable archive coverage are explicit; this read never saves.
     """
     return _run_tool(lambda reader: reader.get_video_cue_details(str(workspace_id), str(cue_id),
                      profile, input_channel, output_channel, video_effects, include_native_triggers=include_native_triggers), timeout=CUE_DETAILS_TIMEOUT)
@@ -1973,6 +2003,7 @@ def qlab_get_light_cue_details(
     saved_curves adds bounded last-saved ascending/descending curves, points and
     explicit archive provenance/freshness. Reads never save; unknown variants
     remain partial and do not enable writes. OSC data survives archive failures.
+    saved_settings also includes last-saved Hotkey assignment and Wall Clock weekdays.
     Use qlab_get_workspace_light_settings for the patch. Inspect coverage and partial errors.
     Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """

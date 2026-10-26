@@ -26,6 +26,20 @@ NATIVE_SNAPSHOT = dict(
     timecodeTrigger=dict(hours=1, minutes=0, seconds=0, frames=0, bits=0))
 
 
+@pytest.mark.parametrize("key,value", [("fadeAndStopOthers", 2), ("sliceMarkers", []),
+    ("sliceMarkers", [{"time": 1.25, "playCount": -1}])])
+def test_fixed_common_readback_accepts_typed_values(key, value):
+    bridge.validate_common_value(key, value)
+
+
+@pytest.mark.parametrize("key,value", [("fadeAndStopOthers", False), ("fadeAndStopOthers", 4),
+    ("sliceMarkers", None), ("sliceMarkers", [{"time": True, "playCount": 1}]),
+    ("sliceMarkers", [{"time": 1, "playCount": 0}])])
+def test_fixed_common_readback_rejects_ambiguous_values(key, value):
+    with pytest.raises(ValueError):
+        bridge.validate_common_value(key, value)
+
+
 @pytest.fixture
 def script_reader(reader, monkeypatch):
     reader.values[START].update(type="Load", hasCueTargets=True, cueTargetID=TARGET, loadTime=0.0)

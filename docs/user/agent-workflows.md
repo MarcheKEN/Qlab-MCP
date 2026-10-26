@@ -50,6 +50,72 @@ Group reads Playlist only in Playlist mode. max_depth=2 (0..5) and max_cues=1000
 (1..5000) bound child summaries; depth zero reads no children. Inspect partial
 errors and contents.truncated; use each child's family tool for its full detail.
 
+## Saved Light and Video cue settings
+
+Batches accept up to 50 operations and 8192 replacement envelope points in total.
+
+Read `qlab_get_light_cue_details` or `qlab_get_video_cue_details` first. Their
+`saved_settings` section describes the last saved archive, with a hash, dirty flag,
+freshness and explicit issues. It never saves or closes a document. Current OSC
+properties remain separate when unsaved edits exist.
+
+`qlab_edit_saved_cue_settings` accepts one to 50 typed operations with exact cue
+UUIDs. Check readiness, preview with `dry_run=true`, inspect the diff, then execute
+the same request with its five-minute single-use `confirm_token`. It closes,
+edits and reopens the same local document with recovery, on QLab 5.5.10/build 5510.
+`needs_save` requires a separate confirmed Save and a new preview. `no_op` neither
+closes nor rewrites. Do not retry an uncertain execution automatically.
+
+| Action | Required fields and behavior |
+| --- | --- |
+| `set_hotkey` | `cue_id`, macOS `key_code`, display `character`, `modifiers` (`shift`, `control`, `option`, `command`). Trigger must be disabled. Code 0, empty character and no modifiers clear it. |
+| `set_hotkey_enabled` | `cue_id`, `enabled`. Enabling requires a known assignment, disarmed cue, Do not continue and Skip if disarmed off. Configure and activate in separate confirmed calls. |
+| `set_wall_clock_days` | `cue_id`, `days` using lowercase English weekday names. Replaces the weekday selection; preserves time and activation. Trigger must be disabled. |
+| `select_audio_track` | Video `cue_id`, exact `track_id` returned in `audio.tracks`; `-1` selects automatically. Binds the current media identity and available tracks. |
+| `set_integrated_audio_fade` | Video `cue_id`, `type` (`custom` or `linear`), complete `points` list. Normalized `t` and `v` are 0–1; times strictly increase from 0 to 1. Endpoint levels may differ. Preserves `doFade` and `lockFadeToCue`. |
+| `insert_video_effect` | Video `cue_id`, `effect_type` (`LinearKey` or `DropShadow`), zero-based insertion `index`. Existing instances retain their order and settings. |
+
+Example preview, using real UUIDs obtained from discovery:
+
+```json
+{
+  "workspace_id": "11111111-1111-4111-8111-111111111111",
+  "operations": [{
+    "action": "set_integrated_audio_fade",
+    "cue_id": "22222222-2222-4222-8222-222222222222",
+    "type": "linear",
+    "points": [{"t": 0, "v": 0}, {"t": 0.15, "v": 1}, {"t": 1, "v": 0.5}]
+  }],
+  "dry_run": true
+}
+```
+
+Enable the integrated envelope separately with the ordinary Video cue editor's
+`doFade`; `lockFadeToCue` chooses whether normalized time follows the selected
+start/end or the natural media duration. These are different from Light cue
+ascending/descending curves. `saved_settings.video_audio` also returns saved input
+name overrides and gangs as sparse row/column member lists, with truncation flags.
+Automatic names can come from the selected track's channel-order metadata.
+
+Current Video audio track IDs and compact formats are returned in `audio` even
+with the safe profile. A missing OSC slice inventory falls back to the fixed local
+AppleScript getter; an explicit empty list means no slices. Fade & Stop Others
+uses the integer native getter when OSC collapses its scope to a boolean. Missing
+Automation or remote QLab preserves the available OSC data and keeps unknown
+baselines blocked.
+
+The ordinary Video editor accepts the special `audioOutputPatchID="ndi-output"`
+only with a clean saved stage/route/device dependency matched to current QLab.
+Save and obtain a new preview before further NDI channel edits. It checks the
+configured NDI audio channel count; it does not start playback or verify a signal.
+Objects, Audio Maps and Audio FX are outside this increment. Trim has no writer.
+
+Light command compound values use the native parameter type and home-value
+prototype: RGB, CMY, HSI and Pan/Tilt identifiers, arity and 0–100 components must
+match. Unknown formatters remain blocked. Parameterless pulls report all
+potentially affected parameters without flattening the dynamic cue reference or
+claiming to compute its final look.
+
 ## Light cue curves
 
 First read `qlab_get_light_cue_details.saved_curves` for the saved ascending and

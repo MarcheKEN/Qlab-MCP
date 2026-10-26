@@ -440,6 +440,10 @@ indexed payload; parameter keys alone never authorize a write. Structural
 Native creation defaults for 58 effects are recorded from isolated QLab 5.5.10
 fixtures. LinearKey/DropShadow add/insert are blocked after fresh readbacks proved
 no creation. Unknown defaults remain blocked until native evidence is recorded.
+`qlab_edit_saved_cue_settings` offers separately validated native-file insertion
+for these two effects; OSC creation stays blocked. Templates are build-bound,
+hash-checked NSKeyedArchiver subgraphs; imported UIDs are remapped and per-chain
+instance IDs allocated without changing existing entries.
 Existing LinearKey/DropShadow instances remain editable with full native identity
 and baseline proof. DropShadow's observed `Color` key uses the documentary
 `inputColor` RGBA validation without changing the requested wire spelling;
@@ -665,3 +669,22 @@ Reopening configured NDI/Syphon or camera patches can initialize QLab backends.
 The MCP does not request capture, receivers, emitters, Monitor, Show or playback.
 Zero active cues does not prove zero device activity. Saved-only properties and
 OSC-verified properties are labelled separately; neither proves physical signal.
+
+## Saved Light/Video cue settings
+
+`qlab_edit_saved_cue_settings` uses the existing local archive transaction,
+5.5.10/build 5510 gate, clean inactive document requirement, exact UUIDs,
+five-minute single-use confirmation, retained recovery and same-path reopen.
+It accepts at most 50 operations and 8192 replacement envelope points in total.
+The preview binds media identity and current audio-track metadata for selection.
+Hotkey configuration requires disabled activation; enabling is a separate call
+and requires an assigned known key, a disarmed cue, no continuation and no
+skip-if-disarmed. No external trigger is sent. Weekday edits preserve time and
+activation. Unknown encodings block the affected write.
+
+Native FX templates preserve their entire keyed subgraph and are hash-checked.
+Saved postconditions and current UUID/type, track, fade flags and FX count are
+checked after reopen. Opaque OSC FX dictionaries do not verify a native class;
+explicit types are compared when exposed. Trim, Objects, Audio Maps and Audio FX
+are not added to this tool. Shared read fallbacks for Fade & Stop scope and slice
+markers are fixed local AppleScript getters, never arbitrary source or setters.

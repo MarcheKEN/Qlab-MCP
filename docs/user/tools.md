@@ -1,6 +1,6 @@
 # Public MCP Tools
 
-QLab MCP exposes exactly 87 tools on the current development branch: 52 reads and 35 gated writes. This page is a compact human
+QLab MCP exposes exactly 88 tools on the current development branch: 52 reads and 36 gated writes. This page is a compact human
 catalogue; decorated functions, generated schemas, and
 `tests/test_server_tools.py` remain the source of truth for exact parameters,
 annotations, and result models.
@@ -74,6 +74,7 @@ annotations, and result models.
 | `qlab_edit_mic_cues` | Typed Mic Basics, Triggers and saved family settings, 1–50 UUIDs | Audio Maps, Audio FX, Trim, playback or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_light_cues` | Typed Light Basics, Triggers and saved family settings, 1–50 UUIDs | Playback, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_light_cue_curves` | Saved ascending/descending Custom, S-Curve, Parametric and Linear curves on exact Light cue UUIDs | Live output, mirrored curves, OSC curve readback | [Light curves](agent-workflows.md#light-cue-curves) |
+| `qlab_edit_saved_cue_settings` | 1–50 typed saved Light/Video cue edits: Hotkey configuration/activation, weekdays, audio track, integrated envelope, LinearKey/DropShadow insertion | Requires clean local 5.5.10/build 5510 document; no playback, Trim, Objects/Maps or Audio FX | [Saved cue settings](agent-workflows.md#saved-light-and-video-cue-settings) |
 | `qlab_edit_fade_cues` | Typed Fade Basics, Triggers and saved family settings, 1–50 UUIDs | Playback, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_network_cues` | Typed Network Basics, Triggers and saved family settings, 1–50 UUIDs | Sending messages, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_midi_cues` | Typed MIDI Basics, Triggers and saved family settings, 1–50 UUIDs | Sending MIDI, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
@@ -136,8 +137,9 @@ Use the existing family editors with exact UUIDs and per-operation signed tokens
 Triggers, with Second Trigger 6–7 limited to Playlist. Video/Camera/Text expose
 bounded FX selectors and typed operations, with native named-getter identity proof
 when inventory metadata is absent. Native creation defaults are verified for
-58 effects on QLab 5.5.10. LinearKey/DropShadow creation remains blocked after
-documented add/insert produced empty stacks. Deletion still requires complete
+58 effects on QLab 5.5.10. LinearKey/DropShadow OSC creation remains blocked after
+documented add/insert produced empty stacks; use `qlab_edit_saved_cue_settings`
+for their validated native file insertion. Deletion still requires complete
 restoration proof; unavailable parameter baselines and ambiguous instances stay
 blocked. Existing LinearKey/DropShadow instances can be read and edited. For
 DropShadow color, select the observed native key `Color`, shown in the QLab

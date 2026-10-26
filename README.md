@@ -11,7 +11,7 @@ saved local archive under a guarded close, replace and reopen workflow.
 **Developed and tested with QLab 5.5.10 on macOS.** Other QLab versions may
 behave differently and have not been validated by this project.
 
-The server provides **87 tools: 52 read-only and 35 gated writes**.
+The server provides **88 tools: 52 read-only and 36 gated writes**.
 Writes are disabled by default and require a reviewed preview and confirmation.
 
 [Capabilities](#capabilities) · [Installation](#installation) ·
@@ -313,6 +313,7 @@ saved state and do not execute cues.
 | `qlab_get_light_cue_details` | Read saved Light commands and cue settings. |
 | `qlab_edit_light_cues` | Edit supported Light commands and cue settings. |
 | `qlab_edit_light_cue_curves` | Edit ascending/descending Light curves through a confirmed saved-file transaction; reopen and verify the saved archive. |
+| `qlab_edit_saved_cue_settings` | Edit saved Hotkeys, Wall Clock weekdays, Video audio-track selection, integrated envelopes and LinearKey/DropShadow insertion in one confirmed file batch. |
 | `qlab_get_group_cues` | List Groups within one Cue List. |
 | `qlab_get_group_cue_details` | Read Group mode, Playlist settings and bounded children. |
 | `qlab_edit_group_cues` | Edit Group properties, mode and supported Playlist settings. |

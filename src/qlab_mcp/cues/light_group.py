@@ -11,6 +11,7 @@ from .family import ControlTriggers, _fail, _section
 from .lists import _contents, _finish
 from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES, serialized_payload_bytes
 from ..sanitizer import sanitize_exception_message
+from ..saved_cue_settings import SavedCueSettings, enrich_cue_details
 
 
 class LightCueSummary(AudioCueSummary):
@@ -97,6 +98,7 @@ class LightCueDetailsResult(CueListReadResult):
     timing: MicTiming | None = None
     light: LightSettings | None = None
     saved_curves: SavedLightCueCurves | None = None
+    saved_settings: SavedCueSettings | None = None
     triggers: ControlTriggers | None = None
     edit_capabilities: dict[str, JsonValue] = Field(default_factory=dict)
     technical_payload: JsonValue = None
@@ -179,7 +181,7 @@ class LightGroupCuesMixin:
             result.partial = True
             result.status = "partial"
             break
-        return result
+        return enrich_cue_details(self, result, MAX_SENSITIVE_CUE_RESPONSE_BYTES)
 
     def get_group_cue_details(self, workspace_id, cue_id, profile="safe", max_depth=2, max_cues=1000, include_native_triggers=False):
         if type(max_depth) is not int or not 0 <= max_depth <= 5 or type(max_cues) is not int or not 1 <= max_cues <= 5000:

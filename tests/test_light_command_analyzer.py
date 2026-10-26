@@ -66,6 +66,46 @@ def named_fixtures(prefix: str, count: int, parameters: list[str] | None = None)
     }
 
 
+@pytest.mark.parametrize("target", ["Red Fixture", "Back", "all", "[Front,Red Fixture]"])
+def test_parameterless_pull_reports_all_potential_parameters(light_patch, target):
+    report = analyze_light_command_text(f"{target} = cue A * .5", light_patch,
+        cue_references={"A": {"uniqueID": "source", "number": "A", "type": "Light"}})
+    result = report["results"][0]
+    assert result["status"] in {"valid", "warning"}
+    assert {"instrument": "Red Fixture", "parameter": "red"} in result["affected"]
+    assert result["parameter"]["defaulted"] is False
+    assert result["value"]["dynamic"] is True
+    assert report["dynamic_look_computed"] is False
+
+
+def test_explicit_parameter_pull_keeps_only_requested_parameter(light_patch):
+    report = analyze_light_command_text("Red Fixture.red = cue A", light_patch,
+        cue_references={"A": {"uniqueID": "source", "number": "A", "type": "Light"}})
+    assert report["results"][0]["affected"] == [{"instrument": "Red Fixture", "parameter": "red"}]
+
+
+@pytest.mark.parametrize("kind,prototype,command", [
+    ("rgbcolor", "rgb(0,0,0)", "rgb(20,40,60)"),
+    ("cmycolor", "cmy(0,0,0)", "cmy(10,20,30)"),
+    ("hsicolor", "hsi(0,0,0)", "hsi(60,30,70)"),
+    ("pantilt", "pantilt(0,0)", "pantilt(25,75)")])
+def test_native_compound_values_require_exact_parameter_prototype(kind, prototype, command):
+    patch = named_fixtures("LED", 2, ["color"])
+    patch["parameters"] = [dict(scope="instrument", owner_name=f"LED {n}", name="color",
+        type=kind, home_value=prototype) for n in (1,2)]
+    result = analyze_light_command_text(f"[LED 1,LED 2].color = {command}", patch)["results"][0]
+    assert result["status"] == "valid"
+    assert len(result["affected"]) == 2
+    assert result["value"]["kind"] == "compound"
+
+
+@pytest.mark.parametrize("value", ["rgb(20,40)", "rgb(101,0,0)", "rgb(-1,0,0)", "rgb(0,0,0)trailing", "rgb(1+2,0,0)", "rgb(NaN,0,0)"])
+def test_compound_values_reject_wrong_arity_range_and_expressions(value):
+    patch = named_fixtures("LED", 1, ["color"])
+    patch["parameters"] = [dict(scope="instrument", owner_name="LED 1", name="color", type="rgbcolor", home_value="rgb(0,0,0)")]
+    assert analyze_light_command_text(f"LED 1.color = {value}", patch)["results"][0]["status"] in {"invalid", "unsupported"}
+
+
 def test_light_command_text_byte_limit_rejects_without_truncation(light_patch: dict) -> None:
     accepted = "x" * 65_536
     analyze_light_command_text(accepted, light_patch)

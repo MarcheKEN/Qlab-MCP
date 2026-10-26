@@ -244,6 +244,26 @@ end run
 '''
 
 KINDS = {"loadTime": "Load", "assignedNumber": "Target"}
+COMMON_READ_KEYS = {"fadeAndStopOthers", "sliceMarkers"}
+
+
+def validate_common_value(key, value):
+    if key == "fadeAndStopOthers":
+        if type(value) is not int or value not in range(4):
+            raise ValueError("Fade & Stop Others requires an integer scope 0–3.")
+    elif key == "sliceMarkers":
+        if not isinstance(value, list) or len(value) > 4096:
+            raise ValueError("Slice markers must be an explicit bounded list.")
+        previous = -1
+        for marker in value:
+            if (not isinstance(marker, dict) or set(marker) != {"time", "playCount"}
+                    or type(marker["time"]) not in {int, float} or not math.isfinite(marker["time"])
+                    or marker["time"] < 0 or marker["time"] <= previous
+                    or type(marker["playCount"]) is not int or marker["playCount"] not in {-1} and marker["playCount"] < 1):
+                raise ValueError("Invalid slice marker or ordering.")
+            previous = marker["time"]
+    else:
+        raise ValueError("Unsupported common native read.")
 
 # Build only from this fixed dictionary, never from request text or property paths.
 _snapshot_lines = []
@@ -355,6 +375,26 @@ SCRIPT = SCRIPT.replace('   if propertyKey is "loadTime"', _native_branch + '   
 SCRIPT = SCRIPT.replace('  end tell\n  end using terms from\n  set currentIdentity',
                         '   end if\n  end tell\n  end using terms from\n  set currentIdentity', 1) + _handlers + SNAPSHOT_COMPARISON_HANDLER
 
+# Read-only dictionary properties omitted or collapsed by OSC in QLab 5.5.10.
+SCRIPT = SCRIPT.replace('   if propertyKey is "loadTime" and kind is "Load" then', '''   if propertyKey is "fadeAndStopOthers" or propertyKey is "sliceMarkers" then
+    if ((payload's objectForKey:"write") as boolean) then error "Common fallback is read-only."
+    if kind is not ((payload's objectForKey:"expected_type") as text) then error "Cue type changed."
+    if propertyKey is "fadeAndStopOthers" then
+     set observed to get fade and stop others of c
+    else
+     if kind is not "Video" and kind is not "Audio" then error "Slices require an Audio or Video cue."
+     set markers to get slice markers of c
+     if (count of markers) > 4096 then error "Slice inventory exceeds its bound."
+     set observed to current application's NSMutableArray's array()
+     repeat with marker in markers
+      set row to current application's NSMutableDictionary's dictionary()
+      row's setObject:(time of marker) forKey:"time"
+      row's setObject:(playCount of marker) forKey:"playCount"
+      observed's addObject:row
+     end repeat
+    end if
+   else if propertyKey is "loadTime" and kind is "Load" then''', 1)
+
 
 def _validate(key, value, *, observed=False):
     if key == "loadTime":
@@ -386,7 +426,8 @@ def request(reader, workspace_id, cue_id, key, *, timeout=None, **change):
         raise AppleScriptPreparationError("These properties require local macOS QLab; remote OSC has no AppleScript fallback.")
     try:
         ws, uid = str(UUID(str(workspace_id))).upper(), str(UUID(str(cue_id))).upper()
-        native = key in TRIGGER_KEYS or key == "triggerSnapshot"
+        common = key in COMMON_READ_KEYS
+        native = key in TRIGGER_KEYS or key == "triggerSnapshot" or common
         if key not in KINDS and not native or set(change) - {
                 "value", "expected", "expected_target", "assigned_cue_id", "expected_type",
                 "expected_snapshot", "expected_application"}:
@@ -394,6 +435,8 @@ def request(reader, workspace_id, cue_id, key, *, timeout=None, **change):
         if native and change.get("expected_type") not in _CUE_TYPES:
             raise ValueError("Native Triggers require an exact supported cue type.")
         writing = "value" in change
+        if common and writing:
+            raise ValueError("Common native fallback is read-only.")
         if "expected_application" in change and (not writing or key not in KINDS):
             raise ValueError("Application identity is only valid for confirmed scalar cue writes.")
         if writing:
@@ -441,8 +484,22 @@ def request(reader, workspace_id, cue_id, key, *, timeout=None, **change):
     if result.get("workspace_id") != ws or result.get("cue_id") != uid or result.get("type") != (change["expected_type"] if native else KINDS[key]):
         raise ValueError("AppleScript workspace/cue identity or type mismatch.")
     value = result.get("value")
-    if key == "triggerSnapshot":
+    if common:
+        validate_common_value(key, value)
+    elif key == "triggerSnapshot":
         validate_trigger_snapshot(value)
     else:
         _validate(key, value, observed=not writing)
     return value
+
+
+def property_value(reader, ws, uid, key, value=None):
+    """Use a current native getter only when an OSC baseline is unusable."""
+    try:
+        validate_common_value(key, value)
+        return value
+    except ValueError:
+        kind = reader._request(f"/workspace/{ws}/cue_id/{uid}/type", workspace_id=ws).data
+        if kind not in _CUE_TYPES:
+            raise ValueError("Native fallback requires an exact cue type.")
+        return request(reader, ws, uid, key, expected_type=kind)

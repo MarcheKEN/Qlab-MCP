@@ -60,6 +60,15 @@ def _parse_value(raw: str) -> dict[str, Any] | None:
     normalized = raw.casefold()
     if normalized in {"home", "pass"}:
         return {"kind": normalized, "raw": raw, "number": None}
+    compound = re.fullmatch(r"([A-Za-z]+)\(([^()]*)\)", raw)
+    if compound:
+        parts = [part.strip() for part in compound[2].split(",")]
+        if not 1 <= len(parts) <= 16 or any(not _NUMBER.fullmatch(part) for part in parts):
+            return None
+        components = [float(part) for part in parts]
+        if any(not math.isfinite(part) for part in components):
+            return None
+        return dict(kind="compound", raw=raw, number=None, identifier=compound[1], components=components)
     pull = _CUE_PULL.fullmatch(raw)
     if pull:
         scale = float(pull.group(2)) if pull.group(2) is not None else 1.0
@@ -204,9 +213,17 @@ def _selector(
 
 def _targets(light_patch: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     targets: list[tuple[str, dict[str, Any]]] = []
+    parameters = {}
+    for spec in light_patch.get("parameters", []):
+        if isinstance(spec, dict) and spec.get("scope") == "instrument":
+            key = spec.get("owner_name"), spec.get("name")
+            parameters[key] = spec if key not in parameters else {}
     for kind, key in (("instrument", "instruments"), ("group", "groups")):
         for item in light_patch.get(key, []):
             if isinstance(item, dict) and isinstance(item.get("name"), str):
+                if kind == "instrument":
+                    item = {**item, "_parameter_info": {name:parameters.get((item["name"],name), {})
+                             for name in item.get("parameter_names", [])}}
                 targets.append((kind, item))
     return targets
 
@@ -240,12 +257,45 @@ def _default_parameter(instrument: dict[str, Any]) -> str | None:
     return name if isinstance(name, str) and name else None
 
 
+def _compound_compatible(result, instrument, parameter):
+    value = result["value"]
+    if value["kind"] != "compound":
+        return True
+    spec = instrument.get("_parameter_info", {}).get(parameter, {})
+    prefix = {"rgbcolor":"rgb", "cmycolor":"cmy", "hsicolor":"hsi", "pantilt":"pantilt"}.get(spec.get("type"))
+    prototype = _parse_value(spec["home_value"]) if isinstance(spec.get("home_value"), str) else None
+    if not prefix or not prototype or prototype["kind"] != "compound" or not prototype["identifier"].startswith(prefix):
+        _unsupported(result, "compound_value", "Compound parameter type/formatter has no verified native prototype.")
+        result["status"] = "unsupported"
+        result["target"].update(resolved_name=None, exists=False)
+        result["parameter"]["exists"] = False
+        result["affected"].clear()
+        return False
+    if (value["identifier"] != prototype["identifier"] or len(value["components"]) != len(prototype["components"])
+            or any(not 0 <= component <= 100 for component in value["components"])):
+        result["status"] = "invalid"
+        result["errors"].append(_issue("compound_value_mismatch", "Compound identifier, arity or 0–100 components do not match the native parameter."))
+        return False
+    return True
+
+
 def _analyze_instrument(
     result: dict[str, Any],
     instrument: dict[str, Any],
     explicit_parameter: str | None,
     expansion_budget: int,
 ) -> None:
+    if explicit_parameter is None and result["value"]["kind"] == "cue_pull":
+        parameters = sorted(_parameter_names(instrument))
+        if len(result["affected"]) + len(parameters) > expansion_budget:
+            _expansion_limit(result)
+            return
+        result["affected"].extend({"instrument": instrument["name"], "parameter": name} for name in parameters)
+        result["parameter"]["exists"] = bool(parameters)
+        if not parameters:
+            result["status"] = "invalid"
+            result["errors"].append(_issue("parameters_unavailable", "Instrument parameters are unavailable."))
+        return
     parameter = explicit_parameter or _default_parameter(instrument)
     if not parameter or parameter not in _parameter_names(instrument):
         code = "unknown_parameter" if explicit_parameter else "default_parameter_unavailable"
@@ -258,6 +308,8 @@ def _analyze_instrument(
         result["errors"].append(_issue(code, message))
         return
     result["parameter"]["exists"] = True
+    if not _compound_compatible(result, instrument, parameter):
+        return
     if len(result["affected"]) >= expansion_budget:
         _expansion_limit(result)
         return
@@ -279,7 +331,7 @@ def _analyze_group(
             result["skipped_members"].append({"instrument": member_name, "reason": "instrument_unavailable"})
             continue
         parameters = _parameter_names(instrument)
-        if all_home:
+        if all_home or (explicit_parameter is None and result["value"]["kind"] == "cue_pull"):
             if not parameters:
                 result["skipped_members"].append({"instrument": member_name, "reason": "parameters_unavailable"})
                 continue
@@ -294,6 +346,8 @@ def _analyze_group(
             reason = "parameter_unavailable" if explicit_parameter else "default_parameter_unavailable"
             result["skipped_members"].append({"instrument": member_name, "reason": reason})
             continue
+        if not _compound_compatible(result, instrument, parameter):
+            return
         if len(result["affected"]) >= expansion_budget:
             _expansion_limit(result)
             return
@@ -369,7 +423,7 @@ def _analyze_line(
         value["dynamic"] = True
 
     result["target"]["input"] = target_input
-    result["parameter"].update({"input": parameter_input, "defaulted": parameter_input is None})
+    result["parameter"].update({"input": parameter_input, "defaulted": parameter_input is None and value["kind"] != "cue_pull"})
     result["value"] = value
 
     if selector_kind is not None and selector_names is not None:

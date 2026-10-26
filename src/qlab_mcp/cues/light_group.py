@@ -37,6 +37,39 @@ class LightSettings(BaseModel):
     subcontroller: StrictBool | None = None
 
 
+class LightCurvePoint(BaseModel):
+    t: FiniteNumber
+    v: FiniteNumber
+
+
+class SavedLightCurveSide(BaseModel):
+    status: Literal["available", "partial"]
+    native_type: JsonValue = None
+    type: StrictStr | None = None
+    parameter: FiniteNumber | None = None
+    points: list[LightCurvePoint] = Field(default_factory=list)
+    total_points: StrictInt | None = None
+    truncated: StrictBool = False
+    resolution: FiniteNumber | None = None
+    mirror_shape: StrictBool | None = None
+    domain: dict[str, JsonValue] | None = None
+    unknown_fields: list[StrictStr] = Field(default_factory=list)
+    issues: list[StrictStr] = Field(default_factory=list)
+
+
+class SavedLightCueCurves(BaseModel):
+    status: Literal["ready", "partial", "unavailable", "unsupported_version", "cue_not_found", "changed_during_read"]
+    source: Literal["saved_archive"] = "saved_archive"
+    sha256: StrictStr | None = None
+    freshness: Literal["last_saved", "possibly_stale", "unavailable"] = "unavailable"
+    document_modified: StrictBool | None = None
+    version: StrictStr | None = None
+    build: StrictInt | None = None
+    message: StrictStr | None = None
+    curves: dict[Literal["up", "down"], SavedLightCurveSide] = Field(default_factory=dict)
+    coverage: StrictStr
+
+
 class GroupSettings(BaseModel):
     mode: Annotated[StrictInt, Field(ge=1, le=6)] | None = None
     isChildAuditioning: StrictBool | None = None
@@ -63,6 +96,7 @@ class LightCueDetailsResult(CueListReadResult):
     state: CueListState | None = None
     timing: MicTiming | None = None
     light: LightSettings | None = None
+    saved_curves: SavedLightCueCurves | None = None
     triggers: ControlTriggers | None = None
     edit_capabilities: dict[str, JsonValue] = Field(default_factory=dict)
     technical_payload: JsonValue = None
@@ -101,9 +135,51 @@ class LightGroupCuesMixin:
                                     GroupCuesResult, GroupCueSummary)
 
     def get_light_cue_details(self, workspace_id, cue_id, profile="safe", include_native_triggers=False):
-        return self._get_family_details(workspace_id, cue_id, profile, None, None,
-                                       LightCueDetailsResult, LightCueSummary,
-                                       {**COMMON_MODELS, "light": LightSettings}, include_native_triggers=include_native_triggers)
+        result = self._get_family_details(workspace_id, cue_id, profile, None, None,
+                                          LightCueDetailsResult, LightCueSummary,
+                                          {**COMMON_MODELS, "light": LightSettings}, include_native_triggers=include_native_triggers)
+        if result.identity is None:
+            return result
+        try:
+            from ..light_patch.curves import read_saved_light_cue_curves
+            result.saved_curves = SavedLightCueCurves.model_validate(
+                read_saved_light_cue_curves(self, result.workspace_id, result.cue_id))
+        except Exception as exc:
+            result.errors["saved_curves"] = sanitize_exception_message(exc)
+            result.coverage.notes.append("Saved archive curves are unavailable; OSC cue details remain usable.")
+            result.partial = True
+            result.status = "partial"
+            return result
+        if result.saved_curves.status not in {"ready"}:
+            result.coverage.notes.append(result.saved_curves.coverage)
+            result.partial = True
+            result.status = "partial"
+        else:
+            result.coverage.notes.append("Light curve points come from the saved .qlab5 archive; they may be stale when the document has unsaved changes.")
+        while serialized_payload_bytes(result.model_dump(mode="json")) > MAX_SENSITIVE_CUE_RESPONSE_BYTES:
+            curves_with_points = [curve for curve in result.saved_curves.curves.values() if curve.points]
+            if curves_with_points:
+                for curve in curves_with_points:
+                    keep = max(0, len(curve.points) // 2)
+                    curve.points = curve.points[:keep]
+                    curve.truncated = True
+                    curve.status = "partial"
+                    if "response_byte_limit" not in curve.issues:
+                        curve.issues.append("response_byte_limit")
+                result.saved_curves.status = "partial"
+                result.saved_curves.coverage = "Curve points were truncated to fit the detail response byte limit."
+                result.partial = True
+                result.status = "partial"
+                continue
+            if result.technical_payload is not None:
+                result.technical_payload = None
+                continue
+            result.saved_curves = None
+            result.coverage.notes = ["Saved curve data omitted because the response byte limit was reached."]
+            result.partial = True
+            result.status = "partial"
+            break
+        return result
 
     def get_group_cue_details(self, workspace_id, cue_id, profile="safe", max_depth=2, max_cues=1000, include_native_triggers=False):
         if type(max_depth) is not int or not 0 <= max_depth <= 5 or type(max_cues) is not int or not 1 <= max_cues <= 5000:

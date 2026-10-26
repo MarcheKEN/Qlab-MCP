@@ -538,7 +538,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {'qlab_get_fonts': {
                                                 'openWorldHint': True,
                                                 'readOnlyHint': True},
                                 'input_schema_hash': '7cc4a31b024156fd175127df7ab00976bac24f1bac335360075ad7633fbd82d6',
-                                'output_schema_hash': '0119314af7aa0d80c0c5d14a1a01002ba8187d9714faba2c41c89755a9a7ea8f',
+                                'output_schema_hash': '8387737cbe8589c81e4e599db754c7716a12423524f583b71577783e7cbd38c6',
                                 'tags': ['details', 'light', 'qlab', 'safe-read'],
                                 'timeout': 20.0,
                                 'title': 'Get QLab Light Cue Details'},

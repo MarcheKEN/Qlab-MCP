@@ -1,4 +1,21 @@
-# Current Project State — 2026-10-25
+# Current Project State — 2026-10-26
+
+## Light cue audit follow-up — PR #19
+
+Light cue details now include bounded last-saved ascending/descending curves,
+with file hash, version, dirty-state freshness and explicit partial coverage for
+unknown variants. Linear curves accept replacement control points as well as
+Custom curves. Compact command ranges retain exact-name precedence and bounded
+expansion. Native cue helpers target the unique verified running QLab installation;
+trigger, Load Time and Target confirmations bind its process and bundle identity.
+
+Verification: **2,338 passed, 35 skipped, 61 subtests passed**; the public contract
+remains **87 tools: 52 reads and 35 writes**. Source FastMCP calls accepted and
+restored a Linear point edit in QLab; native UI corroborated the intermediate
+point. See the [follow-up evidence and remaining gaps](../development/runtime-validation/2026-10-26-light-cue-gap-closure.md).
+The restarted attached MCP also returned both restored curves, native triggers
+and the verified Desktop installation without errors; the document stayed clean
+and inactive and its hash did not change during the reads.
 
 ## Settings follow-up — PR #19
 

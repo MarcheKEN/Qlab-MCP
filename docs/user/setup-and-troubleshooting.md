@@ -80,9 +80,12 @@ workspaces need an explicit choice. Write readiness is separate from read access
 ## Native document and Trigger failures
 
 Document/archive bridges require exactly one verified running local QLab
-installation; cue-native field/Trigger bridges still require `/Applications/QLab.app`.
+installation. Native cue field/Trigger bridges also target that running installation,
+requiring QLab 5.5.10/build 5510 and binding native trigger snapshots to its identity.
 Both require a loopback host and Automation permission for the actual MCP host.
-It does not launch QLab or provide a remote fallback. Keep unavailable native
+QLab must already be running; there is no remote fallback. The fixed scripts use
+the installed `/Applications/QLab.app` dictionary for compile-time terminology,
+while events target the verified running installation. Keep unavailable native
 fields unknown; OSC data can still be useful. Open has its own empty-inventory
 preflight; Save/Close and existing-cue edits require their documented readiness.
 After an uncertain native event, inspect fresh state and never resend blindly.

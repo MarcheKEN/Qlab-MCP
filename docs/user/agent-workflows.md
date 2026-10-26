@@ -52,6 +52,14 @@ errors and contents.truncated; use each child's family tool for its full detail.
 
 ## Light cue curves
 
+First read `qlab_get_light_cue_details.saved_curves` for the saved ascending and
+descending types, parameters and normalized points. Its hash, dirty flag and
+freshness describe the file, separately from current OSC values. Each side
+returns up to 4,096 points within the detail response budget; inspect counts,
+truncation and issues before treating it as complete. Unknown or mirrored
+variants remain inspectable without granting write support. Missing Automation,
+a remote workspace or an inconsistent file read preserves the useful OSC data.
+
 Use `qlab_edit_light_cue_curves` separately from the OSC Light command editor.
 Resolve exact Light cue UUIDs, check write readiness, then preview 1–50 operations:
 
@@ -80,7 +88,7 @@ an uncertain write automatically.
 Types are `custom`, `s_curve`, `parametric` and `linear`. Omitted sides and fields
 retain their values; explicit null is invalid. `parameter` must be finite and
 positive; native acceptance covers 2.5, not every possible boundary. A supplied
-`points` list explicitly replaces the Custom curve's points. Times and values
+`points` list explicitly replaces the Custom or Linear curve's points. Times and values
 are normalized 0–1, times strictly increase, and endpoints are fixed: up
 (0,0)→(1,1), down (0,1)→(1,0). Each side allows 2–4,096 points, with 8,192 supplied
 points across a batch. Mirrored/unknown curve structures are blocked.
@@ -133,7 +141,7 @@ and current references, without inspecting the destination.
 
 Most coverage uses OSC. Load adds `load.loadTime` and Target adds
 `assignment.assignedNumber` through two fixed local AppleScript reads.
-These require macOS, loopback `QLAB_HOST`, one running `/Applications/QLab.app`
+These require macOS, loopback `QLAB_HOST`, one verified running QLab 5.5.10/build 5510
 and Automation permission for the MCP host. Failure preserves OSC data,
 returns a partial error and blocks that property; it does not invent a value.
 Inspect `property_transports` and `blocked_properties`. Audio Maps and /live
@@ -609,7 +617,7 @@ not an edit revision, so concurrent edits while already dirty are not detected.
 `qlab_close_workspace` accepts only a clean document and uses `saving no`; it
 will never discard dirty changes. Both require an inactive workspace in Edit
 Mode, use one native event and verify a new inventory. Do not retry a timeout;
-inspect QLab and call Get again first. These tools need the local `/Applications/QLab.app`
+inspect QLab and call Get again first. These tools need the unique verified local QLab
 process and macOS Automation permission, and are unavailable for remote QLab.
 
 Open requires `QLAB_ENABLE_WRITE=true`; it does not call existing-workspace
@@ -1639,7 +1647,7 @@ retains exact workspace UUID, file identity, version and stability checks.
 Document Save/Close/Open and archive transactions target that same verified
 running installation. AppleScript dictionary compilation uses the installed
 `/Applications/QLab.app` dictionary; this is not the target document path. Separate
-cue-native helpers retain their own installation restrictions.
+cue-native helpers verify the unique running bundle and supported version/build too.
 
 Saved region `warping_center` is derived by evaluating the forward warp at the
 region midpoint, then subtracting half the saved output-route raster. It handles

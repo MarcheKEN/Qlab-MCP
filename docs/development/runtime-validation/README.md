@@ -9,6 +9,9 @@ Use the [current tool catalogue](../../user/tools.md) and
 
 ## Records
 
+- [Light cue audit follow-up — October 26](2026-10-26-light-cue-gap-closure.md):
+  saved curve detail, Linear points, compact ranges and running-installation identity.
+
 - [Settings follow-up — October 25](2026-10-25-settings-extensions.md): complete
   readable definition details, root ordering, empty input names, native NDI rates,
   bounded Syphon directory and type-sensitive archive recovery.

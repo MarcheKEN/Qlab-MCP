@@ -240,6 +240,75 @@ def test_named_numeric_range_expands_inclusive_targets() -> None:
     assert [item["instrument"] for item in result["affected"]] == ["Frontal 1", "Frontal 2", "Frontal 3"]
 
 
+@pytest.mark.parametrize(
+    ("command", "kind", "expected"),
+    [
+        ("1-3=50", "range", ["1", "2", "3"]),
+        ("[1-3]=50", "ad_hoc_group", ["1", "2", "3"]),
+        ("Frontal 1-Frontal 3=25", "range", ["Frontal 1", "Frontal 2", "Frontal 3"]),
+        (
+            "[Frontal 1-Frontal 3]=25",
+            "ad_hoc_group",
+            ["Frontal 1", "Frontal 2", "Frontal 3"],
+        ),
+        (
+            "Front-Left 1-Front-Left 3=25",
+            "range",
+            ["Front-Left 1", "Front-Left 2", "Front-Left 3"],
+        ),
+    ],
+)
+def test_compact_numeric_ranges_expand_inclusively(
+    command: str, kind: str, expected: list[str]
+) -> None:
+    patch = {
+        "instruments": [
+            {
+                "name": name,
+                "parameter_names": ["intensity"],
+                "definition": {"default_parameter_name": "intensity"},
+            }
+            for name in expected
+        ],
+        "groups": [],
+    }
+
+    result = analyze(command, patch)
+
+    assert result["status"] == "valid"
+    assert result["target"]["kind"] == kind
+    assert [item["instrument"] for item in result["affected"]] == expected
+
+
+def test_exact_target_name_precedes_compact_range_parsing() -> None:
+    patch = named_fixtures("Frontal", 3)
+    patch["instruments"].append(
+        {
+            "name": "Frontal 1-Frontal 3",
+            "parameter_names": ["intensity"],
+            "definition": {"default_parameter_name": "intensity"},
+        }
+    )
+
+    result = analyze("Frontal 1-Frontal 3=25", patch)
+
+    assert result["status"] == "valid"
+    assert result["target"]["resolved_name"] == "Frontal 1-Frontal 3"
+    assert result["affected"] == [
+        {"instrument": "Frontal 1-Frontal 3", "parameter": "intensity"}
+    ]
+
+
+def test_long_hyphen_heavy_non_range_stays_within_command_limit() -> None:
+    command = "A1-" * 20_000 + "X=50"
+
+    result = analyze(command, {"instruments": [], "groups": []})
+
+    assert len(command.encode("utf-8")) < 65_536
+    assert result["status"] == "invalid"
+    assert result["errors"][0]["code"] == "unknown_target"
+
+
 def test_named_numeric_range_crosses_digit_width_without_padding() -> None:
     patch = named_fixtures("Frontal", 10)
 
@@ -296,10 +365,11 @@ def test_adhoc_group_expands_named_numeric_targets(command: str, expected: list[
     assert {item["parameter"] for item in result["affected"]} == {"red" if ".red" in command else "blue"}
 
 
-def test_target_range_requires_matching_numeric_suffix_prefix() -> None:
+@pytest.mark.parametrize("command", ["Frontal 1 - LED 3 = 25", "Frontal 1-LED 3=25"])
+def test_target_range_requires_matching_numeric_suffix_prefix(command: str) -> None:
     patch = named_fixtures("Frontal", 3)
 
-    result = analyze("Frontal 1 - LED 3 = 25", patch)
+    result = analyze(command, patch)
 
     assert result["status"] == "unsupported"
     assert result["errors"][0]["code"] == "range_or_list"

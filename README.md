@@ -35,8 +35,8 @@ Writes are disabled by default and require a reviewed preview and confirmation.
 
 AppleScript covers local document operations, Load Time, Target assigned number
 and selected native triggers. Document/archive bridges verify the unique running
-QLab installation, including installations outside `/Applications`; some
-cue-native helpers retain their `/Applications/QLab.app` requirement. macOS
+QLab installation, including installations outside `/Applications`. Native cue
+bridges verify the running QLab 5.5.10/build 5510 installation as well. macOS
 Automation permission belongs to the MCP host. Ordinary cue access uses OSC.
 Light Patch file editing requires local QLab **5.5.10/build 5510**. USB-DMX
 assignments store the supplied device identity; they do not discover a device

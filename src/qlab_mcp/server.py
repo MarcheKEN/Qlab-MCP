@@ -448,7 +448,7 @@ def qlab_edit_light_cue_curves(
     Requires QLab 5.5.10/build 5510 and a clean inactive local document. Preview
     first; execute with its fresh single-use confirmation token. The same path
     close/edit/reopen transaction preserves a recovery file. Omitted fields and
-    sides are preserved; points explicitly replace a Custom curve's normalized
+    sides are preserved; points explicitly replace a Custom or Linear curve's normalized
     point list. Supported types: custom, s_curve, parametric, linear. Mirrored
     curves and unrecognized archive variants are blocked. needs_save requires
     qlab_save_workspace then a new preview. Verification reads the saved archive
@@ -1757,7 +1757,7 @@ def qlab_get_control_cue_details(
     Returns common settings, state, timing and applicable target, Reset or Devamp fields.
     Memo notes are included in safe; technical adds other notes. Inspect coverage and partial errors.
     Load loadTime and Target assignedNumber use fixed local AppleScript reads; inspect partial errors
-    and property_transports. Requires macOS Automation access and /Applications/QLab.app. Audio Maps are excluded.
+    and property_transports. Requires macOS Automation access and one verified running QLab 5.5.10/build 5510. Audio Maps are excluded.
     References do not expand targets or patches. Never starts, stops, loads or modifies cues.
     Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
@@ -1970,6 +1970,9 @@ def qlab_get_light_cue_details(
     """Read one exact Light cue: full command text, collate, subcontroller, state and timing.
 
     safe includes commands; technical adds notes. Commands are never executed or interpreted as live output.
+    saved_curves adds bounded last-saved ascending/descending curves, points and
+    explicit archive provenance/freshness. Reads never save; unknown variants
+    remain partial and do not enable writes. OSC data survives archive failures.
     Use qlab_get_workspace_light_settings for the patch. Inspect coverage and partial errors.
     Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """

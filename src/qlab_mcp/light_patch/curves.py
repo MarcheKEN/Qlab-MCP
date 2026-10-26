@@ -1,9 +1,11 @@
 """Guarded saved-archive edits for QLab Light cue curves."""
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import plistlib
+from pathlib import Path
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -20,6 +22,227 @@ _ENTRY_FIELDS = {"$class", "t", "v", "previous", "next"}
 _MAX_OPERATIONS = 50
 _MAX_POINTS = 4096
 _MAX_TOTAL_POINTS = 8192
+_MAX_READ_POINTS = _MAX_POINTS
+
+
+def _finite_number(value: Any) -> bool:
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def _readable_curve_side(archive: Archive, shapes: dict, side: str) -> dict:
+    """Decode known curve fields without applying the writer's safety restrictions."""
+    native_side = _SIDES[side]
+    result = dict(status="partial", native_type=None, type=None, parameter=None,
+                  points=[], total_points=None, truncated=False, resolution=None,
+                  mirror_shape=None, domain=None, unknown_fields=[], issues=[])
+    shape_ref = shapes.get(native_side)
+    if not isinstance(shape_ref, plistlib.UID):
+        result["issues"].append("shape_reference_unavailable")
+        return result
+    try:
+        if archive.kind(shape_ref) != "FadeShape":
+            result["issues"].append("unknown_shape_class")
+            return result
+        shape = archive.ref(shape_ref)
+    except (KeyError, TypeError, ValueError, AttributeError):
+        result["issues"].append("shape_unreadable")
+        return result
+    shape_unknown = set(shape) - {"$class", "type", "curveParameter", "shapeEntries"}
+    result["unknown_fields"] = sorted(f"shape.{name}" for name in shape_unknown)
+    if shape_unknown:
+        result["issues"].append("unknown_shape_fields")
+    raw_type = archive.ref(shape.get("type"))
+    if type(raw_type) in (int, str):
+        result["native_type"] = raw_type
+    result["type"] = _NATIVE_TO_TYPE.get(raw_type) if type(raw_type) is int else None
+    if result["type"] is None:
+        result["issues"].append("unknown_curve_type")
+    try:
+        parameter = archive.ref(shape.get("curveParameter"))
+        if _finite_number(parameter):
+            result["parameter"] = float(parameter)
+        else:
+            result["issues"].append("curve_parameter_unavailable")
+    except (TypeError, ValueError, OverflowError):
+        result["issues"].append("curve_parameter_unavailable")
+
+    entries_ref = shape.get("shapeEntries")
+    try:
+        if not isinstance(entries_ref, plistlib.UID):
+            raise ValueError("shape_entries_unavailable")
+        try:
+            array_class = archive.kind(entries_ref)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            array_class = None
+        if array_class not in {"NSArray", "NSMutableArray"}:
+            result["issues"].append("unknown_shape_entries_array_class")
+            if array_class:
+                result["unknown_fields"].append(f"shapeEntries.array_class:{array_class}")
+        entries_object = archive.ref(entries_ref)
+        if not isinstance(entries_object, dict) or "NS.keys" in entries_object or not isinstance(entries_object.get("NS.objects"), list):
+            raise ValueError("shape_entries_unreadable")
+        entries = entries_object["NS.objects"]
+        result["total_points"] = len(entries)
+        result["truncated"] = len(entries) > _MAX_READ_POINTS
+        for ref in entries[:_MAX_READ_POINTS]:
+            if not isinstance(ref, plistlib.UID):
+                result["issues"].append("unknown_point_reference")
+                continue
+            try:
+                if archive.kind(ref) != "FadeShapeEntry":
+                    result["issues"].append("unknown_point_class")
+                    continue
+                entry = archive.ref(ref)
+                t, v = archive.ref(entry.get("t")), archive.ref(entry.get("v"))
+                if not _finite_number(t) or not _finite_number(v):
+                    result["issues"].append("invalid_point_values")
+                    continue
+                point = {"t": float(t), "v": float(v)}
+                result["points"].append(point)
+                point_unknown = set(entry) - _ENTRY_FIELDS
+                if point_unknown:
+                    result["issues"].append("unknown_point_fields")
+                    result["unknown_fields"].extend(f"shapeEntries[].{name}" for name in point_unknown)
+            except (KeyError, TypeError, ValueError, AttributeError):
+                result["issues"].append("point_unreadable")
+        if result["truncated"]:
+            result["issues"].append("point_limit_reached")
+    except (KeyError, TypeError, ValueError, AttributeError):
+        result["issues"].append("shape_entries_unreadable")
+
+    # These settings belong to the shared FadeShapesFunction and are included on each side
+    # so clients can consume either curve independently.
+    return result
+
+
+def _decode_saved_curves(source: bytes, cue_id: str) -> dict:
+    outer = Archive(source)
+    meta = outer.mapping(outer.root)
+    version, build = outer.ref(meta.get("QLabShortVersionString")), outer.ref(meta.get("QLabBuildNumber"))
+    workspace_id = str(UUID(outer.ref(meta["uniqueID"]))).upper()
+    if (version, build) != ("5.5.10", 5510):
+        return dict(status="unsupported_version", workspace_id=workspace_id,
+                    version=version if isinstance(version, str) else None,
+                    build=build if type(build) is int else None,
+                    curves={}, coverage="Only QLab 5.5.10/build 5510 archive curves are decoded.")
+    carrier_ref = outer.mapping(outer.root).get("cueLists")
+    carrier = outer.ref(carrier_ref)
+    if not isinstance(carrier, dict) or not isinstance(carrier.get("NS.data"), bytes):
+        raise ValueError("Saved cue-list archive is unavailable.")
+    inner = Archive(carrier["NS.data"])
+    cues, _ = _reachable_cues(inner)
+    found = cues.get(cue_id.upper())
+    if found is None:
+        return dict(status="cue_not_found", workspace_id=workspace_id, version=version,
+                    build=build, curves={}, coverage="No active Light cue with this UUID was found in the saved archive.")
+    cue, _ = found
+    fade_ref = cue.get("fade")
+    if not isinstance(fade_ref, plistlib.UID) or inner.kind(fade_ref) != "Fade":
+        raise ValueError("Saved Light cue Fade structure is unavailable.")
+    fade = inner.ref(fade_ref)
+    shapes_ref = fade.get("shapes")
+    if not isinstance(shapes_ref, plistlib.UID) or inner.kind(shapes_ref) != "FadeShapesFunction":
+        raise ValueError("Saved Light cue FadeShapesFunction is unavailable.")
+    shapes = inner.ref(shapes_ref)
+    domain = inner.ref(shapes.get("domain"))
+    try:
+        domain_class = inner.kind(shapes.get("domain"))
+    except (KeyError, TypeError, ValueError, AttributeError):
+        domain_class = None
+    raw_resolution = inner.ref(shapes.get("resolution"))
+    raw_mirror = inner.ref(shapes.get("mirrorShape"))
+    shared_domain = {}
+    if isinstance(domain, dict):
+        for key in ("mode", "absolute"):
+            value = inner.ref(domain[key]) if key in domain else None
+            if type(value) in (str, bool, int) or (type(value) is float and _finite_number(value)):
+                if key in domain:
+                    shared_domain[key] = value
+    else:
+        shared_domain = None
+    shared_issues = []
+    domain_unknown = (set(domain) - {"$class", "mode", "absolute"}) if isinstance(domain, dict) else set()
+    if domain_unknown:
+        shared_issues.append("unknown_fade_domain_fields")
+    if not _finite_number(raw_resolution):
+        shared_issues.append("resolution_unavailable")
+    if type(raw_mirror) is not bool:
+        shared_issues.append("mirror_state_unavailable")
+    elif raw_mirror:
+        shared_issues.append("curves_are_mirrored")
+    if shared_domain is None or set(shared_domain) != {"mode", "absolute"}:
+        shared_issues.append("fade_domain_unavailable")
+    elif shared_domain != {"mode": 0, "absolute": False}:
+        shared_issues.append("nonstandard_fade_domain")
+    if domain_class != "FadeDomain":
+        shared_issues.append("unknown_fade_domain_class")
+    function_fields = {"$class", "upShape", "downShape", "mirrorShape", "domain", "resolution"}
+    function_unknown_fields = sorted(set(shapes) - function_fields)
+    if function_unknown_fields:
+        shared_issues.append("unknown_fade_shape_function_fields")
+    shared_unknown_fields = [*(f"fade_shape_function.{name}" for name in function_unknown_fields),
+                             *(f"fade_domain.{name}" for name in domain_unknown)]
+    if domain_class and domain_class != "FadeDomain":
+        shared_unknown_fields.append(f"fade_domain.class:{domain_class}")
+    shared = dict(
+        resolution=float(raw_resolution) if _finite_number(raw_resolution) else None,
+        mirror_shape=raw_mirror if type(raw_mirror) is bool else None,
+        domain=shared_domain,
+    )
+    curves = {side: _readable_curve_side(inner, shapes, side) for side in _SIDES}
+    for curve in curves.values():
+        curve.update(shared)
+        curve["unknown_fields"] = sorted(set(curve["unknown_fields"]) | set(shared_unknown_fields))
+        curve["issues"].extend(shared_issues)
+        curve["status"] = "available" if not curve["issues"] else "partial"
+    complete = all(curve["status"] == "available" for curve in curves.values())
+    return dict(status="ready" if complete else "partial", workspace_id=workspace_id,
+                version=version, build=build, curves=curves,
+                coverage="Both saved curve shapes are decoded." if complete else
+                "Known saved curve fields are returned; inspect per-curve issues for unknown or unreadable fields.")
+
+
+def read_saved_light_cue_curves(reader: Any, workspace_id: str, cue_id: str) -> dict:
+    """Read stable last-saved Light cue curves without saving or changing QLab."""
+    from .. import workspace_documents as docs
+    from ..sanitizer import sanitize_exception_message
+    from .reader import _read_file
+
+    unavailable = dict(status="unavailable", source="saved_archive", freshness="unavailable",
+                       document_modified=None, sha256=None, version=None, build=None,
+                       curves={}, coverage="Saved Light cue curves could not be read.")
+    try:
+        docs._local(reader)
+        with docs._LOCK:
+            before = docs._document(docs._inventory(reader), workspace_id)
+            unavailable["document_modified"] = before["modified"]
+            if not before["path"]:
+                raise ValueError("Workspace has no saved document path.")
+            path = Path(before["path"])
+            source, identity = _read_file(path)
+            decoded = _decode_saved_curves(source, cue_id)
+            if decoded["workspace_id"] != workspace_id:
+                raise ValueError("Saved workspace UUID does not match the requested workspace.")
+            after = docs._document(docs._inventory(reader), workspace_id)
+            current, current_identity = _read_file(path)
+            stable_keys = ("workspace_id", "path", "modified", "edit_mode", "show_mode", "active_cue_ids")
+            if any(before.get(key) != after.get(key) for key in stable_keys) or identity != current_identity or source != current:
+                return {**unavailable, "status": "changed_during_read",
+                        "coverage": "Document or saved file changed during the read; saved curves were discarded."}
+            digest = hashlib.sha256(source).hexdigest()
+            return {**decoded, "source": "saved_archive", "sha256": digest,
+                    "document_modified": before["modified"],
+                    "freshness": "possibly_stale" if before["modified"] else "last_saved"}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, plistlib.InvalidFileException) as exc:
+        message = sanitize_exception_message(exc)
+        status = "changed_during_read" if "changed during" in str(exc) else "unavailable"
+        return {**unavailable, "status": status, "message": message,
+                "coverage": message}
 
 
 def _optional_without_null(schema: dict) -> None:
@@ -186,6 +409,8 @@ def _read_shape(archive: Archive, shapes: dict, side: str) -> tuple[dict, dict, 
     entries_ref = shape.get("shapeEntries")
     if not isinstance(entries_ref, plistlib.UID):
         raise ValueError("Curve shapeEntries must be a keyed archive array.")
+    if archive.kind(entries_ref) not in {"NSArray", "NSMutableArray"}:
+        raise ValueError("Unsupported curve shapeEntries array class.")
     entries_object = archive.ref(entries_ref)
     if not isinstance(entries_object, dict) or "NS.keys" in entries_object or not isinstance(entries_object.get("NS.objects"), list):
         raise ValueError("Malformed curve shapeEntries array.")
@@ -327,8 +552,8 @@ def plan_light_cue_curves(source: bytes, operations: list[dict]) -> dict:
             shape_ref, shape, old_refs, before_points = shape_data[side]
             current_type = _NATIVE_TO_TYPE[inner.ref(shape["type"])]
             new_type = edit.get("type", current_type)
-            if "points" in edit and new_type != "custom":
-                raise ValueError("Control points can be supplied only for a Custom curve.")
+            if "points" in edit and new_type not in {"custom", "linear"}:
+                raise ValueError("Control points can be supplied only for Custom or Linear curves.")
             effective_points = edit.get("points", before_points)
             total_points += len(effective_points) if "points" in edit else 0
             if total_points > _MAX_TOTAL_POINTS:

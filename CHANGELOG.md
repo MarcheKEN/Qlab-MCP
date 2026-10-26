@@ -2,6 +2,11 @@
 
 ## 0.4.0 (Unreleased)
 
+- Add last-saved Light cue curves to the existing detail reader, with stable-file
+  identity, explicit freshness and bounded point coverage; permit Linear point edits.
+- Accept compact Light command ranges while preserving exact legacy names.
+- Target the unique verified running QLab installation for native cue properties
+  and bind native trigger confirmations to its identity.
 - Keep Light Definition parameter inspection independent of import validation;
   return complete readable details and explicit counts/diagnostics for rejected definitions.
 - Add root stage/route reorder batches, input-only empty names and all five

@@ -163,6 +163,29 @@ def test_type_and_parameter_edit_preserves_points_and_other_curve():
     assert values[CUE]["downShape"] == before[CUE]["downShape"]
 
 
+def test_linear_curve_points_can_be_replaced_and_type_is_preserved():
+    from qlab_mcp.light_patch.curves import plan_light_cue_curves
+
+    source, _ = _workspace_with_curves()
+    plan = plan_light_cue_curves(source, [{"cue_id": CUE,
+        "up": {"type": "linear", "points": [{"t": 0.0, "v": 0.0},
+                                               {"t": 0.4, "v": 0.2},
+                                               {"t": 1.0, "v": 1.0}]}}])
+    _, _, _, values = _curves(plan["output_bytes"])
+    assert values[CUE]["upShape"]["type"] == 3
+    assert values[CUE]["upShape"]["points"] == [(0.0, 0.0), (0.4, 0.2), (1.0, 1.0)]
+
+
+def test_non_custom_non_linear_curve_points_remain_blocked():
+    from qlab_mcp.light_patch.curves import plan_light_cue_curves
+
+    source, _ = _workspace_with_curves()
+    with pytest.raises(ValueError, match="Custom or Linear"):
+        plan_light_cue_curves(source, [{"cue_id": CUE,
+            "up": {"type": "s_curve", "points": [{"t": 0.0, "v": 0.0},
+                                                    {"t": 1.0, "v": 1.0}]}}])
+
+
 def test_identical_update_is_byte_preserving_noop():
     from qlab_mcp.light_patch.curves import plan_light_cue_curves
 
@@ -229,6 +252,28 @@ def test_unverified_shape_modes_are_rejected(kwargs):
     with pytest.raises(ValueError, match="Mirrored|FadeDomain"):
         plan_light_cue_curves(source, [{"cue_id": CUE,
             "up": {"points": [{"t": 0.0, "v": 0.0}, {"t": 0.5, "v": 0.8}, {"t": 1.0, "v": 1.0}]}}])
+
+
+@pytest.mark.parametrize("unknown_class", ["FutureArray", "FutureDomain"])
+def test_writer_rejects_unrecognized_curve_container_classes(unknown_class):
+    from qlab_mcp.light_patch.curves import plan_light_cue_curves
+
+    source, ids = _workspace_with_curves(unknown_point_fields=False)
+    outer = Archive(source)
+    carrier = outer.ref(outer.mapping(outer.root)["cueLists"])
+    inner = Archive(carrier["NS.data"])
+    if unknown_class == "FutureArray":
+        shape = inner.ref(ids["up_shape"])
+        inner.ref(shape["shapeEntries"])["$class"] = inner.cls(unknown_class)
+        expected = "shapeEntries array class"
+    else:
+        shapes = inner.ref(ids["shapes"])
+        inner.ref(shapes["domain"])["$class"] = inner.cls(unknown_class)
+        expected = "Unknown Light cue curve domain"
+    carrier["NS.data"] = inner.dump()
+
+    with pytest.raises(ValueError, match=expected):
+        plan_light_cue_curves(outer.dump(), [{"cue_id": CUE, "up": {"type": "linear"}}])
 
 
 def test_only_reachable_exact_light_cue_is_edited():

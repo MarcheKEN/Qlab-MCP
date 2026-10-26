@@ -69,8 +69,14 @@ Load `loadTime`, Target `assignedNumber` and fixed native cue Triggers use Apple
 editors require the same OSC Edit permission, Edit Mode, inactive workspace,
 whole-batch preflight and signed single-use confirmations as their OSC fields.
 The bridge requires macOS, a loopback `QLAB_HOST` and exactly one running QLab
-instance at `/Applications/QLab.app`; it never launches QLab. macOS Automation
+instance with verified bundle, version/build and process identity. QLab must
+already be running; the bridge sends no explicit launch command.
+Native trigger snapshots bind the installation identity into confirmations. macOS Automation
 permission belongs to the actual MCP host process and is not bypassed.
+
+AppleEvents still address the verified application path. A process exit between
+verification and event delivery can race with macOS application resolution;
+identity checks reject changed-process writes, and uncertain events are never retried.
 
 The script is fixed: arguments are JSON data passed to `osascript` without a
 shell, never script source. Only explicitly allowlisted saved setters exist. Workspace and

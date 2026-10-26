@@ -166,7 +166,7 @@ def control_edit_capabilities(kind, triggers=None, *, applescript_available=None
         allowed = [key for key in allowed if key != "loadTime"]
     native = "loadTime" if kind == "Load" else "assignedNumber" if kind == "Target" else None
     if native and applescript_available is not True:
-        blocked[native] = "Requires a fresh local AppleScript read, macOS Automation permission and /Applications/QLab.app."
+        blocked[native] = "Requires a fresh local AppleScript read, macOS Automation permission, and exactly one running QLab 5.5.10/build 5510 instance."
     return control_applescript.trigger_capabilities({"tool": tool, "allowed_properties": sorted(set(allowed) - blocked.keys()),
             "blocked_properties": blocked, "requires_fresh_preflight": True,
             "property_transports": {native: "applescript"} if native else {},
@@ -218,11 +218,12 @@ def _scalar(reader, ws, uid, key):
 
 
 def _script_dependencies(reader, ws, uid, before, changes):
+    app_identity = control_applescript.trigger_snapshot(reader, ws, uid, before["type"])["app_identity"]
     receiver = before.get("cueTargetID")
     if type(receiver) is not str:
         raise ValueError("AppleScript cueTargetID must be readable; unknown is not an empty target.")
     receiver = str(UUID(receiver)).upper() if receiver else ""
-    context = {"cueTargetID": receiver}
+    context = {"app_identity": app_identity, "cueTargetID": receiver}
     if receiver:
         resolved = _read(reader, ws, str(UUID(receiver)).upper(),
                          ["uniqueID", "type", "hasCueTargets", "isRunning", "isPaused", "isAuditioning"])
@@ -618,7 +619,9 @@ def edit_control_cues(reader, workspace_id, updates, dry_run=None, *, _family="c
                             context = {"expected_snapshot": native_snapshot, "expected_type": result["before"]["type"]}
                         else:
                             dependency = binding["dependencies"]["applescript"]
-                            context = {"expected_target": dependency["cueTargetID"], "assigned_cue_id": dependency.get("assigned", {}).get("uniqueID")}
+                            context = {"expected_target": dependency["cueTargetID"],
+                                       "expected_application": dependency["app_identity"],
+                                       "assigned_cue_id": dependency.get("assigned", {}).get("uniqueID")}
                         control_applescript.request(reader, ws, result["cue_id"], key, value=plan["args"][0],
                             expected=expected, **context, timeout=min(reader.client.config.timeout, max(0.01, deadline - time.monotonic())))
                     else:

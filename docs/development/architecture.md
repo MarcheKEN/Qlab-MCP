@@ -174,7 +174,8 @@ readback; a no-send acknowledgement is blocked and an unacknowledged response
 stays uncertain. No automatic event retry is performed. The native bridge
 verifies and targets the unique running local QLab installation and requires
 Automation permission. Its compile-time terminology uses the installed
-`/Applications/QLab.app` dictionary; cue-native helpers retain their own guards.
+`/Applications/QLab.app` dictionary. Cue-native helpers target the verified running
+bundle too; trigger dependency snapshots include its path, PID, bundle and build.
 
 `media.py` searches home by filename with entry/time/result bounds and skips
 symlinks. `audio_analysis.py` resolves an authorized file, lazily loads optional

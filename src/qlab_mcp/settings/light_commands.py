@@ -94,7 +94,50 @@ def _unsupported_syntax(result: dict[str, Any], left: str, right: str) -> dict[s
     return None
 
 
-def _selector(left: str) -> tuple[str | None, list[str] | None, str | None, str | None]:
+def _compact_range_parts(expression: str) -> tuple[tuple[str, str, str, str] | None, str | None]:
+    """Find one matching-prefix numeric range without backtracking over hyphens."""
+    end_digits_start = len(expression)
+    while end_digits_start and expression[end_digits_start - 1].isdecimal():
+        end_digits_start -= 1
+    if end_digits_start == len(expression):
+        return None, None
+
+    candidate_found = False
+    for separator, character in enumerate(expression):
+        if character != "-":
+            continue
+        start_digits_end = separator
+        while start_digits_end and expression[start_digits_end - 1].isspace():
+            start_digits_end -= 1
+        start_digits_start = start_digits_end
+        while start_digits_start and expression[start_digits_start - 1].isdecimal():
+            start_digits_start -= 1
+        if start_digits_start == start_digits_end:
+            continue
+        candidate_found = True
+
+        end_prefix_start = separator + 1
+        while end_prefix_start < end_digits_start and expression[end_prefix_start].isspace():
+            end_prefix_start += 1
+        if start_digits_start == end_digits_start - end_prefix_start:
+            # Left-prefix length increases while right-prefix length decreases, so this is the only full comparison.
+            if expression[:start_digits_start] == expression[end_prefix_start:end_digits_start]:
+                return (
+                    expression[:start_digits_start],
+                    expression[start_digits_start:start_digits_end],
+                    expression[end_prefix_start:end_digits_start],
+                    expression[end_digits_start:],
+                ), None
+
+    if candidate_found:
+        return None, "Only ranges with matching names and numeric suffixes are supported."
+    return None, None
+
+
+def _selector(
+    left: str,
+    targets: list[tuple[str, dict[str, Any]]] | None = None,
+) -> tuple[str | None, list[str] | None, str | None, str | None]:
     """Parse documented target lists/ranges using exact instrument names."""
     explicit_parameter = None
     ad_hoc = left.startswith("[")
@@ -125,32 +168,37 @@ def _selector(left: str) -> tuple[str | None, list[str] | None, str | None, str 
         kind = "ad_hoc_group" if ad_hoc else "list"
         return kind, names, explicit_parameter, None
 
-    range_parts = re.split(r"\s+-\s+", expression)
-    if len(range_parts) == 2:
-        start = re.fullmatch(r"(.*?)(\d+)", range_parts[0].strip())
-        end = re.fullmatch(r"(.*?)(\d+)", range_parts[1].strip())
-        if not start or not end or start.group(1) != end.group(1):
+    if not ad_hoc and targets is not None:
+        _, _, _, target_error = _resolve_target(expression, targets)
+        if target_error != "unknown_target":
+            return None, None, None, None
+
+    range_parts, range_error = _compact_range_parts(expression)
+    if range_error:
+        return None, None, None, range_error
+    if range_parts is not None:
+        start_prefix, start_digits, end_prefix, end_digits = range_parts
+        if start_prefix != end_prefix:
             return None, None, None, "Only ranges with matching names and numeric suffixes are supported."
         try:
-            first, last = int(start.group(2)), int(end.group(2))
+            first, last = int(start_digits), int(end_digits)
         except ValueError:
             return None, None, None, "Target range indices are outside the supported numeric size."
-        padded_start = len(start.group(2)) > len(str(first))
-        padded_end = len(end.group(2)) > len(str(last))
-        if padded_start != padded_end or (padded_start and len(start.group(2)) != len(end.group(2))):
+        padded_start = len(start_digits) > len(str(first))
+        padded_end = len(end_digits) > len(str(last))
+        if padded_start != padded_end or (padded_start and len(start_digits) != len(end_digits)):
             return None, None, None, "Zero-padded target range endpoints must use the same numeric width."
         if first > last:
             return None, None, None, "Descending target ranges are not supported."
         if last - first + 1 > MAX_LIGHT_ANALYSIS_RESULTS:
             return None, None, None, f"Target expansion exceeds the {MAX_LIGHT_ANALYSIS_RESULTS}-target analysis limit."
         kind = "ad_hoc_group" if ad_hoc else "range"
-        width = len(start.group(2)) if padded_start else 0
-        return kind, [f"{start.group(1)}{number:0{width}d}" for number in range(first, last + 1)], explicit_parameter, None
+        width = len(start_digits) if padded_start else 0
+        names = [f"{start_prefix}{number:0{width}d}" for number in range(first, last + 1)]
+        return kind, names, explicit_parameter, None
 
     if ad_hoc:
         return None, None, None, "Ad-hoc groups require a range or list."
-    if len(range_parts) > 2:
-        return None, None, None, "Target range syntax is invalid."
     return None, None, None, None
 
 
@@ -283,7 +331,7 @@ def _analyze_line(
     left, right = (part.strip() for part in source.split("=", 1))
     if not left or not right:
         return _unsupported(result, "unsupported_syntax", "Target and value are required.")
-    selector_kind, selector_names, selector_parameter, selector_error = _selector(left)
+    selector_kind, selector_names, selector_parameter, selector_error = _selector(left, targets)
     if selector_error:
         code = "target_expansion_limit" if selector_error.startswith("Target expansion exceeds") else "range_or_list"
         return _unsupported(result, code, selector_error)

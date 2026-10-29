@@ -2563,6 +2563,7 @@ def qlab_edit_camera_cues(
     Validate the entire batch before writing. Sequential, non-atomic, no rollback.
     Every setter uses alwaysReply and fresh readback; timeouts never trigger a retry.
     Routing uses exact UUIDs in this workspace; empty stage/input UUID clears routing.
+    Camera audio channel count/offset require a clean local QLab 5.5.10 document and an exact patch-to-CoreAudio device/capacity match.
     Fade & Stop requires integer scope readback. Text styles require readable uniform fragments.
     Audio Maps, /live, cue execution and external trigger configuration are excluded.
     """
@@ -2643,6 +2644,7 @@ def qlab_edit_mic_cues(
     batch is validated and confirmations reserved before the first setter.
     Sequential, non-atomic; each setter is sent once with immediate fresh readback.
     Failure or uncertain readback stops remaining setters. Never retry; no rollback.
+    Mic channels/channelOffset are conditional: a clean local QLab 5.5.10 document and exact patch-to-CoreAudio capacity must be readable; no capture is started.
     Ask the user before accessing files. File targets need an existing readable
     absolute path and a supported MIDI format; macOS permissions apply to the MCP
     process. No folder allowlist is required. Audio Maps, /live, execution, and

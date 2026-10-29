@@ -1261,8 +1261,14 @@ from unrelated changes and inspect the fresh result. See the
 [live investigation](../development/runtime-validation/2026-10-02-visual-cue-fixes.md).
 
 Unreadable/mixed Text attributes block their scalar setters. Fade & Stop scope
-requires integer readback. Camera input channel count/offset remain blocked
-until input bounds can be verified. Typed FX operations require native index/type
+requires integer readback. Camera and Mic input channel count/offset require a
+clean local QLab 5.5.10 document, an exact saved input-patch identity, and a
+matching CoreAudio device with a readable current channel capacity. The check
+is metadata-only and does not start capture. System Input patches use the
+current macOS default input; explicit patches must match the CoreAudio device
+UID. If the workspace is dirty, the device is absent, or identity/capacity is
+ambiguous, the dry run stays blocked until the issue is resolved and a new plan
+is created. Typed FX operations require native index/type
 proof and a complete fresh stack. Text formatting limits are described below.
 Audio FX and default/silent bulk levels remain pending. Stage/region edits use
 Workspace Settings tools. Supported MIDI/Wall Clock configuration and guarded
@@ -1333,7 +1339,7 @@ multiple play-count edits verify the full cumulative slice inventory.
 | Family | Conditions and limits |
 | --- | --- |
 | Audio | Healthy media for timing; exact output patch and known channel bounds for Levels. Cue-owned objects require a matching UUID inventory and proven absence of an Audio Map. Integrated Fade exposes saved flags, not undocumented curves. |
-| Mic | Exact input/output patch selection, Levels and cue-owned Objects. `channels`/`channelOffset` stay blocked without a readable input capacity. |
+| Mic | Exact input/output patch selection, Levels and cue-owned Objects. `channels`/`channelOffset` are conditional on a clean local saved patch and an exact CoreAudio device/capacity match. |
 | Light | Commands must resolve completely against the current workspace Light patch. Collate/Subcontroller/duration use the same confirmations; no light execution. |
 | Fade | Cue/patch targets must resolve in the workspace. Values and activation flags must fit the target; relative silence and removing the last active parameter are rejected. Capture from target stays excluded without a complete expected snapshot. |
 | Network | `customString` is opaque saved text. Patch UUID membership is required, not a guessed patch-name protocol. Fades need readable mode/bounds; Device Definition parameters stay pending and blocked without metadata. |
@@ -1423,9 +1429,15 @@ quotes `“”` or an em dash `—`. Other punctuation, contractions, combining 
 in words and other scripts require explicit ranges or further native evidence.
 Range/full selections may contain ASCII/Latin characters or combining marks;
 color-only operations additionally accept the verified NBSP, `«»`, `“”` and `—` characters.
-Emoji/other scripts remain blocked even for color: QLab can change font metadata
-through fallback. The full effective format, including every companion attribute,
-must match after the setter.
+CJK selections are conditional: Core Text must resolve every selected grapheme
+to the exact observed font before and after the planned edit. Existing or new
+font substitution blocks the setter. Emoji and other scripts remain blocked.
+Scalar `text/format/fontName` and `text/format/fontFamilyAndStyle` edits are
+also blocked when the text contains emoji or another unsupported script: use
+typed range formatting for supported characters. The confirmation binds the
+text as well as its formatting; change either and a new dry run is required.
+The full effective format, including every companion attribute, must match after
+the setter; visual appearance still requires UI inspection.
 
 ```json
 {"cue_id":"<text-cue-uuid>","operations":[

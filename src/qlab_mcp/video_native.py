@@ -138,6 +138,83 @@ def displays():
                 truncated=total > len(rows), identity_scope='current_macos_display_session')
 
 
+def audio_inputs():
+    """Read CoreAudio input identities and channel counts without opening capture."""
+    core = C.CDLL('/System/Library/Frameworks/CoreAudio.framework/CoreAudio')
+    cf = C.CDLL('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation')
+    size_fn = _function(core, 'AudioObjectGetPropertyDataSize', C.c_int32, C.c_uint32,
+                        C.c_void_p, C.c_uint32, C.c_void_p, C.POINTER(C.c_uint32))
+    get_fn = _function(core, 'AudioObjectGetPropertyData', C.c_int32, C.c_uint32,
+                       C.c_void_p, C.c_uint32, C.c_void_p, C.POINTER(C.c_uint32), C.c_void_p)
+    get_string = _function(cf, 'CFStringGetCString', C.c_bool, C.c_void_p, C.c_char_p,
+                           C.c_long, C.c_uint32)
+    code = lambda value: int.from_bytes(value.encode('ascii'), 'big')
+
+    class Address(C.Structure):
+        _fields_ = [('selector', C.c_uint32), ('scope', C.c_uint32), ('element', C.c_uint32)]
+
+    class AudioBuffer(C.Structure):
+        _fields_ = [('channels', C.c_uint32), ('byte_size', C.c_uint32), ('data', C.c_void_p)]
+
+    class BufferListHeader(C.Structure):
+        _fields_ = [('count', C.c_uint32), ('buffers', AudioBuffer * 1)]
+
+    def property_data(object_id, selector, scope='glob', *, allow_empty=False):
+        address = Address(code(selector), code(scope), 0)
+        size = C.c_uint32()
+        status = size_fn(object_id, C.byref(address), 0, None, C.byref(size))
+        if status or size.value > 64 * 1024 or not size.value and not allow_empty:
+            raise ValueError(f'CoreAudio property {selector!r} is unavailable.')
+        if not size.value:
+            return C.create_string_buffer(1), 0
+        data = C.create_string_buffer(size.value)
+        status = get_fn(object_id, C.byref(address), 0, None, C.byref(size), data)
+        if status:
+            raise ValueError(f'CoreAudio property {selector!r} could not be read.')
+        return data, size.value
+
+    def string_property(object_id, selector):
+        data, size = property_data(object_id, selector)
+        if size != C.sizeof(C.c_void_p):
+            raise ValueError(f'CoreAudio string property {selector!r} has an unknown shape.')
+        value = C.cast(data, C.POINTER(C.c_void_p)).contents.value
+        if not value:
+            return None
+        text = C.create_string_buffer(4096)
+        if not get_string(value, text, len(text), 0x08000100):
+            raise ValueError(f'CoreAudio string property {selector!r} is not UTF-8 readable.')
+        return text.value.decode('utf-8')
+
+    devices_data, devices_size = property_data(1, 'dev#', allow_empty=True)
+    if devices_size % C.sizeof(C.c_uint32):
+        raise ValueError('CoreAudio device inventory has an invalid size.')
+    device_ids = list(C.cast(devices_data, C.POINTER(C.c_uint32 * (devices_size // 4))).contents)
+    if len(device_ids) > LIMIT:
+        raise ValueError('CoreAudio device inventory exceeds its limit.')
+    default_data, default_size = property_data(1, 'dIn ')
+    if default_size != C.sizeof(C.c_uint32):
+        raise ValueError('CoreAudio default input identity has an invalid size.')
+    default_id = C.cast(default_data, C.POINTER(C.c_uint32)).contents.value
+    rows = []
+    for device_id in device_ids:
+        data, size = property_data(device_id, 'slay', 'inpt')
+        if size < BufferListHeader.buffers.offset:
+            raise ValueError('CoreAudio input stream configuration has an invalid size.')
+        header = C.cast(data, C.POINTER(BufferListHeader)).contents
+        needed = BufferListHeader.buffers.offset + header.count * C.sizeof(AudioBuffer)
+        if header.count > 128 or needed > size:
+            raise ValueError('CoreAudio input stream configuration exceeds its bounds.')
+        channels = sum(AudioBuffer.from_buffer(data, BufferListHeader.buffers.offset + index * C.sizeof(AudioBuffer)).channels
+                       for index in range(header.count))
+        rows.append(dict(id=device_id, uid=string_property(device_id, 'uid '),
+                         name=string_property(device_id, 'lnam'),
+                         model_uid=string_property(device_id, 'muid'),
+                         input_channels=channels, source='macos_coreaudio'))
+    return dict(status='ready', devices=rows, formats=[], device_count=len(rows),
+                default_input_id=default_id, identity_scope='current_macos_audio_session',
+                capture_started=False)
+
+
 def inputs(include_syphon=False):
     C.CDLL('/System/Library/Frameworks/AVFoundation.framework/AVFoundation')
     cm = C.CDLL('/System/Library/Frameworks/CoreMedia.framework/CoreMedia')
@@ -273,6 +350,8 @@ def main():
             result = dict(status='unsupported_platform', devices=[], formats=[])
         elif sys.argv[1:] == ['devices']:
             result = displays()
+        elif sys.argv[1:] == ['audio']:
+            result = audio_inputs()
         elif sys.argv[1:] in (['inputs'], ['inputs', '--include-syphon']):
             result = inputs(include_syphon=sys.argv[1:] != ['inputs'])
         else:

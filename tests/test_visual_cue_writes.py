@@ -51,6 +51,28 @@ def test_ndi_output_is_an_explicit_supported_patch_reference():
         visual.VideoCueEditProperties(stageID="ndi-output")
 
 
+def test_camera_audio_input_assignment_uses_workspace_mic_patches(reader):
+    from types import SimpleNamespace
+
+    patch_id = str(UUID(int=99)).upper()
+    reader.values[WAIT]["audioInputPatchID"] = ""
+    original = reader._request
+
+    def request_osc(address, *args, **kwargs):
+        if address.endswith("/settings/mic/patchList"):
+            return SimpleNamespace(data=[{"uniqueID": patch_id, "name": "Input"}])
+        if "/settings/" in address:
+            raise ValueError("Unknown settings route")
+        return original(address, *args, **kwargs)
+
+    reader._request = request_osc
+    result = visual.edit_camera_cues(reader, WS, [request(WAIT, audioInputPatchID=patch_id)], True)
+    assert result["ok"], result
+    missing = visual.edit_camera_cues(reader, WS, [request(WAIT, audioInputPatchID=str(UUID(int=100)))], True)
+    assert not missing["ok"]
+    assert not reader.setters
+
+
 def test_video_without_audio_can_edit_media_timing(reader):
     reader.values[START].update(fileTarget="/tmp/silent.mov", audioTrackFormats={}, numChannelsIn=0,
         levels=[], startTime=0, endTime=8, rate=1, playCount=1)
@@ -166,6 +188,31 @@ def test_optional_text_missing_or_mixed_blocks(reader):
 def test_uniform_text_style_dry_run(reader):
     plan = visual.edit_text_cues(reader, WS, [request(MEMO, **{"text/format/fontSize": 32})], True)
     assert plan["ok"] and plan["results"][0]["before"]["text/format/fontSize"] == 24
+    assert not reader.setters
+
+
+@pytest.mark.parametrize("props", [
+    {"text/format/fontName": "HiraginoSans-W3"},
+    {"text/format/fontFamilyAndStyle": {"family": "Hiragino Sans", "style": "W3"}},
+])
+def test_scalar_font_change_blocks_unverified_emoji_fallback(reader, props):
+    reader.values[MEMO].update(text="漢🙂", **{"text/format": [{"range": [0, 3],
+        "fontName": "HelveticaNeue-Bold", "fontFamily": "Helvetica Neue", "fontStyle": "Bold", "fontSize": 24}]})
+    plan = visual.edit_text_cues(reader, WS, [request(MEMO, **props)], True)
+    assert not plan["ok"]
+    assert not reader.setters
+
+
+def test_scalar_font_confirmation_rejects_changed_text(reader):
+    reader.values[MEMO].update(text="ab", **{"text/format": [{"range": [0, 2],
+        "fontName": "HelveticaNeue-Bold", "fontFamily": "Helvetica Neue", "fontStyle": "Bold", "fontSize": 24}]})
+    item = request(MEMO, **{"text/format/fontName": "HiraginoSans-W3"})
+    plan = visual.edit_text_cues(reader, WS, [item], True)
+    assert plan["ok"], plan
+    item["confirm_gates"] = [op["confirm_token"] for op in plan["results"][0]["planned_operations"]]
+    reader.values[MEMO]["text"] = "🙂"
+    result = visual.edit_text_cues(reader, WS, [item], False)
+    assert not result["ok"]
     assert not reader.setters
 
 

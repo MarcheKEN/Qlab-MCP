@@ -111,6 +111,44 @@ def test_combining_crlf_coordinates_count_native_units_without_tokenization():
     assert [r["range"] for r in after["runs"]] == [[0, 4], [4, 2]]
 
 
+@pytest.mark.parametrize("text,index,length", [
+    ("e\u0301", 0, 1),
+    ("👩\u200d💻", 0, 2),
+    ("🇪🇸", 0, 2),
+    ("A\x00e\u0301", 2, 1),
+    ("a\r\nb", 1, 1),
+])
+def test_range_rejects_split_composed_characters(text, index, length):
+    size = len(text.encode("utf-16-le")) // 2
+    before = fmt.snapshot(text, [{"range": [0, size], "fontSize": 12}], UTF16)
+    with pytest.raises(ValueError, match="splits"):
+        fmt.resolve_selector(operation(selector={"kind": "range", "index": index, "length": length}).args.selector, before, UTF16)
+
+
+def test_cjk_formatting_requires_stable_core_text_fallback(monkeypatch):
+    before = fmt.snapshot("漢字", [{"range": [0, 2], "fontName": "HiraginoSans-W3",
+                                   "fontFamily": "Hiragino Sans", "fontStyle": "W3",
+                                   "fontSize": 12, "color": [1, 1, 1, 1]}], UTF16)
+    monkeypatch.setattr(fmt, "_coretext_fallback", lambda font, size, text: font)
+    changed_color = operation({"color": [1, 0, 0, 1]})
+    assert fmt.preflight(before, [changed_color], semantics=UTF16)["runs"][0]["color"] == [1, 0, 0, 1]
+
+    monkeypatch.setattr(fmt, "_coretext_fallback",
+                        lambda font, size, text: font if size == 12 else "PingFangSC-Regular")
+    changed_size = operation({"fontSize": 24})
+    with pytest.raises(ValueError, match="fallback"):
+        fmt.preflight(before, [changed_size], semantics=UTF16)
+
+
+def test_cjk_formatting_blocks_an_existing_font_substitution(monkeypatch):
+    before = fmt.snapshot("漢", [{"range": [0, 1], "fontName": "HelveticaNeue-Bold",
+                                  "fontFamily": "Helvetica Neue", "fontStyle": "Bold",
+                                  "fontSize": 12, "color": [1, 1, 1, 1]}], UTF16)
+    monkeypatch.setattr(fmt, "_coretext_fallback", lambda font, size, text: "PingFangSC-Regular")
+    with pytest.raises(ValueError, match="substitutes"):
+        fmt.preflight(before, [operation({"color": [1, 0, 0, 1]})], semantics=UTF16)
+
+
 def test_pending_ranges_words_and_percentages_fail_closed():
     with pytest.raises(ValueError, match="range semantics"):
         fmt.preflight(state(), [operation(selector={"kind": "range", "index": 0, "length": 1})], semantics=fmt.RuntimeSemantics())
@@ -451,8 +489,8 @@ def test_unicode_color_preserves_font_metadata_and_utf16_range(text):
     assert not fmt.matches(changed_font, expected)
 
 
-@pytest.mark.parametrize('text', ['A😀B', 'A中文B', 'A、B'])
-def test_color_also_blocks_unpredictable_non_latin_font_fallback(text):
+@pytest.mark.parametrize('text', ['A😀B', 'AЖB'])
+def test_color_also_blocks_unpredictable_emoji_and_non_cjk_fallback(text):
     size = len(text.encode('utf-16-le')) // 2
     before = fmt.snapshot(text, [{'range': [0, size], 'fontName': 'HelveticaNeue-Bold',
                                  'fontSize': 72, 'color': [1, 1, 1, 1]}])

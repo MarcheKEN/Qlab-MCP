@@ -1,6 +1,7 @@
 """No runtime setters: full Text snapshots and safe typed fragment plans."""
 from copy import deepcopy
 import json
+import sys
 
 import pytest
 from pydantic import ValidationError
@@ -9,6 +10,9 @@ from qlab_mcp.cues.visual import TextRun
 from qlab_mcp.write import text_format as fmt
 
 UTF16 = fmt.RuntimeSemantics(index_unit="utf16", ranges_verified=True)
+requires_corefoundation = pytest.mark.skipif(
+    sys.platform != "darwin", reason="Unicode grapheme checks require macOS CoreFoundation"
+)
 
 
 def operation(attrs=None, selector=None):
@@ -89,6 +93,15 @@ def test_incomplete_or_overlapping_coverage_blocks(runs):
         fmt.snapshot("hello", runs)
 
 
+def test_unavailable_corefoundation_blocks_non_ascii_formatting(monkeypatch):
+    def unavailable(*args):
+        raise OSError("CoreFoundation unavailable")
+    monkeypatch.setattr(fmt.ctypes, "CDLL", unavailable)
+    with pytest.raises(ValueError, match="boundaries are unavailable"):
+        fmt.snapshot("漢", [{"range": [0, 1], "fontSize": 12}], UTF16)
+
+
+@requires_corefoundation
 def test_unicode_unit_pending_then_utf16_boundaries():
     runs = [{"range": [0, 4], "fontSize": 12}]
     with pytest.raises(ValueError, match="Unicode"):
@@ -102,6 +115,7 @@ def test_unicode_unit_pending_then_utf16_boundaries():
         fmt.advance(before, operation(selector={"kind": "range", "index": 1, "length": 1}), UTF16)
 
 
+@requires_corefoundation
 def test_combining_crlf_coordinates_count_native_units_without_tokenization():
     text = "e\u0301\r\n😀"
     before = fmt.snapshot(text, [{"range": [0, 6], "fontSize": 12}], UTF16)
@@ -111,6 +125,7 @@ def test_combining_crlf_coordinates_count_native_units_without_tokenization():
     assert [r["range"] for r in after["runs"]] == [[0, 4], [4, 2]]
 
 
+@requires_corefoundation
 @pytest.mark.parametrize("text,index,length", [
     ("e\u0301", 0, 1),
     ("👩\u200d💻", 0, 2),
@@ -125,6 +140,7 @@ def test_range_rejects_split_composed_characters(text, index, length):
         fmt.resolve_selector(operation(selector={"kind": "range", "index": index, "length": length}).args.selector, before, UTF16)
 
 
+@requires_corefoundation
 def test_cjk_formatting_requires_stable_core_text_fallback(monkeypatch):
     before = fmt.snapshot("漢字", [{"range": [0, 2], "fontName": "HiraginoSans-W3",
                                    "fontFamily": "Hiragino Sans", "fontStyle": "W3",
@@ -140,6 +156,7 @@ def test_cjk_formatting_requires_stable_core_text_fallback(monkeypatch):
         fmt.preflight(before, [changed_size], semantics=UTF16)
 
 
+@requires_corefoundation
 def test_cjk_formatting_blocks_an_existing_font_substitution(monkeypatch):
     before = fmt.snapshot("漢", [{"range": [0, 1], "fontName": "HelveticaNeue-Bold",
                                   "fontFamily": "Helvetica Neue", "fontStyle": "Bold",
@@ -410,6 +427,7 @@ def test_integrated_content_and_scalar_format_also_require_separate_dry_runs(for
     assert not result["ok"] and not format_reader.setters
 
 
+@requires_corefoundation
 def test_live_unicode_font_fallback_is_not_accepted_as_requested_size():
     before = fmt.snapshot("A😀B", [{"range": [0, 4], "fontSize": 72, "fontName": "HelveticaNeue-Bold", "fontFamily": "Helvetica Neue", "fontStyle": "Bold"}], UTF16)
     with pytest.raises(ValueError, match="fallback"):
@@ -448,6 +466,7 @@ def test_installed_percentage_rounding_and_simple_word_scope():
         fmt.resolve_selector(word.args.selector, punctuation)
 
 
+@requires_corefoundation
 def test_latin_unicode_range_and_unknown_fallback_block():
     before = fmt.snapshot('Árbol 😀', [{'range':[0,8],'fontSize':72,'fontName':'HelveticaNeue-Bold'}])
     after = fmt.advance(before, operation(selector={'kind':'range','index':0,'length':1}))
@@ -473,6 +492,7 @@ def test_partial_font_requires_complete_observed_companion_metadata():
         fmt.advance(inconsistent,op)
 
 
+@requires_corefoundation
 @pytest.mark.parametrize('text', ['A—B', 'A“”B', 'A\u00a0B', 'Ae\u0301B'])
 def test_unicode_color_preserves_font_metadata_and_utf16_range(text):
     size = len(text.encode('utf-16-le')) // 2
@@ -489,6 +509,7 @@ def test_unicode_color_preserves_font_metadata_and_utf16_range(text):
     assert not fmt.matches(changed_font, expected)
 
 
+@requires_corefoundation
 @pytest.mark.parametrize('text', ['A😀B', 'AЖB'])
 def test_color_also_blocks_unpredictable_emoji_and_non_cjk_fallback(text):
     size = len(text.encode('utf-16-le')) // 2
@@ -498,6 +519,7 @@ def test_color_also_blocks_unpredictable_emoji_and_non_cjk_fallback(text):
         fmt.advance(before, operation({'color': [0, 0, 1, 1]}))
 
 
+@requires_corefoundation
 @pytest.mark.parametrize('attributes', [{'fontSize': 48}, {'color': [0, 0, 1, 1], 'fontSize': 48}])
 def test_punctuation_expansion_does_not_authorize_typography(attributes):
     before = fmt.snapshot('A—B', [{'range': [0, 3], 'fontSize': 72, 'color': [1, 1, 1, 1]}])
@@ -505,6 +527,7 @@ def test_punctuation_expansion_does_not_authorize_typography(attributes):
         fmt.advance(before, operation(attributes))
 
 
+@requires_corefoundation
 @pytest.mark.parametrize('index, expected', [(0, (1, 5)), (1, (8, 3)), (2, (13, 4))])
 def test_native_proven_latin_word_delimiters(index, expected):
     before = fmt.snapshot('«Árbol»—luz\u00a0“azul”', [{'range': [0, 18], 'fontSize': 72}])
@@ -513,6 +536,7 @@ def test_native_proven_latin_word_delimiters(index, expected):
     assert json.loads(fmt.normalize(op, state=before)['args'][0])['range'] == list(expected)
 
 
+@requires_corefoundation
 @pytest.mark.parametrize('text', ["don't stop", 'one_two', '中文 luz', 'luz 😀', '\u0301luz'])
 def test_unproved_word_tokenization_stays_blocked(text):
     size = len(text.encode('utf-16-le')) // 2

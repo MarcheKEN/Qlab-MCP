@@ -1,4 +1,4 @@
-"""FastMCP server exposing safe QLab inspection and gated write tools."""
+﻿"""FastMCP server exposing safe QLab inspection and gated write tools."""
 
 from __future__ import annotations
 
@@ -18,6 +18,16 @@ from pydantic import Field, StrictBool, StrictInt, StrictStr, TypeAdapter
 
 from . import __version__
 from .media import search_media_files
+from .light_patch.models import LightPatchOperations, DefinitionOperations
+from .light_patch.catalogue import get_light_definitions
+from .light_patch.definitions import edit_light_definitions
+from .light_patch.curves import LightCueCurveOperations, edit_light_cue_curves
+from .saved_cue_settings import SavedCueOperations, SavedCueEditResult, edit_saved_cue_settings
+from .light_patch.transaction import edit_light_patch
+from .light_patch.reader import enrich_light_settings
+from .video_settings import enrich_video_settings, enrich_video_detail, enrich_video_inventory
+from .video_editing import edit_video
+from .video_models import RouteOperations, StageOperations, DeviceOperations, InputOperations, VideoArchiveEditResult
 from .audio_analysis_models import AudioAnalysisRequest, AudioAnalysisResult, Resolution
 from .errors import QLabMcpError
 from .models import (
@@ -52,6 +62,7 @@ from .models import (
     WorkspaceVideoSettingsResult,
     VideoStageResult,
     VideoOutputRouteResult,
+    VideoInventoryResult,
     VideoRegionResult,
     CanonicalWorkspaceUUID,
 )
@@ -305,9 +316,9 @@ mcp = FastMCP(
         get_prompt_settings={"enabled": False},
     )],
     instructions="""
-QLab MCP exposes forty-nine read-only tools plus thirty gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
+QLab MCP exposes fifty-two read-only tools plus thirty-six gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
 Existing-workspace writes require QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; they remain dry-run first. Native document Open has its separate empty-inventory preflight, write-enable setting, file fingerprint and document token; no existing workspace is available for OSC readiness.
-This server does not expose GO, stop, panic, playback, audition, /live writes, arbitrary AppleScript, or raw OSC passthrough. Load loadTime, Target assignedNumber and documented cue Triggers use fixed local AppleScript reads/writes. Native Trigger reads require include_native_triggers=true; configuration requires disabled triggers, activation requires disarmed/no continuation/no skip, and Hotkey enabling is blocked without key/modifier readback.
+This server does not expose GO, stop, panic, playback, audition, /live writes, arbitrary AppleScript, or raw OSC passthrough. Load loadTime, Target assignedNumber and documented cue Triggers use fixed local AppleScript reads/writes. Native Trigger reads require include_native_triggers=true; configuration requires disabled triggers, activation requires disarmed/no continuation/no skip, and live Hotkey enabling is blocked without key/modifier readback. The separate qlab_edit_saved_cue_settings workflow reads the saved key descriptor and supports guarded assignment/activation on a clean local document.
 
 Orient first with qlab_check_connection, then use a bounded workspace overview/status or the relevant domain-specific settings read, qlab_query_cues, and qlab_get_cue_details as needed. Resolve one exact workspace before an existing-workspace write. Use exact UUIDs for workspace and cue writes; never infer a workspace or target from selection, playhead, or active state.
 
@@ -329,10 +340,151 @@ def _reader() -> QLabReader:
 def qlab_get_workspace_document(workspace_id: CanonicalWorkspaceUUID) -> dict[str, Any]:
     """Read exact local workspace UUID, document path, dirty flag and native mode/activity.
 
-    Requires the running /Applications/QLab.app. No save or close; unknown state blocks writes.
+    Requires one verified running QLab installation. No save or close; unknown state blocks writes.
     Readback includes the full native inventory, including other open documents' paths and names.
     """
     return _run_tool(lambda reader: get_workspace_document(reader, str(workspace_id)))
+
+
+@mcp.tool(title="Edit QLab Light Patch", tags={"qlab", "workspace", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
+def qlab_edit_light_patch(
+    workspace_id: CanonicalWorkspaceUUID,
+    operations: LightPatchOperations,
+    dry_run: StrictBool = True,
+    confirm_token: StrictStr | None = None,
+) -> dict[str, Any]:
+    """Plan or apply 1–100 typed Light Patch operations in an exact local workspace.
+
+    Supports the validated QLab 5.5.10 archive format only. Read the current patch with
+    qlab_get_workspace_light_settings first. A dry_run never saves, closes or writes;
+    a dirty document returns needs_save: use qlab_save_workspace and obtain a fresh plan.
+    Execution requires write readiness and the fresh signed single-use confirmation token.
+
+    Creates, edits, renames or deletes instruments and groups as
+    one batch, preserving omitted fields. Manage definitions separately with
+    qlab_edit_light_definitions before assigning them to instruments. Output types and parameter variants remain
+    subject to archive capability validation. Light cues are never changed: affected
+    references are reported as pending and must be repaired separately. Dashboard MIDI
+    and the global Light Library are preserved.
+
+    Execution closes the clean target, replaces the same path with bounded recovery,
+    reopens it and requires fresh file/native patch readback. Other open documents are
+    preserved. The full lifecycle is non-atomic; recovery state is retained on failure.
+    Do not retry after timeout or ambiguity. Reopening may affect physical lighting;
+    successful archive readback does not verify DMX hardware output.
+    """
+    return _run_tool(lambda reader: edit_light_patch(
+        reader, str(workspace_id),
+        [operation.model_dump(exclude_unset=True) for operation in operations],
+        dry_run, confirm_token,
+    ))
+
+
+@mcp.tool(title="Get QLab Light Definitions", tags={"qlab", "light", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=60.0)
+def qlab_get_light_definitions(
+    workspace_id: CanonicalWorkspaceUUID | None = None,
+    source: Literal['all', 'bundled', 'personal', 'workspace'] = 'all',
+    query: Annotated[StrictStr, Field(max_length=256)] = '',
+    manufacturer: Annotated[StrictStr, Field(max_length=256)] = '',
+    definition_id: Annotated[StrictStr, Field(min_length=1, max_length=256)] | None = None,
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 100,
+) -> dict[str, Any]:
+    """Read a compact paginated Light Definition catalogue or an exact definition detail.
+
+    Sources are bundled QLab manufacturers, personal local .qlablight files and the
+    saved workspace. Supply workspace_id to include its saved definitions and dirty
+    flag. definition_id selects full channel and virtual-output detail; IDs are source
+    and content bound. No save, close, open or global library writes. Unknown variants
+    remain readable with explicit import compatibility. Read coverage and parameter
+    counts remain separate from importability; import rejection does not truncate
+    readable channel details. Maximum response 2 MiB.
+    A configured definition does not verify a physical fixture or DMX output.
+    """
+    return _run_tool(lambda reader: get_light_definitions(
+        reader, str(workspace_id) if workspace_id else None, source, query,
+        manufacturer, definition_id, offset, limit))
+
+
+@mcp.tool(title="Edit QLab Light Definitions", tags={"qlab", "light", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
+def qlab_edit_light_definitions(
+    workspace_id: CanonicalWorkspaceUUID,
+    operations: DefinitionOperations,
+    dry_run: StrictBool = True,
+    confirm_token: StrictStr | None = None,
+) -> dict[str, Any]:
+    """Import, create, update, rename or delete 1–100 workspace Light Definitions.
+
+    Only QLab 5.5.10/build 5510. Read qlab_get_light_definitions first. Preview is
+    side-effect free; needs_save requires explicit qlab_save_workspace then a new plan.
+    Execution uses a signed single-use token bound to file, document and catalogue
+    content, and the guarded same path close/edit/reopen transaction with recovery.
+    Imports preserve validated native channel positions and virtual bindings; unsupported
+    variants are blocked, never simplified. Omitted properties are preserved; parameters
+    explicitly replace the list. Renaming updates instrument definition references.
+    Delete in-use definitions is blocked; reassign instruments with qlab_edit_light_patch
+    first. Light cues are never changed; reference analysis is partial. Global libraries
+    and Dashboard MIDI are preserved. Native readback only verifies assigned definitions;
+    unused definitions are verified in the saved archive. Do not retry uncertain writes.
+    Reopening can affect physical lighting; no physical output is verified.
+    """
+    return _run_tool(lambda reader: edit_light_definitions(
+        reader, str(workspace_id), [op.model_dump(exclude_unset=True) for op in operations],
+        dry_run, confirm_token))
+
+
+@mcp.tool(title="Edit QLab Light Cue Curves", tags={"qlab", "light", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
+def qlab_edit_light_cue_curves(
+    workspace_id: CanonicalWorkspaceUUID,
+    operations: LightCueCurveOperations,
+    dry_run: StrictBool = True,
+    confirm_token: StrictStr | None = None,
+) -> dict[str, Any]:
+    """Edit ascending and descending curves on 1–50 exact Light cue UUIDs.
+
+    Requires QLab 5.5.10/build 5510 and a clean inactive local document. Preview
+    first; execute with its fresh single-use confirmation token. The same path
+    close/edit/reopen transaction preserves a recovery file. Omitted fields and
+    sides are preserved; points explicitly replace a Custom or Linear curve's normalized
+    point list. Supported types: custom, s_curve, parametric, linear. Mirrored
+    curves and unrecognized archive variants are blocked. needs_save requires
+    qlab_save_workspace then a new preview. Verification reads the saved archive
+    after reopening; OSC does not expose curve values. No playback or physical
+    DMX output is verified. Do not retry an uncertain write.
+    """
+    return _run_tool(lambda reader: edit_light_cue_curves(
+        reader, str(workspace_id), [op.model_dump(mode="json", exclude_unset=True) for op in operations],
+        dry_run, confirm_token))
+
+
+@mcp.tool(title="Edit QLab Saved Cue Settings",
+          tags={"qlab", "cue-edit", "gated-write", "workspace-document"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=180.0)
+def qlab_edit_saved_cue_settings(workspace_id: CanonicalWorkspaceUUID,
+        operations: SavedCueOperations, dry_run: StrictBool = True,
+        confirm_token: StrictStr | None = None) -> SavedCueEditResult:
+    """Edit saved Light/Video cue properties in one guarded 1–50-operation batch.
+
+    Read cue details and saved_settings first. Requires a clean inactive local
+    QLab 5.5.10/build 5510 document. Preview returns a five-minute one-use token;
+    execute once to close, replace and reopen the same workspace with recovery.
+    Operations cover Hotkey assignment and separate guarded activation, Wall Clock
+    weekdays, exact Video audio track IDs, Custom/Linear integrated envelopes and
+    native LinearKey/DropShadow insertion. Hotkey/Wall Clock must be disabled
+    before configuration. Hotkey activation requires disarmed/no continuation/no skip.
+    Hotkey character is its display character; key_code identifies the physical macOS key. Empty
+    character with code zero and no modifiers clears the assignment.
+    Fields outside each typed operation are preserved. needs_save requires the
+    existing save workflow and a fresh preview. No playback or external trigger
+    is invoked. An uncertain execution must never be retried automatically.
+    """
+    return _run_tool(lambda reader: SavedCueEditResult.model_validate(edit_saved_cue_settings(
+        reader, str(workspace_id), [op.model_dump(mode="json", exclude_unset=True) for op in operations],
+        dry_run, confirm_token)), timeout=180.0)
 
 
 @mcp.tool(title="Open QLab Workspace", tags={"qlab", "workspace", "gated-write"},
@@ -591,6 +743,7 @@ def _run_workspace_settings_domain(
     exact_video: bool = False,
     detail_options: dict[str, Any] | None = None,
     validation_error: str | None = None,
+    result_transform: Callable[[QLabReader, dict[str, Any]], dict[str, Any]] | None = None,
 ) -> WorkspaceDomainResultT:
     try:
         if validation_error is not None:
@@ -599,35 +752,44 @@ def _run_workspace_settings_domain(
             raise ValueError("ref is not allowed when view='overview'")
 
         def read(reader: QLabReader) -> WorkspaceDomainResultT:
-            if exact_video:
-                payload = reader.get_video_setting(
-                    workspace_id=workspace_id, kind=detail_kind, ref=ref, profile=profile,
-                )
-            elif detail_kind is None:
-                payload = reader.get_workspace_settings(
-                    workspace_id=workspace_id,
-                    mode="summary",
-                    sections=[domain],
-                    profile=profile,
-                )
-            else:
-                payload = reader.get_workspace_setting_details(
-                    workspace_id=workspace_id,
-                    section=domain,
-                    kind=detail_kind,
-                    ref=ref,
-                    profile=profile,
-                    **(detail_options or {}),
-                )
-            return result_model.model_validate(
-                _workspace_domain_payload(
+            try:
+                if exact_video:
+                    payload = reader.get_video_setting(
+                        workspace_id=workspace_id, kind=detail_kind, ref=ref, profile=profile,
+                    )
+                elif detail_kind is None:
+                    payload = reader.get_workspace_settings(
+                        workspace_id=workspace_id,
+                        mode="summary",
+                        sections=[domain],
+                        profile=profile,
+                    )
+                else:
+                    payload = reader.get_workspace_setting_details(
+                        workspace_id=workspace_id,
+                        section=domain,
+                        kind=detail_kind,
+                        ref=ref,
+                        profile=profile,
+                        **(detail_options or {}),
+                    )
+            except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
+                if result_transform is None:
+                    raise
+                payload = dict(ok=False, status="error", partial=True,
+                               workspace_id=str(workspace_id), profile=profile,
+                               error_code="validation_failed", message=sanitize_exception_message(exc),
+                               errors={"light.patch" if domain == "light" else domain: sanitize_exception_message(exc)})
+            normalized = _workspace_domain_payload(
                     payload,
                     domain=domain,
                     view=view,
                     ref=ref,
                     profile=profile,
                 )
-            )
+            if result_transform is not None:
+                normalized = result_transform(reader, normalized)
+            return result_model.model_validate(normalized)
 
         return _run_tool(read, timeout=WORKSPACE_SETTINGS_TIMEOUT, translate_errors=False)
     except (QLabMcpError, ValueError, TypeError, ToolError) as exc:
@@ -1022,11 +1184,18 @@ def qlab_get_workspace_audio_settings(
 )
 def qlab_get_workspace_video_settings(
     workspace_id: WorkspaceId,
+    section: Literal["all", "stages", "routes", "inputs", "destinations"] = "all",
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 1000,
 ) -> WorkspaceVideoSettingsResult:
     """List Video input patches, output routes, and stages with their exact uniqueIDs.
 
     Use qlab_get_video_stage or qlab_get_video_output_route for exact details.
     OSC exposes only names and uniqueIDs for input patches and no independent device inventory.
+    saved_video adds last-saved local QLab 5.5.10/build 5510 configuration, including
+    nested geometry, masks and configured destinations, with separate provenance.
+    Unsaved changes are never saved. Follow pagination next_requests for bounded
+    1,000-record/2 MiB pages. No capture, device activation or output is performed.
     """
     return _run_workspace_settings_domain(
         workspace_id,
@@ -1037,6 +1206,9 @@ def qlab_get_workspace_video_settings(
         detail_kind=None,
         result_model=WorkspaceVideoSettingsResult,
         allowed={},
+        result_transform=lambda reader, result: enrich_video_settings(
+            reader, str(workspace_id), result, section, offset, limit,
+        ),
     )
 
 
@@ -1050,15 +1222,30 @@ def qlab_get_video_stage(
     workspace_id: WorkspaceId,
     stage_id: Annotated[UUID, Field(description="Exact stage uniqueID from qlab_get_workspace_video_settings.")],
     profile: VideoSettingsProfile = "safe",
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 1000,
+    expected_sha256: str | None = None,
 ) -> VideoStageResult:
     """Read one exact Video stage and its regions, geometry, and assigned output routes.
 
     Technical adds the redacted OSC payload, including full control-point and mesh data.
+    saved_video adds the exact last-saved stage header, assigned routes once per UUID,
+    and geometry_entries JSON paths. Saved route guidelines include validated grid labels.
+    Inspection explains freshness/coverage and adds readable warp labels and stage-centered
+    coordinates. Up to sixteen current regions/routes receive supplemental grid/guide reads;
+    missing values and continuation requests remain explicit. Coverage distinguishes
+    UI actions from saved properties and names unverified UI state. Reads never save.
+    editable_operations inside OSC detail lists legacy setters only; the stage
+    editor operations schema defines archive capabilities.
+    Offset/limit page saved geometry entries; follow pagination.next_requests.
+    Unsaved changes require explicit Save preview/confirmation before a fresh file-edit baseline.
     """
     return _run_workspace_settings_domain(
         workspace_id, domain="video", view="stage", ref=str(stage_id), profile=profile,
         detail_kind="stage", result_model=VideoStageResult,
         allowed={"profile": ["safe", "technical"]}, exact_video=True,
+        result_transform=lambda reader, result: enrich_video_detail(
+            reader, str(workspace_id), result, str(stage_id), "stage", offset, limit, expected_sha256),
     )
 
 
@@ -1076,11 +1263,89 @@ def qlab_get_video_output_route(
     """Read one exact Video output route, its destination, geometry, and guides state.
 
     Technical adds the redacted OSC payload and available destination hardware metadata.
+    saved_video adds the exact saved route configuration, separately from current OSC.
+    inspection adds validated scaling names, full/partial layout geometry and
+    saved stage/region references with explicit provenance and freshness.
+    editable_operations inside OSC detail lists legacy setters only; consult the
+    route editor operations schema for archive authoring capabilities.
+    No device activation, saving or output is performed.
     """
     return _run_workspace_settings_domain(
         workspace_id, domain="video", view="route", ref=str(route_id), profile=profile,
         detail_kind="route", result_model=VideoOutputRouteResult,
         allowed={"profile": ["safe", "technical"]}, exact_video=True,
+        result_transform=lambda reader, result: enrich_video_detail(
+            reader, str(workspace_id), result, str(route_id), "route"),
+    )
+
+
+@mcp.tool(
+    title="Get QLab Video Output Devices",
+    tags={"qlab", "settings", "video", "devices", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_video_output_devices(
+    workspace_id: WorkspaceId,
+    device_ref: Annotated[str | None, Field(max_length=256, description="Exact opaque ref returned by this inventory; not a device name.")] = None,
+    profile: VideoSettingsProfile = "safe",
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 1000,
+) -> VideoInventoryResult:
+    """Inspect passive output metadata, including local displays not used by routes.
+
+    Sources remain separate: CoreGraphics displays, OSC route destinations and
+    saved NDI/Syphon configuration. This is not the complete QLab process registry.
+    Display active/asleep/mirrored flags describe macOS, not QLab rendering.
+    device_ref selects an exact returned record. No network discovery, sender,
+    monitor, device activation or document lifecycle action is performed.
+    Saved references may be stale when the document is modified. Follow explicit
+    pagination next_requests; native source truncation is separately reported.
+    """
+    return _run_workspace_settings_domain(
+        workspace_id, domain="video", view="overview", ref=None, profile=profile,
+        detail_kind=None, result_model=VideoInventoryResult,
+        allowed={"profile": ["safe", "technical"]},
+        result_transform=lambda reader, result: enrich_video_inventory(
+            reader, str(workspace_id), result, "devices", device_ref, offset, limit),
+    )
+
+
+@mcp.tool(
+    title="Get QLab Video Input Patches",
+    tags={"qlab", "settings", "video", "inputs", "safe-read"},
+    annotations=READ_ONLY_QLAB_TOOL,
+    timeout=WORKSPACE_SETTINGS_TIMEOUT,
+)
+def qlab_get_video_input_patches(
+    workspace_id: WorkspaceId,
+    patch_id: Annotated[UUID | None, Field(description="Optional exact input patch UUID returned by this inventory.")] = None,
+    profile: VideoSettingsProfile = "safe",
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 1000,
+) -> VideoInventoryResult:
+    """Read input patches, saved source/mode, passive camera and local Syphon metadata.
+
+    Without patch_id returns patches, available_sources and available_formats.
+    With patch_id returns its exact UUID and associated source/formats when known.
+    available_sources includes connected/suspended/in-use state and observed_format.
+    Observed AVFoundation format is not attributed to QLab or verified capture.
+    Syphon directory records describe local announced servers, not QLab output
+    devices. They have no verified capture format and cannot yet be assigned by
+    the input editor. Directory failure preserves the camera observations.
+    Unknown getters remain null with metadata_errors. Saved configuration is not
+    the effective capture format. OSC, saved archive
+    and local source metadata have separate provenance; names never establish identity.
+    No capture input/session, permission request, NDI discovery, monitor or Save is
+    performed. Remote QLab never uses this Mac's hardware inventory. Follow
+    pagination next_requests and explicit coverage/truncation limitations.
+    """
+    return _run_workspace_settings_domain(
+        workspace_id, domain="video", view="overview", ref=None, profile=profile,
+        detail_kind=None, result_model=VideoInventoryResult,
+        allowed={"profile": ["safe", "technical"]},
+        result_transform=lambda reader, result: enrich_video_inventory(
+            reader, str(workspace_id), result, "inputs", str(patch_id) if patch_id else None, offset, limit),
     )
 
 
@@ -1117,10 +1382,18 @@ def qlab_get_video_region(
 def qlab_get_workspace_light_settings(
     workspace_id: WorkspaceId,
     profile: WorkspaceSettingsProfile = "safe",
+    section: Literal["all", "instruments", "groups", "definitions"] = "all",
+    offset: Annotated[StrictInt, Field(ge=0)] = 0,
+    limit: Annotated[StrictInt, Field(ge=1, le=1000)] = 1000,
 ) -> WorkspaceLightSettingsResult:
     """Return a safe summary or redacted technical payload for the workspace Light Patch.
 
     The Light Patch is the only documented read surface for the larger Light settings panel.
+    Also reads the local saved patch (QLab 5.5.10/build 5510), including addresses,
+    outputs, groups and workspace definitions. Unsaved changes are not saved;
+    OSC and the last saved file have separate provenance and freshness.
+    Responses are bounded to 1,000 records per section and 2 MiB; follow next_requests
+    if pagination reports truncation. No save, close, reopen or output is performed.
     """
     return _run_workspace_settings_domain(
         workspace_id,
@@ -1131,6 +1404,9 @@ def qlab_get_workspace_light_settings(
         detail_kind="light_patch",
         result_model=WorkspaceLightSettingsResult,
         allowed={"profile": ["safe", "technical", "exhaustive"]},
+        result_transform=lambda reader, result: enrich_light_settings(
+            reader, str(workspace_id), result, profile, section, offset, limit,
+        ),
     )
 
 
@@ -1375,6 +1651,9 @@ def qlab_get_video_cue_details(
     native identity. Only requested parameters are read, and ambiguous identity returns a partial result.
     Inspect coverage and partial errors.
     Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
+    saved_settings separates last-saved Hotkey/weekdays and Video audio-track,
+    channel-name overrides, gangs and integrated audio-fade points from current OSC.
+    Dirty-state freshness and unavailable archive coverage are explicit; this read never saves.
     """
     return _run_tool(lambda reader: reader.get_video_cue_details(str(workspace_id), str(cue_id),
                      profile, input_channel, output_channel, video_effects, include_native_triggers=include_native_triggers), timeout=CUE_DETAILS_TIMEOUT)
@@ -1508,7 +1787,7 @@ def qlab_get_control_cue_details(
     Returns common settings, state, timing and applicable target, Reset or Devamp fields.
     Memo notes are included in safe; technical adds other notes. Inspect coverage and partial errors.
     Load loadTime and Target assignedNumber use fixed local AppleScript reads; inspect partial errors
-    and property_transports. Requires macOS Automation access and /Applications/QLab.app. Audio Maps are excluded.
+    and property_transports. Requires macOS Automation access and one verified running QLab 5.5.10/build 5510. Audio Maps are excluded.
     References do not expand targets or patches. Never starts, stops, loads or modifies cues.
     Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
@@ -1721,6 +2000,10 @@ def qlab_get_light_cue_details(
     """Read one exact Light cue: full command text, collate, subcontroller, state and timing.
 
     safe includes commands; technical adds notes. Commands are never executed or interpreted as live output.
+    saved_curves adds bounded last-saved ascending/descending curves, points and
+    explicit archive provenance/freshness. Reads never save; unknown variants
+    remain partial and do not enable writes. OSC data survives archive failures.
+    saved_settings also includes last-saved Hotkey assignment and Wall Clock weekdays.
     Use qlab_get_workspace_light_settings for the patch. Inspect coverage and partial errors.
     Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
@@ -2280,6 +2563,7 @@ def qlab_edit_camera_cues(
     Validate the entire batch before writing. Sequential, non-atomic, no rollback.
     Every setter uses alwaysReply and fresh readback; timeouts never trigger a retry.
     Routing uses exact UUIDs in this workspace; empty stage/input UUID clears routing.
+    Camera audio channel count/offset require a clean local QLab 5.5.10 document and an exact patch-to-CoreAudio device/capacity match.
     Fade & Stop requires integer scope readback. Text styles require readable uniform fragments.
     Audio Maps, /live, cue execution and external trigger configuration are excluded.
     """
@@ -2360,6 +2644,7 @@ def qlab_edit_mic_cues(
     batch is validated and confirmations reserved before the first setter.
     Sequential, non-atomic; each setter is sent once with immediate fresh readback.
     Failure or uncertain readback stops remaining setters. Never retry; no rollback.
+    Mic channels/channelOffset are conditional: a clean local QLab 5.5.10 document and exact patch-to-CoreAudio capacity must be readable; no capture is started.
     Ask the user before accessing files. File targets need an existing readable
     absolute path and a supported MIDI format; macOS permissions apply to the MCP
     process. No folder allowlist is required. Audio Maps, /live, execution, and
@@ -2617,30 +2902,111 @@ def qlab_edit_audio_output_patch(
     return _edit_object_setting(workspace_id, "audio", {"patch_id": str(patch_id)}, operation, dry_run, confirm_token)
 
 
+def _video_batch(workspace_id, domain, operations, dry_run, confirm_token):
+    from .write.safety import resolve_dry_run
+    normalized = [op.model_dump(exclude_unset=True) if hasattr(op, "model_dump") else op for op in operations]
+    return VideoArchiveEditResult.model_validate(_run_tool(lambda reader: edit_video(
+        reader, str(workspace_id), domain, normalized, resolve_dry_run(reader, dry_run), confirm_token)))
+
+
 @mcp.tool(title="Edit QLab Video Output Route", tags={"qlab", "settings", "video", "gated-write"},
-          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT)
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
 def qlab_edit_video_output_route(
     workspace_id: CanonicalWorkspaceUUID,
-    route_id: CanonicalWorkspaceUUID,
-    operation: VideoRouteOperation,
-    dry_run: bool | None = None,
+    route_id: CanonicalWorkspaceUUID | None = None,
+    operation: VideoRouteOperation | None = None,
+    dry_run: StrictBool | None = None,
     confirm_token: str | None = None,
-) -> WorkspaceSettingsEditResult:
-    """Edit enableGuides on one exact Video output route."""
-    return _edit_object_setting(workspace_id, "route", {"route_id": str(route_id)}, operation, dry_run, confirm_token)
+    operations: RouteOperations | None = None,
+) -> VideoArchiveEditResult:
+    """Edit legacy output route guides (enableGuides), or create/edit/order/delete 1–50 saved routes.
+
+    reorder_routes requires a complete permutation of the current route IDs.
+    operation plus route_id uses the existing single OSC setter. operations uses
+    a clean local QLab 5.5.10/build 5510 document, preview and single-use token;
+    it closes, replaces and reopens the same file once. Forms are exclusive.
+    Device refs come from the device reader. Shared-region dependencies are
+    reported; deletion in use is blocked. No Monitor, Show or playback command.
+    """
+    if operations is not None:
+        if operation is not None or route_id is not None:
+            raise ToolError("Use either operations, or route_id with operation.")
+        return _video_batch(workspace_id, "routes", operations, dry_run, confirm_token)
+    if route_id is None or operation is None:
+        raise ToolError("route_id and operation are required for the legacy OSC form.")
+    return VideoArchiveEditResult.model_validate(_edit_object_setting(workspace_id, "route", {"route_id": str(route_id)}, operation, dry_run, confirm_token).model_dump())
 
 
 @mcp.tool(title="Edit QLab Video Stage", tags={"qlab", "settings", "video", "gated-write"},
-          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT)
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
 def qlab_edit_video_stage(
     workspace_id: CanonicalWorkspaceUUID,
-    stage_id: CanonicalWorkspaceUUID,
-    operation: VideoStageOperation,
-    dry_run: bool | None = None,
+    stage_id: CanonicalWorkspaceUUID | None = None,
+    operation: VideoStageOperation | None = None,
+    dry_run: StrictBool | None = None,
     confirm_token: str | None = None,
-) -> WorkspaceSettingsEditResult:
-    """Rename one exact Video stage."""
-    return _edit_object_setting(workspace_id, "stage", {"stage_id": str(stage_id)}, operation, dry_run, confirm_token)
+    operations: StageOperations | None = None,
+) -> VideoArchiveEditResult:
+    """Rename a Video stage through legacy OSC, or author a complete stage/region batch.
+
+    operations accepts 1–50 typed stage, mask, resize, region and warp operations.
+    reorder_stages requires the complete intended stage order; it does not change layers.
+    Creation returns UUIDs; @client_ref refers to objects created earlier in the
+    batch. Use exact stage/region IDs for existing objects. Fields omitted are
+    preserved. Deletion in use is blocked. Requires a clean inactive local QLab
+    5.5.10/build 5510 document; preview then confirm once, with same-path recovery
+    and reopen. Unsaved documents return needs_save. Does not execute cues.
+    """
+    if operations is not None:
+        if operation is not None or stage_id is not None:
+            raise ToolError("Use either operations, or stage_id with operation.")
+        return _video_batch(workspace_id, "stages", operations, dry_run, confirm_token)
+    if stage_id is None or operation is None:
+        raise ToolError("stage_id and operation are required for the legacy OSC form.")
+    return VideoArchiveEditResult.model_validate(_edit_object_setting(workspace_id, "stage", {"stage_id": str(stage_id)}, operation, dry_run, confirm_token).model_dump())
+
+
+@mcp.tool(title="Edit QLab Video Output Devices", tags={"qlab", "settings", "video", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
+def qlab_edit_video_output_devices(
+    workspace_id: CanonicalWorkspaceUUID,
+    operations: DeviceOperations,
+    dry_run: StrictBool = True,
+    confirm_token: str | None = None,
+) -> VideoArchiveEditResult:
+    """Create/edit/delete 1–50 configured NDI/Syphon devices with exact saved refs.
+
+    virtualID is workspace registry scope, not per-device identity. Use a fresh
+    saved-virtual reference from the device reader. Renames/configuration changes
+    update exact associated routes; deletion in use is blocked. Physical displays
+    and Blackmagic hardware settings are excluded. Clean QLab 5.5.10/build 5510
+    document, preview and a five-minute one-use token are required. Same-path
+    close/replace/reopen; no sender, Monitor or playback command is invoked.
+    NDI audio sample rates are 22050, 44100, 48000, 88200 and 96000 Hz.
+    """
+    return _video_batch(workspace_id, "devices", operations, dry_run, confirm_token)
+
+
+@mcp.tool(title="Edit QLab Video Input Patches", tags={"qlab", "settings", "video", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
+def qlab_edit_video_input_patches(
+    workspace_id: CanonicalWorkspaceUUID,
+    operations: InputOperations,
+    dry_run: StrictBool = True,
+    confirm_token: str | None = None,
+) -> VideoArchiveEditResult:
+    """Create/edit/order/delete 1–50 input patches without starting capture.
+
+    Exact patch UUIDs and passive AVFoundation source refs only, including OBS.
+    mode is auto or a supported explicit width/height/pixel-format/frame-rate.
+    Copy pixel_format from available_formats for that exact source; do not guess.
+    An empty name is allowed for a patch. Configured mode is not effective capture.
+    Syphon directory entries are currently read-only candidates; NDI and Blackmagic
+    discovery/assignment are excluded. Deletion in use is blocked. Requires a clean
+    inactive QLab 5.5.10/build 5510 document, preview and one-use token; internally
+    closes, replaces and reopens the same workspace, preserving recovery.
+    """
+    return _video_batch(workspace_id, "inputs", operations, dry_run, confirm_token)
 
 
 @mcp.tool(title="Edit QLab Video Region", tags={"qlab", "settings", "video", "gated-write"},

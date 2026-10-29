@@ -2,6 +2,108 @@
 
 ## 0.4.0 (Unreleased)
 
+- Add `qlab_edit_saved_cue_settings` for confirmed saved Hotkey configuration and
+  activation, Wall Clock weekdays, Video audio-track selection, integrated audio
+  envelopes and native LinearKey/DropShadow insertion. Current surface: **88 tools,
+  52 reads and 36 gated writes**. Objects, Audio Maps and Audio FX remain excluded;
+  Trim is investigated without a public writer.
+- Enrich Light/Video detail with typed saved settings and freshness; expose Video
+  track identifiers/formats and sparse channel-name/gang metadata.
+- Read Fade & Stop Others integer scopes and missing slices through fixed native
+  getters. Admit guarded `ndi-output` routing and timing edits for silent videos.
+- Correct multi-parameter Light cue-pull previews and validate RGB, CMY, HSI and
+  Pan/Tilt compound values against each parameter's current native prototype.
+
+- Add last-saved Light cue curves to the existing detail reader, with stable-file
+  identity, explicit freshness and bounded point coverage; permit Linear point edits.
+- Accept compact Light command ranges while preserving exact legacy names.
+- Target the unique verified running QLab installation for native cue properties
+  and bind native trigger confirmations to its identity.
+- Keep Light Definition parameter inspection independent of import validation;
+  return complete readable details and explicit counts/diagnostics for rejected definitions.
+- Add root stage/route reorder batches, input-only empty names and all five
+  QLab NDI audio sample rates; verify native stage/route/input order after writes.
+- Add bounded public local Syphon server-directory observations to input sources,
+  preserving camera metadata on failure and keeping Syphon assignment unavailable.
+
+- Extended stage and route editors with typed 1–50-operation archive batches,
+  retaining their original single-property OSC forms.
+- Added guarded NDI/Syphon output-device and local/OBS input-patch editors.
+- Added stage masks, explicit resize, regions, edge blends and validated
+  warp/mesh/point operations with dependency-aware deletion.
+- Bound virtual device refs to their archive object/snapshot; callers must refresh
+  saved virtual references after document changes. `virtualID` remains registry
+  scope and is not a device identifier.
+- Verified the exact running QLab installation and reused the archive transaction
+  for video, preserving the lighting compatibility adapter.
+
+- Restricted explicit input FPS to QLab 5.5.10 selectable range endpoints.
+  Interior AVFoundation rates could be saved but displayed as Auto in QLab.
+
+- Fixed import of native Light Definitions with canonical numeric-string default
+  parameter indices; catalogue and archive imports now agree without changing the
+  source payload/hash. Invalid or missing indices remain blocked.
+- Aligned video update schemas with explicit-null rules: omission preserves values;
+  only removable assignments advertise null. Current surface: **87 tools —
+  52 read-only and 35 gated writes**.
+
+- Enrich passive video inventories with camera connected/suspended/in-use state,
+  unverified AVFoundation observed format, macOS display active/asleep/mirrored
+  flags, field-specific unknown reasons and timestamp-independent content hashes.
+
+- Add passive `qlab_get_video_output_devices` and `qlab_get_video_input_patches`: separate OSC, saved configuration and bounded CoreGraphics/AVFoundation metadata without capture, permission requests or network discovery. Add route scaling labels, partial layout and saved stage/region references.
+
+- Expand exact Video stage inspection with source freshness, explicit coverage,
+  readable warp labels, stage-centered coordinates, and bounded live grid/guide
+  reads with continuation requests and shared-route deduplication.
+
+- Exact Video stage/route reads now include saved configuration; stage geometry supports bounded pages with hash-checked continuation and explicit-save guidance.
+
+- Enrich `qlab_get_workspace_video_settings` with read-only `saved_video`
+  configuration from local QLab 5.5.10/build 5510 documents: stages, viewports,
+  masks, nested region geometry, routes, input patches and configured virtual
+  destinations. Keep live OSC and saved provenance distinct; bound section pages
+  to 1,000 records and 2 MiB with explicit continuation and coverage limits.
+
+- Add `qlab_edit_light_cue_curves`: separate bounded ascending/descending curve
+  batches with same-path close/edit/reopen, recovery and saved-archive verification
+  on QLab 5.5.10/build 5510. Preserve omitted fields and reject mirrored/unknown
+  structures; no documented OSC curve readback or physical-output claim.
+- Extend bounded Light command analysis with reserved `all = home`, instrument
+  lists, matching-prefix ranges, bracket selectors and dynamic cue pulls with
+  proportional factors. Bind source hashes and number uniqueness, reject cycles
+  and conflicting batches, and preserve textual references. No playback.
+- Extend definition creation/import to CMY, HSI, Pan/Tilt, acyclic One-to-Many
+  controls and RGB lime, preserving native channels, bindings and metadata.
+  Virtual controls consume no physical DMX channels. Historical checkpoint before
+  the video editors: **85 tools, 52 reads and 33 gated writes**.
+
+- Add `qlab_get_light_definitions`: source-aware paged catalogue of bundled, personal
+  and last-saved workspace definitions, with exact channel/control detail.
+- Add `qlab_edit_light_definitions`: dedicated workspace-only import and definition
+  CRUD using source-bound confirmations and the existing document transaction.
+  Preserve native channel positions and extended RGB bindings; unknown variants
+  remain readable and blocked for import. No global library writes.
+- **Breaking:** remove definition operations from `qlab_edit_light_patch`; use the
+  definition editor first, then create/reassign instruments. Public surface is
+  83 tools: 50 read-only and 33 gated writes.
+
+- Enrich `qlab_get_workspace_light_settings` with typed saved-file instruments,
+  addresses, Art-Net/USB configuration, groups and workspace definitions alongside
+  current OSC data. Dirty documents remain unsaved and sources retain explicit
+  freshness/coverage. Add bounded section pagination and a 2 MiB response budget;
+  archive inspection initially supports QLab 5.5.10/build 5510. Internal cue-editor
+  dependency reads and all write gates remain unchanged.
+- Add `qlab_edit_light_patch`: typed batches of 1–100 create/edit/rename/delete
+  operations for instruments and groups. Workspace definitions use the dedicated editor. On local
+  QLab 5.5.10/build 5510 it previews a source-bound plan, then closes the clean
+  document, replaces the same path with bounded recovery and reopens for
+  archive/OSC-visible readback. Cues, Dashboard MIDI and the global Light
+  Library remain untouched; cue-reference warnings are partial. Art-Net and
+  unpatched output and explicit USB-DMX identities are supported as saved
+  configuration; compatible-device availability and output remain unvalidated. Definition parameters use the separately validated encodings above. Percentage
+  home values use 0–100 display units; raw DMX homes use the 8/16-bit range.
+  The original patch-editor addition exposed 80 tools; the separate definition tools originally brought the surface to 82, before the curve tool.
 - Reuse existing reader normalization and inherited cue model fields, and
   simplify equivalent settings/creation branches without changing MCP contracts.
 - Evidence capture now redacts confirmation tokens embedded in JSON-quoted

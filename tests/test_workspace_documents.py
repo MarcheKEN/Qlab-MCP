@@ -176,7 +176,7 @@ def test_inventory_fail_closed_on_malformed_flags(native):
 
 
 def test_fixed_script_guards_immediately_before_events():
-    assert 'tell application "/Applications/QLab.app"' in docs.SCRIPT
+    assert 'tell application runningPath' in docs.SCRIPT
     assert "set workspaceRecord to" in docs.SCRIPT
     assert "row's setObject" not in docs.SCRIPT
     assert "close w saving no" in docs.SCRIPT
@@ -333,3 +333,30 @@ def test_fixed_bridge_passes_untrusted_path_only_as_json_argv(tmp_path, monkeypa
     assert argv[:2] == ["/usr/bin/osascript", "-"]
     assert json.loads(argv[2])["path"] == path
     assert options["input"] == docs.SCRIPT and "shell" not in options
+
+
+def test_native_event_canonicalizes_target_like_inventory():
+    assert 'set targetPath to my canonicalPath((payload\'s objectForKey:"path") as text)' in docs.SCRIPT
+
+
+def test_read_inventory_uses_running_bundle_without_relaxing_write_gate(monkeypatch):
+    calls = []
+    reader = SimpleNamespace(client=SimpleNamespace(config=SimpleNamespace(host="127.0.0.1")))
+    def request(reader, action="inventory", **kwargs):
+        calls.append(action)
+        return {"documents": []}
+    monkeypatch.setattr(docs, "_native_request", request)
+    assert docs._inventory(reader, running_bundle=True) == {"documents": []}
+    assert docs._inventory(reader) == {"documents": []}
+    assert calls == ["read_inventory", "inventory"]
+    assert 'Running QLab identity changed.' in docs.SCRIPT
+    assert 'if actionName is "inventory" or actionName is "read_inventory" then' in docs.SCRIPT
+    assert 'tell application applicationPath' in docs.SCRIPT
+
+
+def test_document_script_targets_verified_running_bundle():
+    assert 'tell application runningPath' in docs.SCRIPT
+    assert 'CFBundleIdentifier' in docs.SCRIPT
+    assert 'CFBundleShortVersionString' in docs.SCRIPT
+    assert 'expected_application' in docs.SCRIPT
+    assert 'The running QLab must be /Applications/QLab.app.' not in docs.SCRIPT

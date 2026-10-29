@@ -18,6 +18,7 @@ from ..osc.addressing import _workspace_address
 from ..settings.summarizers import _collection_items
 from .visual import (ChannelName, Crosspoint, Gang, OutputFlag, Quaternion, Slider,
                      SliceAdd, SliceCount, SliceDelete, SliceTime, TrueOnly)
+from .input_channels import snapshot as input_channel_snapshot, validate_span as validate_input_span
 
 PositiveInt = Annotated[StrictInt, Field(ge=1)]
 Index = Annotated[StrictInt, Field(ge=0)]
@@ -371,8 +372,6 @@ def capabilities(family, triggers=None, result=None):
     blocked = {key: reason for key, reason in _BLOCKED.items() if key in names}
     if family in {"audio", "mic"}:
         blocked.update({key: "Documented for Fade cues only." for key in names & {"doLevel", "doObjectIDLevel"}})
-    if family == "mic":
-        blocked.update({key: "Input patch capacity is not available through documented OSC." for key in {"channels", "channelOffset"}})
     if triggers is None or type(triggers.fadeAndStopOthers) is not int:
         blocked["fadeAndStopOthers"] = "Scope readback must be an integer, not boolean."
     if family == 'midi':
@@ -383,8 +382,11 @@ def capabilities(family, triggers=None, result=None):
     pending = names & {'parameterValue', 'parameterFadeEnabled'}
     unavailable = ['Hotkey/MIDI/Wall Clock setup', 'Timecode activation/display', 'Trim', 'Audio FX', 'Undocumented curves',
                    *(['Script source editing'] if family == 'script' else [])]
+    conditional = ({key: "Requires a clean local workspace and exact input-device identity/capacity from passive CoreAudio metadata." for key in {"channels", "channelOffset"}}
+                   if family == 'mic' else {})
     return control.control_applescript.trigger_capabilities({"tool": f"qlab_edit_{family}_cues", "allowed_properties": sorted(names - blocked.keys()),
             "blocked_properties": blocked, "requires_fresh_preflight": True,
+            "conditional_properties": conditional,
             "gated_or_planned_properties": {key: "Requires signed dry run, readable baseline and family dependencies." for key in names - blocked.keys()},
             "property_capabilities": {
                 **{key: {"state": "pending_validation" if key in pending else "blocked" if key in blocked else "gated",
@@ -450,6 +452,16 @@ def _scalar(reader, ws, uid, key):
     return _raw(reader, ws, f'cue_id/{uid}/{key}')
 
 
+def _read_input_patch_id(reader, ws, uid):
+    payload = reader.read_cue_values(
+        ws, uid, ['uniqueID', 'type', 'audioInputPatchID'], cacheable=False
+    ).get('values')
+    if (not isinstance(payload, dict) or str(payload.get('uniqueID', '')).upper() != uid
+            or payload.get('type') != 'Mic'):
+        raise ValueError('Fresh Mic identity could not be verified while reading its input patch.')
+    return payload.get('audioInputPatchID')
+
+
 def read(reader, ws, uid, keys, changes=None):
     identity = _scalar(reader, ws, uid, 'uniqueID')
     if not isinstance(identity, str) or identity.upper() != uid:
@@ -473,6 +485,8 @@ def read(reader, ws, uid, keys, changes=None):
             value = _scalar(reader, ws, uid, key.split('/')[0] + 'Channels')
         elif key == 'setSilentLevels':
             value = _scalar(reader, ws, uid, 'levels')
+        elif key == 'audioInputPatchID':
+            value = _read_input_patch_id(reader, ws, uid)
         else:
             value = _scalar(reader, ws, uid, 'framerate' if key == 'timecodeFrameRate' else key)
         if key == 'preservePitch' and type(value) is int and value in (0, 1):
@@ -568,7 +582,10 @@ def preflight(reader, ws, item, family):
     for op in operations:
         if op['property'] in caps['blocked_properties'] and op['property'] not in control.control_applescript.TRIGGER_KEYS:
             raise ValueError(caps['blocked_properties'][op['property']])
-    before.update(read(reader, ws, uid, [op['key'] for op in operations]))
+    read_keys = [op['key'] for op in operations]
+    if family == 'mic' and set(read_keys) & {'channels', 'channelOffset'}:
+        read_keys.extend(key for key in ('audioInputPatchID', 'channels', 'channelOffset') if key not in read_keys)
+    before.update(read(reader, ws, uid, read_keys))
     for op in operations:
         op['baseline'] = before[op['key']]
         if op['property'].startswith('objectID/') and op['property'].endswith('/position'):
@@ -576,6 +593,18 @@ def preflight(reader, ws, item, family):
                 raise ValueError('Object position must be a finite OSC coordinate pair.')
         _validate_scalar_baseline(op)
     deps.update(validate(reader, ws, uid, family, operations, before))
+    channel_ops = {op['key'] for op in operations} & {'channels', 'channelOffset'}
+    if family == 'mic' and channel_ops:
+        if 'audioInputPatchID' in {op['key'] for op in operations}:
+            raise ValueError('Assign the input patch first, then preview channel settings.')
+        patch_id = before.get('audioInputPatchID')
+        if not isinstance(patch_id, str) or not patch_id:
+            raise ValueError('Channel edits require an assigned input patch.')
+        capacity = input_channel_snapshot(reader, ws, patch_id)
+        requested = {op['key']: op['requested'] for op in operations}
+        validate_input_span(capacity['input_channels'], requested.get('channels', before.get('channels')),
+                            requested.get('channelOffset', before.get('channelOffset')))
+        deps['input_channel_capacity'] = capacity
     deps['routes'] = {route: _fingerprint(payload) for route, payload in deps['routes'].items()}
     for op in operations:
         snapshot = selector_snapshot(reader, ws, uid, family, op['property'])
@@ -597,6 +626,11 @@ def _fingerprint(payload):
 
 
 def check_dependencies(reader, ws, uid, dependencies):
+    if 'input_channel_capacity' in dependencies:
+        expected = dependencies['input_channel_capacity']
+        if (_read_input_patch_id(reader, ws, uid) != expected['patch_id']
+                or input_channel_snapshot(reader, ws, expected['patch_id']) != expected):
+            raise ValueError('Input patch, device identity or channel capacity changed after dry run.')
     for route, baseline in dependencies.get('routes', {}).items():
         if _fingerprint(_raw(reader, ws, route)) != baseline:
             raise ValueError('Workspace patch dependencies changed; run a new dry run.')
@@ -604,6 +638,27 @@ def check_dependencies(reader, ws, uid, dependencies):
         current = read(reader, ws, cue, list(baseline))
         if any(not control._same(current.get(k), v) for k, v in baseline.items()):
             raise ValueError('Cue dependency changed; run a new dry run.')
+    for cue, baseline in dependencies.get('light_pull_sources', {}).items():
+        current = read(reader, ws, cue, ['number', 'lightCommandText'])
+        text = current.get('lightCommandText')
+        observed = {
+            'uniqueID': str(current.get('uniqueID', '')).upper(),
+            'number': current.get('number'),
+            'type': current.get('type'),
+            'text_sha256': hashlib.sha256(text.encode('utf-8')).hexdigest() if isinstance(text, str) else None,
+        }
+        if not control._same(observed, baseline):
+            raise ValueError('Light cue pull source changed; run a new dry run.')
+    number_index = dependencies.get('light_pull_number_index')
+    if number_index is not None:
+        from .moves import _read_snapshot
+        from .remaining_context import _light_pull_number_index
+
+        if not isinstance(number_index, dict) or not isinstance(number_index.get('numbers'), list):
+            raise ValueError('Light cue pull number snapshot is invalid; run a new dry run.')
+        current_index = _light_pull_number_index(_read_snapshot(reader, ws), number_index['numbers'])
+        if _fingerprint(current_index) != number_index.get('fingerprint'):
+            raise ValueError('Light cue pull number resolution changed; run a new dry run.')
     selector = dependencies.get('selector')
     if selector and not control._same(selector_snapshot(reader, ws, uid, selector['family'], selector['property']), selector['snapshot']):
         raise ValueError('Selector-dependent state changed after dry run.')

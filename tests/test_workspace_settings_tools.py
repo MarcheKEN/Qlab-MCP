@@ -24,6 +24,33 @@ from qlab_mcp.server import mcp
 from qlab_mcp.settings.summarizers import _summarize_audio_patch, _summarize_network_patch
 
 
+@pytest.mark.parametrize("osc_failure", [False, True])
+def test_light_public_tool_keeps_typed_saved_patch_when_osc_fails(monkeypatch, osc_failure):
+    from qlab_mcp.light_patch import reader as light_reader
+    from qlab_mcp.light_patch.inspection import inspect_saved_patch
+    from test_light_patch_archive import workspace
+
+    saved = inspect_saved_patch(workspace())
+    saved.update(status="ready", source="saved_archive", freshness="last_saved", document_modified=False)
+
+    class FakeReader:
+        def get_workspace_setting_details(self, **kwargs):
+            assert kwargs["section"] == "light" and kwargs["profile"] == "safe"
+            if osc_failure:
+                raise ValueError("OSC unavailable")
+            return dict(ok=True, status="ok", partial=False, workspace_id=saved["workspace_id"],
+                        details={"summary": {"patch_present": True}, "instruments": []})
+
+    monkeypatch.setattr(server_module, "_reader", FakeReader)
+    monkeypatch.setattr(light_reader, "_saved", lambda reader, workspace_id: saved)
+    result = server_module.qlab_get_workspace_light_settings(saved["workspace_id"])
+    assert result.ok
+    assert result.partial is osc_failure
+    assert result.data.saved_patch.instruments[0].name == "Door"
+    assert result.data.saved_patch.definitions[0].parameters[0].channel == 0
+    assert result.data.pagination.byte_limit == 2 * 1024 * 1024
+
+
 def test_workspace_settings_tools_replace_generic_surface() -> None:
     async def list_tool_names() -> set[str]:
         async with Client(mcp) as client:
@@ -44,7 +71,7 @@ def test_workspace_settings_tools_replace_generic_surface() -> None:
     assert expected <= tool_names
     assert "qlab_get_workspace_settings" not in tool_names
     assert "qlab_get_workspace_setting_details" not in tool_names
-    assert len(tool_names) == 79
+    assert len(tool_names) == 88
 
 
 def test_network_destination_absence_is_unknown() -> None:
@@ -103,10 +130,10 @@ def test_workspace_settings_tool_schemas_are_domain_specific() -> None:
         "qlab_get_workspace_audio_settings": {
             "workspace_id", "view", "ref", "profile", "input_channel", "output_channel",
         },
-        "qlab_get_workspace_video_settings": {"workspace_id"},
-        "qlab_get_video_stage": {"workspace_id", "stage_id", "profile"},
+        "qlab_get_workspace_video_settings": {"workspace_id", "section", "offset", "limit"},
+        "qlab_get_video_stage": {"workspace_id", "stage_id", "profile", "offset", "limit", "expected_sha256"},
         "qlab_get_video_output_route": {"workspace_id", "route_id", "profile"},
-        "qlab_get_workspace_light_settings": {"workspace_id", "profile"},
+        "qlab_get_workspace_light_settings": {"workspace_id", "profile", "section", "offset", "limit"},
         "qlab_get_workspace_network_settings": {"workspace_id", "ref", "profile"},
         "qlab_get_workspace_midi_settings": {"workspace_id", "ref", "profile"},
     }
@@ -114,7 +141,9 @@ def test_workspace_settings_tool_schemas_are_domain_specific() -> None:
     for tool_name, parameters in expected_parameters.items():
         tool = tools[tool_name]
         assert set(tool.inputSchema["properties"]) == parameters
-        assert {"section", "mode", "sections", "requests", "kind"}.isdisjoint(parameters)
+        assert {"mode", "sections", "requests", "kind"}.isdisjoint(parameters)
+        if tool_name not in {"qlab_get_workspace_light_settings", "qlab_get_workspace_video_settings"}:
+            assert "section" not in parameters
         assert "data" in tool.outputSchema["properties"]
         assert "domain" in tool.outputSchema["properties"]
         assert "coverage" in tool.outputSchema["properties"]

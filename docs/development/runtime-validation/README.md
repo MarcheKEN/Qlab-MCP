@@ -1,5 +1,7 @@
 # Runtime validation records
 
+- [October 22 lighting authoring completion](2026-10-22-light-authoring-completion.md)
+
 Each report proves only its named QLab version, fixture and operation. Automated checks are separate from real playback and hardware output. JSON files with matching stems retain capture evidence.
 
 Use the [current tool catalogue](../../user/tools.md) and
@@ -7,6 +9,16 @@ Use the [current tool catalogue](../../user/tools.md) and
 
 ## Records
 
+- [Light cue audit follow-up — October 26](2026-10-26-light-cue-gap-closure.md):
+  saved curve detail, Linear points, compact ranges and running-installation identity.
+
+- [Settings follow-up — October 25](2026-10-25-settings-extensions.md): complete
+  readable definition details, root ordering, empty input names, native NDI rates,
+  bounded Syphon directory and type-sensitive archive recovery.
+
+- [Passive video inventories — 2026-10-24](2026-10-24-passive-video-inventories.md)
+
+- [Light Patch authoring — 2026-10-20](2026-10-20-light-patch-authoring.md)
 - [Installed MCP acceptance — 2026-10-17](2026-10-17-installed-mcp-acceptance.md)
 - [Empty Group Delete — QLab MCP 0.3.0](empty-group-delete-2026-08-13.md)
 - [Cue Editor Runtime Checklist](edit-cues.md)
@@ -40,3 +52,8 @@ Use the [current tool catalogue](../../user/tools.md) and
 - [Delete cues runtime validation — 2026-09-26](2026-09-26-delete-cues.md)
 - [Workspace Settings `minGoTime` Runtime Validation](2026-08-15-workspace-settings-min-go-time-live.md)
 - [QLab MCP 0.3.0 live validation report](2026-08-13-qlab-mcp-0-3-0-live.md)
+
+- [Video Settings authoring — October 25](2026-10-25-video-authoring.md): typed
+  four-domain batches, same-path native acceptance, preservation and registry limits.
+- [Attached Light/Video audit — October 25](2026-10-25-light-video-audit.md):
+  restarted-MCP calls, native UI contrast, catalogue/FPS fixes and exact UI gaps.

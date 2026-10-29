@@ -5,11 +5,13 @@
 QLab MCP **0.4.0** connects an MCP-compatible agent to QLab 5, primarily through
 OSC. It can organize cues, configure supported properties and inspect workspace
 settings. Selected local functions use fixed AppleScript bridges on macOS.
+Light Patch/Definition, Light curve and Video Settings batches also edit the
+saved local archive under a guarded close, replace and reopen workflow.
 
 **Developed and tested with QLab 5.5.10 on macOS.** Other QLab versions may
 behave differently and have not been validated by this project.
 
-The server provides **79 tools: 49 read-only and 30 gated writes**.
+The server provides **88 tools: 52 read-only and 36 gated writes**.
 Writes are disabled by default and require a reviewed preview and confirmation.
 
 [Capabilities](#capabilities) · [Installation](#installation) ·
@@ -26,18 +28,32 @@ Writes are disabled by default and require a reviewed preview and confirmation.
 | Organize | Create cues, edit names/numbers, move cues and reorder Lists/Carts. |
 | Configure | Edit supported Audio, Video, Light, Text, MIDI and other cue settings. |
 | Workspace settings | Read six settings domains; edit selected General, Audio and Video properties. |
+| Video Settings | Inspect current/saved stages, routes, devices and inputs; batch edit supported stages/regions, routes, NDI/Syphon devices and local/OBS input patches. |
+| Light Patch | Read current OSC data and saved local patch configuration in one call; batch create, edit, rename and delete instruments and groups. Manage definitions with a separate catalogue and editor. |
 | Local documents | Inspect documents; open, save or clean-close under specific safeguards. |
 | Local media | Find authorized files and analyze audio without playing it. |
 
 AppleScript covers local document operations, Load Time, Target assigned number
-and selected native triggers. It requires a running `/Applications/QLab.app`
-and macOS Automation permission for the MCP host. Ordinary cue access uses OSC.
+and selected native triggers. Document/archive bridges verify the unique running
+QLab installation, including installations outside `/Applications`. Native cue
+bridges verify the running QLab 5.5.10/build 5510 installation as well. macOS
+Automation permission belongs to the MCP host. Ordinary cue access uses OSC.
+Light Patch file editing requires local QLab **5.5.10/build 5510**. USB-DMX
+assignments store the supplied device identity; they do not discover a device
+or prove it is connected. Definition creation/import supports scalar 8/16-bit channels, RGB (including lime),
+CMY, HSI, Pan/Tilt and acyclic One-to-Many controls. Unknown variants retain explicit
+import blocks. The separate curve tool edits saved ascending/descending Light curves. See the
+[definition workflow](docs/user/agent-workflows.md#light-definitions) and [Light Patch workflow](docs/user/agent-workflows.md#edit-the-light-patch)
+for recovery and readback limits.
 
 ### What it does not do
 
 - Execute cues: no GO, playback, stop, panic or Audition tools.
 - Send arbitrary OSC, run arbitrary AppleScript or perform `/live` writes.
 - Expose every QLab Inspector setting, Audio Maps or Script compilation.
+- Reproduce all Settings UI controls: Light Dashboard/global-library writes,
+  USB device discovery, Blackmagic/new network input assignment, the full QLab
+  device registry and the unlicensed “Video output for all cues” selector are outside scope.
 - Delete root Cue Lists/Carts or execute Cart cell moves.
 - Guarantee playback or physical output from a successful configuration change.
 
@@ -207,9 +223,10 @@ Before a real existing-workspace change, the agent must:
 3. Request `dry_run=true` and review the plan, changes and warnings.
 4. Submit the returned fresh confirmation token(s), execute once and read back.
 
-Batches are sequential and non-atomic. Do not retry an uncertain mutation;
-there is no automatic rollback. Keep Audition disabled. Document Open uses a
-separate empty-inventory preflight; Save includes all unsaved edits, and Close
+Batches of OSC cue edits are sequential and non-atomic. The local Light Patch,
+definition and curve editors use a guarded file replacement instead. Do not
+retry an uncertain mutation automatically. Keep Audition disabled. Document
+Open uses a separate empty-inventory preflight; Save includes all unsaved edits, and Close
 refuses dirty documents. See [write workflows](docs/user/agent-workflows.md#common-write-gate).
 
 File search, analysis and assignment require conversational consent for the
@@ -288,13 +305,15 @@ saved state and do not execute cues.
 </details>
 
 <details>
-<summary><strong>Light and Group cues</strong> — 6 tools</summary>
+<summary><strong>Light and Group cues</strong> — 7 tools</summary>
 
 | Tool | What it does |
 | --- | --- |
 | `qlab_get_light_cues` | List Light cues within one Cue List. |
 | `qlab_get_light_cue_details` | Read saved Light commands and cue settings. |
 | `qlab_edit_light_cues` | Edit supported Light commands and cue settings. |
+| `qlab_edit_light_cue_curves` | Edit ascending/descending Light curves through a confirmed saved-file transaction; reopen and verify the saved archive. |
+| `qlab_edit_saved_cue_settings` | Edit saved Hotkeys, Wall Clock weekdays, Video audio-track selection, integrated envelopes and LinearKey/DropShadow insertion in one confirmed file batch. |
 | `qlab_get_group_cues` | List Groups within one Cue List. |
 | `qlab_get_group_cue_details` | Read Group mode, Playlist settings and bounded children. |
 | `qlab_edit_group_cues` | Edit Group properties, mode and supported Playlist settings. |
@@ -347,23 +366,30 @@ saved state and do not execute cues.
 </details>
 
 <details>
-<summary><strong>Workspace settings</strong> — 14 tools</summary>
+<summary><strong>Workspace settings</strong> — 17 tools</summary>
 
 | Tool | What it does |
 | --- | --- |
 | `qlab_get_workspace_general_settings` | Read minimum GO time and selection/playhead lock. |
 | `qlab_get_workspace_audio_settings` | Read Audio patches and an optional selected matrix level. |
-| `qlab_get_workspace_video_settings` | List Video inputs, stages and output routes. |
-| `qlab_get_workspace_light_settings` | Read the Light Patch summary. |
+| `qlab_get_workspace_video_settings` | Read live OSC inventory and saved stages, meshes, masks, routes, input patches and configured destinations, with source status and pagination. |
+| `qlab_get_workspace_light_settings` | Read current OSC data plus saved local patch addresses, outputs, groups and workspace definitions; large results expose follow-up pages. |
+| `qlab_edit_light_patch` | Preview or apply a batch to the saved local Light Patch; close, replace and reopen the same workspace. |
+| `qlab_get_light_definitions` | Browse bundled, personal and saved-workspace definitions; filter the catalogue or select exact channel/virtual-control detail. |
+| `qlab_edit_light_definitions` | Import, create, update, rename or delete workspace definitions with preview and confirmation; global libraries remain unchanged. |
 | `qlab_get_workspace_midi_settings` | Read MIDI patches or one exact patch. |
 | `qlab_get_workspace_network_settings` | Read Network patches or one exact patch. |
 | `qlab_get_video_stage` | Read one stage and its regions. |
-| `qlab_get_video_output_route` | Read one output route and its destination. |
+| `qlab_get_video_output_route` | Read one route, scaling/layout and saved stage/region references. |
+| `qlab_get_video_output_devices` | Read passive local displays, route destinations and saved NDI/Syphon devices. |
+| `qlab_get_video_input_patches` | Read patches, saved modes, camera formats and bounded local Syphon server metadata. |
 | `qlab_get_video_region` | Read one region and an optional control point. |
 | `qlab_edit_workspace_general_settings` | Edit minimum GO time or selection/playhead lock. |
 | `qlab_edit_audio_output_patch` | Edit patch name, cue outputs, levels or mute/solo settings. |
-| `qlab_edit_video_stage` | Rename an existing stage. |
-| `qlab_edit_video_output_route` | Change an output route’s guide visibility. |
+| `qlab_edit_video_stage` | Create, edit, reorder and delete stages; manage regions, masks, resize and warping in a guarded batch. |
+| `qlab_edit_video_output_route` | Create, edit, reorder and delete routes; configure devices, dimensions, rotation, scaling and partial output. |
+| `qlab_edit_video_output_devices` | Manage configured NDI/Syphon devices and associated routes, including five NDI audio sample rates. |
+| `qlab_edit_video_input_patches` | Create, edit, order and delete input patches; assign local/OBS sources and Auto or explicit modes. |
 | `qlab_edit_video_region` | Edit supported region geometry, grid, guide or control point. |
 
 </details>

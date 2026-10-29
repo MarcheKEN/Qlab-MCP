@@ -5,6 +5,8 @@
 QLab MCP is a local FastMCP server that inspects QLab 5 workspaces and exposes
 narrowly gated cue-editing workflows over OSC. The supported deployment is on
 the operator's machine, with QLab reachable through `QLAB_HOST`.
+Local Light Patch editing additionally crosses a filesystem boundary: it
+rewrites the saved `.qlab5` document and uses fixed native close/reopen events.
 
 This policy covers the shipped MCP server, its OSC transport, read profiles,
 workspace/cue/settings resolution, input validation, and gated write paths. It
@@ -67,8 +69,14 @@ Load `loadTime`, Target `assignedNumber` and fixed native cue Triggers use Apple
 editors require the same OSC Edit permission, Edit Mode, inactive workspace,
 whole-batch preflight and signed single-use confirmations as their OSC fields.
 The bridge requires macOS, a loopback `QLAB_HOST` and exactly one running QLab
-instance at `/Applications/QLab.app`; it never launches QLab. macOS Automation
+instance with verified bundle, version/build and process identity. QLab must
+already be running; the bridge sends no explicit launch command.
+Native trigger snapshots bind the installation identity into confirmations. macOS Automation
 permission belongs to the actual MCP host process and is not bypassed.
+
+AppleEvents still address the verified application path. A process exit between
+verification and event delivery can race with macOS application resolution;
+identity checks reject changed-process writes, and uncertain events are never retried.
 
 The script is fixed: arguments are JSON data passed to `osascript` without a
 shell, never script source. Only explicitly allowlisted saved setters exist. Workspace and
@@ -102,8 +110,9 @@ The native `modified` flag is not a revision counter: edits made while it is
 already true cannot be detected by comparing that flag. Save therefore can
 include edits made after its dry run. Opening beside an already open document
 is blocked because this bridge cannot prove unique internal workspace identity
-before QLab assigns the new UUID. These lifecycle tools require exactly one
-running `/Applications/QLab.app`; they do not control a remote instance.
+before QLab assigns the new UUID. These lifecycle tools verify exactly one running local QLab bundle and target
+that installation; they do not control a remote instance. The installed
+`/Applications/QLab.app` dictionary supplies compile-time terminology only.
 
 Native Trigger reads are opt-in (`include_native_triggers=true`). A complete
 snapshot includes all supported Trigger fields, MIDI display/numeric aliases,
@@ -187,6 +196,90 @@ inconclusive. The zero-activity gate is a conservative MCP safety policy, not
 an asserted QLab requirement. The current activity reader cannot prove
 workspace-wide Audition state, so Audition must remain disabled by operator
 policy.
+
+### Local Light Patch files
+
+`qlab_get_workspace_light_settings` supplements current OSC data with a
+read-only inspection of the exact local workspace's saved archive. It resolves
+the document by UUID, checks the archived UUID, bounds the read and checks for
+document/file changes. Only the requested document's metadata is returned;
+the native inventory of other documents is not exposed by this tool. Saved
+enrichment initially supports QLab 5.5.10/build 5510. Remote QLab, absent
+Automation permission, a document without a saved path or an unsupported file leaves the
+available OSC result with an explicit saved-section coverage status.
+
+A dirty document can be inspected: its disk data is labelled as the last saved
+configuration and may differ from current OSC data. These sources are never
+silently merged into an asserted current state. A detected change during the
+read discards inconsistent saved enrichment. Dirty flags and file checks do
+not establish an atomic snapshot of QLab memory and disk. This read requires no
+write enablement or Edit Mode and never saves, closes or reopens the document.
+It excludes the raw archive graph, global Light Library and Dashboard MIDI.
+Configured device identities are not hardware detection. Results are bounded
+to 1,000 records per section and 2 MiB serialized JSON; truncation and subsequent
+requests are explicit, including for technical payloads.
+
+### Saved Video Settings
+
+`qlab_get_workspace_video_settings` combines documented OSC reads with a
+read-only inspection of the requested local workspace's saved `.qlab5` video
+configuration. The saved view is version-gated to QLab 5.5.10/build 5510 and
+is returned with its source and coverage status. It may include nested stages,
+regions, meshes, masks, routes, input patches, and configured destination
+descriptors. Shared objects are represented by identifiers rather than
+duplicated records. Archive traversal and serialized responses are bounded to
+1,000 records per section and 2 MiB; truncation must be explicit and provide
+continuation requests.
+
+Unsaved document changes do not cause a save: OSC state and last-saved archive
+state remain distinct, and comparisons are limited to properties exposed by
+both sources. If document or file identity changes during reading, saved
+enrichment is discarded as inconsistent. Remote QLab, missing Automation
+access, absent saved paths, and unsupported versions retain any available OSC
+result with reduced coverage. This read does not close or reopen the document,
+activate devices, capture video, or modify workspace bytes. Configured
+destinations are not proof that a device is present, that capture/rendering
+works, or that physical video output is active; this tool exposes no independent
+detected-device inventory.
+
+`qlab_edit_light_patch` requires local QLab 5.5.10/build 5510, existing-workspace
+write readiness, a clean inactive document in Edit Mode, disabled start-on-open/
+start-on-close settings, and a five-minute,
+single-use `confirm:lightPatch:v1:` token bound to source bytes, file identity,
+native inventory and operations. Dirty documents return `needs_save`; previews
+never save, close or write. Arguments permit typed operations only, not arbitrary
+archive keys or scripts. File access follows the MCP user's permissions.
+
+The writer is limited to owned single-link regular `.qlab5` files, at most
+64 MiB, with bounded archive objects and traversal. Packages, ambiguous paths,
+unsupported formats and unsafe links are rejected. Other documents must retain
+their inventory and are never closed by this operation. Public Open keeps its
+existing empty-inventory restriction; transaction reopening is a fixed private
+operation bound to the verified file identity.
+
+The transaction preserves an original-byte recovery and durable journal in one
+private sibling recovery directory. An unresolved transaction blocks reuse.
+Recovery files can contain the complete document, including scripts, settings
+and local paths; do not publish them. Replacement preserves original metadata,
+but only file replacement is atomic. Native close/reopen and filesystem events
+are not a single atomic transaction. Hostile local writers are outside the
+coordination guarantee; hash checks and locks do not prevent every external race.
+
+Failure retains the phase and recovery location without automatic retries or
+rollback over newer edits. Native readback checks OSC-visible identity and
+properties; saved routing and definitions also require archive verification.
+USB-DMX stores an explicit supplied identity; a disconnected or unknown device
+may remain unpatched in QLab. No compatible USB device has been validated, and
+configuration does not establish availability or DMX output. New definitions support validated scalar, RGB/lime, CMY, HSI, Pan/Tilt and
+acyclic One-to-Many encodings; unsupported existing data is preserved rather
+than treated as permission to manufacture its schema.
+
+By explicit product policy, Light cues are not rewritten or used to block a
+patch rename/delete. Reference warnings are partial. Resulting cue references
+can be unresolved until repaired separately; this is an accepted workflow
+consequence, not evidence of cue preservation failure. Patch-internal references
+must remain coherent. Reopening can affect lighting output even without a GO
+command; archive/native acceptance does not prove hardware silence or behavior.
 
 ### Move
 
@@ -347,6 +440,10 @@ indexed payload; parameter keys alone never authorize a write. Structural
 Native creation defaults for 58 effects are recorded from isolated QLab 5.5.10
 fixtures. LinearKey/DropShadow add/insert are blocked after fresh readbacks proved
 no creation. Unknown defaults remain blocked until native evidence is recorded.
+`qlab_edit_saved_cue_settings` offers separately validated native-file insertion
+for these two effects; OSC creation stays blocked. Templates are build-bound,
+hash-checked NSKeyedArchiver subgraphs; imported UIDs are remapped and per-chain
+instance IDs allocated without changing existing entries.
 Existing LinearKey/DropShadow instances remain editable with full native identity
 and baseline proof. DropShadow's observed `Color` key uses the documentary
 `inputColor` RGBA validation without changing the requested wire spelling;
@@ -430,3 +527,164 @@ ffprobe limit: ten seconds. Cache: four blocks, 128 MiB, ten-minute TTL.
 Stat identity is checked across phases and before returning; it does not provide
 cryptographic content integrity against an adversary capable of spoofing the
 filesystem metadata. Returned paths/tables describe the authorized source.
+
+
+### Light Definition catalogue and editor
+
+`qlab_get_light_definitions` reads fixed local bundled/personal library locations
+and optionally the exact saved workspace. It accepts no arbitrary file path.
+Bundled LZ4 decompression and keyed archives are bounded to 64 MiB; individual
+JSON definitions to 1 MiB, at most 20,000 records per source. Reads reject symlink
+files and unstable identities. Sources have independent availability; personal
+files are not executed. Pages contain at most 1,000 records and 2 MiB of JSON.
+Only exact detail requests include parameters; no raw archive graph is returned.
+Catalogue identity hashes source, origin and content. Duplicate names do not
+select another source implicitly. Dirty workspace data remains last-saved.
+Parameter inspection is independent of import validation: a rejected definition
+still exposes readable entries and explicit counts/diagnostics. Reading more
+than 512 controls, including virtual controls, does not relax import limits or
+authorize a write. Invalid channel keys remain uninterpreted rather than guessed.
+
+`qlab_edit_light_definitions` uses the same document transaction, recovery and
+activity checks as the patch editor, with a separate single-use
+`confirm:lightDefinitions:v1:` token. Source fingerprints and original requests
+are bound to the token; imports revalidate sources before Close. Only validated scalar, RGB/lime, CMY, HSI, Pan/Tilt and acyclic One-to-Many
+encodings are enabled. Unknown variants and unpreservable metadata block import.
+Preservable unknown JSON metadata retains a semantic-coverage warning. Virtual
+controls do not add physical channels; their references, cycles, defaults and
+existing instrument footprints are validated.
+Definition rename updates patch instrument references; delete in use is blocked.
+Shared definition updates revalidate DMX footprints and overlaps. Light cues are
+not changed and reference analysis is partial. Unused definitions have archive
+verification only, not OSC or physical-output validation. Global/personal
+libraries and Dashboard MIDI are never written. Definition actions have been
+removed from public `qlab_edit_light_patch` batches.
+
+### Saved Light cue curves
+
+`qlab_edit_light_cue_curves` has a separate `confirm:lightCueCurves:v1:` token
+family and reuses the clean/inactive QLab 5.5.10/build 5510 document transaction,
+identity checks and bounded recovery. It edits only requested up/down shapes,
+copying changed graph branches and preserving unrelated data and omitted fields.
+Point replacements require normalized, ordered fixed-endpoint data with bounded
+counts. Mirrored curves, unknown types and unsupported metadata changes block.
+The generated result and reopened saved archive must satisfy curve postconditions.
+`saved_curve_verified` is archive evidence; OSC patch readback is separate and
+does not prove native curve rendering, playback, hardware silence or DMX output.
+
+### Dynamic Light cue references
+
+The Light command editor preserves `cue NUMBER` references and optional numeric
+factors. Exact uniquely numbered Light sources and their transitive graph are
+bounded (100 sources, depth 32); self-reference and cycles block preflight.
+Confirmations bind source UUID/type/number and text SHA-256 plus a fingerprint
+of all candidates for referenced numbers. Rechecks detect source edits and new
+number collisions. A batch cannot edit source text/numbers or introduce a number
+collision while another item depends on that resolution. Failed previews emit
+no setter tokens. The analysis identifies dependencies, not resulting DMX levels.
+
+Video mask aliases expose known saved paths and bookmark presence, never raw
+bookmark bytes. Route-to-virtual-device name/type matches are candidate
+associations, not proof of identity or ownership. Oversized saved stages retain
+a bounded header where possible and identify the exact stage reader. That
+reader pages saved geometry under its own hash guard; compare hashes between
+the overview and detail rather than assuming they are the same snapshot.
+
+Exact Video stage and route reads also expose the corresponding saved object.
+Stage geometry pages use JSON paths and a saved-file SHA-256 continuation guard.
+Dirty documents require an explicitly reviewed Save before relying on a fresh
+archive baseline; the reader never saves. Oversized live geometry is reported
+as omitted, and cannot be treated as the same snapshot as saved geometry.
+
+
+Stage inspection supplements the saved snapshot with bounded current grid/guide
+queries (at most sixteen root regions/shared routes and an eight-second scheduling
+budget; an in-flight OSC transaction retains its configured timeout). These reads
+are not an atomic snapshot. Missing visibility remains null and coverage partial.
+Stage-centered coordinates and readable warp labels retain their source and raw
+values; unknown codes are reported. No reader saves pending changes. UI selection,
+monitor pixels and physical-device availability are not inferred from this data.
+
+### Passive local video metadata
+
+`qlab_get_video_output_devices` and `qlab_get_video_input_patches` add bounded,
+fixed metadata getters for local QLab only. CoreGraphics enumerates online
+screens and current display modes. AVFoundation enumerates device descriptors,
+format descriptions, frame-rate ranges, connected/suspended/in-use flags and
+the observed device format. This format is not attributed to QLab and does not
+prove capture, even when present. Missing getters remain unknown with reasons.
+CoreGraphics active/asleep/mirrored flags describe macOS only. These getters
+never create a capture input or
+session, locks/configures a device, requests camera access or reads frames.
+Metadata can be available with camera authorization not determined. Device
+providers are operated by macOS; the tool does not initialize QLab capture
+coordinators, NDI finders or Blackmagic capture backends. The input inventory may
+load the public Syphon framework from the uniquely identified running QLab bundle
+and observe its local server directory for up to one second. Before loading,
+the helper requires an Apple-issued Figure 53 signature (team `7672N4CCJM`,
+identifier `info.v002.Syphon`) and a binary path inside that bundle. Failure or
+verification timeout disables Syphon enrichment without removing camera data.
+This authenticates the loaded framework, not the host process. This creates no
+Syphon client/server and requests no frames. It is a bounded observation, not
+an exhaustive inventory or proof of availability in QLab. UUID-less entries
+cannot establish identity; Syphon candidates are not yet assignable by the writer.
+
+The fixed native helper runs in an isolated Python subprocess with a ten-second
+timeout, output/record bounds and no shell/user-provided code. Native failures
+are not retried through an activating fallback. Local metadata, OSC destination
+observations and saved virtual devices remain distinct; matching names never
+establish identity. A saved screen reference also requires its vendor/model/
+serial tuple. Current session display IDs are not persistent hardware UUIDs.
+Supported camera formats and saved mode configuration do not prove effective
+capture, connectivity or physical output. The complete QLab device registry is
+explicitly outside coverage. Read results may expose device names/identifiers,
+saved mode settings and configured source metadata; no credentials are requested.
+
+A saved-file/document change around native inspection discards the saved
+augmentation. Independent source failures preserve other observations. Every
+serialized response remains within 2 MiB, with at most 1,000 returned records
+per section and explicit native-source caps. Inventory pages carry a content
+snapshot ID; callers must restart if it changes between pages. These readers
+never perform document lifecycle actions or setters, and do not require write
+mode. Their OSC readers and saved decoding are independent of editor tokens.
+
+### Video archive authoring
+
+The four video editors share the signed archive transaction with lighting.
+Archive batches require a local clean inactive document in Edit Mode, exact
+UUID, QLab 5.5.10/build 5510, stable file, and a five-minute single-use token.
+Identity includes the unique running application path, bundle/version/build and
+process; a second instance or installation change blocks the transaction.
+Native document Open remains empty-inventory-only; the internal guarded reopen
+preserves other documents. Workspace open/close cue hooks must be disabled.
+
+Video plans preserve unknown objects and shared references; destructive batches
+block removal of used stages, routes, virtual devices and input patches.
+Virtual device refs bind archive hash and object identity, not workspace-level
+`virtualID`. Physical assignments bind hardware metadata. Camera mode/source and
+mask dependencies are rechecked before close; mask bookmark creation reads a
+bounded local file. No global device preferences are modified.
+
+Reopening configured NDI/Syphon or camera patches can initialize QLab backends.
+The MCP does not request capture, receivers, emitters, Monitor, Show or playback.
+Zero active cues does not prove zero device activity. Saved-only properties and
+OSC-verified properties are labelled separately; neither proves physical signal.
+
+## Saved Light/Video cue settings
+
+`qlab_edit_saved_cue_settings` uses the existing local archive transaction,
+5.5.10/build 5510 gate, clean inactive document requirement, exact UUIDs,
+five-minute single-use confirmation, retained recovery and same-path reopen.
+It accepts at most 50 operations and 8192 replacement envelope points in total.
+The preview binds media identity and current audio-track metadata for selection.
+Hotkey configuration requires disabled activation; enabling is a separate call
+and requires an assigned known key, a disarmed cue, no continuation and no
+skip-if-disarmed. No external trigger is sent. Weekday edits preserve time and
+activation. Unknown encodings block the affected write.
+
+Native FX templates preserve their entire keyed subgraph and are hash-checked.
+Saved postconditions and current UUID/type, track, fade flags and FX count are
+checked after reopen. Opaque OSC FX dictionaries do not verify a native class;
+explicit types are compared when exposed. Trim, Objects, Audio Maps and Audio FX
+are not added to this tool. Shared read fallbacks for Fade & Stop scope and slice
+markers are fixed local AppleScript getters, never arbitrary source or setters.

@@ -25,7 +25,7 @@ Inspect definitions without connecting to QLab:
 uv run --locked --no-editable --extra dev fastmcp inspect fastmcp.json --skip-env
 ```
 
-Expect 79 tools, including 49 reads and 30 gated writes. Definitions alone do
+Expect 88 tools, including 52 reads and 36 gated writes. Definitions alone do
 not establish QLab reachability. Use `qlab_check_connection` for live read access,
 resolve one returned workspace UUID, then request a bounded overview.
 
@@ -79,9 +79,13 @@ workspaces need an explicit choice. Write readiness is separate from read access
 
 ## Native document and Trigger failures
 
-The fixed local bridge requires exactly one running `/Applications/QLab.app`,
-a loopback host and Automation permission for the actual MCP host process.
-It does not launch QLab or provide a remote fallback. Keep unavailable native
+Document/archive bridges require exactly one verified running local QLab
+installation. Native cue field/Trigger bridges also target that running installation,
+requiring QLab 5.5.10/build 5510 and binding native trigger snapshots to its identity.
+Both require a loopback host and Automation permission for the actual MCP host.
+QLab must already be running; there is no remote fallback. The fixed scripts use
+the installed `/Applications/QLab.app` dictionary for compile-time terminology,
+while events target the verified running installation. Keep unavailable native
 fields unknown; OSC data can still be useful. Open has its own empty-inventory
 preflight; Save/Close and existing-cue edits require their documented readiness.
 After an uncertain native event, inspect fresh state and never resend blindly.

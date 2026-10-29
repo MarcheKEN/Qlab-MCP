@@ -170,6 +170,8 @@ class VisualCueEditProperties(CueEditCommonProperties):
             if aggregate in changes and components & changes.keys():
                 raise ValueError(f"Use {aggregate} or its components in one update.")
         for key in ("stageID", "videoInputPatchID", "audioOutputPatchID"):
+            if key == "audioOutputPatchID" and changes.get(key) == "ndi-output":
+                continue
             if changes.get(key):
                 if str(UUID(changes[key])).casefold() != changes[key].casefold():
                     raise ValueError(f"{key} requires an exact UUID or empty string.")
@@ -387,6 +389,37 @@ def _reference(reader, ws, route, uid):
     return match
 
 
+def _ndi_context(reader, ws, uid):
+    from ..video_settings import _saved
+    saved = _saved(reader, ws)
+    if saved.get("status") not in {"ready", "partial"} or saved.get("document_modified") is not False:
+        raise ValueError("NDI audio requires a stable clean saved video configuration.")
+    stage_id = control._scalar(reader, ws, uid, "stageID")
+    stage = next((s for s in saved["stages"] if s["id"] == stage_id), None)
+    if stage is None:
+        raise ValueError("NDI audio requires an exact assigned stage.")
+    route_ids = {region.get("route_id") for region in stage["regions"]}
+    destinations = []
+    for route in saved["routes"]:
+        if route["id"] not in route_ids or route["destination_type"] != "NDI":
+            continue
+        live = reader._request(_workspace_address(ws, f"settings/video/routeID/{route['id']}"), workspace_id=ws).data
+        if not isinstance(live, dict) or live.get("uniqueID") != route["id"] or live.get("destinationInfo") != route["destination_info"]:
+            raise ValueError("Live NDI route identity/configuration differs from the saved archive.")
+        candidates = route["destination_candidates"]
+        if len(candidates) != 1:
+            raise ValueError("NDI device configuration is absent or ambiguous.")
+        device = next(d for d in saved["destinations"] if d["id"] == candidates[0])
+        channels = device["fields"].get("audioChannels")
+        if type(channels) is not int or not 1 <= channels <= 128:
+            raise ValueError("NDI audio channel bounds are unavailable.")
+        destinations.append({"route": route, "device": device})
+    if not destinations:
+        raise ValueError("Assigned stage has no verifiable NDI audio destination.")
+    return dict(sha256=saved["sha256"], stage_id=stage_id, destinations=destinations,
+                outputs=min(d["device"]["fields"]["audioChannels"] for d in destinations))
+
+
 def preflight(reader, ws, item, family):
     uid = str(item.cue_id).upper()
     changes = item.properties.model_dump(by_alias=True, exclude_unset=True) if item.properties is not None else {}
@@ -463,6 +496,12 @@ def preflight(reader, ws, item, family):
     if "fadeAndStopOthers" in changes and type(before["fadeAndStopOthers"]) is not int:
         raise ValueError("Fade & Stop scope is not reliably readable; boolean is not a mode.")
     dependencies = indexed_dependencies
+    if family == "text" and {"text/format/fontName", "text/format/fontFamilyAndStyle"} & changes.keys():
+        content = control._scalar(reader, ws, uid, "text")
+        if not isinstance(content, str):
+            raise ValueError("Text content is unavailable for font validation.")
+        text_format._unicode_scope({"text": content}, 0, text_format._units(content, text_format.SEMANTICS), text_format.SEMANTICS)
+        dependencies["text/font_content"] = content
     if text_requests:
         saved = text_format.read(reader, ws, uid)
         text_format.preflight(saved, text_requests, changes)
@@ -508,9 +547,13 @@ def preflight(reader, ws, item, family):
                 control._FAMILIES[family][1].model_validate({key: before[key]})
                 normalize({key: before[key]}, family)
     for key, route in {"stageID": "settings/video/stages", "videoInputPatchID": "settings/video/inputPatchList",
-                       "audioInputPatchID": "settings/audio/inputPatchList", "audioOutputPatchID": "settings/audio/patchList"}.items():
-        if key in changes and changes[key]:
+                       "audioInputPatchID": "settings/mic/patchList", "audioOutputPatchID": "settings/audio/patchList"}.items():
+        if key in changes and changes[key] and changes[key] != "ndi-output":
             dependencies[route] = _reference(reader, ws, route, changes[key])
+    if changes.get("audioOutputPatchID") == "ndi-output":
+        if "stageID" in changes:
+            raise ValueError("Assign the stage separately before assigning NDI audio.")
+        dependencies["ndi_audio"] = _ndi_context(reader, ws, uid)
     if "number" in changes and changes["number"]:
         nodes = control._read_snapshot(reader, ws)["nodes"].values()
         if any(node.get("number") == changes["number"] and str(node["uniqueID"]).upper() != uid for node in nodes):
@@ -544,8 +587,13 @@ def preflight(reader, ws, item, family):
             or isinstance(channels, (int, float)) and not isinstance(channels, bool) and channels > 0
             or isinstance(levels, (list, tuple)) and bool(levels)
         )
+        if not has_audio and (type(channels) is not int or channels != 0 or not dependencies["media"]["fileTarget"]):
+            raise ValueError("Video time/loop editing requires readable media/channel evidence.")
         if not has_audio:
-            raise ValueError("Video time/loop editing requires readable embedded audio evidence.")
+            start = control._scalar(reader, ws, uid, "startTime")
+            end = control._scalar(reader, ws, uid, "endTime")
+            if type(start) not in (int,float) or type(end) not in (int,float) or not 0 <= start < end or "preservePitch" in changes:
+                raise ValueError("Silent video timing requires a readable positive media range; pitch requires audio.")
     if {"startTime", "endTime"} & changes.keys():
         start = changes.get("startTime", control._scalar(reader, ws, uid, "startTime"))
         end = changes.get("endTime", control._scalar(reader, ws, uid, "endTime"))
@@ -559,7 +607,11 @@ def preflight(reader, ws, item, family):
         patch_id = changes.get("audioOutputPatchID", control._scalar(reader, ws, uid, "audioOutputPatchID"))
         if type(channels) is not int or channels < 1 or not patch_id:
             raise ValueError("Audio input channels and output patch must be readable.")
-        patch = reader._request(_workspace_address(ws, f"settings/audio/patchID/{patch_id}"), workspace_id=ws).data
+        if patch_id == "ndi-output":
+            dependencies["ndi_audio"] = _ndi_context(reader, ws, uid)
+            patch = dict(uniqueID=patch_id, cueOutputChannels=dependencies["ndi_audio"]["outputs"])
+        else:
+            patch = reader._request(_workspace_address(ws, f"settings/audio/patchID/{patch_id}"), workspace_id=ws).data
         if not isinstance(patch, dict) or str(patch.get("uniqueID", "")).casefold() != patch_id.casefold():
             raise ValueError("Audio patch identity could not be verified.")
         outputs = patch.get("cueOutputChannels")
@@ -573,10 +625,16 @@ def preflight(reader, ws, item, family):
                 raise ValueError("Audio channel is outside the cue/patch bounds.")
         dependencies["audio_bounds"] = {"numChannelsIn": channels, "patch_id": patch_id, "outputs": outputs}
     if family == "camera" and {"channels", "channelOffset"} & changes.keys():
+        if "audioInputPatchID" in changes:
+            raise ValueError("Assign the input patch first, then preview channel settings.")
         input_id = changes.get("audioInputPatchID", control._scalar(reader, ws, uid, "audioInputPatchID"))
         if not input_id:
             raise ValueError("Camera input channel editing requires a valid input patch.")
-        raise ValueError("Camera input channel bounds have no validated OSC inventory; channel edits remain blocked.")
+        from .input_channels import snapshot as input_channel_snapshot, validate_span
+        capacity = input_channel_snapshot(reader, ws, input_id)
+        validate_span(capacity["input_channels"], changes.get("channels", control._scalar(reader, ws, uid, "channels")),
+                      changes.get("channelOffset", control._scalar(reader, ws, uid, "channelOffset")))
+        dependencies["input_channel_capacity"] = capacity
     if "videoEffectIndex/enabled" in changes:
         effects = control._scalar(reader, ws, uid, "videoEffects")
         index = changes["videoEffectIndex/enabled"]["index"]
@@ -608,6 +666,10 @@ def check_dependencies(reader, ws, uid, dependencies):
     if "text_format" in dependencies:
         text_format.check_dependencies(reader, ws, uid, dependencies["text_format"])
     for route, expected in dependencies.items():
+        if route == "ndi_audio":
+            if _ndi_context(reader, ws, uid) != expected:
+                raise ValueError("NDI stage/device dependencies changed before setter.")
+            continue
         if route.startswith("settings/"):
             if _reference(reader, ws, route, expected["uniqueID"]) != expected:
                 raise ValueError("Routing dependency changed before setter.")
@@ -617,13 +679,24 @@ def check_dependencies(reader, ws, uid, dependencies):
         elif route == "text/format":
             if control._scalar(reader, ws, uid, route) != expected:
                 raise ValueError("Text fragments changed before setter.")
+        elif route == "text/font_content":
+            if control._scalar(reader, ws, uid, "text") != expected:
+                raise ValueError("Text content changed before the font setter.")
         elif route == "media":
             if any(control._scalar(reader, ws, uid, key) != value for key, value in expected.items()):
                 raise ValueError("Media dependency changed before setter.")
         elif route == "audio_bounds":
-            patch = reader._request(_workspace_address(ws, f"settings/audio/patchID/{expected['patch_id']}"), workspace_id=ws).data
+            if expected['patch_id'] == 'ndi-output':
+                patch = dict(uniqueID='ndi-output', cueOutputChannels=dependencies['ndi_audio']['outputs'])
+            else:
+                patch = reader._request(_workspace_address(ws, f"settings/audio/patchID/{expected['patch_id']}"), workspace_id=ws).data
             if control._scalar(reader, ws, uid, "audioOutputPatchID") != expected["patch_id"] or control._scalar(reader, ws, uid, "numChannelsIn") != expected["numChannelsIn"] or not isinstance(patch, dict) or str(patch.get("uniqueID", "")).casefold() != expected["patch_id"].casefold() or patch.get("cueOutputChannels") != expected["outputs"]:
                 raise ValueError("Audio channel bounds changed before setter.")
+        elif route == "input_channel_capacity":
+            from .input_channels import snapshot as input_channel_snapshot
+            if (control._scalar(reader, ws, uid, "audioInputPatchID") != expected["patch_id"]
+                    or input_channel_snapshot(reader, ws, expected["patch_id"]) != expected):
+                raise ValueError("Input patch, device identity or channel capacity changed after dry run.")
         elif route in {"videoEffects", "sliceMarkers"}:
             if control._scalar(reader, ws, uid, route) != expected:
                 raise ValueError(f"{route} changed before setter.")
@@ -658,8 +731,10 @@ def capabilities(kind, result):
         blocked["duration"] = "Cue reports no editable duration or capability is unknown."
     if result.triggers is None or type(result.triggers.fadeAndStopOthers) is not int:
         blocked["fadeAndStopOthers"] = "Scope readback must be an integer, not boolean."
-    if kind == "Camera":
-        blocked.update({key: "Input channel bounds require validated OSC inventory." for key in ("channels", "channelOffset")})
+    conditional = ({key: "Requires a clean local workspace and exact input-device identity/capacity from passive CoreAudio metadata." for key in {"channels", "channelOffset"}}
+                   if kind == "Camera" else
+                   {"text/format": "CJK ranges require Core Text to report unchanged fallback for every selected grapheme."}
+                   if kind == "Text" else {})
     if kind == "Video" and (result.audio is None or result.audio.sliceMarkers is None):
         blocked.update({key: "OSC slice inventory is unavailable; absence does not prove an empty list."
                         for key in ("addSliceMarker", "deleteSliceMarker", "deleteSliceMarkers", "sliceMarker/time", "sliceMarker/playCount", "lastSlicePlayCount")})
@@ -679,10 +754,10 @@ def capabilities(kind, result):
     return control.control_applescript.trigger_capabilities({"tool": f"qlab_edit_{family}_cues", "allowed_properties": sorted(fields - blocked.keys()),
             'video_fx': fx_capabilities,
             **({"text_format": text_format.capabilities()} if kind == "Text" else {}),
-            "blocked_properties": blocked, "requires_fresh_preflight": True,
+            "blocked_properties": blocked, "conditional_properties": conditional, "requires_fresh_preflight": True,
             "unavailable_via_osc": ["Hotkey/MIDI/Wall Clock setup", "Timecode activation/display"],
             "excluded": ["Audio Maps", "/live", "cue execution", "workspace stage/region edits"],
-            "pending_validation": ["FX LinearKey/DropShadow creation, ambiguous native identities and unavailable native parameter baselines", "Audio FX", "Non-Latin Text fallback, complex words, unobserved fonts and partial shadows", "Camera input channel bounds"],
+            "pending_validation": ["FX LinearKey/DropShadow creation, ambiguous native identities and unavailable native parameter baselines", "Audio FX", "Emoji and non-CJK Text fallback, complex words, unobserved fonts and partial shadows"],
             "blocked_operations": ["setDefaultLevels", "setSilentLevels"]}, result.triggers)
 
 

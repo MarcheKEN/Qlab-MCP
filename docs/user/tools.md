@@ -1,6 +1,6 @@
 # Public MCP Tools
 
-QLab MCP exposes exactly 79 tools on the current development branch. This page is a compact human
+QLab MCP exposes exactly 88 tools on the current development branch: 52 reads and 36 gated writes. This page is a compact human
 catalogue; decorated functions, generated schemas, and
 `tests/test_server_tools.py` remain the source of truth for exact parameters,
 annotations, and result models.
@@ -24,7 +24,7 @@ annotations, and result models.
 | `qlab_get_script_cues` | Scoped Script inventory | Cue Carts | [Remaining cues](agent-workflows.md#fade-network-midi-timecode-and-script-cues) |
 | `qlab_get_script_cue_details` | Common cue detail; script source in technical | Compiling or executing scripts | [Remaining cues](agent-workflows.md#fade-network-midi-timecode-and-script-cues) |
 | `qlab_get_light_cues` | Scoped Light inventory | Carts or patch expansion | [Light/Group](agent-workflows.md#light-and-group-cues) |
-| `qlab_get_light_cue_details` | Command text, collate, subcontroller, state and timing | Executing commands or computing DMX | [Light/Group](agent-workflows.md#light-and-group-cues) |
+| `qlab_get_light_cue_details` | Command text, collate, subcontroller, state, timing and separately labelled saved curves/points | Executing commands or computing DMX | [Light/Group](agent-workflows.md#light-and-group-cues) |
 | `qlab_get_group_cues` | Scoped Group inventory | Lists/carts as Groups | [Light/Group](agent-workflows.md#light-and-group-cues) |
 | `qlab_get_group_cue_details` | Mode, Playlist and bounded children | Full descendant details | [Light/Group](agent-workflows.md#light-and-group-cues) |
 | `qlab_get_video_cues` | Compact Video inventory within a required Cue List UUID | Carts, other lists or deep properties | [Visual cues](agent-workflows.md#video-text-and-camera-cues) |
@@ -42,11 +42,16 @@ annotations, and result models.
 | `qlab_get_workspace_status` | Derived cue warnings, known Video Settings problems, and timecode context | A complete QLab Status-window warning total | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_workspace_general_settings` | Minimum GO time and selection/playhead lock | The complete General panel | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_workspace_audio_settings` | Audio overview or exact output/input patch, including exact `name_property`; optional Main/input/output/crosspoint level | Audio Maps or full-matrix scans | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_workspace_video_settings` | Compact Video inputs, routes, and stages | Exact object detail | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_video_stage` | Exact stage UUID and its regions, safe or technical | Stage mutation or name selection | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_video_output_route` | Exact output route UUID and destination, safe or technical | Independent device inventory or mutation | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_video_settings` | OSC overview plus saved local Video configuration: stages, regions, routes, inputs, and configured destinations; paged | Detected-device inventory, live capture, or proof of physical output | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_video_stage` | Exact stage: current OSC, saved geometry, readable coordinates and bounded grid/guide inspection | Stage mutation or name selection | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_video_output_route` | Exact route, current/saved scaling and partial layout, saved stage/region references | Device inventory, mutation or rendered output proof | [Video inventories](agent-workflows.md#passive-video-inventories) |
+| `qlab_get_video_output_devices` | Passive CoreGraphics displays and active/asleep/mirrored state, OSC destination observations and saved virtual devices; optional exact ref | Complete QLab registry, discovery or device activation | [Video inventories](agent-workflows.md#passive-video-inventories) |
+| `qlab_get_video_input_patches` | Input patches, saved modes, passive camera state/formats and bounded local Syphon server directory; optional exact patch UUID | Capture, Syphon assignment, permission requests, NDI discovery or effective capture format | [Video inventories](agent-workflows.md#passive-video-inventories) |
 | `qlab_get_video_region` | Exact OSC bounds, grid/guide and optional one control point | Full point scan or UI-coordinate conversion | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_workspace_light_settings` | Light Patch summary or redacted technical payload | Light Definitions or Dashboard settings | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_light_settings` | Current OSC patch plus saved local instruments, groups, outputs and workspace definitions | Global Light Library, Dashboard MIDI or hardware detection | [Light Patch read](agent-workflows.md#read-the-light-patch) |
+| `qlab_get_light_definitions` | Paged bundled/personal/workspace catalogue and exact native parameter details | Global library writes or physical fixture detection | [Definitions](agent-workflows.md#light-definitions) |
+| `qlab_edit_light_definitions` | Import or manage workspace definitions, 1–100 operations | Dashboard, global library writes, unsupported native variants | [Definitions](agent-workflows.md#light-definitions) |
+| `qlab_edit_light_patch` | One signed batch of 1–100 instrument and group operations, with same-path close/edit/reopen | Cue repair, global Library, Dashboard MIDI, USB device discovery/hardware proof or unvalidated parameter creation | [Light Patch](agent-workflows.md#edit-the-light-patch) |
 | `qlab_get_workspace_network_settings` | Network Patch inventory or exact patch | The complete Network panel | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_workspace_midi_settings` | MIDI Patch inventory or exact patch | The complete MIDI panel | [Read](agent-workflows.md#read-sequence) |
 | `qlab_query_cues` | Bounded filtered cue discovery | Full Inspector payloads | [Read](agent-workflows.md#read-sequence) |
@@ -68,6 +73,8 @@ annotations, and result models.
 | `qlab_edit_audio_cues` | Typed Audio Basics, Triggers and saved family settings, 1–50 UUIDs | Audio Maps, Audio FX, Trim, playback or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_mic_cues` | Typed Mic Basics, Triggers and saved family settings, 1–50 UUIDs | Audio Maps, Audio FX, Trim, playback or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_light_cues` | Typed Light Basics, Triggers and saved family settings, 1–50 UUIDs | Playback, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
+| `qlab_edit_light_cue_curves` | Saved ascending/descending Custom, S-Curve, Parametric and Linear curves on exact Light cue UUIDs | Live output, mirrored curves, OSC curve readback | [Light curves](agent-workflows.md#light-cue-curves) |
+| `qlab_edit_saved_cue_settings` | 1–50 typed saved Light/Video cue edits: Hotkey configuration/activation, weekdays, audio track, integrated envelope, LinearKey/DropShadow insertion | Requires clean local 5.5.10/build 5510 document; no playback, Trim, Objects/Maps or Audio FX | [Saved cue settings](agent-workflows.md#saved-light-and-video-cue-settings) |
 | `qlab_edit_fade_cues` | Typed Fade Basics, Triggers and saved family settings, 1–50 UUIDs | Playback, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_network_cues` | Typed Network Basics, Triggers and saved family settings, 1–50 UUIDs | Sending messages, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
 | `qlab_edit_midi_cues` | Typed MIDI Basics, Triggers and saved family settings, 1–50 UUIDs | Sending MIDI, `/live`, raw OSC or blocked capabilities | [Remaining family edits](agent-workflows.md#edit-audio-mic-light-fade-network-midi-midi-file-timecode-and-script-cues) |
@@ -80,8 +87,10 @@ annotations, and result models.
 | `qlab_save_workspace` | Save an exact inactive workspace at its existing path | Save As, selective save, or recovery of earlier contents | [Workspace documents](agent-workflows.md#workspace-documents) |
 | `qlab_close_workspace` | Close an exact inactive, clean workspace | Discarding unsaved edits or implicit save | [Workspace documents](agent-workflows.md#workspace-documents) |
 | `qlab_edit_audio_output_patch` | Patch name, cue output count, one Main/input/output/crosspoint level, mute/solo, or clear | Audio Maps and full matrix scans | [Workspace settings](agent-workflows.md#edit-workspace-settings) |
-| `qlab_edit_video_output_route` | Route guide visibility | Other route properties | [Workspace settings](agent-workflows.md#edit-workspace-settings) |
-| `qlab_edit_video_stage` | Stage name | Stage geometry | [Workspace settings](agent-workflows.md#edit-workspace-settings) |
+| `qlab_edit_video_output_route` | Batched route CRUD/order, device, dimensions, rotation, scaling and tiles; legacy OSC guides | Physical signal validation | [Video authoring](agent-workflows.md#author-video-settings) |
+| `qlab_edit_video_output_devices` | Batched NDI/Syphon configuration and associated-route updates | Physical display creation or macOS settings | [Video authoring](agent-workflows.md#author-video-settings) |
+| `qlab_edit_video_input_patches` | Batched patch CRUD/order, local/OBS source assignment and validated modes | Capture or new network/Blackmagic sources | [Video authoring](agent-workflows.md#author-video-settings) |
+| `qlab_edit_video_stage` | Batched stage/region CRUD, mask, resize, edge blend, warp and mesh; legacy OSC rename | Editor zoom/selection, Monitor or playback | [Video authoring](agent-workflows.md#author-video-settings) |
 | `qlab_edit_video_region` | Region geometry, one control point, grid/guide | UI coordinates or point scans | [Workspace settings](agent-workflows.md#edit-workspace-settings) |
 | `qlab_move_cue_lists` | Reorder 1–50 root Cue Lists/Carts | Moving Cart cells, cross-workspace moves or root deletion | [Root Move](agent-workflows.md#move-cue-lists-and-carts) |
 | `qlab_move_cues` | Sequential structural moves, 1–50 UUID targets | Playback or unproven Cart writes | [Move](agent-workflows.md#move-existing-cues) |
@@ -94,7 +103,8 @@ annotations, and result models.
   instead requires write-enable, an empty local inventory, a bounded fingerprint
   and a document token; it cannot run existing-workspace OSC readiness.
 - Edit confirmation is per planned operation; Create, Move, Delete, and
-  Workspace Settings Edit tools use dedicated confirmation flows.
+  Workspace Settings Edit tools use dedicated confirmation flows. Light Patch
+  uses one source-bound `confirm:lightPatch:v1:` token for the complete batch.
 - Batches are sequential/non-transactional unless a tool description says
   otherwise. Timeout or identity ambiguity means inspect first; do not retry.
 - `destructiveHint` is MCP metadata, not authorization. Runtime gates remain
@@ -127,8 +137,9 @@ Use the existing family editors with exact UUIDs and per-operation signed tokens
 Triggers, with Second Trigger 6–7 limited to Playlist. Video/Camera/Text expose
 bounded FX selectors and typed operations, with native named-getter identity proof
 when inventory metadata is absent. Native creation defaults are verified for
-58 effects on QLab 5.5.10. LinearKey/DropShadow creation remains blocked after
-documented add/insert produced empty stacks. Deletion still requires complete
+58 effects on QLab 5.5.10. LinearKey/DropShadow OSC creation remains blocked after
+documented add/insert produced empty stacks; use `qlab_edit_saved_cue_settings`
+for their validated native file insertion. Deletion still requires complete
 restoration proof; unavailable parameter baselines and ambiguous instances stay
 blocked. Existing LinearKey/DropShadow instances can be read and edited. For
 DropShadow color, select the observed native key `Color`, shown in the QLab

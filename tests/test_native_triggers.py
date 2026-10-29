@@ -17,7 +17,9 @@ from test_light_group_cue_tools import FIRST
 from test_cue_list_tools import WS as READ_WS
 
 
-BASE = dict(hotkeyTriggerEnabled=False, midiTriggerEnabled=False,
+APP_IDENTITY = dict(path="/Applications/QLab.app", pid=1234,
+                    bundle_id="com.figure53.QLab.5", version="5.5.10", build="5510")
+BASE = dict(app_identity=APP_IDENTITY, hotkeyTriggerEnabled=False, midiTriggerEnabled=False,
             midiTriggerCommand=1, midiTriggerChannel=0, midiTriggerByte1=0,
             midiTriggerByte2=0, midiTriggerByte1String="0", midiTriggerByte2String="0",
             wallClockTriggerEnabled=False, wallClockHours=0, wallClockMinutes=0,
@@ -98,6 +100,14 @@ def test_native_dependency_change_invalidates_whole_batch(native, key):
     items = [request(midiTriggerChannel=1), request(WAIT, name="unchanged")]
     plan_and_confirm(native, items)
     native.native[START][key] = 1 if key == "continueMode" else True if key in {"armed", "skipIfDisarmed"} else 15
+    result = control.edit_control_cues(native, WS, items, False)
+    assert not result["ok"] and not native.native_setters and not native.setters
+
+
+def test_running_qlab_identity_change_invalidates_confirmation(native):
+    items = [request(wallClockSeconds=30)]
+    plan_and_confirm(native, items)
+    native.native[START]["app_identity"] = {**APP_IDENTITY, "pid": 4321}
     result = control.edit_control_cues(native, WS, items, False)
     assert not result["ok"] and not native.native_setters and not native.setters
 
@@ -183,6 +193,25 @@ def test_native_bridge_serializes_checked_snapshot_and_preserves_types(native, m
     # Use the actual bridge, not the in-memory native fixture substitute.
     assert REAL_REQUEST(native, WS, START, "wallClockSeconds", value=30, expected=0,
                         expected_snapshot=BASE, expected_type="Start") == 30
+
+
+@pytest.mark.parametrize("identity", [
+    None,
+    {**APP_IDENTITY, "pid": True},
+    {**APP_IDENTITY, "path": "relative/QLab.app"},
+    {**APP_IDENTITY, "bundle_id": "com.example.other"},
+    {**APP_IDENTITY, "version": "5.5.9"},
+    {**APP_IDENTITY, "build": "5509"},
+    {**APP_IDENTITY, "unexpected": "field"},
+])
+def test_native_snapshot_requires_exact_supported_application_identity(identity):
+    snapshot = deepcopy(BASE)
+    if identity is None:
+        snapshot.pop("app_identity")
+    else:
+        snapshot["app_identity"] = identity
+    with pytest.raises(ValueError, match="snapshot|installation identity"):
+        bridge.validate_trigger_snapshot(snapshot)
 
 
 REAL_REQUEST = bridge.request

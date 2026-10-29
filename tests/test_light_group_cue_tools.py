@@ -123,7 +123,7 @@ def test_new_tools_public_schemas():
     async def run():
         async with Client(mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-        assert len(tools) == 79
+        assert len(tools) == 88
         for family in ("light", "group"):
             for suffix in ("cues", "cue_details"):
                 tool = tools[f"qlab_get_{family}_{suffix}"]

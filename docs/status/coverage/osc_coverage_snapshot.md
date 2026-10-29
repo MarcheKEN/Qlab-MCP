@@ -122,10 +122,10 @@ contract, authorize excluded operations, or establish current runtime readiness.
   parameters remain planned-only: documented `network/patchList` readback does
   not prove that a patch uses `OSC Message`, while `customString` also writes
   Plain Text cues.
-- `Mic.channelOffset` and `Mic.channels` are gated by `patch_routing` until input
-  patch bounds validation exists. `settings/mic/patchList` exposes only ID/name;
-  cue `numChannelsIn`, `channelOffset`, and `channels` do not expose the selected
-  patch's capacity.
+- `Mic.channelOffset`, `Mic.channels`, and Camera audio channel edits require a
+  clean local QLab 5.5.10 archive and an exact CoreAudio device/capacity match.
+  The OSC patch inventory exposes only ID/name. Metadata inspection does not
+  start capture; absent or ambiguous devices remain blocked.
 - Phase 8A also covers `Audio.audioOutputPatchID` and Mic input/output patch
   IDs through exact-ID, type/profile-bound token candidates. Audio/Mic IDs are
   checked against the fresh workspace output/input patch lists in eligible dry-run and

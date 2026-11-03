@@ -15,14 +15,43 @@ from test_cue_list_tools import WS as READ_WS
 from qlab_mcp.qlab import QLabReader
 
 
+APP_IDENTITY = dict(path="/Applications/QLab.app", pid=1234,
+                    bundle_id="com.figure53.QLab.5", version="5.5.10", build="5510")
+NATIVE_SNAPSHOT = dict(
+    app_identity=APP_IDENTITY, hotkeyTriggerEnabled=False, midiTriggerEnabled=False,
+    midiTriggerCommand=1, midiTriggerChannel=0, midiTriggerByte1=0, midiTriggerByte2=0,
+    midiTriggerByte1String="0", midiTriggerByte2String="0", wallClockTriggerEnabled=False,
+    wallClockHours=0, wallClockMinutes=0, wallClockSeconds=0, timecodeTriggerEnabled=False,
+    timecodeShowAsTimecode=True, armed=False, continueMode=0, skipIfDisarmed=False,
+    timecodeTrigger=dict(hours=1, minutes=0, seconds=0, frames=0, bits=0))
+
+
+@pytest.mark.parametrize("key,value", [("fadeAndStopOthers", 2), ("sliceMarkers", []),
+    ("sliceMarkers", [{"time": 1.25, "playCount": -1}])])
+def test_fixed_common_readback_accepts_typed_values(key, value):
+    bridge.validate_common_value(key, value)
+
+
+@pytest.mark.parametrize("key,value", [("fadeAndStopOthers", False), ("fadeAndStopOthers", 4),
+    ("sliceMarkers", None), ("sliceMarkers", [{"time": True, "playCount": 1}]),
+    ("sliceMarkers", [{"time": 1, "playCount": 0}])])
+def test_fixed_common_readback_rejects_ambiguous_values(key, value):
+    with pytest.raises(ValueError):
+        bridge.validate_common_value(key, value)
+
+
 @pytest.fixture
 def script_reader(reader, monkeypatch):
     reader.values[START].update(type="Load", hasCueTargets=True, cueTargetID=TARGET, loadTime=0.0)
+    reader.native_snapshot = json.loads(json.dumps(NATIVE_SNAPSHOT))
     reader.script_setters = []
 
     def script_request(_reader, ws, uid, key, **kwargs):
         assert ws == WS
+        if key == "triggerSnapshot":
+            return json.loads(json.dumps(reader.native_snapshot))
         if "value" in kwargs:
+            assert kwargs["expected_application"] == reader.native_snapshot["app_identity"]
             assert reader.values[uid][key] == kwargs["expected"]
             reader.script_setters.append((uid, key, kwargs["value"]))
             reader.values[uid][key] = kwargs["value"]
@@ -60,6 +89,21 @@ def test_stale_load_time_token_prevents_all_setters(script_reader):
     items = confirmed_items(script_reader, [request(loadTime=3, name="new")])
     script_reader.values[START]["loadTime"] = 0.5
     result = writes.edit_control_cues(script_reader, WS, items, False)
+    assert not result["ok"] and not script_reader.script_setters and not script_reader.setters
+
+
+def test_changed_qlab_process_invalidates_load_time_confirmation(script_reader):
+    items = confirmed_items(script_reader, [request(loadTime=3)])
+    script_reader.native_snapshot["app_identity"] = {**APP_IDENTITY, "pid": 4321}
+    result = writes.edit_control_cues(script_reader, WS, items, False)
+    assert not result["ok"] and not script_reader.script_setters and not script_reader.setters
+
+
+def test_changed_qlab_process_invalidates_assigned_number_confirmation(script_reader, monkeypatch):
+    target_setup(script_reader, monkeypatch)
+    items = confirmed_items(script_reader, [request(assignedNumber="3")], "target")
+    script_reader.native_snapshot["app_identity"] = {**APP_IDENTITY, "pid": 4321}
+    result = writes.edit_target_cues(script_reader, WS, items, False)
     assert not result["ok"] and not script_reader.script_setters and not script_reader.setters
 
 
@@ -196,7 +240,8 @@ def test_bridge_remote_host_cannot_modify_local_qlab(reader, monkeypatch):
     monkeypatch.setattr(bridge.sys, "platform", "darwin")
     monkeypatch.setattr(bridge.subprocess, "run", lambda *a, **kw: pytest.fail("Must not send AppleEvents"))
     with pytest.raises(bridge.AppleScriptPreparationError):
-        bridge.request(reader, WS, START, "loadTime", value=1, expected=0, expected_target=TARGET)
+        bridge.request(reader, WS, START, "loadTime", value=1, expected=0, expected_target=TARGET,
+                       expected_application=APP_IDENTITY)
 
 
 def test_bridge_user_text_stays_data_not_source(reader, monkeypatch):
@@ -206,10 +251,12 @@ def test_bridge_user_text_stays_data_not_source(reader, monkeypatch):
         assert value not in kwargs["input"]
         payload = json.loads(argv[-1])
         assert payload["value"] == value
+        assert payload["expected_application"] == APP_IDENTITY
         assert "shell" not in kwargs
         return SimpleNamespace(returncode=0, stdout=json.dumps({"workspace_id": WS, "cue_id": START, "type": "Target", "value": value}), stderr="")
     monkeypatch.setattr(bridge.subprocess, "run", run)
-    assert bridge.request(reader, WS, START, "assignedNumber", value=value, expected="", expected_target=TARGET, assigned_cue_id=WAIT) == value
+    assert bridge.request(reader, WS, START, "assignedNumber", value=value, expected="", expected_target=TARGET,
+                          expected_application=APP_IDENTITY, assigned_cue_id=WAIT) == value
 
 
 def test_bridge_process_timeout_is_not_retried(reader, monkeypatch):
@@ -220,8 +267,48 @@ def test_bridge_process_timeout_is_not_retried(reader, monkeypatch):
         raise subprocess.TimeoutExpired("osascript", 2)
     monkeypatch.setattr(bridge.subprocess, "run", run)
     with pytest.raises(bridge.AppleScriptTimeoutError):
-        bridge.request(reader, WS, START, "loadTime", value=1, expected=0, expected_target=TARGET)
+        bridge.request(reader, WS, START, "loadTime", value=1, expected=0, expected_target=TARGET,
+                       expected_application=APP_IDENTITY)
     assert len(calls) == 1
+
+
+def test_script_targets_only_the_unique_verified_running_qlab_installation():
+    script = bridge.SCRIPT
+    assert 'runningApplicationsWithBundleIdentifier:"com.figure53.QLab.5"' in script
+    assert 'if (apps\'s |count|() as integer) is not 1' in script
+    assert 'CFBundleIdentifier' in script and 'CFBundleShortVersionString' in script and 'CFBundleVersion' in script
+    assert 'is not "5.5.10"' in script and 'is not "5510"' in script
+    assert 'tell application applicationPath' in script
+    assert 'tell application "/Applications/QLab.app"' not in script
+    assert 'on nativeSnapshot(c, applicationIdentity)' in script
+    assert 'on nativeSet(c, propertyKey, payload, applicationPath)' in script
+    assert 'on midiCommandNumber(cmd, applicationPath)' in script
+    assert 'expected_application' in script
+
+
+def test_script_rejects_ambiguous_or_changed_qlab_process_and_keeps_write_gates():
+    script = bridge.SCRIPT
+    assert 'Exactly one local QLab instance must already be running.' in script
+    assert 'The QLab process is no longer running.' in script
+    assert 'QLab process identity changed during the native cue request.' in script
+    assert 'if (unique id of w) is not wsid or (uniqueID of c) is not uid' in script
+    assert 'if not (edit mode of w) or (count of active cues of w) is not 0' in script
+    assert 'Native trigger or safety baseline changed.' in script
+    assert 'output\'s setObject:applicationIdentity forKey:"app_identity"' in script
+    assert 'QLab process identity changed before native cue setter.' in script
+    assert 'QLab installation identity changed since preflight.' in script
+
+
+def test_dynamic_target_is_not_caller_controlled(reader, monkeypatch):
+    monkeypatch.setattr(bridge.sys, "platform", "darwin")
+    def run(argv, **kwargs):
+        payload = json.loads(argv[-1])
+        assert "application_path" not in payload and "applicationPath" not in payload
+        assert "tell application applicationPath" in kwargs["input"]
+        return SimpleNamespace(returncode=0, stdout=json.dumps({
+            "workspace_id": WS, "cue_id": START, "type": "Load", "value": 1.25}), stderr="")
+    monkeypatch.setattr(bridge.subprocess, "run", run)
+    assert bridge.request(reader, WS, START, "loadTime") == 1.25
 
 
 def test_bridge_disabled_write_mode_never_sends_appleevents(reader, monkeypatch):
@@ -230,6 +317,14 @@ def test_bridge_disabled_write_mode_never_sends_appleevents(reader, monkeypatch)
     monkeypatch.setattr(bridge.sys, "platform", "darwin")
     monkeypatch.setattr(bridge.subprocess, "run", lambda *a, **kw: pytest.fail("Disabled writes must not start a script"))
     with pytest.raises(bridge.AppleScriptPreparationError):
+        bridge.request(reader, WS, START, "loadTime", value=1, expected=0, expected_target=TARGET,
+                       expected_application=APP_IDENTITY)
+
+
+def test_scalar_script_write_requires_preflight_application_identity(reader, monkeypatch):
+    monkeypatch.setattr(bridge.sys, "platform", "darwin")
+    monkeypatch.setattr(bridge.subprocess, "run", lambda *a, **kw: pytest.fail("No script without signed app identity"))
+    with pytest.raises(bridge.AppleScriptPreparationError, match="installation identity"):
         bridge.request(reader, WS, START, "loadTime", value=1, expected=0, expected_target=TARGET)
 
 
@@ -237,7 +332,8 @@ def test_bridge_nonzero_exit_after_possible_mutation_is_not_claimed_unsent(reade
     monkeypatch.setattr(bridge.sys, "platform", "darwin")
     monkeypatch.setattr(bridge.subprocess, "run", lambda *a, **kw: SimpleNamespace(returncode=1, stdout="", stderr="unexpected runtime exit"))
     with pytest.raises(bridge.QLabMcpError) as error:
-        bridge.request(reader, WS, START, "loadTime", value=1, expected=0, expected_target=TARGET)
+        bridge.request(reader, WS, START, "loadTime", value=1, expected=0, expected_target=TARGET,
+                       expected_application=APP_IDENTITY)
     assert not isinstance(error.value, bridge.AppleScriptPreparationError)
 
 
@@ -284,7 +380,8 @@ def test_invalid_script_arguments_are_preparation_failures(reader, monkeypatch):
     monkeypatch.setattr(bridge.sys, "platform", "darwin")
     monkeypatch.setattr(bridge.subprocess, "run", lambda *a, **kw: pytest.fail("Invalid arguments must not start a process"))
     with pytest.raises(bridge.AppleScriptPreparationError):
-        bridge.request(reader, WS, START, "loadTime", value=1, expected=0, expected_target=None)
+        bridge.request(reader, WS, START, "loadTime", value=1, expected=0, expected_target=None,
+                       expected_application=APP_IDENTITY)
 
 
 def test_expired_read_deadline_is_preparation_failure_before_script(reader, monkeypatch):
@@ -295,7 +392,8 @@ def test_expired_read_deadline_is_preparation_failure_before_script(reader, monk
     monkeypatch.setattr(bridge.sys, "platform", "darwin")
     monkeypatch.setattr(bridge.subprocess, "run", lambda *a, **kw: pytest.fail("No process after deadline"))
     with pytest.raises(bridge.AppleScriptPreparationError):
-        bridge.request(reader, WS, START, "loadTime", value=1, expected=0, expected_target=TARGET)
+        bridge.request(reader, WS, START, "loadTime", value=1, expected=0, expected_target=TARGET,
+                       expected_application=APP_IDENTITY)
 
 
 def test_native_operation_confirms_with_public_fastmcp_schema(script_reader, monkeypatch):

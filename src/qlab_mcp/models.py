@@ -511,18 +511,102 @@ class WorkspaceVideoSettingsOverview(BaseModel):
     problems: list[VideoSettingsProblem] = Field(default_factory=list)
 
 
+class SavedVideoRecord(BaseModel):
+    """Interpreted saved object; version-specific known fields remain JSON typed."""
+    model_config = ConfigDict(extra="allow")
+    __pydantic_extra__: dict[str, JsonValue] = Field(init=False)
+
+
+class SavedVideoConfiguration(BaseModel):
+    preparation: dict[str, JsonValue] = Field(default_factory=dict)
+    process_inventory: str = "not_in_saved_workspace_archive"
+    status: str
+    source: Literal["saved_archive"] = "saved_archive"
+    workspace_id: str | None = None
+    version: str | None = None
+    build: int | None = None
+    sha256: str | None = None
+    document_modified: bool | None = None
+    freshness: str = "unavailable"
+    message: str | None = None
+    coverage: str = "partial"
+    stages: list[SavedVideoRecord] = Field(default_factory=list)
+    routes: list[SavedVideoRecord] = Field(default_factory=list)
+    inputs: list[SavedVideoRecord] = Field(default_factory=list)
+    destinations: list[SavedVideoRecord] = Field(default_factory=list)
+    diagnostics: list[dict[str, JsonValue]] = Field(default_factory=list)
+
+
+class VideoSourceStatus(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    __pydantic_extra__: dict[str, JsonValue] = Field(init=False)
+    live_osc: str
+    saved_archive: str
+    atomic_snapshot: Literal[False] = False
+
+
+class VideoPagination(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    __pydantic_extra__: dict[str, JsonValue] = Field(init=False)
+    section: str
+    offset: int
+    limit: int
+    truncated: bool
+
+
 class WorkspaceVideoSettingsData(BaseModel):
     overview: WorkspaceVideoSettingsOverview | None = None
+    saved_video: SavedVideoConfiguration | None = None
+    source_status: VideoSourceStatus | None = None
+    pagination: VideoPagination | None = None
 
 
 class VideoStageData(BaseModel):
+    inspection: dict[str, JsonValue] | None = None
     detail: VideoStageDetail | None = None
     technical_payload: JsonValue | None = None
+    saved_video: SavedVideoConfiguration | None = None
+    pagination: VideoPagination | None = None
 
 
 class VideoOutputRouteData(BaseModel):
     detail: VideoRouteSummary | None = None
     technical_payload: JsonValue | None = None
+    saved_video: SavedVideoConfiguration | None = None
+    inspection: dict[str, JsonValue] | None = None
+
+
+class VideoObservedFormat(BaseModel):
+    """AVFoundation observation; neither QLab attribution nor received frames."""
+    width: StrictInt
+    height: StrictInt
+    pixel_format: StrictInt
+    source: Literal['macos_avfoundation'] = 'macos_avfoundation'
+    qlab_attribution: Literal['unverified'] = 'unverified'
+    capture_verified: Literal[False] = False
+
+
+class VideoDeviceRecord(SavedVideoRecord):
+    """Source-specific passive state; null state never means idle or available."""
+    connected: bool | None = None
+    suspended: bool | None = None
+    in_use_by_another_application: bool | None = None
+    observed_format: VideoObservedFormat | None = None
+    active: bool | None = None
+    asleep: bool | None = None
+    mirrored: bool | None = None
+    metadata_errors: dict[str, str] = Field(default_factory=dict)
+
+
+class VideoInventoryData(BaseModel):
+    snapshot_id: str
+    items: list[VideoDeviceRecord] = Field(default_factory=list)
+    available_sources: list[VideoDeviceRecord] = Field(default_factory=list)
+    available_formats: list[SavedVideoRecord] = Field(default_factory=list)
+    saved_video: SavedVideoConfiguration | None = None
+    local_metadata: dict[str, JsonValue] = Field(default_factory=dict)
+    coverage: dict[str, JsonValue] = Field(default_factory=dict)
+    pagination: VideoPagination | None = None
 
 
 class VideoRegionData(BaseModel):
@@ -605,9 +689,127 @@ class LightPatchDetail(BaseModel):
     technical_payloads_omitted: list[str] = Field(default_factory=list)
 
 
+class SavedLightParameter(BaseModel):
+    name: JsonValue = None
+    type: JsonValue = None
+    channel: int
+    two_bytes: JsonValue = None
+    value_is_percentage: JsonValue = None
+    home_value: JsonValue = None
+    home_value_double: JsonValue = None
+    outputs: JsonValue = None
+
+
+class SavedLightOutput(BaseModel):
+    backend: str
+    backend_type: JsonValue = None
+    backend_class: str | None = None
+    net: int | None = None
+    subnet: int | None = None
+    universe: int | None = None
+    address: int | None = None
+    device_serial: str | None = None
+    device_name: str | None = None
+    device_universes: int | None = None
+
+
+class SavedLightInstrument(BaseModel):
+    name: str
+    note: str
+    definition: str
+    order: int
+    output: SavedLightOutput
+    dmx_address_start: int | None = None
+    dmx_address_end: int | None = None
+    dmx_footprint: int | None = None
+
+
+class SavedLightGroup(BaseModel):
+    name: str
+    note: str
+    order: int
+    members: list[str] = Field(default_factory=list)
+
+
+class SavedLightDefinition(BaseModel):
+    name: str
+    manufacturer: str
+    version: JsonValue = None
+    default_parameter: JsonValue = None
+    parameters: list[SavedLightParameter] = Field(default_factory=list)
+    dmx_footprint: int | None = None
+    used_by: list[str] = Field(default_factory=list)
+
+
+class LightReadDiagnostic(BaseModel):
+    section: str
+    code: str
+    message: str
+    index: int | None = None
+    name: str | None = None
+
+
+class SavedLightPatch(BaseModel):
+    status: str
+    source: Literal["saved_archive"] = "saved_archive"
+    workspace_id: str | None = None
+    version: str | None = None
+    build: int | None = None
+    sha256: str | None = None
+    document_modified: bool | None = None
+    freshness: str
+    message: str | None = None
+    coverage: str = "partial"
+    instruments: list[SavedLightInstrument] = Field(default_factory=list)
+    groups: list[SavedLightGroup] = Field(default_factory=list)
+    definitions: list[SavedLightDefinition] = Field(default_factory=list)
+    diagnostics: list[LightReadDiagnostic] = Field(default_factory=list)
+
+
+class LightSourceStatus(BaseModel):
+    live_osc: str
+    saved_archive: str
+    comparison: str
+    comparison_scope: list[str] = Field(default_factory=list)
+    differences: list[str] = Field(default_factory=list)
+    atomic_snapshot: Literal[False] = False
+
+
+class LightPageSection(BaseModel):
+    live_total: int
+    saved_total: int
+    live_returned: int
+    saved_returned: int
+    truncated: bool
+
+
+class LightNextRequest(BaseModel):
+    workspace_id: str
+    profile: str
+    section: str
+    offset: int
+    limit: int
+
+
+class LightPagination(BaseModel):
+    section: str
+    offset: int
+    limit: int
+    effective_limit: int
+    byte_limit: int
+    truncated: bool
+    byte_truncated: bool
+    sections: dict[str, LightPageSection]
+    next_requests: list[LightNextRequest] = Field(default_factory=list)
+    omitted_fields: list[str] = Field(default_factory=list)
+
+
 class WorkspaceLightSettingsData(BaseModel):
     detail: LightPatchDetail | None = None
     technical_payload: JsonValue | None = None
+    saved_patch: SavedLightPatch | None = None
+    source_status: LightSourceStatus | None = None
+    pagination: LightPagination | None = None
 
 
 class NetworkPatchSummary(SettingsItemIdentity):
@@ -663,6 +865,11 @@ class VideoStageResult(WorkspaceDomainSettingsResult):
 class VideoOutputRouteResult(WorkspaceDomainSettingsResult):
     domain: Literal["video"] = "video"
     data: VideoOutputRouteData | None = None
+
+
+class VideoInventoryResult(WorkspaceDomainSettingsResult):
+    domain: Literal["video"] = "video"
+    data: VideoInventoryData | None = None
 
 
 class WorkspaceLightSettingsResult(WorkspaceDomainSettingsResult):

@@ -1,4 +1,10 @@
-# Implementation plan history
+# Implementation plans
+
+## Current implementation records
+
+- [Light Patch authoring](2026-10-20-light-patch-authoring.md) — implemented in PR #19; native acceptance and explicit capability limits.
+
+## Historical plans
 
 These plans are historical designs, not instructions or authorization to implement features. The roadmap and current schemas take precedence.
 

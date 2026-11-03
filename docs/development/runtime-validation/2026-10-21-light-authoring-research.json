@@ -1,0 +1,343 @@
+{
+  "qlab_version": "5.5.10",
+  "build": 5510,
+  "workspace_id": "REDACTED-UUID-2",
+  "native_reopen_verified": true,
+  "physical_output_tested": false,
+  "public_curve_tool_registered": false,
+  "proof": {
+    "source_sha256": "REDACTED-SHA256-2",
+    "output_sha256": "REDACTED-SHA256-3",
+    "changed_inner_object_count": 1,
+    "only_changed_field": "v",
+    "native_ui_observed": true
+  },
+  "restoration": {
+    "matching_existing_cues": 7,
+    "curves_restored": true,
+    "patch_unchanged": true,
+    "commands_restored_via_mcp": true,
+    "document_clean": true
+  },
+  "samples": [
+    {
+      "label": "Custom",
+      "sha256": "REDACTED-SHA256-4",
+      "cue_id": "REDACTED-UUID-3",
+      "curves": {
+        "upShape": {
+          "type": 0,
+          "curve_parameter": 1.0,
+          "points": [
+            {
+              "t": 0.0,
+              "v": 0.0
+            },
+            {
+              "t": 1.0,
+              "v": 1.0
+            }
+          ]
+        },
+        "downShape": {
+          "type": 0,
+          "curve_parameter": 1.0,
+          "points": [
+            {
+              "t": 0.0,
+              "v": 1.0
+            },
+            {
+              "t": 1.0,
+              "v": 0.0
+            }
+          ]
+        }
+      },
+      "mirror_shape": false
+    },
+    {
+      "label": "S-Curve",
+      "sha256": "REDACTED-SHA256-5",
+      "cue_id": "REDACTED-UUID-3",
+      "curves": {
+        "upShape": {
+          "type": 1,
+          "curve_parameter": 1.0,
+          "points": [
+            {
+              "t": 0.0,
+              "v": 0.0
+            },
+            {
+              "t": 1.0,
+              "v": 1.0
+            }
+          ]
+        },
+        "downShape": {
+          "type": 1,
+          "curve_parameter": 1.0,
+          "points": [
+            {
+              "t": 0.0,
+              "v": 1.0
+            },
+            {
+              "t": 1.0,
+              "v": 0.0
+            }
+          ]
+        }
+      },
+      "mirror_shape": false
+    },
+    {
+      "label": "Parametric",
+      "sha256": "REDACTED-SHA256-6",
+      "cue_id": "REDACTED-UUID-3",
+      "curves": {
+        "upShape": {
+          "type": 2,
+          "curve_parameter": 2.5,
+          "points": [
+            {
+              "t": 0.0,
+              "v": 0.0
+            },
+            {
+              "t": 1.0,
+              "v": 1.0
+            }
+          ]
+        },
+        "downShape": {
+          "type": 2,
+          "curve_parameter": 2.5,
+          "points": [
+            {
+              "t": 0.0,
+              "v": 1.0
+            },
+            {
+              "t": 1.0,
+              "v": 0.0
+            }
+          ]
+        }
+      },
+      "mirror_shape": false
+    },
+    {
+      "label": "Linear",
+      "sha256": "REDACTED-SHA256-7",
+      "cue_id": "REDACTED-UUID-3",
+      "curves": {
+        "upShape": {
+          "type": 3,
+          "curve_parameter": 2.5,
+          "points": [
+            {
+              "t": 0.0,
+              "v": 0.0
+            },
+            {
+              "t": 1.0,
+              "v": 1.0
+            }
+          ]
+        },
+        "downShape": {
+          "type": 3,
+          "curve_parameter": 2.5,
+          "points": [
+            {
+              "t": 0.0,
+              "v": 1.0
+            },
+            {
+              "t": 1.0,
+              "v": 0.0
+            }
+          ]
+        }
+      },
+      "mirror_shape": false
+    },
+    {
+      "label": "Custom point",
+      "sha256": "REDACTED-SHA256-2",
+      "cue_id": "REDACTED-UUID-4",
+      "curves": {
+        "upShape": {
+          "type": 0,
+          "curve_parameter": 1.0,
+          "points": [
+            {
+              "t": 0.0,
+              "v": 0.0
+            },
+            {
+              "t": 0.49849849939346313,
+              "v": 0.7586206793785095
+            },
+            {
+              "t": 1.0,
+              "v": 1.0
+            }
+          ]
+        },
+        "downShape": {
+          "type": 0,
+          "curve_parameter": 1.0,
+          "points": [
+            {
+              "t": 0.0,
+              "v": 1.0
+            },
+            {
+              "t": 1.0,
+              "v": 0.0
+            }
+          ]
+        }
+      },
+      "mirror_shape": false
+    },
+    {
+      "label": "Offline-edited Custom point",
+      "sha256": "REDACTED-SHA256-3",
+      "cue_id": "REDACTED-UUID-4",
+      "curves": {
+        "upShape": {
+          "type": 0,
+          "curve_parameter": 1.0,
+          "points": [
+            {
+              "t": 0.0,
+              "v": 0.0
+            },
+            {
+              "t": 0.49849849939346313,
+              "v": 0.8
+            },
+            {
+              "t": 1.0,
+              "v": 1.0
+            }
+          ]
+        },
+        "downShape": {
+          "type": 0,
+          "curve_parameter": 1.0,
+          "points": [
+            {
+              "t": 0.0,
+              "v": 1.0
+            },
+            {
+              "t": 1.0,
+              "v": 0.0
+            }
+          ]
+        }
+      },
+      "mirror_shape": false
+    }
+  ],
+  "catalogue": {
+    "sources": [
+      {
+        "source": "bundled",
+        "status": "ready",
+        "failed_records": 0,
+        "errors": []
+      }
+    ],
+    "definitions": 5793,
+    "importable": 2336,
+    "parameter_counts": {
+      "scalar": 102290,
+      "rgbcolor": 10547,
+      "pantilt": 1937,
+      "muxer": 1201,
+      "cmycolor": 789,
+      "hsicolor": 452
+    },
+    "examples": {
+      "scalar": {
+        "definition": "Thunder Wash 600 RGBW - Mode 2 - 2 channel",
+        "definition_id": "bundled:REDACTED-SHA256-8",
+        "outputs": null,
+        "channel": 0,
+        "importable": true,
+        "source_sha256": "REDACTED-SHA256-9"
+      },
+      "rgbcolor": {
+        "definition": "Freedom H1 - 6 channel",
+        "definition_id": "bundled:REDACTED-SHA256-10",
+        "outputs": {
+          "amber": "amber",
+          "red": "red",
+          "white": "white",
+          "blue": "blue",
+          "green": "green"
+        },
+        "channel": -2,
+        "importable": true,
+        "source_sha256": "REDACTED-SHA256-9"
+      },
+      "pantilt": {
+        "definition": "Eliminator Stinger Spot 30 - 4 channel",
+        "definition_id": "bundled:REDACTED-SHA256-11",
+        "outputs": {
+          "pan": "pan",
+          "tilt": "tilt"
+        },
+        "channel": -2,
+        "importable": false,
+        "source_sha256": "REDACTED-SHA256-9"
+      },
+      "muxer": {
+        "definition": "Oxygen - Mode 2 - 37 channel",
+        "definition_id": "bundled:REDACTED-SHA256-12",
+        "outputs": [
+          "color 1",
+          "color 2",
+          "color 3",
+          "color 4",
+          "color 5",
+          "color 6",
+          "color 7"
+        ],
+        "channel": -10,
+        "importable": false,
+        "source_sha256": "REDACTED-SHA256-9"
+      },
+      "cmycolor": {
+        "definition": "Sky Falcon Arc colour 1200W - 6 channel",
+        "definition_id": "bundled:REDACTED-SHA256-13",
+        "outputs": {
+          "magenta": "magenta",
+          "cyan": "cyan",
+          "yellow": "yellow"
+        },
+        "channel": -2,
+        "importable": false,
+        "source_sha256": "REDACTED-SHA256-9"
+      },
+      "hsicolor": {
+        "definition": "Pixel 8, strobe multi - D CCT GM HUE SAT S - 48 channel",
+        "definition_id": "bundled:REDACTED-SHA256-14",
+        "outputs": {
+          "hue": "hue 1",
+          "saturation": "saturation 1",
+          "intensity": "intensity 1"
+        },
+        "channel": -6,
+        "importable": false,
+        "source_sha256": "REDACTED-SHA256-9"
+      }
+    }
+  }
+}

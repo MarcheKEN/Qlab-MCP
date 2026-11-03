@@ -1,5 +1,10 @@
 # Development
 
+- [October 22 lighting authoring completion](runtime-validation/2026-10-22-light-authoring-completion.md)
+
+- [Light Patch authoring design](../superpowers/specs/2026-10-20-light-patch-authoring-design.md)
+  and [implementation plan](../superpowers/plans/2026-10-20-light-patch-authoring.md)
+  — implemented in PR #19; see the [native acceptance record](runtime-validation/2026-10-20-light-patch-authoring.md).
 - [2026-10-17 installed MCP acceptance](runtime-validation/2026-10-17-installed-mcp-acceptance.md)
 - [2026-10-17 documentation review](reviews/2026-10-17-documentation-audit.md)
 - [2026-10-17 code cleanup](reviews/2026-10-17-code-cleanup.md)

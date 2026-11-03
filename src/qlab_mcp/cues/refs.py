@@ -162,15 +162,13 @@ def _bounded_cue_refs_from_shallow(
             return
         if not isinstance(cue, dict):
             errors[f"depth:{depth}:item:{len(refs)}"] = "QLab shallow cue entry must be an object"
-            if root_cues is not None:
-                mark_truncated("invalid_payload")
+            mark_truncated("invalid_payload")
             return
 
         cue_id_value = cue.get("uniqueID")
-        if root_cues is not None and (
-            not isinstance(cue_id_value, str) or not cue_id_value.strip()
-            or not isinstance(cue.get("type"), str) or not cue["type"].strip()
-        ):
+        if (not isinstance(cue_id_value, str) or not cue_id_value.strip()
+            or (root_cues is not None and
+                (not isinstance(cue.get("type"), str) or not cue["type"].strip()))):
             errors[f"depth:{depth}:item:{len(refs)}"] = "QLab shallow cue identity and type must be non-empty strings"
             mark_truncated("invalid_payload")
             return

@@ -433,11 +433,13 @@ class CueQueryMixin:
             for reason in bounded["truncation_reasons"]
         ]
         query_completeness_reasons: list[str] = []
-        if "max_cues_scanned" in base_truncation_reasons:
-            query_completeness_reasons.append("max_cues_scanned")
+        for reason in ("root_read_error", "child_read_error", "max_cues_scanned", "invalid_payload"):
+            if reason in base_truncation_reasons:
+                query_completeness_reasons.append(reason)
         if id_only_unscanned_count > 0:
             query_completeness_reasons.append("id_only_unscanned")
-        query_completeness = "partial" if query_completeness_reasons else "complete"
+        elif "child_metadata_unavailable" in base_truncation_reasons:
+            query_completeness_reasons.append("child_metadata_unavailable")
         warnings: list[str] = []
         if id_only_unscanned_count > 0:
             warnings.append(
@@ -454,7 +456,13 @@ class CueQueryMixin:
             truncation_reasons = [*base_truncation_reasons]
             if result_limited:
                 truncation_reasons.append("max_results")
+            query_completeness = (
+                "failed" if "root_read_error" in query_completeness_reasons
+                else "partial" if query_completeness_reasons else "complete"
+            )
             return {
+                **({"ok": False, "status": "root_read_error", "error_code": "root_read_error"}
+                   if query_completeness == "failed" else {}),
                 "workspace_id": resolved_workspace_id,
                 "filters": filters,
                 "profile": profile,
@@ -512,7 +520,14 @@ class CueQueryMixin:
                         raise ValueError("QLab valuesForKeys response must be an object")
                     values.update(chunk_values)
             except Exception as exc:
-                errors[str(cue_id)] = sanitize_exception_message(exc)
+                error_key = str(cue_id)
+                if error_key in bounded["errors"]:
+                    error_key = f"cue:{error_key}"
+                errors[error_key] = sanitize_exception_message(exc)
+                scanned_all_cues = False
+                if "cue_read_error" not in query_completeness_reasons:
+                    query_completeness_reasons.append("cue_read_error")
+                    base_truncation_reasons.append("cue_read_error")
                 continue
 
             if not all(_cue_matches_filter(values, cue_ref, query_filter) for query_filter in filters):

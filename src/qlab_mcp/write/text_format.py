@@ -6,6 +6,7 @@ fallback and paragraph normalization fail closed before a setter is planned.
 from __future__ import annotations
 
 from copy import deepcopy
+import ctypes
 from dataclasses import dataclass
 import json
 import math
@@ -142,6 +143,48 @@ def _boundaries(text, semantics):
     return positions
 
 
+def _composed_boundaries(text):
+    """Use macOS character clusters rather than splitting combined glyphs."""
+    if text.isascii():
+        return set(range(len(text) + 1)) - {i + 1 for i in range(len(text) - 1) if text[i:i + 2] == '\r\n'}
+    class Range(ctypes.Structure):
+        _fields_ = [("location", ctypes.c_long), ("length", ctypes.c_long)]
+    try:
+        cf = ctypes.CDLL('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation')
+        create = cf.CFStringCreateWithBytes
+        create.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_long, ctypes.c_uint32, ctypes.c_bool]
+        create.restype = ctypes.c_void_p
+        find = cf.CFStringGetRangeOfComposedCharactersAtIndex
+        find.argtypes = [ctypes.c_void_p, ctypes.c_long]
+        find.restype = Range
+        release = cf.CFRelease
+        release.argtypes = [ctypes.c_void_p]
+        release.restype = None
+        encoded = text.encode('utf-8')
+        value = create(None, encoded, len(encoded), 0x08000100, False)
+        if not value:
+            raise ValueError('Cannot inspect composed character boundaries.')
+        try:
+            size = len(text.encode('utf-16-le')) // 2
+            result, offset = {0}, 0
+            while offset < size:
+                part = find(value, offset)
+                if part.location != offset or part.length < 1 or offset + part.length > size:
+                    raise ValueError('Invalid composed character boundaries.')
+                offset += part.length
+                result.add(offset)
+            units = 0
+            for index, char in enumerate(text[:-1]):
+                units += 2 if ord(char) > 0xffff else 1
+                if char == '\r' and text[index + 1] == '\n':
+                    result.discard(units)
+            return result
+        finally:
+            release(value)
+    except (OSError, AttributeError, UnicodeError) as exc:
+        raise ValueError('Composed character boundaries are unavailable.') from exc
+
+
 def snapshot(text, runs, semantics=None):
     """Validate contiguous complete coverage while preserving all raw attributes."""
     from ..cues.visual import TextRun
@@ -150,11 +193,13 @@ def snapshot(text, runs, semantics=None):
         raise ValueError("Complete saved text and format runs are required.")
     total = _units(text, semantics)
     boundaries = _boundaries(text, semantics)
+    composed = _composed_boundaries(text) if semantics.index_unit == "utf16" else boundaries
     cursor = 0
     for run in runs:
         TextRun.model_validate(run)
         start, length = run["range"]
-        if start != cursor or length <= 0 or start not in boundaries or start + length not in boundaries:
+        if (start != cursor or length <= 0 or start not in boundaries or start + length not in boundaries
+                or start not in composed or start + length not in composed):
             raise ValueError("Format runs must cover text exactly without gaps, overlap or split characters.")
         _json_value(run)
         cursor += length
@@ -232,6 +277,10 @@ def resolve_selector(selected, state, semantics=None):
         raise ValueError("Text range is empty or outside saved text.")
     if start not in boundaries or start + length not in boundaries:
         raise ValueError("Text range splits a native Unicode character.")
+    if semantics.index_unit == "utf16":
+        composed = _composed_boundaries(state["text"])
+        if start not in composed or start + length not in composed:
+            raise ValueError("Text range splits a composed Unicode character.")
     return start, length
 
 
@@ -256,12 +305,123 @@ def _font_attributes(state, attrs):
     return {**attrs, **dict(zip(fields, next(iter(candidates)), strict=True))}
 
 
+def _is_cjk(char):
+    name = unicodedata.name(char, "")
+    return name.startswith(("CJK UNIFIED IDEOGRAPH", "CJK COMPATIBILITY", "HANGUL ",
+                            "HIRAGANA ", "KATAKANA ", "IDEOGRAPHIC ", "BOPOMOFO "))
+
+
 def _unicode_scope(state, start, length, semantics, *, color_only=False):
     encoded = state["text"].encode("utf-16-le") if semantics.index_unit == "utf16" else None
     selected = encoded[start*2:(start+length)*2].decode("utf-16-le") if encoded is not None else state["text"][start:start+length]
     if any(not (char.isascii() or unicodedata.name(char, "").startswith("LATIN ") or 0x300 <= ord(char) <= 0x36f
-                or color_only and char in "\u00a0«»“”—") for char in selected):
-        raise ValueError("Unicode font fallback is not predictable for this selection; only ASCII/Latin formatting is validated.")
+                or color_only and char in "\u00a0«»“”—" or _is_cjk(char)) for char in selected):
+        raise ValueError("Font fallback for emoji and this script is not validated; use a supported Latin or CJK range.")
+
+
+def _coretext_fallback(font_name, font_size, text):
+    """Return Core Text's concrete font for a grapheme without opening a text view."""
+    class Range(ctypes.Structure):
+        _fields_ = [("location", ctypes.c_long), ("length", ctypes.c_long)]
+
+    cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+    ct = ctypes.CDLL("/System/Library/Frameworks/CoreText.framework/CoreText")
+    create_string = cf.CFStringCreateWithBytes
+    create_string.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_long, ctypes.c_uint32, ctypes.c_bool]
+    create_string.restype = ctypes.c_void_p
+    copy_font = ct.CTFontCreateWithName
+    copy_font.argtypes = [ctypes.c_void_p, ctypes.c_double, ctypes.c_void_p]
+    copy_font.restype = ctypes.c_void_p
+    for_string = ct.CTFontCreateForString
+    for_string.argtypes = [ctypes.c_void_p, ctypes.c_void_p, Range]
+    for_string.restype = ctypes.c_void_p
+    postscript = ct.CTFontCopyPostScriptName
+    postscript.argtypes = [ctypes.c_void_p]
+    postscript.restype = ctypes.c_void_p
+    get_string = cf.CFStringGetCString
+    get_string.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_long, ctypes.c_uint32]
+    get_string.restype = ctypes.c_bool
+    release = cf.CFRelease
+    release.argtypes = [ctypes.c_void_p]
+    encoding = 0x08000100
+    name_data = font_name.encode("utf-8")
+    text_data = text.encode("utf-8")
+    name = create_string(None, name_data, len(name_data), encoding, False)
+    string = create_string(None, text_data, len(text_data), encoding, False)
+    font = resolved = resolved_name = None
+    try:
+        if not name or not string:
+            raise ValueError("Core Text could not create a font query.")
+        font = copy_font(name, float(font_size), None)
+        if not font:
+            raise ValueError("Core Text could not resolve the observed font.")
+        units = len(text.encode("utf-16-le")) // 2
+        resolved = for_string(font, string, Range(0, units))
+        resolved_name = postscript(resolved) if resolved else None
+        if not resolved_name:
+            raise ValueError("Core Text could not resolve the selected grapheme.")
+        buffer = ctypes.create_string_buffer(1024)
+        if not get_string(resolved_name, buffer, len(buffer), encoding):
+            raise ValueError("Core Text returned an unreadable font name.")
+        return buffer.value.decode("utf-8")
+    except (OSError, AttributeError, UnicodeError, TypeError, OverflowError) as exc:
+        raise ValueError("Core Text font fallback could not be verified.") from exc
+    finally:
+        for value in (resolved_name, resolved, font, string, name):
+            if value:
+                release(value)
+
+
+def _cjk_fallbacks(state, spans, semantics=None):
+    semantics = semantics or SEMANTICS
+    text = state["text"]
+    encoded = text.encode("utf-16-le")
+    bounds = sorted(_composed_boundaries(text)) if semantics.index_unit == "utf16" else sorted(_boundaries(text, semantics))
+    rows = []
+    for start, end in zip(bounds, bounds[1:]):
+        if not any(a <= start and end <= b for a, b in spans):
+            continue
+        cluster = encoded[start * 2:end * 2].decode("utf-16-le") if semantics.index_unit == "utf16" else text[start:end]
+        if not any(_is_cjk(char) for char in cluster):
+            continue
+        run = next((item for item in state["runs"]
+                    if item["range"][0] <= start and start + item["range"][1] >= end), None)
+        if run is None or not isinstance(run.get("fontName"), str) or type(run.get("fontSize")) not in (int, float):
+            raise ValueError("CJK formatting requires an observed font name and size for every selected run.")
+        fallback = _coretext_fallback(run["fontName"], run["fontSize"], cluster)
+        rows.append({"range": [start, end - start], "fontName": run["fontName"],
+                     "fontSize": run["fontSize"], "fallback": fallback})
+    return rows
+
+
+def validate_cjk_fallbacks(before, after, spans, semantics=None):
+    """Allow a CJK edit only when Core Text preserves fallback or selects the requested font."""
+    old, new = _cjk_fallbacks(before, spans, semantics), _cjk_fallbacks(after, spans, semantics)
+    if len(old) != len(new):
+        raise ValueError("CJK font coverage changed during preview.")
+    for previous, requested in zip(old, new, strict=True):
+        if previous["range"] != requested["range"]:
+            raise ValueError("CJK grapheme identity changed during preview.")
+        if previous["fallback"] != previous["fontName"]:
+            raise ValueError("The observed font substitutes this CJK grapheme; setter blocked.")
+        if previous["fontName"] == requested["fontName"]:
+            if requested["fallback"] != requested["fontName"]:
+                raise ValueError("Requested formatting changes Core Text's CJK fallback; setter blocked.")
+        elif requested["fallback"] != requested["fontName"]:
+            raise ValueError("Requested font does not cover every selected CJK grapheme; setter blocked.")
+    return new
+
+
+def _cjk_spans(state, spans, semantics):
+    text = state["text"]
+    encoded = text.encode("utf-16-le") if semantics.index_unit == "utf16" else None
+    result = []
+    for start, length in spans:
+        selected = (encoded[start * 2:(start + length) * 2].decode("utf-16-le")
+                    if encoded is not None else text[start:start + length])
+        if any(_is_cjk(char) for char in selected):
+            result.append((start, start + length))
+    return result
 
 
 def advance(state, operation, semantics=None):
@@ -307,9 +467,11 @@ def preflight(state, operations, properties=None, semantics=None):
         raise ValueError("Provide 1–50 Text formatting operations.")
     operations = [TextFormatOperation.model_validate(op) for op in operations]
     occupied = []
+    selected_spans = []
     expected = state
     for operation in operations:
         start, length = resolve_selector(operation.args.selector, state, semantics)
+        selected_spans.append((start, length))
         attrs = set(_font_attributes(state, _attributes(operation)))
         for a, b, previous in occupied:
             if start < b and a < start + length and attrs & previous:
@@ -319,6 +481,9 @@ def preflight(state, operations, properties=None, semantics=None):
             raise ValueError("Use a property or a format operation for each destination.")
         occupied.append((start, start+length, attrs))
         expected = advance(expected, operation, semantics)
+    cjk = _cjk_spans(state, selected_spans, semantics)
+    if cjk:
+        validate_cjk_fallbacks(state, expected, cjk, semantics)
     return expected
 
 
@@ -381,11 +546,12 @@ def check_dependencies(reader, ws, uid, expected, semantics=None):
 def capabilities():
     return {"property": "text/format", "selectors": ["full", "range", "word"],
             "requires_complete_text_and_runs": True,
-            "pending_validation": ["other word delimiters, contractions and combining marks", "unobserved font companion metadata", "non-Latin font fallback", "partial shadow line scope"],
+            "pending_validation": ["other word delimiters and contractions", "unobserved font companion metadata", "emoji and non-CJK fallback", "partial shadow line scope"],
             "native_index_unit": SEMANTICS.index_unit,
             "ranges_verified": SEMANTICS.ranges_verified,
-            "unicode_scope": "ASCII/Latin selections; color-only edits also allow verified NBSP/guillemet/curly-quote/em-dash characters; other scripts and emoji remain blocked",
+            "unicode_scope": "ASCII/Latin and CJK selections; CJK requires Core Text fallback to remain stable for the selected graphemes",
             "color_only_extra_characters": list("\u00a0«»“”—"),
+            "conditional_cjk_formatting": "Allowed only when Core Text reports unchanged fallback before and after the planned edit",
             "unicode_formatting_pending": True,
             "percentage_rounding": SEMANTICS.percentage_rounding,
             "word_tokenization": SEMANTICS.word_tokenization,

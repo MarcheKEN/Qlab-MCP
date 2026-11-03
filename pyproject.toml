@@ -3,7 +3,7 @@ name = "qlab-mcp"
 version = "0.4.0"
 license = "MIT"
 license-files = ["LICENSE", "NOTICE"]
-description = "FastMCP server for QLab 5 inspection and gated cue and workspace-settings writes over OSC."
+description = "FastMCP server for QLab 5 inspection and gated OSC and local-workspace editing."
 requires-python = ">=3.11"
 dependencies = [
     "fastmcp>=3.3,<4",

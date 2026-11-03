@@ -1,16 +1,235 @@
-# Current Project State — 2026-10-17
+# Current Project State — 2026-11-01
 
-## Version 0.4.0 — release preparation
+## Video cue diagnostics — 2026-11-01
+
+`qlab_get_video_cue_details` now includes bounded `configuration_observations`
+for exactly zero opacity, explicitly disarmed cues, and QLab-reported broken
+or warning states. They use values already read by the detail tool and do not
+change cue health or edit permissions. The health summary describes
+`fileTargetPresent` as an assigned target; it does not claim that media exists,
+is accessible, or is compatible. If the cause remains unconfirmed, the workflow
+keeps it unknown.
+
+Video capabilities distinguish blocked LinearKey/DropShadow OSC creation from
+the existing guarded saved-file insertion path. No new write surface or claim
+of rendered or physical video output was added.
+
+## Camera/Mic channel acceptance — 2026-10-29
+
+The later live pass accepted valid settings on a one-channel input and rejected
+two channels, an out-of-bounds offset and values above the API limit. A dirty
+workspace required a save and fresh preview. This supersedes only the earlier
+host-availability limitation; other devices and patch combinations remain
+unproven. See the [dated follow-up](../development/runtime-validation/2026-10-27-video-follow-up.md#cameramic-channel-acceptance-follow-up--2026-10-29).
+
+## Query completeness and verification — 2026-10-31
+
+The source now reports a failed root inventory as `failed` and incomplete
+branch, payload or cue reads as `partial`, preserving the errors and reasons.
+A result limit remains separate from search completeness; see the
+[tool catalogue](../user/tools.md). The local suite reported **2,424 passed,
+35 skipped, 61 subtests passed**. A later focused documentation and contract
+check reported **109 passed**; the 66 deselected tests were outside that check.
+
+On QLab 5.5.10/build 5510, a fresh source FastMCP client read the test workspace:
+it scanned 533 cue items, distinguished a complete result-limited Video query
+from a scan-limited partial query, returned zero matches for an absent name and
+reported an unknown workspace as failed. Root, branch and cue read failures were
+exercised in simulated tests, not induced in the live workspace.
+
+Guarded live configuration checks changed and restored a disarmed Light cue's
+pre-wait (0 → 0.75 → 0 seconds) and a Video cue's opacity (1 → 0.8 → 1).
+Fresh reads confirmed the restored values; the workspace was left marked
+modified and was not saved. These observations are bounded configuration
+readbacks, not playback, rendered video or physical DMX/output validation.
+The dated sections below retain their original evidence and test totals.
+
+## Cue settings completion — PR #19
+
+The source contract now contains **88 tools: 52 reads and 36 gated writes**.
+`qlab_edit_saved_cue_settings` adds disabled Hotkey assignment, separate guarded
+activation, Wall Clock weekdays, Video audio-track selection, integrated audio
+fade points and native LinearKey/DropShadow insertion. Detail tools return typed
+saved settings with provenance and dirty-state freshness. Existing OSC editors
+retain channel/slice operations and add guarded NDI audio assignment and silent
+moving-video timing; Light command analysis covers multiparameter cue pulls and
+validated compound values.
+
+Native acceptance, the corrected prototype failure/recovery, verification limits
+and research-only Trim findings are recorded in the
+[cue settings report](../development/runtime-validation/2026-10-26-cue-settings-completion.md).
+Automated verification for that October 26 pass: **2,390 passed, 35 skipped,
+61 subtests passed**.
+The test workspace retains an Audit NDI stage because existing cues refer to it;
+see the cleanup outcome in the report. Earlier test/tool counts below describe
+their dated validation passes.
+
+## Light cue audit follow-up — PR #19
+
+Light cue details now include bounded last-saved ascending/descending curves,
+with file hash, version, dirty-state freshness and explicit partial coverage for
+unknown variants. Linear curves accept replacement control points as well as
+Custom curves. Compact command ranges retain exact-name precedence and bounded
+expansion. Native cue helpers target the unique verified running QLab installation;
+trigger, Load Time and Target confirmations bind its process and bundle identity.
+
+Verification: **2,338 passed, 35 skipped, 61 subtests passed**; the public contract
+remains **87 tools: 52 reads and 35 writes**. Source FastMCP calls accepted and
+restored a Linear point edit in QLab; native UI corroborated the intermediate
+point. See the [follow-up evidence and remaining gaps](../development/runtime-validation/2026-10-26-light-cue-gap-closure.md).
+The restarted attached MCP also returned both restored curves, native triggers
+and the verified Desktop installation without errors; the document stayed clean
+and inactive and its hash did not change during the reads.
+
+## Settings follow-up — PR #19
+
+Definition details now expose all interpretable parameters independently of
+import eligibility. Video batches support root stage/route ordering, empty
+input names and five NDI audio sample rates. The native writer preserves the
+floating-point archive encoding of refresh/sample rates. Input inventories
+include a bounded public local Syphon directory observation after framework
+signature verification, without capture or assignment support.
+
+Automated verification: **2,303 passed, 35 skipped, 61 subtests passed**.
+Native acceptance and remaining limits are recorded in the
+[settings follow-up](../development/runtime-validation/2026-10-25-settings-extensions.md).
+
+## Video Settings authoring — PR #19
+
+Four editors now support local saved-archive batches: stage/region, route,
+configured NDI/Syphon device and local/OBS input patch. Stage and route tools
+retain their original single OSC operation form; region OSC edits remain.
+The shared transaction binds the running installation, document, file and
+external dependencies, retains recovery, and closes/reopens only the target.
+Dirty documents require an explicit Save and new preview; dependent deletions
+are blocked. Initial compatibility remains QLab 5.5.10/build 5510.
+
+See [workflow](../user/agent-workflows.md#author-video-settings). Native acceptance
+and limitations are recorded in the [October 25 report](../development/runtime-validation/2026-10-25-video-authoring.md), separately from physical output.
+Source verification: **2,281 passed, 35 skipped, 61 subtests passed**; FastMCP
+exposes 87 tools. The [attached audit](../development/runtime-validation/2026-10-25-light-video-audit.md)
+now records real restarted-MCP calls and native UI agreement, including fixes for
+string default indices and camera modes not selectable by QLab. This is supported
+settings coverage, not full UI parity. Approved temporary objects were removed;
+final reads confirm the original Light/video inventories and a clean inactive
+workspace. The interrupted operation’s recovery remains retained separately.
+The PR remains in draft for review.
+
+## Passive video inventories — PR #19
+
+Two new read-only tools inspect output devices and input patches, alongside the
+extended exact route reader. Local CoreGraphics screens and AVFoundation
+source/format metadata remain distinct from OSC observations and saved virtual
+devices. No capture session, permission request, device activation or network
+finder is created. Coverage is partial for the QLab process registry and network
+sources. Saved configuration remains version-gated to 5.5.10/build 5510.
+
+## Lighting authoring implementation — PR #19
+
+Current source exposes **87 tools: 52 reads and 35 gated writes**.
+`qlab_edit_light_cue_curves` adds separate saved-file ascending/descending curve
+edits with source-bound confirmations, recovery and saved-archive postconditions.
+Custom, S-Curve, Parametric and Linear were accepted on two new disarmed cues in
+QLab 5.5.10/build 5510, including adding/removing points, no-op and consumed-token
+rejection. OSC cannot read curve values; native visual checks are separately recorded.
+
+The Light command analyzer models `all = home`, lists, matching-prefix ranges,
+bracket selectors and dynamic cue pulls with proportional factors. Source hashes,
+number resolution, cycles and same-batch conflicts are checked before setters;
+the resulting dynamic look is not calculated. Native text/readback acceptance
+confirmed a proportional pull with `pass`, with no cue errors or warnings.
+
+Definition creation/import now covers CMY, HSI, Pan/Tilt, acyclic One-to-Many
+and RGB lime alongside scalar 8/16-bit parameters. A native batch imported four
+manufacturer examples, created combined/nested controls and assigned them to
+five unpatched test instruments. Both file and OSC-visible verification passed;
+QLab's native editor confirmed the virtual bindings. Global/personal libraries
+and Dashboard MIDI are unchanged. No physical-output claim follows.
+
+Verification: **2,183 passed, 61 subtests passed, 35 skipped**; FastMCP reports
+83 tools. Test additions were removed and the original patch snapshot restored.
+
+See [October 22 acceptance](../development/runtime-validation/2026-10-22-light-authoring-completion.md).
+Earlier counts, blocked capabilities and test totals below retain their dated scope.
+
+## October 21 lighting authoring research — PR #19
+
+The [2026-10-21 research](../development/research/2026-10-21-light-authoring-expansion.md)
+records native LCL acceptance, definition variant coverage and an accepted
+same-path Light cue Custom control-point file edit in QLab 5.5.10. The shared
+analyzer now models reserved `all = home` correctly and ignores only known
+group-member parameter mismatches. Instrument lists, matching-prefix numeric
+ranges and ad-hoc selectors are supported with bounded expansion. This is not complete LCL or curve authoring:
+the proposed curve tool is not registered, and unvalidated definition variants
+remain blocked. No playback or physical output was tested.
+
+## October 21 separate Light Definition tools — PR #19
+
+At the October 21 validation, source exposed **82 tools: 50 reads and 32 gated writes**.
+`qlab_get_light_definitions` lists bundled/personal and last-saved workspace
+sources with exact detail, source-bound IDs, filters and pagination.
+`qlab_edit_light_definitions` imports native definitions or performs workspace
+CRUD using the existing guarded document transaction and a dedicated token.
+Public `qlab_edit_light_patch` now accepts instrument/group actions only;
+definition actions moved to the dedicated tool (breaking change).
+Initial import encodings cover scalar 8/16-bit and RGB with extended outputs;
+other native variants remain readable with explicit import blocks.
+No global library or Dashboard writes. [Native acceptance](../development/runtime-validation/2026-10-21-light-definitions.md)
+confirmed extended RGB import, manufacturer import, 16-bit creation, edits,
+rename/reference updates and in-use deletion blocking on temporary test copies.
+The original workspace was reopened with unchanged bytes; no physical output
+was tested. The transaction now resets the authenticated OSC session after
+reopen, before readback. Verification: **2,120 passed, 61 subtests passed,
+35 skipped**; FastMCP inspection reports 82 tools (50 reads, 32 writes).
+
+## Combined Light Patch inspection — PR #19
+
+`qlab_get_workspace_light_settings` now returns current OSC data together with
+typed `saved_patch` configuration: addresses, outputs, direct group membership
+and all stored workspace definitions. The saved source supports local QLab
+5.5.10/build 5510. Dirty documents are labelled potentially stale and never
+saved. Unavailable sources and unknown fields retain explicit coverage gaps.
+Default requests cover up to 1,000 records per section, with a 2 MiB response
+budget and exact continuation requests. Internal OSC readers and write guards
+are unchanged. See the [inspection validation record](../development/runtime-validation/2026-10-21-light-patch-inspection.md)
+for live and retained-file evidence and remaining limits.
+
+## Light Patch authoring — PR #19
+
+At the original patch-authoring validation, source exposed **80 tools: 49 reads and 31 gated writes**.
+`qlab_edit_light_patch` adds signed batches of 1–100 typed operations for
+instruments, groups and workspace definitions, including rename/delete. It
+edits the original local document through clean-close, verified file replacement
+with bounded recovery, reopen and OSC-visible readback on QLab 5.5.10/build 5510.
+Preview has no native/file side effects; dirty documents require the existing
+Save flow and a fresh preview.
+
+Light cues, Dashboard MIDI and the global Library are preserved. Cue references
+may need later repair and are reported with partial-analysis warnings. Art-Net
+and unpatched assignments plus explicit USB-DMX identities are enabled as saved
+configuration. USB discovery, compatible-device availability and output remain
+unvalidated. New definition parameters are scalar/RGB only;
+existing other parameter data is preserved where recognized.
+
+File verification covers saved routing and definitions. Current OSC-visible
+verification checks instrument names, notes, used definition parameters/defaults,
+patched state and group names/memberships; routing and unused definitions remain
+archive-only checks. USB patched state is not required for an absent device. No hardware-output claim follows from a verified result.
+The [native acceptance record](../development/runtime-validation/2026-10-20-light-patch-authoring.md)
+covers original-path batches, all twelve actions and preserving another open
+document. Hardware output and additional parameter encodings remain unvalidated.
+Earlier registry counts and test totals below retain their dated scope.
+
+## Version 0.4.0 — October 17 release preparation
 
 The package, MCP initialization version and current user guidance now identify
-this development branch as **0.4.0**. PR #18 prepares that version; no tag or
-GitHub Release has been published. Earlier 0.3.0 reports and validation counts
+this development branch as **0.4.0**. PR #18 prepared that version. Earlier 0.3.0 reports and validation counts
 below retain their original version: the version bump does not rerun or rename
 historical runtime evidence.
 
-## Latest validation — 2026-10-17
+## Earlier validation — 2026-10-17
 
-The development branch exposes **79 tools: 49 reads and 30 gated writes**.
+At that validation point, the branch exposed **79 tools: 49 reads and 30 gated writes**.
 The documentation reconciliation and code cleanup are included in PR #18.
 At `9a346bc`, the local suite passed **1,942 tests and 61 subtests**, with
 35 skips; GitHub CI, lockfile verification and artifact builds passed.
@@ -36,7 +255,7 @@ current restrictions.
 
 ## Documentation reconciliation — 2026-10-17
 
-Current source exposes 79 tools (49 reads, 30 gated writes). The [roadmap](roadmap.md)
+At that review, source exposed 79 tools (49 reads, 30 gated writes). The [roadmap](roadmap.md)
 now separates implemented contracts from remaining runtime cases; [architecture](../development/architecture.md)
 reflects native document/Trigger operations and actual UDP/TCP behavior.
 Existing-workspace writes require OSC readiness. Native Open instead uses its
@@ -74,7 +293,7 @@ and local workspace document tools. Unsupported FX creation, unreadable Text
 attributes, and other documented capability gates remain closed.
 
 QLab 5.5.10 live tests ran in `redacted-workspace-6b31c91e.qlab5`, UUID
-`8E86FE91-668B-560C-B738-4D581B5A7498`. Readiness confirmed write mode, `/connect`
+`REDACTED-UUID-9`. Readiness confirmed write mode, `/connect`
 edit permission and Edit Mode; QLab showed 0 active cues. Group Second Trigger
 was changed 0→1→0 and matched the Triggers inspector. Existing LinearKey
 `inputContrast` changed 4.7→4.8→4.7; DropShadow `Distance` changed 0→2→0.
@@ -343,8 +562,8 @@ branch remains unforced. A fresh Move token passed directly from dry-run
 to execution and verified the Cart's existing last position without sending a
 move. The manually copied token failure remains a transcription error before
 OSC. The two fixtures are left in the test workspace as requested:
-`67D3BD54-4FBB-5144-B37A-BDFB82FE0AC7` and
-`BA9DB096-A4F0-52C6-AA04-2A385374DB72`.
+`REDACTED-UUID-10` and
+`REDACTED-UUID-11`.
 
 ## Root Move and deferred root Delete — installed token spot check
 
@@ -468,7 +687,7 @@ Development update (2026-09-23): ten Fade, Network, MIDI/MIDI File, Timecode,
 and Script read tools are implemented. Source exposes 49 tools (43 read-only,
 6 gated writes). Final local verification: 3044 tests and 39 subtests passed;
 `git diff --check` passed. In the installed MCP, read-only validation on
-`redacted-workspace-76f33afa.qlab5` (`F54ABACA-BB62-5B95-87E5-B43CFBD14B2B`) found two Fade
+`redacted-workspace-76f33afa.qlab5` (`REDACTED-UUID-12`) found two Fade
 and 80 Network cues; two exact details of each returned `ok`. The three
 Cue Lists had no MIDI, MIDI File, Timecode, or Script examples. The final
 Network message-error profile change was made after those installed calls,
@@ -482,7 +701,7 @@ documented OSC coverage limitations; Audio Maps stay excluded.
 
 Control-family runtime validation (2026-09-22): both tools invoked through
 FastMCP against QLab 5.5.10 in `redacted-workspace-6b31c91e.qlab5`
-(`8E86FE91-668B-560C-B738-4D581B5A7498`). Seventeen Cue Lists read; examples
+(`REDACTED-UUID-9`). Seventeen Cue Lists read; examples
 of all twelve types returned status=ok in safe and technical (24 details).
 The local validation process received denied for the other three workspaces;
 their content is not claimed validated by this process. No cues executed or
@@ -594,9 +813,9 @@ Cue List read-only STDIO validation (2026-09-20, QLab 5.5.10): inventory returne
 17 lists and 1 excluded Cart in `redacted-workspace-6b31c91e.qlab5`, 5 lists in
 `redacted-workspace-1ebcea13.qlab5`, and 8 lists in `redacted-workspace-7cd29b97.qlab5`.
 Safe and technical detail passed for `Main Cue List`
-(`70A6B610-7094-5939-A9FC-D7AAD7C3379C`, 25 direct / 27 returned descendants),
-`Master` (`8A01493C-BAD2-56D6-89DF-92C89A79BDEC`, 151 / 215), and `Full show`
-(`8836BE62-7BEC-5499-9DF0-11F0620F00C4`, 22 / 128). Depth-2 truncation was
+(`REDACTED-UUID-13`, 25 direct / 27 returned descendants),
+`Master` (`REDACTED-UUID-14`, 151 / 215), and `Full show`
+(`REDACTED-UUID-15`, 22 / 128). Depth-2 truncation was
 explicit for Main and Full show. Current timecode was unavailable in these
 samples; MTC configuration was readable. Generic details retained the payload
 and returned the deprecation notice in each workspace. These observations used
@@ -612,10 +831,10 @@ snapshot below remains historical; see the current [tool catalog](../user/tools.
 Video split verification: `PYTHONPATH=src .venv/bin/python -m pytest -q
 -p no:cacheprovider` passed with **2681 tests and 41 subtests**. FastMCP
 inspection reported 20 tools. Read-only STDIO calls against QLab 5.5.10,
-workspace `redacted-workspace-6b31c91e.qlab5` (`8E86FE91-668B-560C-B738-4D581B5A7498`), returned
+workspace `redacted-workspace-6b31c91e.qlab5` (`REDACTED-UUID-9`), returned
 3 input patches, 5 routes, and 9 stages. Exact Stage
-`A41F907E-3E01-570E-A4BC-0B86C6A1922E` and Route
-`3B9E921B-BB0E-509A-A0A5-CE5C76DB3567` passed both safe and technical reads.
+`REDACTED-UUID-16` and Route
+`REDACTED-UUID-17` passed both safe and technical reads.
 A nonexistent Stage UUID returned `video_stage_not_found` after a same-domain
 inventory check. No QLab setters, playback, or save commands were used.
 This validates the local checkout; a running MCP process must reload source

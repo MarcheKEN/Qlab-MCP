@@ -1,12 +1,13 @@
 """Fresh family dependencies for the shared, signed cue writer."""
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import struct
 
 from . import control
-from .remaining import COMMON, _depend, _finite, _raw, _reference, _time_seconds, _scalar
+from .remaining import COMMON, _depend, _finite, _fingerprint, _raw, _reference, _time_seconds, _scalar, read
 
 PATCH_ROUTES = {'audioOutputPatchID': 'settings/audio/patchList',
                 'audioInputPatchID': 'settings/mic/patchList',
@@ -18,6 +19,106 @@ SLICES = {'addSliceMarker', 'deleteSliceMarker', 'deleteSliceMarkers', 'sliceMar
 VOICE = {'channel', 'status', 'note', 'velocity', 'programChange', 'pitchBend', 'byte1', 'byte2', 'byteCombo', 'endValue', 'doFade'}
 MSC = {'command', 'commandFormat', 'controlNumber', 'controlValue', 'deviceID', 'hours', 'minutes', 'seconds', 'frames', 'subframes', 'macro', 'qList', 'qNumber', 'qPath', 'timecodeString', 'timecodeFormat'}
 MSC_COMMANDS = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, *range(16, 31)}
+MAX_LIGHT_CUE_PULLS = 100
+MAX_LIGHT_CUE_PULL_DEPTH = 32
+
+
+def _light_pull_number_index(snapshot, cue_numbers):
+    nodes = snapshot.get('nodes')
+    if not isinstance(nodes, dict):
+        raise ValueError('Light cue structure is unavailable.')
+    return {
+        number: sorted(
+            (
+                {
+                    'uniqueID': str(node.get('uniqueID', '')).upper(),
+                    'number': node.get('number'),
+                    'type': node.get('type'),
+                }
+                for node in nodes.values()
+                if str(node.get('number', '')) == number
+            ),
+            key=lambda item: item['uniqueID'],
+        )
+        for number in sorted(set(cue_numbers))
+    }
+
+
+def _light_cue_pull_context(reader, ws, cue_uid, command_text, deps):
+    from uuid import UUID
+    from .moves import _read_snapshot
+    from ..settings.light_commands import light_cue_references
+
+    references = light_cue_references(command_text)
+    if not references:
+        return {}
+
+    snapshot = _read_snapshot(reader, ws)
+    nodes = list(snapshot['nodes'].values())
+    resolved_by_uuid = {}
+    resolved_by_number = {}
+    visiting = {cue_uid}
+
+    def resolve(number, depth):
+        if depth > MAX_LIGHT_CUE_PULL_DEPTH:
+            raise ValueError('Light cue pull chain exceeds the supported depth limit.')
+        matches = [node for node in nodes if str(node.get('number', '')) == number]
+        if not matches:
+            raise ValueError(f'Light cue pull target {number!r} does not exist.')
+        if len(matches) != 1:
+            raise ValueError(f'Light cue pull target {number!r} is ambiguous.')
+        node = matches[0]
+        if node.get('type') != 'Light':
+            raise ValueError(f'Light cue pull target {number!r} is not a Light cue.')
+        try:
+            source_uid = str(UUID(str(node.get('uniqueID')))).upper()
+        except (ValueError, TypeError, AttributeError):
+            raise ValueError(f'Light cue pull target {number!r} has no valid cue UUID.') from None
+        if source_uid == cue_uid:
+            raise ValueError('A Light cue cannot pull from itself.')
+        if source_uid in visiting:
+            raise ValueError('Light cue pull references form a cycle.')
+        cached = resolved_by_uuid.get(source_uid)
+        if cached is not None:
+            resolved_by_number[number] = cached
+            return cached
+        if len(resolved_by_uuid) >= MAX_LIGHT_CUE_PULLS:
+            raise ValueError(f'Light cue pull graph exceeds the {MAX_LIGHT_CUE_PULLS}-cue limit.')
+
+        source = read(reader, ws, source_uid, ['number', 'lightCommandText'])
+        if source['type'] != 'Light' or str(source['number']) != number:
+            raise ValueError(f'Light cue pull target {number!r} changed during preflight.')
+        text = source.get('lightCommandText')
+        if not isinstance(text, str):
+            raise ValueError(f'Light cue pull target {number!r} command text is unavailable.')
+        value = {'uniqueID': str(source['uniqueID']).upper(), 'number': source['number'], 'type': source['type']}
+        deps.setdefault('light_pull_sources', {})[source_uid] = {
+            **value,
+            'text_sha256': hashlib.sha256(text.encode('utf-8')).hexdigest(),
+        }
+        visiting.add(source_uid)
+        try:
+            nested = light_cue_references(text)
+            if len(nested) > MAX_LIGHT_CUE_PULLS:
+                raise ValueError(f'Light cue pull graph exceeds the {MAX_LIGHT_CUE_PULLS}-cue limit.')
+            for target_number in nested:
+                resolve(target_number, depth + 1)
+        finally:
+            visiting.remove(source_uid)
+        resolved_by_uuid[source_uid] = value
+        resolved_by_number[number] = value
+        return value
+
+    if len(references) > MAX_LIGHT_CUE_PULLS:
+        raise ValueError(f'Light cue pull graph exceeds the {MAX_LIGHT_CUE_PULLS}-cue limit.')
+    for number in references:
+        resolve(number, 1)
+    cue_numbers = sorted(resolved_by_number)
+    deps['light_pull_number_index'] = {
+        'numbers': cue_numbers,
+        'fingerprint': _fingerprint(_light_pull_number_index(snapshot, cue_numbers)),
+    }
+    return resolved_by_number
 
 
 def validate(reader, ws, uid, family, operations, before):
@@ -169,7 +270,10 @@ def validate(reader, ws, uid, family, operations, before):
         patch, error = _try_read_safe_light_patch(reader, ws)
         if error or patch is None:
             raise ValueError(error or 'Light patch unavailable.')
-        analysis = analyze_light_command_text(changes['lightCommandText'], patch)
+        cue_references = _light_cue_pull_context(reader, ws, uid, changes['lightCommandText'], deps)
+        analysis = analyze_light_command_text(
+            changes['lightCommandText'], patch, cue_references=cue_references
+        )
         if not changes['lightCommandText'].strip() or _summarize_light_command_analysis(analysis)['overall_status'] != 'valid':
             raise ValueError('Light commands must resolve entirely against the workspace patch.')
         deps['light_patch'] = patch

@@ -198,6 +198,8 @@ class CueFamilyReadsMixin:
         if "triggers" in detail_models:
             # valuesForKeys reduces Fade & Stop scope to a boolean in QLab 5.5.10.
             direct_keys.append("fadeAndStopOthers")
+        if cue_type == "Video":
+            direct_keys.append("audioTrackID")
         batch_keys = [key for key in keys if key not in direct_keys]
         try:
             extra = self.read_cue_values(result.workspace_id, result.cue_id, ["uniqueID", "type", *batch_keys], cacheable=False)["values"]
@@ -259,6 +261,18 @@ class CueFamilyReadsMixin:
                 "Optional Text attributes are summarized only when every fragment contains the same value; "
                 "inspect text.fragments for absent or mixed attributes."
             )
+        for key in control_applescript.COMMON_READ_KEYS & set(keys):
+            try:
+                control_applescript.validate_common_value(key, values.get(key))
+            except ValueError:
+                try:
+                    values[key] = control_applescript.request(self, result.workspace_id, result.cue_id,
+                        key, expected_type=actual_type)
+                    result.errors.pop(key, None)
+                    result.coverage.source = "documented_osc_and_applescript"
+                    result.coverage.notes.append(f"{key}: current fixed AppleScript getter fallback.")
+                except Exception:
+                    result.coverage.notes.append(f"{key}: native fallback unavailable; no inferred baseline.")
         if direct_keys or conditional_models is not None:
             try:
                 final = self.read_cue_values(result.workspace_id, result.cue_id, ["uniqueID", "type", *guards], cacheable=False)["values"]
@@ -307,7 +321,7 @@ class CueFamilyReadsMixin:
                                                value=matrix[input_channel][output_channel])
             except ValueError as exc:
                 result.errors["level"] = str(exc)
-        result.coverage.notes = ["Audio Maps, Audio Objects and live metrics are excluded.",
+        result.coverage.notes = [*result.coverage.notes, "Audio Maps, Audio Objects and live metrics are excluded.",
                                  "Levels are read as one aggregate; crosspoints are never scanned individually.",
                                  "Patch identity is a reference; use workspace Audio Settings for patch configuration.",
                                  f"Containing Cue List context comes from qlab_get_{family}_cues; detail reads only the immediate parent."]
@@ -341,6 +355,9 @@ class CueFamilyReadsMixin:
             result.technical_payload = _redact_payload(normalized,
                 section=f"{family}_cue", profile=profile, redactions=result.redactions)
             result.warnings.append("Technical notes and paths may contain sensitive free text.")
+        if cue_type == "Video":
+            from .visual import _configuration_observations
+            result.configuration_observations = _configuration_observations(result)
         if serialized_payload_bytes(result.model_dump(mode="json")) > max_bytes:
             result.technical_payload = None
             for name in detail_models:
@@ -348,5 +365,7 @@ class CueFamilyReadsMixin:
             if hasattr(result, "level"):
                 result.level = None
             result.identity = None
+            if cue_type == "Video":
+                result.configuration_observations = []
             return _fail(result, "cue_payload_too_large", f"{cue_type} detail exceeds the response byte budget")
         return _finish(result)

@@ -41,6 +41,7 @@ class NativeTriggerProperties(BaseModel):
 
 TRIGGER_KEYS = frozenset(NativeTriggerProperties.model_fields)
 ENABLED_KEYS = frozenset(key for key in TRIGGER_KEYS if key.endswith("Enabled"))
+_APP_IDENTITY_KEYS = frozenset({"path", "pid", "bundle_id", "version", "build"})
 _NATIVE_PROPERTIES = {
     "hotkeyTriggerEnabled": "hotkey trigger", "midiTriggerEnabled": "midi trigger",
     "midiTriggerCommand": "midi command", "midiTriggerChannel": "midi trigger channel",
@@ -71,9 +72,20 @@ def validate_trigger_changes(changes):
         raise ValueError("Change trigger activation separately from its configuration.")
 
 
+def _validate_application_identity(app):
+    if (not isinstance(app, dict) or set(app) != _APP_IDENTITY_KEYS
+            or type(app.get("path")) is not str or not app["path"].startswith("/") or "\0" in app["path"]
+            or type(app.get("pid")) is not int or app["pid"] <= 0
+            or app.get("bundle_id") != "com.figure53.QLab.5"
+            or app.get("version") != "5.5.10" or app.get("build") != "5510"):
+        raise ValueError("Native QLab installation identity is unavailable or unsupported.")
+    return app
+
+
 def validate_trigger_snapshot(snapshot):
-    if not isinstance(snapshot, dict) or set(snapshot) != TRIGGER_KEYS | {"armed", "continueMode", "skipIfDisarmed", "timecodeTrigger"}:
+    if not isinstance(snapshot, dict) or set(snapshot) != TRIGGER_KEYS | {"armed", "continueMode", "skipIfDisarmed", "timecodeTrigger", "app_identity"}:
         raise ValueError("Complete native trigger snapshot is unavailable.")
+    _validate_application_identity(snapshot["app_identity"])
     for key in TRIGGER_KEYS:
         _validate(key, snapshot[key], observed=True)
     if type(snapshot["armed"]) is not bool or type(snapshot["skipIfDisarmed"]) is not bool:
@@ -133,6 +145,27 @@ def trigger_capabilities(capabilities, triggers):
 
 
 SCRIPT = '''use framework "AppKit"
+on runningQLab()
+ set apps to current application's NSRunningApplication's runningApplicationsWithBundleIdentifier:"com.figure53.QLab.5"
+ if (apps's |count|() as integer) is not 1 then error "Exactly one local QLab instance must already be running."
+ set runningApp to apps's firstObject()
+ if runningApp's isTerminated() then error "The QLab process is no longer running."
+ set runningPath to ((runningApp's bundleURL()'s |path|()) as text)
+ set processID to runningApp's processIdentifier() as integer
+ if runningPath is "" or processID is less than or equal to 0 then error "Running QLab identity is unavailable."
+ set bundle to current application's NSBundle's bundleWithPath:runningPath
+ if bundle is missing value then error "The running QLab bundle is unavailable."
+ set appInfo to bundle's infoDictionary()
+ if ((appInfo's objectForKey:"CFBundleIdentifier") as text) is not "com.figure53.QLab.5" then error "Unexpected QLab bundle identity."
+ if ((appInfo's objectForKey:"CFBundleShortVersionString") as text) is not "5.5.10" or ((appInfo's objectForKey:"CFBundleVersion") as text) is not "5510" then error "Native cue properties require QLab 5.5.10/build 5510."
+ set identity to current application's NSMutableDictionary's dictionary()
+ identity's setObject:runningPath forKey:"path"
+ identity's setObject:processID forKey:"pid"
+ identity's setObject:(appInfo's objectForKey:"CFBundleIdentifier") forKey:"bundle_id"
+ identity's setObject:(appInfo's objectForKey:"CFBundleShortVersionString") forKey:"version"
+ identity's setObject:(appInfo's objectForKey:"CFBundleVersion") forKey:"build"
+ return identity
+end runningQLab
 on run argv
  set sent to false
  set output to current application's NSMutableDictionary's dictionary()
@@ -142,10 +175,14 @@ on run argv
   set wsid to (payload's objectForKey:"workspace_id") as text
   set uid to (payload's objectForKey:"cue_id") as text
   set propertyKey to (payload's objectForKey:"property") as text
-  set apps to current application's NSRunningApplication's runningApplicationsWithBundleIdentifier:"com.figure53.QLab.5"
-  if (apps's |count|() as integer) is not 1 then error "Exactly one local QLab instance must already be running."
-  if (((apps's firstObject())'s bundleURL()'s |path|()) as text) is not "/Applications/QLab.app" then error "The running QLab must be /Applications/QLab.app."
-  tell application "/Applications/QLab.app"
+  set appIdentity to my runningQLab()
+  set applicationPath to (appIdentity's objectForKey:"path") as text
+  if ((payload's objectForKey:"write") as boolean) and (propertyKey is "loadTime" or propertyKey is "assignedNumber") then
+   set expectedApplication to payload's objectForKey:"expected_application"
+   if expectedApplication is missing value or not (my sameSnapshot(appIdentity, expectedApplication)) then error "QLab installation identity changed since preflight."
+  end if
+  using terms from application "/Applications/QLab.app"
+  tell application applicationPath
    set w to first workspace whose unique id is wsid
    set c to cue id uid of w
    if (unique id of w) is not wsid or (uniqueID of c) is not uid then error "AppleScript identity mismatch."
@@ -177,6 +214,8 @@ on run argv
      end if
     end if
     if observed is not previous then error "Property changed before setter."
+    set currentIdentity to my runningQLab()
+    if not (my sameSnapshot(currentIdentity, appIdentity)) then error "QLab process identity changed before native cue setter."
     set sent to true
     if propertyKey is "loadTime" then
      set load time of c to wanted
@@ -187,6 +226,9 @@ on run argv
     end if
    end if
   end tell
+  end using terms from
+  set currentIdentity to my runningQLab()
+  if not (my sameSnapshot(currentIdentity, appIdentity)) then error "QLab process identity changed during the native cue request."
   output's setObject:wsid forKey:"workspace_id"
   output's setObject:uid forKey:"cue_id"
   output's setObject:kind forKey:"type"
@@ -202,6 +244,26 @@ end run
 '''
 
 KINDS = {"loadTime": "Load", "assignedNumber": "Target"}
+COMMON_READ_KEYS = {"fadeAndStopOthers", "sliceMarkers"}
+
+
+def validate_common_value(key, value):
+    if key == "fadeAndStopOthers":
+        if type(value) is not int or value not in range(4):
+            raise ValueError("Fade & Stop Others requires an integer scope 0–3.")
+    elif key == "sliceMarkers":
+        if not isinstance(value, list) or len(value) > 4096:
+            raise ValueError("Slice markers must be an explicit bounded list.")
+        previous = -1
+        for marker in value:
+            if (not isinstance(marker, dict) or set(marker) != {"time", "playCount"}
+                    or type(marker["time"]) not in {int, float} or not math.isfinite(marker["time"])
+                    or marker["time"] < 0 or marker["time"] <= previous
+                    or type(marker["playCount"]) is not int or marker["playCount"] not in {-1} and marker["playCount"] < 1):
+                raise ValueError("Invalid slice marker or ordering.")
+            previous = marker["time"]
+    else:
+        raise ValueError("Unsupported common native read.")
 
 # Build only from this fixed dictionary, never from request text or property paths.
 _snapshot_lines = []
@@ -209,7 +271,7 @@ _setter_lines = []
 for _key, _property in _NATIVE_PROPERTIES.items():
     _expression = f"({_property} of c is enabled)" if _key in ENABLED_KEYS else f"{_property} of c"
     if _key == "midiTriggerCommand":
-        _expression = "my midiCommandNumber(midi command of c)"
+        _expression = "my midiCommandNumber(midi command of c, applicationPath)"
     _snapshot_lines.append(f'  set v to {_expression}\n  output\'s setObject:v forKey:"{_key}"')
     _wanted = "((payload's objectForKey:\"value\") as text)" if _key.endswith("String") else "((payload's objectForKey:\"value\") as boolean)" if _key == "timecodeShowAsTimecode" else "((payload's objectForKey:\"value\") as integer)"
     if _key in ENABLED_KEYS:
@@ -224,18 +286,23 @@ for _key, _property in _NATIVE_PROPERTIES.items():
     _setter_lines.append(f' {"if" if not _setter_lines else "else if"} propertyKey is "{_key}" then\n{_body}')
 
 _handlers = '''
-on midiCommandNumber(cmd)
- tell application "/Applications/QLab.app"
+on midiCommandNumber(cmd, applicationPath)
+ using terms from application "/Applications/QLab.app"
+ tell application applicationPath
   set commands to {note_off, note_on, key_pressure, control_change, program_change, channel_pressure}
   repeat with n from 1 to count of commands
    if cmd is item n of commands then return n - 1
   end repeat
   error "Unsupported MIDI trigger command."
  end tell
+ end using terms from
 end midiCommandNumber
-on nativeSnapshot(c)
+on nativeSnapshot(c, applicationIdentity)
  set output to current application's NSMutableDictionary's dictionary()
- tell application "/Applications/QLab.app"
+ output's setObject:applicationIdentity forKey:"app_identity"
+ set applicationPath to (applicationIdentity's objectForKey:"path") as text
+ using terms from application "/Applications/QLab.app"
+ tell application applicationPath
 ''' + "\n".join(_snapshot_lines) + '''
   output's setObject:(armed of c) forKey:"armed"
   output's setObject:(skip if disarmed of c) forKey:"skipIfDisarmed"
@@ -253,15 +320,18 @@ on nativeSnapshot(c)
   parts's setObject:(timecode bits of c) forKey:"bits"
   output's setObject:parts forKey:"timecodeTrigger"
  end tell
+ end using terms from
  return output
 end nativeSnapshot
-on nativeSet(c, propertyKey, payload)
- tell application "/Applications/QLab.app"
+on nativeSet(c, propertyKey, payload, applicationPath)
+ using terms from application "/Applications/QLab.app"
+ tell application applicationPath
 ''' + "\n".join(_setter_lines) + '''
  else
   error "Unsupported fixed native trigger setter."
  end if
  end tell
+ end using terms from
 end nativeSet
 '''
 SNAPSHOT_COMPARISON_HANDLER = '''
@@ -272,7 +342,7 @@ end sameSnapshot
 '''
 _native_branch = '''   if propertyKey is "triggerSnapshot" or payload's objectForKey:"expected_snapshot" is not missing value then
     if kind is not ((payload's objectForKey:"expected_type") as text) then error "Native cue type changed."
-    set snapshot to my nativeSnapshot(c)
+    set snapshot to my nativeSnapshot(c, appIdentity)
     set observed to snapshot
     if propertyKey is not "triggerSnapshot" then set observed to snapshot's objectForKey:propertyKey
     if ((payload's objectForKey:"write") as boolean) then
@@ -290,9 +360,11 @@ _native_branch = '''   if propertyKey is "triggerSnapshot" or payload's objectFo
       if ((snapshot's objectForKey:triggerKey) as boolean) then error "Disable the trigger before editing configuration."
      end if
      if propertyKey starts with "midiTriggerByte2" and ((snapshot's objectForKey:"midiTriggerCommand") as integer) > 3 then error "One-byte MIDI trigger command."
+     set currentIdentity to my runningQLab()
+     if not (my sameSnapshot(currentIdentity, appIdentity)) then error "QLab process identity changed before native cue setter."
      set sent to true
-     my nativeSet(c, propertyKey, payload)
-     set snapshot to my nativeSnapshot(c)
+     my nativeSet(c, propertyKey, payload, applicationPath)
+     set snapshot to my nativeSnapshot(c, appIdentity)
      set observed to snapshot's objectForKey:propertyKey
     end if
    else
@@ -300,7 +372,28 @@ _native_branch = '''   if propertyKey is "triggerSnapshot" or payload's objectFo
 _native_branch = _native_branch.replace('propertyKey is "triggerSnapshot" or payload\'s objectForKey:"expected_snapshot" is not missing value',
     'propertyKey is in {' + ', '.join('"' + key + '"' for key in ("triggerSnapshot", *_NATIVE_PROPERTIES)) + '}')
 SCRIPT = SCRIPT.replace('   if propertyKey is "loadTime"', _native_branch + '   if propertyKey is "loadTime"', 1)
-SCRIPT = SCRIPT.replace('  end tell\n  output', '   end if\n  end tell\n  output', 1) + _handlers + SNAPSHOT_COMPARISON_HANDLER
+SCRIPT = SCRIPT.replace('  end tell\n  end using terms from\n  set currentIdentity',
+                        '   end if\n  end tell\n  end using terms from\n  set currentIdentity', 1) + _handlers + SNAPSHOT_COMPARISON_HANDLER
+
+# Read-only dictionary properties omitted or collapsed by OSC in QLab 5.5.10.
+SCRIPT = SCRIPT.replace('   if propertyKey is "loadTime" and kind is "Load" then', '''   if propertyKey is "fadeAndStopOthers" or propertyKey is "sliceMarkers" then
+    if ((payload's objectForKey:"write") as boolean) then error "Common fallback is read-only."
+    if kind is not ((payload's objectForKey:"expected_type") as text) then error "Cue type changed."
+    if propertyKey is "fadeAndStopOthers" then
+     set observed to get fade and stop others of c
+    else
+     if kind is not "Video" and kind is not "Audio" then error "Slices require an Audio or Video cue."
+     set markers to get slice markers of c
+     if (count of markers) > 4096 then error "Slice inventory exceeds its bound."
+     set observed to current application's NSMutableArray's array()
+     repeat with marker in markers
+      set row to current application's NSMutableDictionary's dictionary()
+      row's setObject:(time of marker) forKey:"time"
+      row's setObject:(playCount of marker) forKey:"playCount"
+      observed's addObject:row
+     end repeat
+    end if
+   else if propertyKey is "loadTime" and kind is "Load" then''', 1)
 
 
 def _validate(key, value, *, observed=False):
@@ -333,12 +426,19 @@ def request(reader, workspace_id, cue_id, key, *, timeout=None, **change):
         raise AppleScriptPreparationError("These properties require local macOS QLab; remote OSC has no AppleScript fallback.")
     try:
         ws, uid = str(UUID(str(workspace_id))).upper(), str(UUID(str(cue_id))).upper()
-        native = key in TRIGGER_KEYS or key == "triggerSnapshot"
-        if key not in KINDS and not native or set(change) - {"value", "expected", "expected_target", "assigned_cue_id", "expected_type", "expected_snapshot"}:
+        common = key in COMMON_READ_KEYS
+        native = key in TRIGGER_KEYS or key == "triggerSnapshot" or common
+        if key not in KINDS and not native or set(change) - {
+                "value", "expected", "expected_target", "assigned_cue_id", "expected_type",
+                "expected_snapshot", "expected_application"}:
             raise ValueError("Unsupported fixed AppleScript operation.")
         if native and change.get("expected_type") not in _CUE_TYPES:
             raise ValueError("Native Triggers require an exact supported cue type.")
         writing = "value" in change
+        if common and writing:
+            raise ValueError("Common native fallback is read-only.")
+        if "expected_application" in change and (not writing or key not in KINDS):
+            raise ValueError("Application identity is only valid for confirmed scalar cue writes.")
         if writing:
             if not config.enable_write or not config.passcode:
                 raise ValueError("Write mode and the existing OSC Edit access configuration are required.")
@@ -352,6 +452,7 @@ def request(reader, workspace_id, cue_id, key, *, timeout=None, **change):
                 if snapshot[key] != change["expected"]:
                     raise ValueError("Native baseline contradicts its snapshot.")
             else:
+                _validate_application_identity(change.get("expected_application"))
                 target = change.get("expected_target")
                 if target != "":
                     change["expected_target"] = str(UUID(target)).upper()
@@ -383,8 +484,22 @@ def request(reader, workspace_id, cue_id, key, *, timeout=None, **change):
     if result.get("workspace_id") != ws or result.get("cue_id") != uid or result.get("type") != (change["expected_type"] if native else KINDS[key]):
         raise ValueError("AppleScript workspace/cue identity or type mismatch.")
     value = result.get("value")
-    if key == "triggerSnapshot":
+    if common:
+        validate_common_value(key, value)
+    elif key == "triggerSnapshot":
         validate_trigger_snapshot(value)
     else:
         _validate(key, value, observed=not writing)
     return value
+
+
+def property_value(reader, ws, uid, key, value=None):
+    """Use a current native getter only when an OSC baseline is unusable."""
+    try:
+        validate_common_value(key, value)
+        return value
+    except ValueError:
+        kind = reader._request(f"/workspace/{ws}/cue_id/{uid}/type", workspace_id=ws).data
+        if kind not in _CUE_TYPES:
+            raise ValueError("Native fallback requires an exact cue type.")
+        return request(reader, ws, uid, key, expected_type=kind)

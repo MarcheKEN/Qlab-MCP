@@ -47,7 +47,7 @@ def test_multiple_indexed_only(reader):
 
 def confirmed(reader, items, family='audio'):
     plan = remaining.edit_remaining_cues(reader, WS, items, True, family=family)
-    assert plan['ok'], plan['results']
+    assert plan['ok'], plan
     for item, result in zip(items, plan['results'], strict=True):
         item['confirm_gates'] = [p['confirm_token'] for p in result['planned_operations']]
     return items
@@ -287,7 +287,31 @@ def test_residual_metadata_limits_block_even_with_readable_baseline(reader, fami
     result = remaining.edit_remaining_cues(reader, WS, [
         {'cue_id': START, 'properties': properties}], True, family=family)
     assert not result['ok'] and not reader.setters
-    assert set(properties) <= remaining.capabilities(family)['blocked_properties'].keys()
+    if family == 'mic' and set(properties) <= {'channels', 'channelOffset'}:
+        assert set(properties) <= remaining.capabilities(family)['conditional_properties'].keys()
+    else:
+        assert set(properties) <= remaining.capabilities(family)['blocked_properties'].keys()
+
+
+def test_mic_channel_preflight_binds_the_exact_input_patch_capacity(reader, monkeypatch):
+    patch = str(UUID(int=81)).upper()
+    reader.values[START].update(type='Mic', audioInputPatchID=patch, channels=1, channelOffset=0)
+    original_request = reader._request
+    def request(address, *args, **kwargs):
+        if address.endswith(f'/cue_id/{START}/audioInputPatchID') and not args:
+            return SimpleNamespace(data=None)
+        return original_request(address, *args, **kwargs)
+    reader._request = request
+    snapshot = {'workspace_id': WS, 'patch_id': patch, 'input_channels': 2, 'device_uid': 'mic-test'}
+    monkeypatch.setattr(remaining, 'input_channel_snapshot', lambda _reader, _ws, patch_id: snapshot)
+    items = [{'cue_id': START, 'properties': {'channels': 2}}]
+    plan = remaining.edit_remaining_cues(reader, WS, items, True, family='mic')
+    assert plan['ok'], plan['results'][0].get('errors')
+    assert not reader.setters
+    items[0]['confirm_gates'] = [op['confirm_token'] for op in plan['results'][0]['planned_operations']]
+    result = remaining.edit_remaining_cues(reader, WS, items, False, family='mic')
+    assert result['ok'], result['results']
+    assert reader.setters == [(START, 'channels', (2,))]
 
 
 @pytest.mark.parametrize('property_name,value', [('channels', 2), ('channelOffset', 1)])
@@ -298,7 +322,9 @@ def test_camera_input_capacity_blocks_with_existing_patch_and_baseline(reader, p
     result = visual.edit_camera_cues(reader, WS, [
         {'cue_id': START, 'properties': {property_name: value}}], True)
     assert not result['ok'] and not reader.setters
-    assert 'no validated OSC inventory' in str(result['results'][0]['errors'])
+    assert property_name in visual.capabilities('Camera', SimpleNamespace(
+        basics=SimpleNamespace(allowsEditingDuration=True), triggers=SimpleNamespace(fadeAndStopOthers=1),
+        video=None)).get('conditional_properties', {})
 
 def test_midi_type_two_file_rejected(reader, tmp_path, monkeypatch):
     import struct

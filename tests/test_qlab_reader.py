@@ -4889,7 +4889,7 @@ class QLabReaderTests(unittest.TestCase):
         self.assertNotIn("fileTarget", result["cues"][0])
         self.assertIn("fileTarget", requested_values_for_keys(server))
         self.assertEqual(result["cues"][0]["health_summary"]["status"], "broken")
-        self.assertIn("File target exists", result["cues"][0]["health_summary"]["messages"][0])
+        self.assertIn("file target is assigned", result["cues"][0]["health_summary"]["messages"][0])
 
     def test_query_cues_targets_profile_redacts_file_target_but_reports_presence(self) -> None:
         cue_id = "11111111-1111-4111-8111-111111111111"
@@ -7009,6 +7009,18 @@ class QLabReaderTests(unittest.TestCase):
         self.assertEqual(result["properties"]["health_summary"]["status"], "broken")
         self.assertIn("file_target_present_but_broken", result["properties"]["health_summary"]["probable_causes"])
         self.assertEqual(result["properties"]["health_summary"]["confidence"], "derived")
+
+    def test_broken_video_with_assigned_target_does_not_diagnose_media(self) -> None:
+        from qlab_mcp.cues.profiles import _health_summary
+        summary = _health_summary({"type": "Video", "isBroken": True,
+                                   "fileTargetPresent": True})
+        self.assertEqual(summary["status"], "broken")
+        self.assertIn("file_target_present_but_broken", summary["probable_causes"])
+        self.assertIn("assigned", " ".join(summary["messages"]))
+        self.assertNotIn("exists", " ".join(summary["messages"]))
+        self.assertNotIn("likely", " ".join(summary["messages"]))
+        self.assertIn("stage", " ".join(summary["diagnostic_hints"]))
+        self.assertIsNone(_health_summary({"type": "Video"}))
 
     def test_targets_profile_redacts_file_target_but_reports_presence(self) -> None:
         responses = {

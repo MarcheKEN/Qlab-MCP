@@ -20,9 +20,9 @@ and current OSC summaries, but several values remain raw, UI-only, or explicitly
 unavailable. A successful call is not proof of UI equivalence.
 
 Workspace: `mcp_prueba.qlab5`, UUID
-`95F0A03D-140E-4673-974A-E76748EBB023`; QLab 5.5.10/build 5510.
+`REDACTED-UUID-5`; QLab 5.5.10/build 5510.
 Saved file SHA-256:
-`7170baaf3db4401f977400568ceab433eb524ec7b544de3f0b94f689029c1139`.
+`REDACTED-SHA256-17`.
 The file hash matches the preceding native verification. No workspace Save,
 Close, Open, setter, cue execution, mask assignment, grid export or physical
 output test was performed during this audit.
@@ -31,7 +31,7 @@ All twelve stages were queried through the attached MCP using `technical`.
 OSC succeeded for all twelve. Saved enrichment correctly degraded to
 `unavailable: Multiple QLab instances are running.` after Computer Use opened
 the second installation at `/Applications/QLab.app`. The workspace is in the
-installation at `/Users/filarmonica/Desktop/QLab.app`. Closing the empty second
+installation at `REDACTED-LOCAL-PATH-2`. Closing the empty second
 instance was pending at that point; it was subsequently closed and native
 enrichment revalidated as recorded below. Direct decoding alone is not a
 substitute for the tool's live document/freshness checks.
@@ -116,7 +116,7 @@ REA decoded a temporary bundle containing an unchanged copy of
 Evidence ID:
 `ev_9072151e97529934d0636b6f00bf2ed27a7c5a4b5fcfc33618c68f0327343b02`.
 NIB SHA-256:
-`b92538918547735cc39a1784bfabb4bd30014fbea3119e3848bd89ef6e4e2a8e`.
+`REDACTED-SHA256-23`.
 
 The sixteen menu titles and tags are row-major: modes 0–3 are 1×1 through
 4×1; 4–7 are 1×2 through 4×2; 8–11 are 1×3 through 4×3; 12–15 are 1×4
@@ -169,7 +169,7 @@ coverage. Full Stage Editor equivalence remains unproven.
 
 The attached MCP now returns `ok`, saved status `ready`, clean document,
 `top`, the mask alias, and the assigned Output 1 with a `4×4` guideline grid.
-Its SHA-256 remains `7170baaf3db4401f977400568ceab433eb524ec7b544de3f0b94f689029c1139`.
+Its SHA-256 remains `REDACTED-SHA256-17`.
 This supersedes the pending restart acceptance above.
 
 The native arm64 `VideoStageEditor lockRegionAspectRatio` getter at
@@ -255,9 +255,9 @@ baseline, with `document_modified=true`, `possibly_stale` and `needs_save`.
 
 | Sample | Native UI Center | Saved forward midpoint | Evidence |
 | --- | --- | --- | --- |
-| Bézier, inner control 5 changed to (500,180) | (-940,-752) | (-940.3117617187501,-752.15541890625) | 16 controls; native saved SHA-256 `627ef2df05a00a63afbedd6d4dde5f59b7f980c985af56ff46b0679e36c42da4` |
+| Bézier, inner control 5 changed to (500,180) | (-940,-752) | (-940.3117617187501,-752.15541890625) | 16 controls; native saved SHA-256 `REDACTED-SHA256-24` |
 | Linear, child corner 3 changed to (740,440) | (-935,-748) | (-935,-747.5) | Four controls; exact MCP setter readback |
-| Perspective, same deformed child corner | (-945,-759) | (-945.1933953065072,-758.7822921406748) | Saved SHA-256 `d7c63e91ae8bbe481d08ca8bde353978916b4496aa2f577a5cdbc7ca19cb675b` |
+| Perspective, same deformed child corner | (-945,-759) | (-945.1933953065072,-758.7822921406748) | Saved SHA-256 `REDACTED-SHA256-25` |
 
 All match QLab's integer rounding. The last sample retains different parent
 and child control coordinates; evaluating the nested child is essential.
@@ -278,7 +278,7 @@ confirmed the exact workspace UUID and QLab 5.5.10. The attached Codex MCP now
 returns `forward_warp_at_region_midpoint`, the native sample-validation field,
 and the Layout lock under `ui_only`; the stale-process blocker is resolved.
 The reopened saved baseline SHA-256 is
-`2b3271b8edc9b4c35a35365a6966e8236a380d9975c20d039b0017f8ae14be82`.
+`REDACTED-SHA256-18`.
 All twelve attached stage calls succeeded with saved status `ready`, clean
 document, identical hashes, no geometry truncation and matching region counts.
 Stage 12 Center is (-945.1933953065072,-758.7822921406748).

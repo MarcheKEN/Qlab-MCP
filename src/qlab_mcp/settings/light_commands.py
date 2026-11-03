@@ -84,6 +84,8 @@ def _parse_value(raw: str) -> dict[str, Any] | None:
     if not _NUMBER.fullmatch(raw):
         return None
     number: int | float = float(raw)
+    if not math.isfinite(number):
+        return None
     if "." not in raw:
         number = int(raw)
     return {"kind": "number", "raw": raw, "number": number}

@@ -1,13 +1,13 @@
 {
   "qlab_version": "5.5.10",
   "build": 5510,
-  "workspace_id": "7F8AC745-4E3F-4E88-9598-81F4BA1E90BE",
+  "workspace_id": "REDACTED-UUID-2",
   "native_reopen_verified": true,
   "physical_output_tested": false,
   "public_curve_tool_registered": false,
   "proof": {
-    "source_sha256": "4dd13f04a117730d37a40c501caf08e65a652de127a7e1bb12c7c5d0b124950b",
-    "output_sha256": "943ad5d4cf12055aed3a2b750111a6ad446eac575e4e810dab63ce72339c91b7",
+    "source_sha256": "REDACTED-SHA256-2",
+    "output_sha256": "REDACTED-SHA256-3",
     "changed_inner_object_count": 1,
     "only_changed_field": "v",
     "native_ui_observed": true
@@ -22,8 +22,8 @@
   "samples": [
     {
       "label": "Custom",
-      "sha256": "ca96ac22f8245a290b3b80572ac2c38d9c2bb04db810f34d62ef5409a95b8a81",
-      "cue_id": "BE10B8ED-E585-42BC-9F41-D9B514D2DD9F",
+      "sha256": "REDACTED-SHA256-4",
+      "cue_id": "REDACTED-UUID-3",
       "curves": {
         "upShape": {
           "type": 0,
@@ -58,8 +58,8 @@
     },
     {
       "label": "S-Curve",
-      "sha256": "65d584f37201a0d57f407141fb87b4572fe1a3163611bb001ac2730d0485f208",
-      "cue_id": "BE10B8ED-E585-42BC-9F41-D9B514D2DD9F",
+      "sha256": "REDACTED-SHA256-5",
+      "cue_id": "REDACTED-UUID-3",
       "curves": {
         "upShape": {
           "type": 1,
@@ -94,8 +94,8 @@
     },
     {
       "label": "Parametric",
-      "sha256": "4d67ae098edf0f2ecf12851ada761f1debf4c003e2a11dc385cb31ada2724e6d",
-      "cue_id": "BE10B8ED-E585-42BC-9F41-D9B514D2DD9F",
+      "sha256": "REDACTED-SHA256-6",
+      "cue_id": "REDACTED-UUID-3",
       "curves": {
         "upShape": {
           "type": 2,
@@ -130,8 +130,8 @@
     },
     {
       "label": "Linear",
-      "sha256": "d9a0c6fac9f2847cc29445fb45ba517452845f90d9112bfecd701c88581568d4",
-      "cue_id": "BE10B8ED-E585-42BC-9F41-D9B514D2DD9F",
+      "sha256": "REDACTED-SHA256-7",
+      "cue_id": "REDACTED-UUID-3",
       "curves": {
         "upShape": {
           "type": 3,
@@ -166,8 +166,8 @@
     },
     {
       "label": "Custom point",
-      "sha256": "4dd13f04a117730d37a40c501caf08e65a652de127a7e1bb12c7c5d0b124950b",
-      "cue_id": "0F5E0871-F8D7-4B83-81AD-7EA74CE84779",
+      "sha256": "REDACTED-SHA256-2",
+      "cue_id": "REDACTED-UUID-4",
       "curves": {
         "upShape": {
           "type": 0,
@@ -206,8 +206,8 @@
     },
     {
       "label": "Offline-edited Custom point",
-      "sha256": "943ad5d4cf12055aed3a2b750111a6ad446eac575e4e810dab63ce72339c91b7",
-      "cue_id": "0F5E0871-F8D7-4B83-81AD-7EA74CE84779",
+      "sha256": "REDACTED-SHA256-3",
+      "cue_id": "REDACTED-UUID-4",
       "curves": {
         "upShape": {
           "type": 0,
@@ -267,15 +267,15 @@
     "examples": {
       "scalar": {
         "definition": "Thunder Wash 600 RGBW - Mode 2 - 2 channel",
-        "definition_id": "bundled:b8e24dee4bdbe28850f0088ba1b1e9b6bb40a4e20f66f2632388c128394825c8",
+        "definition_id": "bundled:REDACTED-SHA256-8",
         "outputs": null,
         "channel": 0,
         "importable": true,
-        "source_sha256": "dac6134c726c01af78bb25d5b61a8c10e4734481cb0e74634c56b9a5ea3eaa5d"
+        "source_sha256": "REDACTED-SHA256-9"
       },
       "rgbcolor": {
         "definition": "Freedom H1 - 6 channel",
-        "definition_id": "bundled:cd4c01332d1451f8e3f29d96ead3f29e8154125ab5a0ce9bf36a2514d9646738",
+        "definition_id": "bundled:REDACTED-SHA256-10",
         "outputs": {
           "amber": "amber",
           "red": "red",
@@ -285,22 +285,22 @@
         },
         "channel": -2,
         "importable": true,
-        "source_sha256": "dac6134c726c01af78bb25d5b61a8c10e4734481cb0e74634c56b9a5ea3eaa5d"
+        "source_sha256": "REDACTED-SHA256-9"
       },
       "pantilt": {
         "definition": "Eliminator Stinger Spot 30 - 4 channel",
-        "definition_id": "bundled:7b402c73a17194a7b747b413de243512fe2efe7c169753f2be56dba1dcc3de6b",
+        "definition_id": "bundled:REDACTED-SHA256-11",
         "outputs": {
           "pan": "pan",
           "tilt": "tilt"
         },
         "channel": -2,
         "importable": false,
-        "source_sha256": "dac6134c726c01af78bb25d5b61a8c10e4734481cb0e74634c56b9a5ea3eaa5d"
+        "source_sha256": "REDACTED-SHA256-9"
       },
       "muxer": {
         "definition": "Oxygen - Mode 2 - 37 channel",
-        "definition_id": "bundled:6c6d9bdcc48dfa5f450ceb32a2ccd9401f1cd55cc4f7fce3503fe01a47aec085",
+        "definition_id": "bundled:REDACTED-SHA256-12",
         "outputs": [
           "color 1",
           "color 2",
@@ -312,11 +312,11 @@
         ],
         "channel": -10,
         "importable": false,
-        "source_sha256": "dac6134c726c01af78bb25d5b61a8c10e4734481cb0e74634c56b9a5ea3eaa5d"
+        "source_sha256": "REDACTED-SHA256-9"
       },
       "cmycolor": {
         "definition": "Sky Falcon Arc colour 1200W - 6 channel",
-        "definition_id": "bundled:22fcf721ae35a17dfb0baa0a780af506365c85494a7bcb50b6d1e69b53859bce",
+        "definition_id": "bundled:REDACTED-SHA256-13",
         "outputs": {
           "magenta": "magenta",
           "cyan": "cyan",
@@ -324,11 +324,11 @@
         },
         "channel": -2,
         "importable": false,
-        "source_sha256": "dac6134c726c01af78bb25d5b61a8c10e4734481cb0e74634c56b9a5ea3eaa5d"
+        "source_sha256": "REDACTED-SHA256-9"
       },
       "hsicolor": {
         "definition": "Pixel 8, strobe multi - D CCT GM HUE SAT S - 48 channel",
-        "definition_id": "bundled:a2fa121441fcb9afe94e7c03cc78dabd9c1e1a31bd27f7d230ee679f29e14f7b",
+        "definition_id": "bundled:REDACTED-SHA256-14",
         "outputs": {
           "hue": "hue 1",
           "saturation": "saturation 1",
@@ -336,7 +336,7 @@
         },
         "channel": -6,
         "importable": false,
-        "source_sha256": "dac6134c726c01af78bb25d5b61a8c10e4734481cb0e74634c56b9a5ea3eaa5d"
+        "source_sha256": "REDACTED-SHA256-9"
       }
     }
   }

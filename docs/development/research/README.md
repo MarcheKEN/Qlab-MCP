@@ -7,13 +7,17 @@ Use the [current tool catalogue](../../user/tools.md) and
 
 ## Records
 
+- [Video diagnostics and capability clarification — 2026-11-01](2026-11-01-video-diagnostics-and-capabilities.md)
+- [Camera and Unicode follow-up — 2026-10-27](2026-10-27-camera-unicode-follow-up.md)
+- [Video Settings authoring recommendation — 2026-10-24](2026-10-24-video-settings-authoring-recommendation.md)
+- [Light authoring expansion — 2026-10-21](2026-10-21-light-authoring-expansion.md)
 - [Native cue Triggers — 2026-10-10](2026-10-10-native-triggers.md)
 - [Blend Mode and Video FX closure audit](2026-10-09-video-fx-closure-audit.md)
 - [Pending capability audit: workspace authoring](2026-10-06-workspace-authoring-gap-audit.md)
 - [Documentary inventory of Video FX](2026-10-06-video-fx-parameter-inventory.md)
 - [Research to complete editors and remove the generic tool](2026-10-06-cue-edit-migration-fx-text-plan.md)
 - [Completion of the nine saved cue editors](2026-10-05-remaining-cue-completion.md)
-- [> Historical adapter inventory. The completed shared executor and current limits](2026-10-02-remaining-cue-edit-tools.md)
+- [Historical adapter inventory. The completed shared executor and current limits](2026-10-02-remaining-cue-edit-tools.md)
 - [Video, Camera and Text inspector editing — 2026-10-01](2026-10-01-visual-cue-editing.md)
 - [Workspace Settings: editing and creation through OSC or AppleScript](2026-09-30-workspace-settings-edit-create-inventory.md)
 - [Investigation of MCP audit failures](2026-09-30-mcp-audit-read-failures.md)

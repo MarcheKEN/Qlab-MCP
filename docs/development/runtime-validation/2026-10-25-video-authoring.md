@@ -7,7 +7,7 @@ restart/FPS follow-up status below; this report retains the initial source test.
 
 Source FastMCP acceptance in QLab **5.5.10/build 5510**, running from the Desktop
 installation, against the authorized `mcp_prueba.qlab5` (workspace UUID
-`95F0A03D-140E-4673-974A-E76748EBB023`). Fixed document operations verified the
+`REDACTED-UUID-5`). Fixed document operations verified the
 single running bundle/process and reopened the same path. No second QLab app
 was launched. The public Open tool retains its empty-inventory restriction.
 

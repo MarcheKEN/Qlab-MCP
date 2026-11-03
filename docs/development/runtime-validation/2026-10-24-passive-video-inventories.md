@@ -3,7 +3,7 @@
 ## Scope
 
 QLab 5.5.10/build 5510, local `mcp_prueba.qlab5`, workspace UUID
-`95F0A03D-140E-4673-974A-E76748EBB023`. The document already had unsaved
+`REDACTED-UUID-5`. The document already had unsaved
 user changes; no Save, Close, Open, setter, Monitor or cue execution occurred.
 
 ## Native and MCP evidence
@@ -40,7 +40,7 @@ the authorized native repeat was used for acceptance.
 Initial observed durations: output devices 2.93 s, input patches 2.43 s,
 route detail 1.10 s. These are fixture observations, not latency guarantees.
 All reads preserved the exact workspace bytes and SHA-256:
-`2b3271b8edc9b4c35a35365a6966e8236a380d9975c20d039b0017f8ae14be82`.
+`REDACTED-SHA256-18`.
 The unsaved document state remained explicit; it was not cleared by a reader.
 
 ## Automated checks
@@ -81,7 +81,7 @@ format. Route detail returned Output 5 with Fill, full 1×1 layout, disconnected
 status, and eight saved stage-region references. Limit-1 continuation returned
 the requested next item with the same snapshot ID. All responses retained the
 dirty-document warning. The archive SHA-256 before and after attached-process
-reads was identical (`2b3271b8edc9b4c35a35365a6966e8236a380d9975c20d039b0017f8ae14be82`).
+reads was identical (`REDACTED-SHA256-18`).
 Attached-process acceptance is complete for this QLab 5.5.10 fixture.
 
 ## Extended read-tool acceptance
@@ -147,11 +147,11 @@ these observations without populating effective_capture_format.
 Focused inventory/video/contracts tests: 201 passed. Workspace settings/document
 regressions: 86 passed. The workspace SHA-256 before/after both updated native
 helper reads was identical:
-`6f7119078af8523287b1068a950abbb47ad1b29f0b8c44057f4512160051b19b`.
+`REDACTED-SHA256-1`.
 
 The attached MCP still resolves the expected workspace over OSC. Current local
 archive enrichment is blocked by the existing document guard: the running
-workspace belongs to /Users/filarmonica/Desktop/QLab.app, while document operations
+workspace belongs to REDACTED-LOCAL-PATH-3 while document operations
 require /Applications/QLab.app. This guard was preserved. Computer Use's initial
 name lookup opened the Applications installation's empty launcher with a port
 warning; that instance was subsequently selected by exact path and closed.

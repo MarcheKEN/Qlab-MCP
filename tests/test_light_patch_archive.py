@@ -123,6 +123,15 @@ def test_shared_definition_footprint_rechecks_other_instruments():
         plan_patch(p['output_bytes'],[{'action':'update_definition','name':'Dimmer','parameters':[{'type':'scalar','name':'intensity','two_bytes':True}]}])
 
 
+@pytest.mark.parametrize('width', [None, 'false', 1])
+def test_footprint_rejects_unknown_byte_width(width):
+    from qlab_mcp.light_patch.archive import Patch, _validate
+    summary = Patch(workspace()).snapshot()
+    summary['definitions'][0]['parameters'][0]['twoBytes'] = width
+    with pytest.raises(ValueError, match='byte width'):
+        _validate(summary)
+
+
 def test_rename_preserves_existing_member_range_objects():
     from qlab_mcp.light_patch.archive import Patch,plan_patch
     created=plan_patch(workspace(),[{'action':'create_group','name':'Front','members':['Door']}])

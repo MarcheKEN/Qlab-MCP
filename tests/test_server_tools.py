@@ -664,7 +664,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {'qlab_get_fonts': {
                                                 'openWorldHint': True,
                                                 'readOnlyHint': True},
                                'input_schema_hash': '2734838d3ecd4fe7a5d412e08777007dbe199ecc318f119cfe86999b266920ae',
-                                'output_schema_hash': 'c7b0afc6954479b41d782791a329ee69db7fb0c5f71bfba8be3d38312ab1ad9b',
+                                'output_schema_hash': 'b5e92fd88fc0616abbc7303df8f83edc6ff05e5443c92188378c23504779cc70',
                                 'tags': ['details', 'qlab', 'safe-read', 'video'],
                                 'timeout': 20.0,
                                 'title': 'Get QLab Video Cue Details'},

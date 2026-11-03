@@ -148,14 +148,25 @@ DropShadow color, select the observed native key `Color`, shown in the QLab
 keys or inventing a missing baseline. Text supports
 UTF-16 ranges, percentages and Latin word selections with verified whitespace,
 guillemet/curly-quote/em-dash delimiters. Color-only edits also allow
-NBSP, guillemets, curly double quotes and em dashes; emoji and other scripts
-remain blocked. Partial fonts
+NBSP, guillemets, curly double quotes and em dashes. CJK ranges are conditional
+on exact Core Text font resolution; emoji and unsupported scripts remain blocked.
+Partial fonts
 require a complete mapping already observed in the same cue. See
 [fragment editing](agent-workflows.md#fx-and-text-fragment-operations) for limits,
 font inventory and the emoji font-normalization boundary.
 
 Python callers must also use the family editors: `QLabReader.edit_cues()` and
 `QLabReader.update_cue()` have been removed.
+
+For `qlab_query_cues`, `query_completeness` is `failed` on a root inventory
+failure, `partial` when a branch or cue could not be evaluated or the scan was
+bounded, and `complete` when the discovered candidates were evaluated without
+those gaps. `query_completeness_reasons` can include `root_read_error`,
+`child_read_error`, `child_metadata_unavailable`, `invalid_payload`,
+`cue_read_error`, `max_cues_scanned` and `id_only_unscanned`; inspect `errors`
+and omitted branches before relying on an absence of matches. `max_results`
+sets `result_limited` when more matches exist than were returned, but does not
+by itself make `query_completeness` partial when the scan completed.
 
 Specialized cue-family detail tools accept `include_native_triggers=true`; their
 editors share the [native Trigger contract](agent-workflows.md#native-cue-triggers).

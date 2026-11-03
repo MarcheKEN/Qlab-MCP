@@ -62,7 +62,7 @@ Sources:
 ## REA evidence and gaps
 
 Source collection:
-`/Users/filarmonica/Documents/ChatGPT/Qlab-REA/qlab-research/`.
+`REDACTED-LOCAL-PATH-1`.
 
 | Evidence | What it establishes | What remains unproved |
 | --- | --- | --- |
@@ -88,7 +88,7 @@ a demonstrated per-device unique identifier.
 
 Read-only decoding of the current native archive confirmed:
 
-- Workspace `virtualOutputID`: `E97A517F-E171-46F3-B076-FE23ACDF36DA`.
+- Workspace `virtualOutputID`: `REDACTED-UUID-1`.
 - Its NDI destination has the same `virtualID` (archive object slot 1228).
 - The NDI route stores `videoOutputKeyPath=ndi.NDI` in `destinationInfo`, rather
   than a direct destination UUID reference.
@@ -164,7 +164,7 @@ is needed for this recommendation.
 
 1. Verify exact document lifecycle support for the running QLab installation;
    current mutation guards require `/Applications/QLab.app`, whereas this fixture
-   is open in `/Users/filarmonica/Desktop/QLab.app`. Do not bypass that guard.
+   is open in `REDACTED-LOCAL-PATH-2`. Do not bypass that guard.
 2. Capture native device identities and minimal creation/deletion fixtures.
 3. Prove a narrow offline route edit with reopen, OSC/UI comparison and semantic
    graph conservation; then basic route/stage/region creation.
@@ -192,7 +192,7 @@ create an object. Creation options were taken from the official manual and
 recorded REA UI evidence instead; no alternative mutation was attempted.
 
 The workspace SHA-256 before and after observation remained
-`6f7119078af8523287b1068a950abbb47ad1b29f0b8c44057f4512160051b19b`.
+`REDACTED-SHA256-1`.
 No implementation tests were run: this pass changed only this research note.
 
 ## Implementation follow-up

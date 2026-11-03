@@ -1,7 +1,7 @@
 # Video follow-up — 2026-10-27
 
 QLab 5.5.10/build 5510, workspace `mcp_prueba.qlab5`
-(`95F0A03D-140E-4673-974A-E76748EBB023`). All writes used MCP previews,
+(`REDACTED-UUID-5`). All writes used MCP previews,
 fresh confirmations and readback. No cue was run or camera capture started.
 
 - A temporary Video cue with `negro.mp4` and a connected stage was healthy.
@@ -53,6 +53,16 @@ cannot be demonstrated here. Text CJK preflight now permits only graphemes that
 Core Text resolves to the exact observed font; unit tests cover this condition.
 The earlier QLab CJK block predates this code. The updated MCP still needs a
 fresh dry-run and, for an eligible font, one setter/readback plus UI inspection.
+
+## Camera/Mic channel acceptance follow-up — 2026-10-29
+
+The later [PR #19 validation summary](https://github.com/MarcheKEN/Qlab-MCP/pull/19)
+records valid channel settings accepted on a one-channel input, and rejection
+of two channels, an out-of-bounds offset and values above the API limit. A dirty
+workspace required saving and a fresh preview. This later pass supersedes only
+the earlier statement that a successful write could not be demonstrated on
+that host; it does not establish support for other devices or every patch
+combination.
 
 ## Scalar font fallback follow-up — 2026-10-29
 

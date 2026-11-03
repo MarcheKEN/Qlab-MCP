@@ -213,11 +213,13 @@ returns a partial error and blocks that property; it does not invent a value.
 Inspect `property_transports` and `blocked_properties`. Audio Maps and /live
 variants remain excluded.
 Missing fields remain null with coverage.unavailable_fields; malformed fields
-produce partial errors. `fadeAndStopOthers` preserves QLab's returned type:
-the dictionary describes modes 0..3, but QLab 5.5.10 was observed returning
-a boolean through both valuesForKeys and direct reads. A boolean is not
-interpreted as a specific scope. Never call /loadAt to inspect Load settings:
-it is an action. These tools execute no cue actions.
+produce partial errors. `fadeAndStopOthers` preserves the type returned by its
+read source. The dictionary describes modes 0..3, but OSC reads may collapse
+the setting to a boolean. For `Control` cues, the fixed local AppleScript
+fallback can return the native integer 0..3; inspect coverage notes to see
+which transport supplied the value. A boolean is never interpreted as a
+specific scope. Never call /loadAt to inspect Load settings: it is an action.
+These tools execute no cue actions.
 
 Sources: [OSC Dictionary](https://qlab.app/docs/v5/scripting/osc-dictionary-v5/),
 common cue, Reset and Devamp sections; [AppleScript Dictionary](https://qlab.app/docs/v5/scripting/applescript-dictionary-v5/),
@@ -391,6 +393,23 @@ requested saved parameters. Each selector uses a zero-based index and may
 include an exact effect type and key; if type is omitted, the Get discovers it
 from native indexed identity or reports ambiguity. They do not scan every
 effect automatically.
+
+Video details include up to four `configuration_observations`, each with `code`
+and `message`: `opacity_zero`, `cue_disarmed`, `qlab_reports_broken` and
+`qlab_reports_warning`. These describe the current values already read; unknown
+values produce no observation. Zero opacity and disarming may be intentional.
+Observations neither change cue health or edit permissions nor prove visibility.
+
+Before editing, inspect these observations and `edit_capabilities`. Check the
+assigned media and stage, then inspect QLab's full Warnings list in Workspace
+Status when available; the MCP warning summary is partial. If no read confirms
+the cause, leave it unknown. Use the existing guarded editor and read the
+details again. `fileTargetPresent=true` means a target is assigned, not that
+its file exists or is accessible/compatible.
+For LinearKey/DropShadow, OSC creation remains blocked; Video's
+`edit_capabilities.saved_settings.insert_video_effect_types` lists the types
+available through guarded `qlab_edit_saved_cue_settings` archive insertion.
+Its clean local document, version/build and confirmation requirements still apply.
 
 Text safe details include full content, output size, fixed width and format
 runs with ranges; text may contain sensitive show content. Aggregate formatting
@@ -1360,8 +1379,10 @@ returned −59.01564 for a Fade slider request of −59: the tool reported faile
 verification, retained the observed value and sent no retry. It was restored with
 a fresh confirmation. This low-level boundary is not declared exact/verified.
 
-Audio Maps, `/live`, playback, external signals, capture, Hotkey assignment/enabling,
-Trim, Audio FX and undocumented curves remain out of scope. Supported incoming
+For these family editors, Audio Maps, `/live`, playback, external signals, capture,
+Hotkey assignment/enabling, Trim, Audio FX and undocumented curves remain out
+of scope. Saved Hotkeys and weekdays have a separate guarded
+[`qlab_edit_saved_cue_settings`](#saved-light-and-video-cue-settings) workflow. Supported incoming
 MIDI/Wall Clock configuration and guarded activation use the
 [native Trigger workflow](#native-cue-triggers); they do not send signals or run
 cues. The generic editor has been removed. See the
@@ -1373,8 +1394,9 @@ cues. The generic editor has been removed. See the
 keys, types, enums and numeric bands in pages. It is static reference data, not
 proof that a native instance can be identified or written. Follow it with an
 exact cue UUID and selected indexed Get. Missing native attributes have no
-inferred aliases or defaults. Native Linear Key and Drop Shadow creation stays
-blocked; edits require readable values and a uniquely identified instance.
+inferred aliases or defaults. OSC Linear Key and Drop Shadow creation stays
+blocked; the separate saved-cue-settings editor supports guarded native-file
+insertion. Existing-instance edits require readable values and a uniquely identified instance.
 
 Video, Camera and Text editors accept typed `operations`, up to 50 per cue,
 with optional `properties`. Details accept up to 50 `video_effects` selectors
@@ -1398,8 +1420,11 @@ and aggregate native reads; numeric/enum operations retain scalar routes.
 
 Structural changes require one operation per cue, without other changes.
 QLab must be 5.5.10. Creation defaults have native evidence for 58 effects;
-LinearKey and DropShadow add/insert are blocked because neither route created
-an effect during testing. Adding a repeated type is blocked. An effect without recorded native defaults
+LinearKey and DropShadow creation through OSC remains blocked because that
+route did not create an effect during testing. Video can insert these two types
+through guarded saved-file insertion in `qlab_edit_saved_cue_settings`, subject
+to that tool's clean-document and identity checks. Adding a repeated type is
+blocked. An effect without recorded native defaults
 remains blocked; the editor does not invent defaults.
 These creation blocks do not prevent editing an existing instance with native
 identity and readable parameters. LinearKey and DropShadow created manually by

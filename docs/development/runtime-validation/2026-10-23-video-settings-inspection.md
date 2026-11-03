@@ -1,7 +1,7 @@
 # Saved video settings inspection — 2026-10-23
 
 Baseline: local QLab 5.5.10/build 5510; authorized `mcp_prueba.qlab5`
-fixture, UUID `95F0A03D-140E-4673-974A-E76748EBB023`.
+fixture, UUID `REDACTED-UUID-5`.
 
 ## Native observations
 
@@ -24,7 +24,7 @@ fixture, UUID `95F0A03D-140E-4673-974A-E76748EBB023`.
 - All five route Show switches were off. Settings was closed with Done after
   observation; no Monitor, capture, cue or output was activated.
 - Workspace bytes remained SHA-256
-  `30cddd67a25d115ce27aa2c08b17570fe8581b558c0cdb0fc68222805fced554`
+  `REDACTED-SHA256-16`
   before and after the call. No Save, Close, Open or setter was used.
 
 ## Limits
@@ -52,7 +52,7 @@ Source FastMCP Client acceptance against QLab 5.5.10/build 5510 read the exact
 lower-left (-480,-55), upper-right (480,55), size 960x110, grid off, region guide
 off and the shared Output 5 route guides off. All 129 saved geometry leaves fit
 on the default page. The document was clean at this later observation; its saved
-SHA-256 was `7170baaf3db4401f977400568ceab433eb524ec7b544de3f0b94f689029c1139`
+SHA-256 was `REDACTED-SHA256-17`
 before and after. No Save/Close/Open, setter, cue or output activation was used.
 The earlier dirty observation above describes a different snapshot.
 

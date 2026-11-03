@@ -3,7 +3,7 @@
 ## Scope
 
 QLab 5.5.10/build 5510, local `mcp_prueba.qlab5`, exact workspace UUID
-`95F0A03D-140E-4673-974A-E76748EBB023`. No cues were started. Configuration
+`REDACTED-UUID-5`. No cues were started. Configuration
 acceptance does not establish trigger execution, rendering, NDI audio or DMX output.
 
 The source FastMCP server adds `qlab_edit_saved_cue_settings` (88 tools: 52 reads,
@@ -29,7 +29,7 @@ freshness remains explicit. Reads do not save, close or reopen documents.
 Native artifacts were retained outside Git under
 `/private/tmp/qlab-cue-gap-implementation-20261026/`, including source MCP requests,
 previews, results and saved snapshots. The original snapshot SHA-256 was
-`b1147b6052a3e10b982ebd6c15a3106b5d24a4144b2a9c3dd5e97e6af96989d4`.
+`REDACTED-SHA256-21`.
 These local artifacts are not distributed fixture files and are not a guarantee
 for another QLab version.
 

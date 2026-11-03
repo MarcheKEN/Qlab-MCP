@@ -8,6 +8,13 @@ from qlab_mcp.write import control, visual
 from test_control_cue_writes import Reader, WS, START, WAIT, MEMO
 
 
+def test_ndi_audio_rejects_partial_saved_configuration(monkeypatch):
+    from qlab_mcp import video_settings
+    monkeypatch.setattr(video_settings, "_saved", lambda *_: {"status": "partial", "document_modified": False})
+    with pytest.raises(ValueError, match="complete"):
+        visual._ndi_context(None, WS, START)
+
+
 @pytest.fixture
 def reader(monkeypatch):
     monkeypatch.setattr(control, "check_write_readiness", lambda *a: {"ok": True})

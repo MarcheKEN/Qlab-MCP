@@ -217,6 +217,11 @@ class VisualDetailsResult(CueListReadResult):
     redactions: list[dict[str, str]] = Field(default_factory=list)
 
 
+class ConfigurationObservation(BaseModel):
+    code: Literal["opacity_zero", "cue_disarmed", "qlab_reports_broken", "qlab_reports_warning"]
+    message: StrictStr
+
+
 class VideoCueDetailsResult(VisualDetailsResult):
     cue_type: ClassVar[str] = "Video"
     identity: VideoCueSummary | None = None
@@ -225,6 +230,22 @@ class VideoCueDetailsResult(VisualDetailsResult):
     audio: VideoAudioSettings | None = None
     level: AudioCrosspoint | None = None
     saved_settings: SavedCueSettings | None = None
+    configuration_observations: list[ConfigurationObservation] = Field(default_factory=list, max_length=4)
+
+
+def _configuration_observations(result):
+    state = result.state
+    checks = [
+        (result.video is not None and result.video.opacity == 0, "opacity_zero",
+         "Configured opacity is zero; this may be intentional and does not establish rendered output."),
+        (state is not None and state.armed is False, "cue_disarmed",
+         "Cue is configured as disarmed; this may be intentional."),
+        (state is not None and state.isBroken is True, "qlab_reports_broken",
+         "QLab reports the cue as broken; inspect its media, stage and QLab warnings for the cause."),
+        (state is not None and state.isWarning is True, "qlab_reports_warning",
+         "QLab reports a warning; its cause is not established by this flag."),
+    ]
+    return [ConfigurationObservation(code=code, message=message) for observed, code, message in checks if observed]
 
 
 class CameraCueDetailsResult(VisualDetailsResult):

@@ -463,6 +463,8 @@ def _validate(summary):
         footprint = 0
         for parameter in params:
             if parameter['type'] in {'scalar',0}:
+                if type(parameter.get('twoBytes')) is not bool:
+                    raise ValueError('Physical parameter byte width is unavailable or invalid.')
                 channel = parameter.get('channel',footprint)
                 if channel < 0:
                     raise ValueError('Physical parameter has a negative channel.')

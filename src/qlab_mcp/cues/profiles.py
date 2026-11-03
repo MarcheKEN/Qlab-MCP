@@ -406,8 +406,15 @@ def _health_summary(values: dict[str, Any]) -> dict[str, Any] | None:
         probable_causes.append("broken_child_cue_likely")
         diagnostic_hints.append("Query or expand child cues with isBroken=true before editing the container.")
         needs_human_check.append("Open QLab Workspace Status or expand the container to confirm which child cue is broken.")
+    elif is_broken and normalized_type == "video":
+        messages.append("Video cue reports a broken state." +
+                        (" A file target is assigned; its existence, accessibility and compatibility are not established."
+                         if file_target_present is True else ""))
+        probable_causes.append("file_target_present_but_broken" if file_target_present is True else "cue_reported_broken")
+        diagnostic_hints.append("Inspect the assigned media, video stage and QLab warnings before identifying a cause.")
+        needs_human_check.append("Check QLab Workspace Status for the exact reason; target assignment alone does not establish media or stage validity.")
     elif is_broken and file_target_present is True:
-        messages.append("File target exists but the cue is broken; likely missing, unavailable, or incompatible media.")
+        messages.append("A file target is assigned but the cue is broken; its existence, accessibility and compatibility are not established.")
         probable_causes.append("file_target_present_but_broken")
         diagnostic_hints.append("Inspect the cue with profile='technical' only if the exact media path is needed.")
         needs_human_check.append("Check that the media volume is mounted and the target file is reachable and supported by QLab.")

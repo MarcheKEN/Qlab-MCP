@@ -3,7 +3,7 @@
 ## Scope
 
 Authorized native fixture: `mcp_prueba.qlab5`, UUID
-`95F0A03D-140E-4673-974A-E76748EBB023`, QLab 5.5.10/build 5510.
+`REDACTED-UUID-5`, QLab 5.5.10/build 5510.
 Only newly created test definitions and two newly created, disarmed Light cues
 were used. Existing fixture cues were not repaired or executed. Pending edits
 were saved using the reviewed MCP Save flow. No playback or hardware output test.
@@ -16,8 +16,8 @@ process does not reload source or schemas automatically.
 
 Test cue UUIDs:
 
-- `F32918E6-5163-4634-A170-F6036B4D25A4`
-- `97B57008-64B3-4F1D-B06B-AF2CDEDBC4BF`
+- `REDACTED-UUID-6`
+- `REDACTED-UUID-7`
 
 First preview/execution batch: ascending Custom with an interior point
 `t=0.4,v=0.8`, descending Parametric 2.5, ascending S-Curve 2.5 and descending

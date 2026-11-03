@@ -29,7 +29,7 @@ the approved local-socket environment and passed.
 ## Native saved-file evidence
 
 The retained native QLab 5.5.10 research sample with SHA-256
-`935f9bae82cb594b894045a003c0a6b424893fe6d175a0f50ee5fd27ecb2bbc6`
+`REDACTED-SHA256-15`
 was read without modification. The new decoder returned six active instruments,
 four groups and four stored definitions, with complete known-field coverage and
 zero diagnostics. Unreachable residual objects did not inflate the inventory.

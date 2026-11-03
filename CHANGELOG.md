@@ -2,6 +2,13 @@
 
 ## 0.4.0 (Unreleased)
 
+- Add bounded Video configuration observations from existing reads, correct
+  assigned-target health guidance, and distinguish blocked OSC effect creation
+  from guarded Video LinearKey/DropShadow archive insertion.
+- Reports root inventory failures as failed cue queries and branch or cue read
+  failures as partial, with explicit reasons and retained errors. Result limits
+  remain separate from search completeness.
+
 - Add `qlab_edit_saved_cue_settings` for confirmed saved Hotkey configuration and
   activation, Wall Clock weekdays, Video audio-track selection, integrated audio
   envelopes and native LinearKey/DropShadow insertion. Current surface: **88 tools,

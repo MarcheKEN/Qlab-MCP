@@ -7,7 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 import plistlib
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue, StrictBool, StrictInt, StrictStr, TypeAdapter, model_validator
 
@@ -559,6 +559,7 @@ def enrich_cue_details(reader, result, max_bytes=None):
     result.saved_settings = SavedCueSettings.model_validate(read_saved_cue_settings(reader, result.workspace_id, result.cue_id))
     result.edit_capabilities["saved_settings"] = dict(tool="qlab_edit_saved_cue_settings",
         operations=["set_hotkey", "set_hotkey_enabled", "set_wall_clock_days", *(["select_audio_track", "set_integrated_audio_fade", "insert_video_effect"] if result.identity.type == "Video" else [])], requires_clean_document=True,
+        **({"insert_video_effect_types": list(get_args(InsertEffect.model_fields["effect_type"].annotation))} if result.identity.type == "Video" else {}),
         verification_scope="Saved archive after reopen; no trigger execution is tested.")
     from .cues.limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES
     from .cues.limits import serialized_payload_bytes

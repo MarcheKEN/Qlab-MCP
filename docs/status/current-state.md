@@ -1,4 +1,48 @@
-# Current Project State — 2026-10-26
+# Current Project State — 2026-11-01
+
+## Video cue diagnostics — 2026-11-01
+
+`qlab_get_video_cue_details` now includes bounded `configuration_observations`
+for exactly zero opacity, explicitly disarmed cues, and QLab-reported broken
+or warning states. They use values already read by the detail tool and do not
+change cue health or edit permissions. The health summary describes
+`fileTargetPresent` as an assigned target; it does not claim that media exists,
+is accessible, or is compatible. If the cause remains unconfirmed, the workflow
+keeps it unknown.
+
+Video capabilities distinguish blocked LinearKey/DropShadow OSC creation from
+the existing guarded saved-file insertion path. No new write surface or claim
+of rendered or physical video output was added.
+
+## Camera/Mic channel acceptance — 2026-10-29
+
+The later live pass accepted valid settings on a one-channel input and rejected
+two channels, an out-of-bounds offset and values above the API limit. A dirty
+workspace required a save and fresh preview. This supersedes only the earlier
+host-availability limitation; other devices and patch combinations remain
+unproven. See the [dated follow-up](../development/runtime-validation/2026-10-27-video-follow-up.md#cameramic-channel-acceptance-follow-up--2026-10-29).
+
+## Query completeness and verification — 2026-10-31
+
+The source now reports a failed root inventory as `failed` and incomplete
+branch, payload or cue reads as `partial`, preserving the errors and reasons.
+A result limit remains separate from search completeness; see the
+[tool catalogue](../user/tools.md). The local suite reported **2,424 passed,
+35 skipped, 61 subtests passed**. A later focused documentation and contract
+check reported **109 passed**; the 66 deselected tests were outside that check.
+
+On QLab 5.5.10/build 5510, a fresh source FastMCP client read the test workspace:
+it scanned 533 cue items, distinguished a complete result-limited Video query
+from a scan-limited partial query, returned zero matches for an absent name and
+reported an unknown workspace as failed. Root, branch and cue read failures were
+exercised in simulated tests, not induced in the live workspace.
+
+Guarded live configuration checks changed and restored a disarmed Light cue's
+pre-wait (0 → 0.75 → 0 seconds) and a Video cue's opacity (1 → 0.8 → 1).
+Fresh reads confirmed the restored values; the workspace was left marked
+modified and was not saved. These observations are bounded configuration
+readbacks, not playback, rendered video or physical DMX/output validation.
+The dated sections below retain their original evidence and test totals.
 
 ## Cue settings completion — PR #19
 
@@ -14,7 +58,8 @@ validated compound values.
 Native acceptance, the corrected prototype failure/recovery, verification limits
 and research-only Trim findings are recorded in the
 [cue settings report](../development/runtime-validation/2026-10-26-cue-settings-completion.md).
-Final automated verification: **2,390 passed, 35 skipped, 61 subtests passed**.
+Automated verification for that October 26 pass: **2,390 passed, 35 skipped,
+61 subtests passed**.
 The test workspace retains an Audit NDI stage because existing cues refer to it;
 see the cleanup outcome in the report. Earlier test/tool counts below describe
 their dated validation passes.
@@ -248,7 +293,7 @@ and local workspace document tools. Unsupported FX creation, unreadable Text
 attributes, and other documented capability gates remain closed.
 
 QLab 5.5.10 live tests ran in `redacted-workspace-6b31c91e.qlab5`, UUID
-`8E86FE91-668B-560C-B738-4D581B5A7498`. Readiness confirmed write mode, `/connect`
+`REDACTED-UUID-9`. Readiness confirmed write mode, `/connect`
 edit permission and Edit Mode; QLab showed 0 active cues. Group Second Trigger
 was changed 0→1→0 and matched the Triggers inspector. Existing LinearKey
 `inputContrast` changed 4.7→4.8→4.7; DropShadow `Distance` changed 0→2→0.
@@ -517,8 +562,8 @@ branch remains unforced. A fresh Move token passed directly from dry-run
 to execution and verified the Cart's existing last position without sending a
 move. The manually copied token failure remains a transcription error before
 OSC. The two fixtures are left in the test workspace as requested:
-`67D3BD54-4FBB-5144-B37A-BDFB82FE0AC7` and
-`BA9DB096-A4F0-52C6-AA04-2A385374DB72`.
+`REDACTED-UUID-10` and
+`REDACTED-UUID-11`.
 
 ## Root Move and deferred root Delete — installed token spot check
 
@@ -642,7 +687,7 @@ Development update (2026-09-23): ten Fade, Network, MIDI/MIDI File, Timecode,
 and Script read tools are implemented. Source exposes 49 tools (43 read-only,
 6 gated writes). Final local verification: 3044 tests and 39 subtests passed;
 `git diff --check` passed. In the installed MCP, read-only validation on
-`redacted-workspace-76f33afa.qlab5` (`F54ABACA-BB62-5B95-87E5-B43CFBD14B2B`) found two Fade
+`redacted-workspace-76f33afa.qlab5` (`REDACTED-UUID-12`) found two Fade
 and 80 Network cues; two exact details of each returned `ok`. The three
 Cue Lists had no MIDI, MIDI File, Timecode, or Script examples. The final
 Network message-error profile change was made after those installed calls,
@@ -656,7 +701,7 @@ documented OSC coverage limitations; Audio Maps stay excluded.
 
 Control-family runtime validation (2026-09-22): both tools invoked through
 FastMCP against QLab 5.5.10 in `redacted-workspace-6b31c91e.qlab5`
-(`8E86FE91-668B-560C-B738-4D581B5A7498`). Seventeen Cue Lists read; examples
+(`REDACTED-UUID-9`). Seventeen Cue Lists read; examples
 of all twelve types returned status=ok in safe and technical (24 details).
 The local validation process received denied for the other three workspaces;
 their content is not claimed validated by this process. No cues executed or
@@ -768,9 +813,9 @@ Cue List read-only STDIO validation (2026-09-20, QLab 5.5.10): inventory returne
 17 lists and 1 excluded Cart in `redacted-workspace-6b31c91e.qlab5`, 5 lists in
 `redacted-workspace-1ebcea13.qlab5`, and 8 lists in `redacted-workspace-7cd29b97.qlab5`.
 Safe and technical detail passed for `Main Cue List`
-(`70A6B610-7094-5939-A9FC-D7AAD7C3379C`, 25 direct / 27 returned descendants),
-`Master` (`8A01493C-BAD2-56D6-89DF-92C89A79BDEC`, 151 / 215), and `Full show`
-(`8836BE62-7BEC-5499-9DF0-11F0620F00C4`, 22 / 128). Depth-2 truncation was
+(`REDACTED-UUID-13`, 25 direct / 27 returned descendants),
+`Master` (`REDACTED-UUID-14`, 151 / 215), and `Full show`
+(`REDACTED-UUID-15`, 22 / 128). Depth-2 truncation was
 explicit for Main and Full show. Current timecode was unavailable in these
 samples; MTC configuration was readable. Generic details retained the payload
 and returned the deprecation notice in each workspace. These observations used
@@ -786,10 +831,10 @@ snapshot below remains historical; see the current [tool catalog](../user/tools.
 Video split verification: `PYTHONPATH=src .venv/bin/python -m pytest -q
 -p no:cacheprovider` passed with **2681 tests and 41 subtests**. FastMCP
 inspection reported 20 tools. Read-only STDIO calls against QLab 5.5.10,
-workspace `redacted-workspace-6b31c91e.qlab5` (`8E86FE91-668B-560C-B738-4D581B5A7498`), returned
+workspace `redacted-workspace-6b31c91e.qlab5` (`REDACTED-UUID-9`), returned
 3 input patches, 5 routes, and 9 stages. Exact Stage
-`A41F907E-3E01-570E-A4BC-0B86C6A1922E` and Route
-`3B9E921B-BB0E-509A-A0A5-CE5C76DB3567` passed both safe and technical reads.
+`REDACTED-UUID-16` and Route
+`REDACTED-UUID-17` passed both safe and technical reads.
 A nonexistent Stage UUID returned `video_stage_not_found` after a same-domain
 inventory check. No QLab setters, playback, or save commands were used.
 This validates the local checkout; a running MCP process must reload source

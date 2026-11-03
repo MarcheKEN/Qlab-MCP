@@ -355,6 +355,9 @@ class CueFamilyReadsMixin:
             result.technical_payload = _redact_payload(normalized,
                 section=f"{family}_cue", profile=profile, redactions=result.redactions)
             result.warnings.append("Technical notes and paths may contain sensitive free text.")
+        if cue_type == "Video":
+            from .visual import _configuration_observations
+            result.configuration_observations = _configuration_observations(result)
         if serialized_payload_bytes(result.model_dump(mode="json")) > max_bytes:
             result.technical_payload = None
             for name in detail_models:
@@ -362,5 +365,7 @@ class CueFamilyReadsMixin:
             if hasattr(result, "level"):
                 result.level = None
             result.identity = None
+            if cue_type == "Video":
+                result.configuration_observations = []
             return _fail(result, "cue_payload_too_large", f"{cue_type} detail exceeds the response byte budget")
         return _finish(result)

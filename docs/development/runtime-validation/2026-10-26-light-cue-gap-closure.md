@@ -28,12 +28,12 @@ discard the enrichment. OSC detail survives unavailable archive enrichment.
 ## Native source acceptance
 
 Target: `mcp_prueba.qlab5`, workspace
-`95F0A03D-140E-4673-974A-E76748EBB023`, QLab **5.5.10/build 5510**.
-The running installation was `/Users/filarmonica/Desktop/QLab.app`.
+`REDACTED-UUID-5`, QLab **5.5.10/build 5510**.
+The running installation was `REDACTED-LOCAL-PATH-2`.
 
 Public FastMCP Client calls against current source checked the clean, inactive
 document in Edit Mode, then read Light cue
-`A1B43231-CA7A-466A-A7E6-C1974D875D2A` (number 12,
+`REDACTED-UUID-8` (number 12,
 `LIGHT_DISARMED_BROKEN`). Both saved Custom curves were readable.
 
 A fresh preview and confirmation applied an ascending Linear curve with points
@@ -49,7 +49,7 @@ archive does not imply byte-identical restoration.
 
 On October 26, another public source read with native triggers returned `ok`,
 no errors and ready saved curves from the Desktop installation. The clean saved
-file hash was `954a8d88970ba3c10509527008b6bf663b1c986c493fc4a671a2af92a6bdff01`;
+file hash was `REDACTED-SHA256-22`;
 it was identical before and after that read. The restored curves were Custom.
 This follow-up did not exercise a native trigger activation or scalar setter.
 
@@ -79,8 +79,12 @@ This does not establish complete Settings UI parity. New NDI/Syphon/Blackmagic
 input assignment needs backend-specific native serialization and reopen evidence;
 Blackmagic also needs the relevant hardware. The complete process device registry
 and unlicensed global output selector have no validated public read/write backend.
-LinearKey/DropShadow effect creation and compound virtual-control command syntax
-still need accepted native samples; existing effect-instance handling is unchanged.
+At this checkpoint, LinearKey/DropShadow effect creation and compound
+virtual-control command syntax still needed accepted native samples; existing
+effect-instance handling was unchanged. The later [cue settings completion
+report](2026-10-26-cue-settings-completion.md) records guarded saved-file
+insertion and reopen/UI acceptance for both effects. That evidence does not
+unblock their OSC creation route.
 
 Global/personal library writes, Dashboard/live operation, playback and physical
 signal remain outside scope. AppleEvents addressed by application path retain a

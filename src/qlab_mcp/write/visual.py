@@ -392,8 +392,8 @@ def _reference(reader, ws, route, uid):
 def _ndi_context(reader, ws, uid):
     from ..video_settings import _saved
     saved = _saved(reader, ws)
-    if saved.get("status") not in {"ready", "partial"} or saved.get("document_modified") is not False:
-        raise ValueError("NDI audio requires a stable clean saved video configuration.")
+    if saved.get("status") != "ready" or saved.get("document_modified") is not False:
+        raise ValueError("NDI audio requires a complete, stable, clean saved video configuration.")
     stage_id = control._scalar(reader, ws, uid, "stageID")
     stage = next((s for s in saved["stages"] if s["id"] == stage_id), None)
     if stage is None:
@@ -757,7 +757,7 @@ def capabilities(kind, result):
             "blocked_properties": blocked, "conditional_properties": conditional, "requires_fresh_preflight": True,
             "unavailable_via_osc": ["Hotkey/MIDI/Wall Clock setup", "Timecode activation/display"],
             "excluded": ["Audio Maps", "/live", "cue execution", "workspace stage/region edits"],
-            "pending_validation": ["FX LinearKey/DropShadow creation, ambiguous native identities and unavailable native parameter baselines", "Audio FX", "Emoji and non-CJK Text fallback, complex words, unobserved fonts and partial shadows"],
+            "pending_validation": ["LinearKey/DropShadow OSC creation is blocked; Video cues support guarded archive insertion via qlab_edit_saved_cue_settings. Ambiguous native identities and unavailable native parameter baselines remain blocked.", "Audio FX", "Emoji and non-CJK Text fallback, complex words, unobserved fonts and partial shadows"],
             "blocked_operations": ["setDefaultLevels", "setSilentLevels"]}, result.triggers)
 
 

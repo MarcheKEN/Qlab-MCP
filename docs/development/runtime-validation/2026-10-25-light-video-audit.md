@@ -8,8 +8,8 @@ control or every backend. This audit checks that distinction, actual tool calls,
 native UI agreement and public documentation; it does not certify physical output.
 
 The target was the already-open `mcp_prueba.qlab5`, UUID
-`95F0A03D-140E-4673-974A-E76748EBB023`, in Edit Mode with zero active cues.
-Initial saved SHA-256: `dabf463e6fbd5817bc0732fdb1933cd454147be4333e9683d6a9bdbd9968ea5d`.
+`REDACTED-UUID-5`, in Edit Mode with zero active cues.
+Initial saved SHA-256: `REDACTED-SHA256-19`.
 Initial configuration: 6 instruments, 4 explicit groups, 2 workspace definitions,
 12 stages, 5 routes, 3 input patches and 1 configured virtual device.
 The built-in `all` light group explains the extra group in the OSC inventory.
@@ -98,7 +98,7 @@ removed through their public editors. Each cleanup returned `verified`.
 Final attached reads: **6 instruments, 4 groups, 2 definitions; 12 stages,
 5 routes, 3 inputs, 1 configured virtual device**. Both settings reads reported
 matching observable fields, no diagnostics, and the same saved SHA-256:
-`3308ce218979aea167fd341fc3092d3a45314756050541652c65243a82250c9b`.
+`REDACTED-SHA256-20`.
 The document was clean, in Edit Mode, with no active cues. This is logical
 configuration preservation, not a claim of byte-identical archives after edits.
 

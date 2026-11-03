@@ -6,6 +6,11 @@ from qlab_mcp.errors import UnsafeWriteOperationError
 from qlab_mcp.settings.light_commands import _light_command_line_count, analyze_light_command_text
 
 
+def test_nonfinite_numeric_literal_is_rejected():
+    from qlab_mcp.settings.light_commands import _parse_value
+    assert _parse_value('9' * 400 + '.0') is None
+
+
 @pytest.fixture
 def light_patch() -> dict:
     return {

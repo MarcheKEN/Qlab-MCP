@@ -80,6 +80,64 @@ def test_unavailable_slices_do_not_advertise_enabled_edits():
         assert key not in result.edit_capabilities['allowed_properties']
 
 
+@pytest.mark.parametrize('values,codes', [
+    ({'opacity': 0, 'armed': False, 'isBroken': True, 'isWarning': True},
+     ['opacity_zero', 'cue_disarmed', 'qlab_reports_broken', 'qlab_reports_warning']),
+    ({'opacity': 0, 'armed': True, 'isBroken': False, 'isWarning': False}, ['opacity_zero']),
+    ({'opacity': 0.0001, 'armed': True, 'isBroken': False, 'isWarning': False}, []),
+    ({'opacity': None, 'armed': None, 'isBroken': None, 'isWarning': None}, []),
+])
+def test_video_configuration_observations_are_derived_without_extra_reads(values, codes):
+    osc = fixture('video')
+    baseline = detail(QLabReader(osc), 'video')
+    calls = list(osc.calls)
+    osc.calls.clear()
+    osc.cell_values[FIRST].update(values)
+    result = detail(QLabReader(osc), 'video')
+    assert [item.code for item in result.configuration_observations] == codes
+    assert all(item.message for item in result.configuration_observations)
+    assert osc.calls == calls
+    assert result.ok == baseline.ok and result.status == baseline.status
+    assert result.edit_capabilities == baseline.edit_capabilities
+    assert result.state.armed is values['armed']
+    assert result.state.isBroken is values['isBroken']
+    assert '/private/video.mov' not in result.model_dump_json()
+
+
+def test_video_observations_and_saved_effect_capabilities_survive_fastmcp(monkeypatch):
+    osc = fixture('video')
+    osc.cell_values[FIRST]['opacity'] = 0
+    monkeypatch.setattr(server, '_reader', lambda: QLabReader(osc))
+    async def run():
+        async with Client(server.mcp) as client:
+            result = await client.call_tool('qlab_get_video_cue_details',
+                dict(workspace_id=WS, cue_id=FIRST))
+        data = result.structured_content
+        assert data['configuration_observations'][0]['code'] == 'opacity_zero'
+        saved = data['edit_capabilities']['saved_settings']
+        assert saved['insert_video_effect_types'] == ['LinearKey', 'DropShadow']
+        assert saved['tool'] == 'qlab_edit_saved_cue_settings'
+        assert saved['requires_clean_document'] is True
+        assert 'OSC creation' in ' '.join(data['edit_capabilities']['pending_validation'])
+    asyncio.run(run())
+
+
+def test_video_observations_respect_response_budget():
+    from qlab_mcp.cues.limits import serialized_payload_bytes
+    from qlab_mcp.cues.visual import VideoCueDetailsResult, VideoCueSummary, VIDEO_MODELS
+    osc = fixture('video')
+    osc.cell_values[FIRST].update(opacity=0, armed=False)
+    reader = QLabReader(osc)
+    args = (WS, FIRST, 'safe', None, None, VideoCueDetailsResult, VideoCueSummary, VIDEO_MODELS)
+    baseline = reader._get_family_details(*args)
+    assert len(baseline.configuration_observations) == 2
+    limit = serialized_payload_bytes(baseline.model_dump(mode='json')) - 1
+    result = reader._get_family_details(*args, max_bytes=limit)
+    assert result.error_code == 'cue_payload_too_large'
+    assert result.configuration_observations == [] and result.identity is None
+    assert serialized_payload_bytes(result.model_dump(mode='json')) <= limit
+
+
 @pytest.mark.parametrize("kind", KINDS)
 def test_scoped_paged_inventory_and_empty(kind):
     osc = fixture(kind)

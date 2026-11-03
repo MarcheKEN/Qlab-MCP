@@ -1316,9 +1316,9 @@ Example Audio dry run (replace UUIDs with resolved exact values):
 
 ```json
 {
-  "workspace_id": "8E86FE91-668B-560C-B738-4D581B5A7498",
+  "workspace_id": "11111111-1111-4111-8111-111111111111",
   "updates": [{
-    "cue_id": "C45EE972-F0E8-5241-8D10-28F86D5F05EC",
+    "cue_id": "22222222-2222-4222-8222-222222222222",
     "properties": {"rate": 1.1, "duckOthers": true},
     "operations": [
       {"property": "level", "args": {"inChannel": 1, "outChannel": 1, "decibel": -3}},

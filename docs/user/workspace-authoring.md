@@ -48,8 +48,10 @@ Do not claim a complete audit from a sample or an unreadable field.
 
 Read `edit_capabilities` before proposing a setter. Distinguish available with
 confirmation, blocked, pending validation and unavailable by OSC. A token or
-documented endpoint cannot override a blocked capability. Leave LinearKey and
-DropShadow creation blocked; existing-instance editing has separate coverage.
+documented endpoint cannot override a blocked capability. LinearKey and
+DropShadow creation via OSC remains blocked; `qlab_edit_saved_cue_settings`
+provides separately guarded native-file insertion. Existing-instance editing
+has separate coverage.
 
 ### Report format
 

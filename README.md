@@ -224,7 +224,7 @@ Before a real existing-workspace change, the agent must:
 4. Submit the returned fresh confirmation token(s), execute once and read back.
 
 Batches of OSC cue edits are sequential and non-atomic. The local Light Patch,
-definition and curve editors use a guarded file replacement instead. Do not
+definition, curve, saved-cue and Video Settings editors use a guarded file replacement. Do not
 retry an uncertain mutation automatically. Keep Audition disabled. Document
 Open uses a separate empty-inventory preflight; Save includes all unsaved edits, and Close
 refuses dirty documents. See [write workflows](docs/user/agent-workflows.md#common-write-gate).
@@ -305,7 +305,7 @@ saved state and do not execute cues.
 </details>
 
 <details>
-<summary><strong>Light and Group cues</strong> — 7 tools</summary>
+<summary><strong>Light and Group cues</strong> — 8 tools</summary>
 
 | Tool | What it does |
 | --- | --- |
@@ -366,7 +366,7 @@ saved state and do not execute cues.
 </details>
 
 <details>
-<summary><strong>Workspace settings</strong> — 17 tools</summary>
+<summary><strong>Workspace settings</strong> — 21 tools</summary>
 
 | Tool | What it does |
 | --- | --- |

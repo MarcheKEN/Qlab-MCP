@@ -39,8 +39,8 @@ message, output, fade, or target mode, then rechecks identity and selector.
 Failures in secondary reads preserve confirmed identity as partial data.
 Sensitive Network text and Script source require the technical profile.
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 85 decorated tools
-(52 read-only and 35 gated writes),
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 88 decorated tools
+(52 read-only and 36 gated writes),
 their schemas, annotations, timeouts, and result models. QLab-backed calls
 create a fresh `QLabReader` and close it after the operation; local media tools
 do not use that reader. `qlab-mcp` maps to
@@ -95,7 +95,8 @@ verification reads are fresh.
 
 Workspace Settings reads use six domain tools and the shared domain executor.
 Video has a three-query overview plus UUID-only Stage, Output Route, and Region
-tools.
+tools. Passive output-device and input-patch inventories separately report local
+metadata, saved configuration and OSC observations with their coverage limits.
 The exact tools reuse the settings transport/redaction helpers and provide typed
 summaries with an optional redacted technical payload. Internal settings readers
 remain available to Workspace Status and Cue Details; their Video overview uses
@@ -150,8 +151,9 @@ shares the Move executor. Move, Delete, and Workspace Settings writes have
 dedicated modules and public tools. `settings/write_registry.py` and
 `settings/write_operations.py` retain the established `minGoTime` writer;
 `settings/object_writes.py` handles the other typed settings edits. The public
-`qlab_edit_workspace_settings` tool was replaced by five object-specific Edit
-tools. Real writes require
+`qlab_edit_workspace_settings` tool was replaced by scoped General, Audio and
+Video editors. The five Video editors cover OSC route/stage/region setters and
+saved-file batches for stages, routes, devices and inputs. Real writes require
 exact targeting, readiness, deterministic preflight, the required fresh token,
 one setter per operation, cache invalidation, and fresh readback. A timed-out setter is never resent automatically; later reads
 determine whether the result is confirmed or uncertain.

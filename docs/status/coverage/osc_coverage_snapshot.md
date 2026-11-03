@@ -36,7 +36,10 @@ enable blocked operations. Historical gate descriptions are preserved below.
 | Devamp | 0 | 3 | 0 | 0 |
 | Script | 0 | 1 | 0 | 0 |
 
-## Current public contract (reviewed 2026-10-17)
+## Historical public contract review (2026-10-17)
+
+The route-count table above is generated from the current registry; this dated
+review records the public contract as it stood on October 17.
 
 - `qlab_edit_cues`, `QLabReader.edit_cues()` and `QLabReader.update_cue()`
   are removed. Family editors reuse private helpers, not a generic entry point.

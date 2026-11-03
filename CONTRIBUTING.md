@@ -29,7 +29,7 @@ git diff --check
 ```
 
 CI runs the locked Python 3.11 base suite, lockfile verification and wheel/sdist
-builds on Ubuntu. FastMCP inspection and documentation-link checks are additional
+builds on Ubuntu and macOS. FastMCP inspection and documentation-link checks are additional
 maintainer checks, not CI jobs. Some native/macOS, local-fixture and optional
 audio tests skip on CI; record the observed skip count rather than treating
 it as full runtime coverage.
@@ -37,7 +37,7 @@ it as full runtime coverage.
 The project does not currently configure a separate linter or type checker.
 Do not add substitute checks as if they were official.
 
-The FastMCP inspection must expose exactly the 83 tools listed in
+The FastMCP inspection must expose exactly the 88 tools listed in
 [`docs/user/tools.md`](docs/user/tools.md). The schemas and contract tests in
 `tests/test_server_tools.py` remain authoritative.
 

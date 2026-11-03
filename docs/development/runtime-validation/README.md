@@ -9,6 +9,12 @@ Use the [current tool catalogue](../../user/tools.md) and
 
 ## Records
 
+- [Video, Camera and Text follow-up — October 27](2026-10-27-video-follow-up.md)
+- [Saved cue settings completion — October 26](2026-10-26-cue-settings-completion.md)
+- [Video Settings inspection — October 23](2026-10-23-video-settings-inspection.md)
+- [Stage editor read coverage audit — October 24](stage-editor-coverage-audit.md)
+- [Light definitions — October 21](2026-10-21-light-definitions.md)
+- [Light Patch inspection — October 21](2026-10-21-light-patch-inspection.md)
 - [Light cue audit follow-up — October 26](2026-10-26-light-cue-gap-closure.md):
   saved curve detail, Linear points, compact ranges and running-installation identity.
 

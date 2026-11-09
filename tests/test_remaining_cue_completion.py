@@ -10,6 +10,21 @@ def reader(monkeypatch):
     monkeypatch.setattr(control, 'check_write_readiness', lambda *a: {'ok': True})
     monkeypatch.setattr(control, 'ensure_write_ready', lambda *a: None)
     r = Reader()
+    r.archive_digest = 'fixture-archive'
+
+    def saved_owner(reader, workspace_id, cue_id, object_ids):
+        row = reader.values[cue_id]
+        map_id = row.get('audioMap/uniqueID', '')
+        owned = {str(item.get('uniqueID', item.get('id', ''))).upper() for item in row.get('objects', [])}
+        if map_id not in ('', None) or not set(object_ids) <= owned:
+            raise ValueError('Fixture archive does not prove direct cue ownership.')
+        return {'source': 'saved_archive', 'workspace_id': workspace_id, 'cue_id': cue_id,
+                'cue_type': row.get('type', 'Audio'), 'audio_map_id': '',
+                'object_ids': sorted(object_ids), 'ownership': 'direct_cue_collection',
+                'sha256': reader.archive_digest, 'freshness': 'last_saved'}
+
+    from qlab_mcp import saved_cue_settings
+    monkeypatch.setattr(saved_cue_settings, 'read_saved_cue_object_ownership', saved_owner)
     original = r._request
     patch = str(UUID(int=100)).upper()
     def request(address, *args, **kwargs):
@@ -256,6 +271,15 @@ def test_owned_object_confirmation_rejects_changed_identity_or_ownership(reader,
         reader.values[START]['uniqueID'] = MEMO
     else:
         items[0]['operations'][0]['args']['objectID'] = other
+    result = remaining.edit_remaining_cues(reader, WS, items, False, family='audio')
+    assert not result['ok'] and not reader.setters
+
+
+def test_owned_object_confirmation_rejects_changed_saved_archive(reader):
+    obj = owned_object(reader)
+    items = confirmed(reader, [{'cue_id': START, 'operations': [
+        {'property': 'objectID/name', 'args': {'objectID': obj, 'name': 'new'}}]}])
+    reader.archive_digest = 'changed-archive'
     result = remaining.edit_remaining_cues(reader, WS, items, False, family='audio')
     assert not result['ok'] and not reader.setters
 

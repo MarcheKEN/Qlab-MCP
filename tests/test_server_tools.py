@@ -139,7 +139,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {'qlab_get_fonts': {
                                                   'idempotentHint': False,
                                                   'openWorldHint': True,
                                                   'readOnlyHint': False},
-                                  'input_schema_hash': 'cc68b39dd9b8d55f94f0e67836bdec6574e3b56d33c1055894605a7bb6bcb3f9',
+                                  'input_schema_hash': '01accce5909cf2dc1ef59bc0dee8508a26d33165918aef860af99505f71fe10e',
                                   'output_schema_hash': '12573ab3c34f0974c9245594b5dbc752ac1717003946758cb6baadb4c15909b7',
                                   'tags': ['audio', 'gated-write', 'qlab', 'settings'],
                                   'timeout': 60.0,
@@ -916,7 +916,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_saved_audio_patches'] = {
     'annotations': {'readOnlyHint': False, 'destructiveHint': True,
                     'idempotentHint': False, 'openWorldHint': True},
     'tags': ['audio', 'gated-write', 'qlab', 'settings', 'workspace-document'],
-    'input_schema_hash': 'ecca0d4cef0badbb40c02181335a3c9abcb2641c0f844ea25b0a9602887d290f',
+    'input_schema_hash': '580a39aedcc60991e5a592870a2d0a13a3da80b2f54ab2caccfbcfdf75ad9628',
     'output_schema_hash': '82ef96cebaf5fbe16269fd18b0240d78f5b9b90a4155a17eb797115b09148ecf',
 }
 ADDED_TOOL_NAMES = {
@@ -938,7 +938,7 @@ EXPECTED_TOOL_CONCEPTS = {
     "qlab_get_saved_audio_patches": ("last-saved", "passive CoreAudio", "connected or that audio works"),
     "qlab_get_audio_effect_catalogue": ("saved_workspace_instances", "installed_plugins", "unknown"),
     "qlab_edit_saved_audio_patches": ("5.5.10/build 5510", "single-use token", "No capture or audio is activated",
-                                     "New patches can only", "duplicating an existing patch", "edit cue Trim"),
+                                     "system-device", "New patches can only", "duplicating an existing patch", "edit cue Trim"),
     "qlab_get_workspace_document": ("local", "workspace UUID", "dirty"),
     "qlab_open_workspace": ("empty inventory", "single-use", "Do not retry"),
     "qlab_save_workspace": ("existing path", "unsaved", "single-use"),
@@ -1011,7 +1011,7 @@ EXPECTED_TOOL_CONCEPTS = {
     "qlab_check_write_readiness": ("without sending any mutating osc commands", "edit mode", "read-only preflight"),
     "qlab_create_cues": ("one verified /new per item", "without automatic rollback", "confirm:createcues:v2", "mcp sends no cue number", "do not predict it from the setting or template", "do not retry"),
     "qlab_edit_workspace_general_settings": ("minGoTime", "selectionIsPlayhead", "single-use token"),
-    "qlab_edit_audio_output_patch": ("patch property", "mutes/solos", "single-use token"),
+    "qlab_edit_audio_output_patch": ("bounded batch", "one preview token", "no setter is retried"),
     "qlab_edit_video_output_route": ("enableGuides", "output route"),
     "qlab_edit_video_stage": ("Video stage", "Rename"),
     "qlab_edit_video_region": ("OSC-coordinate", "exact indices"),
@@ -1990,6 +1990,14 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert edit_audio.inputSchema["properties"]["dry_run"]["default"] is True
     assert edit_audio.annotations.readOnlyHint is False
     assert edit_audio.annotations.destructiveHint is True
+    saved_audio_operations = json.dumps(edit_audio.inputSchema["properties"]["operations"])
+    assert "set_system_device" in saved_audio_operations and '"enabled"' in saved_audio_operations
+
+    edit_audio_patch = tools["qlab_edit_audio_output_patch"]
+    operation_schema = json.dumps(edit_audio_patch.inputSchema["properties"]["operation"])
+    assert '"batch"' in operation_schema and '"operations"' in operation_schema
+    assert '"maxItems": 50' in operation_schema
+    assert all(f'"{kind}"' in operation_schema for kind in ("level", "mute", "solo"))
 
     create_cues = tools["qlab_create_cues"]
     planned_count_description = create_cues.outputSchema["properties"]["planned_count"]["description"]
@@ -3198,3 +3206,42 @@ def test_light_curve_tool_delegates_typed_request(monkeypatch):
     asyncio.run(invoke())
     assert received == [("11111111-1111-4111-8111-111111111111",
         [{"cue_id": "22222222-2222-4222-8222-222222222222", "up": {"type": "linear"}}], True, None)]
+
+
+def test_audio_patch_tool_dispatches_typed_batch(monkeypatch):
+    calls = []
+    workspace_id = "11111111-1111-4111-8111-111111111111"
+    patch_id = "33333333-3333-4333-8333-333333333333"
+
+    class Reader:
+        def edit_audio_patch_batch(self, workspace, patch, batch, dry_run, confirm_token):
+            calls.append((workspace, patch, batch.model_dump(exclude_none=True), dry_run, confirm_token))
+            return {
+                "ok": True, "status": "dry_run", "workspace_id": workspace,
+                "operation": "batch", "dry_run": dry_run, "retry_unsafe": False,
+                "message": "dry_run", "confirm_token": "fresh-token",
+            }
+
+    monkeypatch.setattr(server_module, "_reader", lambda: Reader())
+
+    async def invoke():
+        async with Client(mcp) as client:
+            return await client.call_tool("qlab_edit_audio_output_patch", {
+                "workspace_id": workspace_id,
+                "patch_id": patch_id,
+                "operation": {"kind": "batch", "operations": [
+                    {"kind": "level", "input_channel": 1, "output_channel": 2, "value": -6},
+                    {"kind": "mute", "output_channel": 2, "value": True},
+                ]},
+                "dry_run": True,
+            })
+
+    result = asyncio.run(invoke())
+    assert not result.is_error
+    assert result.structured_content["confirm_token"] == "fresh-token"
+    assert calls == [(workspace_id, patch_id, {
+        "kind": "batch", "operations": [
+            {"kind": "level", "input_channel": 1, "output_channel": 2, "value": -6},
+            {"kind": "mute", "output_channel": 2, "value": True},
+        ],
+    }, True, None)]

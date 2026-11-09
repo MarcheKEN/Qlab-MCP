@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import plistlib
 from typing import Annotated, Literal, get_args
+from uuid import UUID
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue, StrictBool, StrictInt, StrictStr, TypeAdapter, model_validator
 
@@ -408,6 +409,123 @@ def inspect_saved_cue(source, cue_id):
     settings, issues = _settings(a, found[0])
     return dict(status="partial" if issues else "ready", workspace_id=str(outer.ref(meta["uniqueID"])).upper(),
                 cue_type=a.kind(found[0]).removesuffix("Cue"), version="5.5.10", build=5510, settings=settings, issues=issues)
+
+
+def inspect_saved_cue_object_ownership(source, cue_id, object_ids):
+    outer, meta, _, a, cues, _ = _archive(source)
+    uid = str(UUID(str(cue_id))).upper()
+    requested = {str(UUID(str(value))).upper() for value in object_ids}
+    if not requested:
+        raise ValueError("At least one exact Audio Object UUID is required.")
+    found = cues.get(uid)
+    if found is None:
+        raise ValueError("No active supported cue has this exact UUID.")
+    cue = found[0]
+    cue_kind = a.kind(cue)
+    if cue_kind not in {"AudioCue", "MicCue"}:
+        raise ValueError("Audio Object writes require an Audio or Mic cue owner.")
+    map_id = a.ref(cue.get("audioMapID")) if "audioMapID" in cue else None
+    if "audioMapID" not in cue or map_id not in (None, ""):
+        raise ValueError("The saved cue has an Audio Map or unknown map ownership.")
+
+    def object_collection(archive, owner):
+        collection_ref = owner.get("audioObjects")
+        collection = archive.ref(collection_ref)
+        if not isinstance(collection, dict) or archive.kind(collection) != "AudioObjectCollection":
+            raise ValueError("Saved cue Audio Object collection is unavailable or unknown.")
+        return archive.array(collection["audioObjects"])
+
+    def object_info(archive, reference):
+        if not isinstance(reference, plistlib.UID):
+            raise ValueError("Saved Audio Object reference is not a unique archive object.")
+        value = archive.ref(reference)
+        if not isinstance(value, dict) or archive.kind(value) != "F53AudioObject":
+            raise ValueError("Saved Audio Object class is unknown.")
+        identity = archive.ref(value.get("uniqueID"))
+        if not isinstance(identity, str):
+            raise ValueError("Saved Audio Object UUID is unavailable.")
+        return str(UUID(identity)).upper(), reference.data
+
+    def kind(archive, value):
+        try:
+            return archive.kind(value)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            return None
+
+    target_refs = {}
+    owner_ids = []
+    for reference in object_collection(a, cue):
+        identity, index = object_info(a, reference)
+        if identity in owner_ids:
+            raise ValueError("Saved cue Audio Object UUIDs are duplicated.")
+        owner_ids.append(identity)
+        target_refs[identity] = index
+    if not requested <= set(owner_ids):
+        raise ValueError("Requested object UUID is absent from the cue-owned saved archive collection.")
+
+    cue_ref = plistlib.UID(found[1])
+    if any(isinstance(value, dict) and any(value.get(key) == cue_ref for key in ("audioCue", "micCue"))
+           for value in a.objects):
+        raise ValueError("Saved Audio Object cue is also referenced as another cue's embedded audio track.")
+
+    for other_id, (other, _) in cues.items():
+        if other_id == uid or a.kind(other) not in {"AudioCue", "MicCue"}:
+            continue
+        collection_ref = other.get("audioObjects")
+        if a.ref(collection_ref) is None:
+            continue
+        if requested & {object_info(a, reference)[0] for reference in object_collection(a, other)}:
+            raise ValueError("Saved Audio Object is also referenced by another cue.")
+
+    for archive in (outer, a):
+        for value in archive.objects:
+            if not isinstance(value, dict) or "$class" not in value or kind(archive, value) != "AudioMap":
+                continue
+            collection_ref = value.get("audioObjects")
+            collection = archive.ref(collection_ref)
+            if collection is None:
+                continue
+            map_refs = object_collection(archive, value)
+            if requested & {object_info(archive, reference)[0] for reference in map_refs}:
+                raise ValueError("Requested Audio Object is owned by an Audio Map.")
+
+    for archive in (outer, a):
+        for index, value in enumerate(archive.objects):
+            if not isinstance(value, dict) or "$class" not in value or kind(archive, value) != "F53AudioObject":
+                continue
+            identity = archive.ref(value.get("uniqueID"))
+            if isinstance(identity, str) and str(UUID(identity)).upper() in requested:
+                expected = target_refs.get(str(UUID(identity)).upper())
+                if archive is not a or expected != index:
+                    raise ValueError("Saved Audio Object identity is duplicated outside its owning cue.")
+
+    return dict(source="saved_archive", workspace_id=str(outer.ref(meta["uniqueID"])).upper(),
+                cue_id=uid, cue_type=cue_kind.removesuffix("Cue"), audio_map_id="",
+                object_ids=sorted(requested), ownership="direct_cue_collection")
+
+
+def read_saved_cue_object_ownership(reader, workspace_id, cue_id, object_ids):
+    from . import workspace_documents as docs
+    from .light_patch.reader import _read_file
+
+    ws = docs._uuid(workspace_id)
+    docs._local(reader)
+    with docs._LOCK:
+        before = docs._document(docs._inventory(reader), ws)
+        if before["modified"]:
+            raise ValueError("Save or discard workspace changes before verifying Audio Object ownership.")
+        if not before["path"]:
+            raise ValueError("Workspace has no saved document path.")
+        data, identity = _read_file(Path(before["path"]))
+        result = inspect_saved_cue_object_ownership(data, cue_id, object_ids)
+        if result["workspace_id"] != ws:
+            raise ValueError("Saved workspace UUID does not match the request.")
+        after = docs._document(docs._inventory(reader), ws)
+        current, current_identity = _read_file(Path(before["path"]))
+        if before != after or current_identity != identity or current != data:
+            raise ValueError("Workspace or saved archive changed during Audio Object ownership check.")
+        result.update(sha256=hashlib.sha256(data).hexdigest(), freshness="last_saved")
+        return result
 
 
 def read_saved_cue_settings(reader, workspace_id, cue_id):

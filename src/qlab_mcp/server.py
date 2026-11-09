@@ -57,6 +57,7 @@ from .models import (
     WorkspaceSettingsEditResult,
     GeneralSettingsOperation,
     AudioOutputPatchOperation,
+    AudioOutputPatchBatchOperation,
     VideoRouteOperation,
     VideoStageOperation,
     VideoRegionOperation,
@@ -2973,7 +2974,18 @@ def qlab_edit_audio_output_patch(
     dry_run: bool | None = None,
     confirm_token: str | None = None,
 ) -> WorkspaceSettingsEditResult:
-    """Edit one patch property, including name, or clear mutes/solos with a single-use token."""
+    """Edit a patch property or a bounded batch of level, mute, and solo changes.
+
+    A batch uses one preview token bound to every requested setter and baseline. It reads each
+    target back immediately and stops after an uncertain result; no setter is retried.
+    """
+    if isinstance(operation, AudioOutputPatchBatchOperation):
+        return _run_tool(
+            lambda reader: WorkspaceSettingsEditResult.model_validate(reader.edit_audio_patch_batch(
+                str(workspace_id), str(patch_id), operation, dry_run, confirm_token,
+            )),
+            timeout=WORKSPACE_SETTINGS_WRITE_TIMEOUT,
+        )
     return _edit_object_setting(workspace_id, "audio", {"patch_id": str(patch_id)}, operation, dry_run, confirm_token)
 
 
@@ -2987,10 +2999,12 @@ def qlab_edit_saved_audio_patches(
 ) -> dict[str, Any]:
     """Edit saved input/output audio patch collections and output buses in one guarded batch.
 
-    Supports patch rename/duplicate/delete/order, exact passive CoreAudio device assignment, cue-output
-    names, bus names, and removal/reordering/enabling of existing output-bus effects. New patches can only
-    be made by duplicating an existing patch. It does not change cue-output count, add AudioUnits, edit their
-    parameters, or edit cue Trim. Requires a clean local QLab 5.5.10/build 5510 document and a
+    Supports patch rename/duplicate/delete/order, exact passive CoreAudio device assignment, system-device
+    mode, cue-output names, bus names, and removal/reordering/enabling of existing output-bus effects.
+    Enabling system-device mode preserves the saved descriptor; disabling it requires an exact currently
+    observed CoreAudio device. New patches can only be made by duplicating an existing patch. It does not
+    change cue-output count, add AudioUnits, edit their parameters, or edit cue Trim. Requires a clean local
+    QLab 5.5.10/build 5510 document and a
     reviewed single-use token; it closes, replaces and reopens the same file. No capture or audio is activated.
     """
     normalized = [operation.model_dump(exclude_none=True) for operation in operations]

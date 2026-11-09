@@ -242,6 +242,8 @@ def validate(reader, ws, uid, family, operations, before):
         for object_id in object_ids:
             if not isinstance(object_id, str) or not any(str(x.get('uniqueID', x.get('id', ''))).casefold() == object_id.casefold() for x in entries):
                 raise ValueError('Object UUID is absent from the cue-owned inventory.')
+        from ..saved_cue_settings import read_saved_cue_object_ownership
+        deps['saved_object_ownership'] = read_saved_cue_object_ownership(reader, ws, uid, object_ids)
         # The inventory can contain fields being edited. Store only identity/ownership.
         deps['routes'].pop(f'cue_id/{uid}/objects')
         deps['object_ids'] = sorted(str(x.get('uniqueID', x.get('id', ''))).upper() for x in entries)

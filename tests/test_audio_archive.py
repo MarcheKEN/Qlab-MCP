@@ -210,6 +210,72 @@ def test_device_assignment_requires_current_exact_passive_device():
         plan_saved_audio_patches(source, [operation])
 
 
+def test_system_device_toggle_preserves_saved_descriptors_for_input_and_output():
+    source = audio_workspace()
+    before = inspect_saved_audio_patches(source)
+    operations = [
+        {"action": "set_system_device", "patch_type": "input", "patch_id": IN1, "enabled": True},
+        {"action": "set_system_device", "patch_type": "output", "patch_id": OUT1, "enabled": True},
+    ]
+
+    plan = plan_saved_audio_patches(source, operations)
+    after = inspect_saved_audio_patches(plan["output_bytes"])
+
+    for domain in ("input_patches", "output_patches"):
+        before_device = before[domain][0]["device"]
+        after_device = after[domain][0]["device"]
+        assert after_device["use_system_device"] is True
+        assert {key: value for key, value in after_device.items() if key != "use_system_device"} == {
+            key: value for key, value in before_device.items() if key != "use_system_device"
+        }
+
+
+def test_disabling_system_device_requires_current_exact_saved_device():
+    source = Archive(audio_workspace())
+    root = source.mapping(source.root)
+    settings = source.mapping(root["settings"])
+    audio = source.mapping(settings["Audio"])
+    patch = source.ref(source.array(audio["audioOutputPatches"])[0])
+    patch["useSystemDevice"] = source.add(True)
+    system_source = source.dump()
+    operation = {"action": "set_system_device", "patch_type": "output", "patch_id": OUT1, "enabled": False}
+
+    device = {"uid": "fixture-device", "name": "Current Device", "manufacturer": "Example",
+              "model_uid": "Fixture", "input_channels": 2, "output_channels": 2}
+    plan = plan_saved_audio_patches(system_source, [operation], devices={device["uid"]: device})
+    saved = inspect_saved_audio_patches(plan["output_bytes"])
+    assert saved["output_patches"][0]["device"] == {
+        "deviceUID": "fixture-device", "name": "Current Device", "manufacturer": "Example",
+        "deviceModelUID": "Fixture", "inputChannels": 2, "outputChannels": 2,
+        "use_system_device": False, "source": "saved_archive",
+    }
+    with pytest.raises(ValueError, match="passive CoreAudio"):
+        plan_saved_audio_patches(system_source, [operation], devices={})
+
+
+def test_system_device_false_noop_does_not_require_device_inventory():
+    plan = plan_saved_audio_patches(audio_workspace(), [{
+        "action": "set_system_device", "patch_type": "input", "patch_id": IN1, "enabled": False,
+    }], devices={})
+
+    assert plan["changes"] == []
+    assert plan["output_bytes"] == audio_workspace()
+
+
+def test_enabling_system_device_blocks_unknown_saved_descriptor():
+    source = Archive(audio_workspace())
+    root = source.mapping(source.root)
+    settings = source.mapping(root["settings"])
+    mic = source.mapping(settings["Mic"])
+    patch = source.ref(source.array(mic["audioInputPatches"])[0])
+    patch.pop("deviceDescription")
+
+    with pytest.raises(ValueError, match="descriptor is unavailable"):
+        plan_saved_audio_patches(source.dump(), [{
+            "action": "set_system_device", "patch_type": "input", "patch_id": IN1, "enabled": True,
+        }])
+
+
 def test_delete_blocks_last_output_and_patch_referenced_by_audio_cue():
     source = audio_workspace()
     with pytest.raises(ValueError, match="last"):
@@ -342,3 +408,28 @@ def test_device_assignment_blocks_empty_coreaudio_inventory(monkeypatch):
 
     assert result["status"] == "blocked"
     assert "passive CoreAudio inventory is unavailable" in result["error"]
+
+
+def test_system_device_disable_confirmation_binds_to_passive_inventory(monkeypatch):
+    from qlab_mcp import workspace_archive
+    from qlab_mcp.audio_archive import edit_saved_audio_patches
+
+    snapshots = [
+        {"status": "ready", "devices": [{"id": 4, "uid": "fixture-device", "name": "Speaker",
+            "manufacturer": "Example", "model_uid": "Fixture", "input_channels": 0, "output_channels": 2}]},
+        {"status": "ready", "devices": [{"id": 4, "uid": "fixture-device", "name": "Changed Speaker",
+            "manufacturer": "Example", "model_uid": "Fixture", "input_channels": 0, "output_channels": 2}]},
+    ]
+    monkeypatch.setattr(video_settings, "_native_metadata", lambda _: snapshots.pop(0))
+
+    def edit_archive(*args, **kwargs):
+        kwargs["dependency_check"]()
+        return {"ok": True, "status": "verified"}
+
+    monkeypatch.setattr(workspace_archive, "edit_archive", edit_archive)
+    result = edit_saved_audio_patches(SimpleNamespace(), WS, [{
+        "action": "set_system_device", "patch_type": "output", "patch_id": OUT1, "enabled": False,
+    }], dry_run=False, confirm_token="stale")
+
+    assert result["status"] == "blocked"
+    assert "device inventory changed since preview" in result["error"]

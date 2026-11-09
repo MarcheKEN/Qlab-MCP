@@ -223,6 +223,27 @@ class AudioClearOperation(BaseModel):
     kind: Literal["muteClear", "soloClear"]
 
 
+AudioPatchBatchCellOperation = AudioLevelOperation | AudioBoolOperation
+
+
+class AudioOutputPatchBatchOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["batch"]
+    operations: Annotated[list[AudioPatchBatchCellOperation], Field(min_length=1, max_length=50)]
+
+    @model_validator(mode="after")
+    def unique_targets(self) -> "AudioOutputPatchBatchOperation":
+        targets = []
+        for operation in self.operations:
+            target = ((operation.kind, operation.input_channel, operation.output_channel)
+                      if isinstance(operation, AudioLevelOperation)
+                      else (operation.kind, operation.output_channel))
+            targets.append(target)
+        if len(targets) != len(set(targets)):
+            raise ValueError("Audio patch batch cannot contain duplicate targets.")
+        return self
+
+
 class VideoBoundsOperation(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["bounds", "origin", "size", "controlPoint"]
@@ -261,7 +282,10 @@ class GeneralSelectionOperation(BaseModel):
 
 
 GeneralSettingsOperation = GeneralMinGoTimeOperation | GeneralSelectionOperation
-AudioOutputPatchOperation = AudioCueOutputsOperation | AudioLevelOperation | AudioBoolOperation | AudioClearOperation | SettingNameOperation
+AudioOutputPatchOperation = (
+    AudioCueOutputsOperation | AudioLevelOperation | AudioBoolOperation | AudioClearOperation |
+    AudioOutputPatchBatchOperation | SettingNameOperation
+)
 VideoRouteOperation = VideoRouteGuidesOperation
 VideoStageOperation = SettingNameOperation
 VideoRegionOperation = VideoBoundsOperation | VideoComponentOperation | VideoRegionBoolOperation

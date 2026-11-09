@@ -262,6 +262,55 @@ def test_ndi_audio_sample_rate_accepts_qlab_values(rate):
         plan_video(source,[dict(kind='create_device',client_ref='bad',name='Bad',device_type='NDI',audio_sample_rate=32000)],domain='devices')
 
 
+@pytest.mark.parametrize('channels',[0,64])
+def test_ndi_audio_channels_accepts_bounds_on_create_and_update(channels):
+    from qlab_mcp.video_archive import plan_video
+    from qlab_mcp.video_settings import inspect_saved_video
+    source=video_workspace()
+    existing=inspect_saved_video(source)['destinations'][0]
+    created=plan_video(source,[dict(kind='create_device',client_ref='ndi',name='Channels',device_type='NDI',audio_channels=channels)],domain='devices')
+    assert next(d for d in created['summary']['destinations'] if d['name']=='Channels')['fields']['audioChannels']==channels
+    updated=plan_video(source,[dict(kind='update_device',device_ref='saved-virtual:'+existing['id'],audio_channels=channels)],domain='devices')
+    assert next(d for d in updated['summary']['destinations'] if d['name']=='NDI')['fields']['audioChannels']==channels
+
+
+@pytest.mark.parametrize('channels',[-1,65])
+def test_ndi_audio_channels_rejects_values_outside_bounds(channels):
+    from qlab_mcp.video_archive import plan_video
+    with pytest.raises(ValueError):
+        plan_video(video_workspace(),[dict(kind='create_device',client_ref='ndi',name='Bad',device_type='NDI',audio_channels=channels)],domain='devices')
+
+
+@pytest.mark.parametrize('buffer_size',[128,256,512,1024,2048])
+def test_ndi_audio_buffer_size_accepts_qlab_values_on_create_and_update(buffer_size):
+    from qlab_mcp.video_archive import plan_video
+    from qlab_mcp.video_settings import inspect_saved_video
+    source=video_workspace()
+    existing=inspect_saved_video(source)['destinations'][0]
+    created=plan_video(source,[dict(kind='create_device',client_ref='ndi',name='Buffer',device_type='NDI',audio_buffer_size=buffer_size)],domain='devices')
+    assert next(d for d in created['summary']['destinations'] if d['name']=='Buffer')['fields']['audioBufferSize']==buffer_size
+    updated=plan_video(source,[dict(kind='update_device',device_ref='saved-virtual:'+existing['id'],audio_buffer_size=buffer_size)],domain='devices')
+    assert next(d for d in updated['summary']['destinations'] if d['name']=='NDI')['fields']['audioBufferSize']==buffer_size
+
+
+def test_ndi_audio_buffer_size_rejects_unlisted_value():
+    from qlab_mcp.video_archive import plan_video
+    with pytest.raises(ValueError):
+        plan_video(video_workspace(),[dict(kind='create_device',client_ref='ndi',name='Bad',device_type='NDI',audio_buffer_size=64)],domain='devices')
+
+
+@pytest.mark.parametrize('field,value',[('audio_channels',2),('audio_buffer_size',512)])
+def test_syphon_rejects_ndi_audio_fields_for_create_and_update(field,value):
+    from qlab_mcp.video_archive import plan_video
+    source=video_workspace()
+    syphon=plan_video(source,[dict(kind='create_device',client_ref='syphon',name='Syphon',device_type='Syphon')],domain='devices')
+    with pytest.raises(ValueError,match='Syphon'):
+        plan_video(source,[dict(kind='create_device',client_ref='bad',name='Bad',device_type='Syphon',**{field:value})],domain='devices')
+    syphon_id=syphon['created_refs']['syphon']
+    with pytest.raises(ValueError,match='Syphon'):
+        plan_video(syphon['output_bytes'],[dict(kind='update_device',device_ref='saved-virtual:'+syphon_id,**{field:value})],domain='devices')
+
+
 def test_root_route_order_is_exact_and_preserves_route_dependencies():
     from qlab_mcp.video_archive import VideoArchive,plan_video
     source=video_workspace();before=Archive(source);before_editor=VideoArchive(source,{})

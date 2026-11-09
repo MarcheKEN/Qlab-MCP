@@ -134,6 +134,116 @@ def audio_fx_source(cue_type="Audio", *, video=False):
     return outer.dump()
 
 
+OBJECT_ID = "A0000000-0000-4000-8000-000000000001"
+
+
+def audio_object_source(*, mapped=False, shared=False, video_owner=False, map_owned=False, duplicate=False):
+    from qlab_mcp.light_patch.curves import _reachable_cues
+
+    outer = Archive(source())
+    carrier = outer.ref(outer.mapping(outer.root)["cueLists"])
+    a = Archive(carrier["NS.data"])
+    cues, _ = _reachable_cues(a, ("LightCue",))
+    cue, other = cues[CUE.upper()][0], cues[OTHER.upper()][0]
+    cue_ref = plistlib.UID(cues[CUE.upper()][1])
+    cue["$class"] = a.cls("AudioCue")
+    cue["audioMapID"] = a.add("attached-map") if mapped else a.add("")
+    obj = a.add({"$class": a.cls("F53AudioObject"), "uniqueID": a.add(OBJECT_ID),
+                 "name": a.add("Fixture Object"), "spread": 0.0})
+
+    def collection(references):
+        return a.add({"$class": a.cls("AudioObjectCollection"),
+                      "audioObjects": a.make_array(references)})
+
+    cue["audioObjects"] = collection([obj])
+    if shared:
+        other["$class"] = a.cls("MicCue")
+        other["audioMapID"] = a.add("")
+        other["audioObjects"] = collection([obj])
+    if video_owner:
+        other["$class"] = a.cls("VideoCue")
+        other["audioCue"] = cue_ref
+    if duplicate:
+        a.add({"$class": a.cls("F53AudioObject"), "uniqueID": a.add(OBJECT_ID),
+               "name": a.add("Duplicate"), "spread": 0.0})
+    carrier["NS.data"] = a.dump()
+    if map_owned:
+        map_object = outer.add({"$class": outer.cls("F53AudioObject"),
+                                "uniqueID": outer.add(OBJECT_ID), "name": outer.add("Map Object"),
+                                "spread": 0.0})
+        map_collection = outer.add({"$class": outer.cls("AudioObjectCollection"),
+                                   "audioObjects": outer.make_array([map_object])})
+        outer.add({"$class": outer.cls("AudioMap"), "audioObjects": map_collection})
+    return outer.dump()
+
+
+def test_saved_audio_object_owner_requires_direct_unmapped_cue_collection():
+    from qlab_mcp.saved_cue_settings import inspect_saved_cue_object_ownership
+
+    result = inspect_saved_cue_object_ownership(audio_object_source(), CUE, [OBJECT_ID])
+    assert result == {
+        "source": "saved_archive", "workspace_id": "11111111-1111-4111-8111-111111111111",
+        "cue_id": CUE.upper(), "cue_type": "Audio", "audio_map_id": "",
+        "object_ids": [OBJECT_ID], "ownership": "direct_cue_collection",
+    }
+
+
+@pytest.mark.parametrize("fixture, message", [
+    ({"mapped": True}, "Audio Map"),
+    ({"shared": True}, "another cue"),
+    ({"video_owner": True}, "embedded audio track"),
+    ({"map_owned": True}, "Audio Map"),
+    ({"duplicate": True}, "duplicated outside"),
+])
+def test_saved_audio_object_owner_rejects_map_shared_or_ambiguous_ids(fixture, message):
+    from qlab_mcp.saved_cue_settings import inspect_saved_cue_object_ownership
+
+    with pytest.raises(ValueError, match=message):
+        inspect_saved_cue_object_ownership(audio_object_source(**fixture), CUE, [OBJECT_ID])
+
+
+def test_saved_audio_object_owner_rejects_an_object_not_in_the_cue_collection():
+    from qlab_mcp.saved_cue_settings import inspect_saved_cue_object_ownership
+
+    with pytest.raises(ValueError, match="absent from the cue-owned"):
+        inspect_saved_cue_object_ownership(audio_object_source(), CUE,
+                                           ["A0000000-0000-4000-8000-000000000002"])
+
+
+def test_saved_audio_object_ownership_read_is_clean_and_hash_bound(monkeypatch):
+    import hashlib
+    from qlab_mcp import saved_cue_settings, workspace_documents
+
+    data = audio_object_source()
+    row = {"workspace_id": "11111111-1111-4111-8111-111111111111",
+           "path": "/private/tmp/audio-object-owner-fixture.qlab5", "modified": False}
+    monkeypatch.setattr(workspace_documents, "_local", lambda reader: None)
+    monkeypatch.setattr(workspace_documents, "_inventory", lambda reader: {"documents": [row]})
+    monkeypatch.setattr(workspace_documents, "_document", lambda inventory, workspace_id: row.copy())
+    monkeypatch.setattr("qlab_mcp.light_patch.reader._read_file", lambda path: (data, (1, 2, len(data), 3)))
+
+    result = saved_cue_settings.read_saved_cue_object_ownership(
+        object(), "11111111-1111-4111-8111-111111111111", CUE, [OBJECT_ID],
+    )
+    assert result["sha256"] == hashlib.sha256(data).hexdigest()
+    assert result["freshness"] == "last_saved"
+    assert result["ownership"] == "direct_cue_collection"
+
+
+def test_saved_audio_object_ownership_read_blocks_dirty_workspace(monkeypatch):
+    from qlab_mcp import saved_cue_settings, workspace_documents
+
+    row = {"workspace_id": "11111111-1111-4111-8111-111111111111",
+           "path": "/private/tmp/audio-object-owner-fixture.qlab5", "modified": True}
+    monkeypatch.setattr(workspace_documents, "_local", lambda reader: None)
+    monkeypatch.setattr(workspace_documents, "_inventory", lambda reader: {"documents": [row]})
+    monkeypatch.setattr(workspace_documents, "_document", lambda inventory, workspace_id: row.copy())
+    with pytest.raises(ValueError, match="Save or discard"):
+        saved_cue_settings.read_saved_cue_object_ownership(
+            object(), "11111111-1111-4111-8111-111111111111", CUE, [OBJECT_ID],
+        )
+
+
 def test_video_envelope_is_in_embedded_audio_and_preserves_light_curves():
     from qlab_mcp.saved_cue_settings import inspect_saved_cue, plan_saved_cue_settings
     original = video_source()

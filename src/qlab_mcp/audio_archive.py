@@ -65,6 +65,11 @@ class SetAudioDevice(AudioPatchBase):
     device_uid: Annotated[StrictStr, Field(min_length=1, max_length=512)]
 
 
+class SetSystemDevice(AudioPatchBase):
+    action: Literal["set_system_device"]
+    enabled: StrictBool
+
+
 class SetCueOutputName(AudioPatchBase):
     action: Literal["set_cue_output_name"]
     patch_type: Literal["output"]
@@ -101,7 +106,7 @@ class SetAudioBusEffectEnabled(AudioBusOperation):
 
 
 AudioPatchOperation = Annotated[
-    RenamePatch | DeletePatch | DuplicatePatch | ReorderPatches | SetAudioDevice |
+    RenamePatch | DeletePatch | DuplicatePatch | ReorderPatches | SetAudioDevice | SetSystemDevice |
     SetCueOutputName | SetAudioBusName | RemoveAudioBusEffect |
     MoveAudioBusEffect | SetAudioBusEffectEnabled,
     Field(discriminator="action"),
@@ -513,6 +518,34 @@ class AudioPatchArchive:
         patch["useSystemDevice"] = self.a.add(False) if isinstance(patch.get("useSystemDevice"), plistlib.UID) else False
         self.dirty = True
 
+    def _system_device(self, ref, enabled):
+        patch = self.a.ref(ref)
+        current = self.a.ref(patch.get("useSystemDevice"))
+        if type(current) is not bool:
+            raise ValueError("Saved system-device setting is unavailable.")
+        if current is enabled:
+            return
+        if enabled:
+            descriptor = patch.get("deviceDescription")
+            if descriptor is None:
+                raise ValueError("Saved audio device descriptor is unavailable.")
+            values = self.a.mapping(descriptor)
+            required = {"deviceUID", "name", "manufacturer", "deviceModelUID", "inputChannels", "outputChannels"}
+            if not required <= set(values):
+                raise ValueError("Saved device descriptor does not match the validated QLab 5.5.10 schema.")
+            patch["useSystemDevice"] = self.a.add(True) if isinstance(patch.get("useSystemDevice"), plistlib.UID) else True
+            self.dirty = True
+            return
+        descriptor = patch.get("deviceDescription")
+        if descriptor is None:
+            raise ValueError("Saved device descriptor is unavailable; explicit device assignment cannot be verified.")
+        values = self.a.mapping(descriptor)
+        device_uid = _text(self.a, values.get("deviceUID"))
+        if not isinstance(device_uid, str) or not device_uid:
+            raise ValueError("Saved device UID is unavailable; explicit device assignment cannot be verified.")
+        # Reuse set_device's exact passive-device, channel-capacity, and descriptor checks.
+        self._device(ref, device_uid)
+
     def _clone(self, value, memo=None):
         memo = {} if memo is None else memo
         if isinstance(value, plistlib.UID):
@@ -651,6 +684,8 @@ class AudioPatchArchive:
             self._write_array(domain)
         elif op.action == "set_device":
             self._device(ref, op.device_uid)
+        elif op.action == "set_system_device":
+            self._system_device(ref, op.enabled)
         elif op.action == "set_cue_output_name":
             self._cue_output_name(ref, op.output_channel, op.name)
         elif op.action == "set_bus_name":
@@ -723,11 +758,20 @@ def _postcondition(source, plan):
 
 
 def _device_dependencies(reader, workspace_id, operations):
-    if not any(op.get("action") == "set_device" for op in operations):
+    uses_device_inventory = any(
+        op.get("action") == "set_device"
+        or (op.get("action") == "set_system_device" and op.get("enabled") is False)
+        for op in operations
+    )
+    if not uses_device_inventory:
         return {}
     from .video_settings import _native_metadata
     native = _native_metadata("audio")
     if native.get("status") != "ready":
+        # Disabling system mode will still fail closed in the archive planner when
+        # the current descriptor needs an explicit device; a no-op remains a no-op.
+        if not any(op.get("action") == "set_device" for op in operations):
+            return {"devices": {}}
         raise ValueError("Current passive CoreAudio inventory is unavailable.")
     devices = native.get("devices", [])
     fields = ("id", "uid", "name", "manufacturer", "model_uid", "input_channels", "output_channels")

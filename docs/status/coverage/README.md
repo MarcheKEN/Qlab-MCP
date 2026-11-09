@@ -7,7 +7,7 @@ Write-registry coverage (not a census of the specialized read tools):
 For the public read inventory and its deliberate exclusions, use the
 [tool catalogue](../../user/tools.md) and [current state](../current-state.md).
 
-The current public surface is 88 tools: 52 reads and 36 gated writes. The local
+The current public surface is 91 tools: 54 reads and 37 gated writes. The local
 `qlab_edit_light_patch` archive writer is outside the OSC setter registry above;
 its [workflow](../../user/agent-workflows.md#edit-the-light-patch) distinguishes
 saved-file verification from partial OSC-visible readback. USB-DMX assignments

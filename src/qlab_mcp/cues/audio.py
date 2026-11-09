@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, JsonValue, StrictBool, StrictInt, StrictS
 from .list_models import CueListReadResult, CueListState, CueTimecodeComponents, FiniteNumber
 from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES
 from .family import AudioCrosspoint, ControlTriggers, Level
+from ..saved_cue_settings import SavedCueSettings, enrich_cue_details
 
 
 Channel = Annotated[StrictInt, Field(ge=0, le=128)]
@@ -103,6 +104,7 @@ class AudioCueDetailsResult(CueListReadResult):
     level: AudioCrosspoint | None = None
     triggers: ControlTriggers | None = None
     edit_capabilities: dict[str, JsonValue] = Field(default_factory=dict)
+    saved_settings: SavedCueSettings | None = None
     technical_payload: JsonValue = None
     redactions: list[dict[str, str]] = Field(default_factory=list)
 
@@ -116,6 +118,7 @@ class AudioCuesMixin:
                                      AudioCuesResult, AudioCueSummary)
 
     def get_audio_cue_details(self, workspace_id, cue_id, profile="safe", input_channel=None, output_channel=None, include_native_triggers=False):
-        return self._get_family_details(workspace_id, cue_id, profile, input_channel, output_channel,
-                                        AudioCueDetailsResult, AudioCueSummary, DETAIL_MODELS,
-                                        max_bytes=MAX_SENSITIVE_CUE_RESPONSE_BYTES, include_native_triggers=include_native_triggers)
+        result = self._get_family_details(workspace_id, cue_id, profile, input_channel, output_channel,
+                                          AudioCueDetailsResult, AudioCueSummary, DETAIL_MODELS,
+                                          max_bytes=MAX_SENSITIVE_CUE_RESPONSE_BYTES, include_native_triggers=include_native_triggers)
+        return enrich_cue_details(self, result)

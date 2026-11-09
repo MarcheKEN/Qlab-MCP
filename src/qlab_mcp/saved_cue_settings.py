@@ -66,6 +66,7 @@ class CueFileSettings(BaseModel):
     wall_clock: WallClockSettings | None = None
     video_audio: SavedVideoAudio | None = None
     video_effects: list[dict[str, JsonValue]] = Field(default_factory=list)
+    audio_effects: list[dict[str, JsonValue]] | None = None
 
 
 class SavedCueSettings(BaseModel):
@@ -164,7 +165,26 @@ class SelectTrack(Operation):
         return self
 
 
-SavedCueOperation = Annotated[SetHotkey | SetHotkeyEnabled | SetDays | SetEnvelope | InsertEffect | SelectTrack, Field(discriminator="action")]
+class RemoveAudioEffect(Operation):
+    action: Literal["remove_audio_effect"]
+    effect_index: Annotated[StrictInt, Field(ge=0, le=49)]
+
+
+class MoveAudioEffect(Operation):
+    action: Literal["move_audio_effect"]
+    effect_index: Annotated[StrictInt, Field(ge=0, le=49)]
+    new_index: Annotated[StrictInt, Field(ge=0, le=49)]
+
+
+class SetAudioEffectBypassed(Operation):
+    action: Literal["set_audio_effect_bypassed"]
+    effect_index: Annotated[StrictInt, Field(ge=0, le=49)]
+    bypassed: StrictBool
+
+
+SavedCueOperation = Annotated[SetHotkey | SetHotkeyEnabled | SetDays | SetEnvelope | InsertEffect | SelectTrack |
+                              RemoveAudioEffect | MoveAudioEffect | SetAudioEffectBypassed,
+                              Field(discriminator="action")]
 
 
 def _point_budget(operations):
@@ -183,7 +203,7 @@ def _archive(source):
         raise ValueError("Saved cue settings require QLab 5.5.10/build 5510.")
     carrier = outer.ref(meta["cueLists"])
     inner = Archive(carrier["NS.data"])
-    cues, incoming = _reachable_cues(inner, ("LightCue", "VideoCue"))
+    cues, incoming = _reachable_cues(inner, ("LightCue", "VideoCue", "AudioCue", "MicCue"))
     return outer, meta, carrier, inner, cues, incoming
 
 
@@ -206,17 +226,19 @@ def _hotkey(a, cue):
 
 def _settings(a, cue):
     result, issues = {}, []
-    try:
-        result["hotkey"] = _hotkey(a, cue)
-    except (ValueError, KeyError, TypeError) as exc:
-        issues.append(str(exc))
-    days = {day: a.ref(cue.get("wall" + day.title())) for day in DAYS}
-    if all(type(value) is bool for value in days.values()):
-        result["wall_clock"] = dict(days=[day for day,value in days.items() if value],
-            mode=a.ref(cue.get("wallClockMode")), enabled=a.ref(cue.get("useWallClock")))
-    else:
-        issues.append("Wall Clock days are unavailable.")
-    if a.kind(cue) == "VideoCue":
+    cue_kind = a.kind(cue)
+    if cue_kind in {"LightCue", "VideoCue"}:
+        try:
+            result["hotkey"] = _hotkey(a, cue)
+        except (ValueError, KeyError, TypeError) as exc:
+            issues.append(str(exc))
+        days = {day: a.ref(cue.get("wall" + day.title())) for day in DAYS}
+        if all(type(value) is bool for value in days.values()):
+            result["wall_clock"] = dict(days=[day for day,value in days.items() if value],
+                mode=a.ref(cue.get("wallClockMode")), enabled=a.ref(cue.get("useWallClock")))
+        else:
+            issues.append("Wall Clock days are unavailable.")
+    if cue_kind == "VideoCue":
         try:
             result["video_effects"] = _effect_summary(a, cue)
         except (ValueError, KeyError, TypeError) as exc:
@@ -225,6 +247,10 @@ def _settings(a, cue):
             audio = a.ref(cue["audioCue"])
             if a.kind(audio) != "AudioCue":
                 raise ValueError("Embedded AudioCue is unavailable.")
+            try:
+                result["audio_effects"] = _audio_effect_summary(a, audio)
+            except (ValueError, KeyError, TypeError) as exc:
+                issues.append("Audio FX: " + str(exc))
             track = a.ref(audio.get("track"))
             result["video_audio"] = dict(track=track if type(track) is int else None,
                 input_channel_names=[], gangs=[], integrated_fade={})
@@ -271,7 +297,74 @@ def _settings(a, cue):
                 channel_metadata_truncated=truncated)
         except (ValueError, KeyError, TypeError, AttributeError) as exc:
             issues.append("Embedded audio: " + str(exc))
+    elif cue_kind in {"AudioCue", "MicCue"}:
+        try:
+            result["audio_effects"] = _audio_effect_summary(a, cue)
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            issues.append("Audio FX: " + str(exc))
     return result, issues
+
+
+def _audio_effect_summary(a, audio_cue):
+    if a.kind(audio_cue) not in {"AudioCue", "MicCue"}:
+        raise ValueError("Audio/Mic cue effect owner is unavailable.")
+    effects_ref = audio_cue.get("effects")
+    if not isinstance(effects_ref, plistlib.UID) or a.kind(effects_ref) not in {"NSArray", "NSMutableArray"}:
+        raise ValueError("Saved Audio FX chain is unavailable or has an unknown array encoding.")
+    from .audio_archive import _effect_chain
+    return _effect_chain(a, effects_ref)
+
+
+def _audio_cue_for_fx(a, cue):
+    cue_kind = a.kind(cue)
+    if cue_kind in {"AudioCue", "MicCue"}:
+        return cue
+    if cue_kind == "VideoCue":
+        audio = a.ref(cue.get("audioCue"))
+        if not isinstance(audio, dict) or a.kind(audio) != "AudioCue":
+            raise ValueError("Embedded AudioCue is unavailable.")
+        return audio
+    raise ValueError("Audio FX edits require an Audio, Mic, or Video cue with an AudioCue.")
+
+
+def _audio_fx_chain(a, cue):
+    audio_cue = _audio_cue_for_fx(a, cue)
+    if a.kind(cue) == "VideoCue":
+        child_ref = cue.get("audioCue")
+        owners = sum(1 for obj in a.objects if isinstance(obj, dict) and "$class" in obj
+                     and a.kind(obj) == "VideoCue" and obj.get("audioCue") == child_ref)
+        if owners != 1:
+            raise ValueError("Shared Video audio track settings cannot be edited safely.")
+    effects_ref = audio_cue.get("effects")
+    if not isinstance(effects_ref, plistlib.UID) or a.kind(effects_ref) not in {"NSArray", "NSMutableArray"}:
+        raise ValueError("Saved Audio FX chain is unavailable or has an unknown array encoding.")
+    refs = list(a.array(effects_ref))
+    effects = _audio_effect_summary(a, audio_cue)
+    if len(refs) != len(effects):
+        raise ValueError("Saved Audio FX chain changed while reading.")
+    identifiers = [item.get("identifier") for item in effects]
+    if any(not isinstance(identifier, str) or not identifier for identifier in identifiers) or len(set(identifiers)) != len(identifiers):
+        raise ValueError("Audio FX identities are missing or ambiguous.")
+    return audio_cue, effects_ref, refs, effects
+
+
+def _audio_effect_reference_count(a, target):
+    count = 0
+    stack = [a.data["$top"]["root"]]
+    visited = set()
+    while stack:
+        value = stack.pop()
+        if isinstance(value, plistlib.UID):
+            if value == target:
+                count += 1
+            elif value.data and value.data not in visited:
+                visited.add(value.data)
+                stack.append(a.ref(value))
+        elif isinstance(value, dict):
+            stack.extend(value.values())
+        elif isinstance(value, list):
+            stack.extend(value)
+    return count
 
 
 def _effect_summary(a, cue):
@@ -311,7 +404,7 @@ def inspect_saved_cue(source, cue_id):
     outer, meta, _, a, cues, _ = _archive(source)
     found = cues.get(str(cue_id).upper())
     if found is None:
-        raise ValueError("No active Light/Video cue has this exact UUID.")
+        raise ValueError("No active supported cue has this exact UUID.")
     settings, issues = _settings(a, found[0])
     return dict(status="partial" if issues else "ready", workspace_id=str(outer.ref(meta["uniqueID"])).upper(),
                 cue_type=a.kind(found[0]).removesuffix("Cue"), version="5.5.10", build=5510, settings=settings, issues=issues)
@@ -349,14 +442,21 @@ def plan_saved_cue_settings(source, operations, *, media=None, targets=()):
     outer, meta, carrier, a, cues, incoming = _archive(source)
     target_ids = set(targets) | {str(op.cue_id).upper() for op in ops}
     if not target_ids <= cues.keys():
-        raise ValueError("An active unique Light/Video cue is required.")
+        raise ValueError("An active unique Light, Audio, Mic, or Video cue is required.")
     original_settings = {uid: _settings(a, cues[uid][0])[0] for uid in target_ids}
     changes = []
     for op in ops:
         uid = str(op.cue_id).upper()
         if uid not in cues or incoming[cues[uid][1]] != 1:
-            raise ValueError("An active unique Light/Video cue is required.")
+            raise ValueError("An active unique Light, Audio, Mic, or Video cue is required.")
         cue = cues[uid][0]
+        cue_kind = a.kind(cue)
+        if isinstance(op, (SetHotkey, SetHotkeyEnabled, SetDays)) and cue_kind not in {"LightCue", "VideoCue"}:
+            raise ValueError("Hotkey and Wall Clock edits require a Light or Video cue.")
+        if isinstance(op, (SetEnvelope, SelectTrack, InsertEffect)) and cue_kind != "VideoCue":
+            raise ValueError("Audio track, integrated fade and Video FX operations require a Video cue.")
+        if isinstance(op, (RemoveAudioEffect, MoveAudioEffect, SetAudioEffectBypassed)) and cue_kind not in {"AudioCue", "MicCue", "VideoCue"}:
+            raise ValueError("Audio FX edits require an Audio, Mic, or Video cue.")
         before = _settings(a, cue)[0]
         if isinstance(op, SetHotkey):
             if a.ref(cue.get("useHotKey")) is not False:
@@ -448,10 +548,43 @@ def plan_saved_cue_settings(source, operations, *, media=None, targets=()):
             entries.insert(op.index, ref)
             array = a.add({**a.ref(entries_ref), "NS.objects": entries})
             cue["videoEffects"] = a.replacing_mapping(cue["videoEffects"], "effectEntries", array)
+        elif isinstance(op, (RemoveAudioEffect, MoveAudioEffect, SetAudioEffectBypassed)):
+            audio_cue, effects_ref, effects, summaries = _audio_fx_chain(a, cue)
+            if op.effect_index >= len(effects):
+                raise ValueError("Audio effect index is outside the saved chain.")
+            if isinstance(op, RemoveAudioEffect):
+                del effects[op.effect_index]
+                audio_cue["effects"] = a.add({**a.ref(effects_ref), "NS.objects": effects})
+            elif isinstance(op, MoveAudioEffect):
+                if op.new_index >= len(effects):
+                    raise ValueError("New audio effect index is outside the saved chain.")
+                if op.new_index != op.effect_index:
+                    effects.insert(op.new_index, effects.pop(op.effect_index))
+                    audio_cue["effects"] = a.add({**a.ref(effects_ref), "NS.objects": effects})
+            else:
+                effect_ref = effects[op.effect_index]
+                if not isinstance(effect_ref, plistlib.UID):
+                    raise ValueError("Audio effect reference has an unknown encoding.")
+                if _audio_effect_reference_count(a, effect_ref) != 1:
+                    raise ValueError("Shared AudioUnit effect references cannot be bypassed safely.")
+                effect = a.ref(effect_ref)
+                state_ref = effect.get("state")
+                if not isinstance(state_ref, plistlib.UID) or a.kind(state_ref) not in {"NSDictionary", "NSMutableDictionary"}:
+                    raise ValueError("Audio effect state has an unknown dictionary encoding.")
+                state = a.mapping(state_ref)
+                enabled_ref = state.get("enabled")
+                enabled = a.ref(enabled_ref)
+                if type(enabled) is not bool:
+                    raise ValueError("Audio effect enabled state is unavailable.")
+                requested_enabled = not op.bypassed
+                if enabled != requested_enabled:
+                    state["enabled"] = a.add(requested_enabled) if isinstance(enabled_ref, plistlib.UID) else requested_enabled
+                    effect["state"] = a.make_dict(state)
         after = _settings(a, cue)[0]
         if after != before:
             field = ("hotkey" if isinstance(op, (SetHotkey,SetHotkeyEnabled)) else "wall_clock" if isinstance(op, SetDays)
-                     else "video_effects" if isinstance(op, InsertEffect) else "video_audio")
+                     else "video_effects" if isinstance(op, InsertEffect) else "audio_effects" if isinstance(op, (RemoveAudioEffect, MoveAudioEffect, SetAudioEffectBypassed))
+                     else "video_audio")
             old_value, new_value = before[field], after[field]
             if isinstance(op, (SetEnvelope, SelectTrack)):
                 subfield = "integrated_fade" if isinstance(op, SetEnvelope) else "track"
@@ -501,7 +634,7 @@ def edit_saved_cue_settings(reader, workspace_id, operations, dry_run=True, conf
         result["summary"] = dict(cue_ids=sorted(summary.get("cues", {})))
     result["native_cue_verified"] = result.pop("native_patch_verified", False)
     result.pop("native_patch_verification_scope", None)
-    result["verification_scope"] = "Saved cue settings after reopen; current cue UUID/type, audio track, fade flags and Video FX count; FX types are archive-verified and compared natively only when explicitly exposed. No cue execution or physical output is verified."
+    result["verification_scope"] = "Saved cue settings after reopen; native cue UUID/type, audio track, fade flags and Video FX count. Audio FX chain identity, order, bypass state and observed parameters are checked against the saved archive only. No cue execution or physical output is verified."
     return result
 
 
@@ -558,9 +691,20 @@ def enrich_cue_details(reader, result, max_bytes=None):
         return result
     result.saved_settings = SavedCueSettings.model_validate(read_saved_cue_settings(reader, result.workspace_id, result.cue_id))
     result.edit_capabilities["saved_settings"] = dict(tool="qlab_edit_saved_cue_settings",
-        operations=["set_hotkey", "set_hotkey_enabled", "set_wall_clock_days", *(["select_audio_track", "set_integrated_audio_fade", "insert_video_effect"] if result.identity.type == "Video" else [])], requires_clean_document=True,
+        requires_clean_document=True,
         **({"insert_video_effect_types": list(get_args(InsertEffect.model_fields["effect_type"].annotation))} if result.identity.type == "Video" else {}),
         verification_scope="Saved archive after reopen; no trigger execution is tested.")
+    cue_type = result.identity.type
+    operations = []
+    if cue_type in {"Light", "Video"}:
+        operations.extend(["set_hotkey", "set_hotkey_enabled", "set_wall_clock_days"])
+    if cue_type == "Video":
+        operations.extend(["select_audio_track", "set_integrated_audio_fade", "insert_video_effect"])
+    if cue_type in {"Audio", "Mic", "Video"}:
+        operations.extend(["remove_audio_effect", "move_audio_effect", "set_audio_effect_bypassed"])
+        result.edit_capabilities["saved_settings"]["audio_fx_write_scope"] = (
+            "Existing AudioUnit effects only; saved archive verification; no parameter editing or insertion.")
+    result.edit_capabilities["saved_settings"]["operations"] = operations
     from .cues.limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES
     from .cues.limits import serialized_payload_bytes
     maximum = max_bytes if max_bytes is not None else MAX_SENSITIVE_CUE_RESPONSE_BYTES

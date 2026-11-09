@@ -370,13 +370,13 @@ class SettingsInventoryEmpty(BaseModel):
 
 
 class AudioOutputChannelName(BaseModel):
-    channel: Annotated[StrictInt, Field(ge=1)]
+    channel: Annotated[StrictInt, Field(ge=1, le=128)]
     name: str
 
 
 class AudioPatchLevel(BaseModel):
     input_channel: Annotated[StrictInt, Field(ge=0, le=128)]
-    output_channel: Annotated[StrictInt, Field(ge=0)]
+    output_channel: Annotated[StrictInt, Field(ge=0, le=128)]
     decibels: Annotated[StrictInt | StrictFloat, Field(allow_inf_nan=False)] | Literal["-inf"]
 
 
@@ -394,8 +394,8 @@ class AudioPatchSummary(SettingsItemIdentity):
 class AudioOutputPatchDetail(AudioPatchSummary):
     # Required so the detail union cannot parse an input patch as an output patch.
     name_property: str | None
-    mute_channels: list[Annotated[StrictInt, Field(ge=1)]] = Field(default_factory=list)
-    solo_channels: list[Annotated[StrictInt, Field(ge=1)]] = Field(default_factory=list)
+    mute_channels: list[Annotated[StrictInt, Field(ge=1, le=128)]] = Field(default_factory=list)
+    solo_channels: list[Annotated[StrictInt, Field(ge=1, le=128)]] = Field(default_factory=list)
     level: AudioPatchLevel | None = None
     editable_operations: list[str] = Field(default_factory=lambda: [
         "name", "cueOutputChannels", "level", "mute", "solo", "muteClear", "soloClear",

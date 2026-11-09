@@ -1,4 +1,27 @@
-# Current Project State — 2026-11-01
+# Current Project State — 2026-11-09
+
+## Audio authoring — 2026-11-09
+
+The current source contract exposes **91 tools: 54 reads and 37 gated writes**.
+Audio settings now read saved patch routing cells, level, mute/solo, buses,
+device descriptors and AudioUnit identities/parameters with source and freshness
+kept explicit. Guarded saved-file editors cover patch structure and limited
+existing Audio FX chain changes on Audio, Mic and Video cues. OSC `/level`
+setters remain the routing-cell write path; `/routing` is read-only.
+
+A temporary QLab 5.5.10/build 5510 workspace reopened with duplicated, renamed
+and reordered output patches, renamed cue outputs, a built-in output-bus Audio
+Unit effect and its bypassed state. A separate cue Audio FX bypass round-trip
+was read from the saved archive. The original `mcp_prueba.qlab5` hash was
+unchanged. No cue was run and no playback, capture or physical output was
+tested. CoreAudio inventory returned unavailable in this environment, so
+device assignment could not be accepted. Trim remains blocked because no
+build-5510 saved/reopened fixture validates its archive format.
+
+See the [audio authoring validation](../development/runtime-validation/2026-11-09-audio-authoring.md)
+for fixture details and limits. Automated verification: **2,462 passed, 40
+skipped, 61 subtests passed**; local loopback access was needed by the OSC
+transport tests.
 
 ## Video cue diagnostics — 2026-11-01
 

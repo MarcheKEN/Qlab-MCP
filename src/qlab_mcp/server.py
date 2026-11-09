@@ -17,6 +17,7 @@ from pathlib import Path
 from pydantic import Field, StrictBool, StrictInt, StrictStr, TypeAdapter
 
 from . import __version__
+from .audio_archive import AudioPatchOperations, edit_saved_audio_patches, read_saved_audio_patches
 from .media import search_media_files
 from .light_patch.models import LightPatchOperations, DefinitionOperations
 from .light_patch.catalogue import get_light_definitions
@@ -316,7 +317,7 @@ mcp = FastMCP(
         get_prompt_settings={"enabled": False},
     )],
     instructions="""
-QLab MCP exposes fifty-two read-only tools plus thirty-six gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
+QLab MCP exposes fifty-four read-only tools plus thirty-seven gated write tools. QLab access primarily uses OSC; media discovery searches the MCP user's home folder after consent.
 Existing-workspace writes require QLAB_ENABLE_WRITE=true, QLAB_PASSCODE, QLab /connect Edit permission, and Edit Mode; they remain dry-run first. Native document Open has its separate empty-inventory preflight, write-enable setting, file fingerprint and document token; no existing workspace is available for OSC readiness.
 This server does not expose GO, stop, panic, playback, audition, /live writes, arbitrary AppleScript, or raw OSC passthrough. Load loadTime, Target assignedNumber and documented cue Triggers use fixed local AppleScript reads/writes. Native Trigger reads require include_native_triggers=true; configuration requires disabled triggers, activation requires disarmed/no continuation/no skip, and live Hotkey enabling is blocked without key/modifier readback. The separate qlab_edit_saved_cue_settings workflow reads the saved key descriptor and supports guarded assignment/activation on a clean local document.
 
@@ -541,6 +542,80 @@ def qlab_get_video_effect_catalogue(
     live effect: use its exact cue Get and a fresh family-editor dry run.
     """
     return video_effect_catalogue(effect_types, offset=offset, limit=limit)
+
+
+def _saved_audio_effect_instances(saved: dict[str, Any]) -> list[dict[str, Any]]:
+    instances = [dict(scope="cue", **item) for item in saved.get("audio_effects", [])]
+    for patch in saved.get("output_patches", []):
+        for bus_type, key in (("cue", "cue_output_buses"), ("device", "device_output_buses")):
+            for bus in patch.get(key, []):
+                for effect in bus.get("effects", []):
+                    instances.append({
+                        "scope": "output_patch_bus",
+                        "patch_id": patch.get("id"),
+                        "patch_name": patch.get("name"),
+                        "bus_type": bus_type,
+                        "bus_index": bus.get("index"),
+                        **effect,
+                    })
+    return instances
+
+
+@mcp.tool(title="Get QLab Saved Audio Patches", tags={"qlab", "audio", "patches", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=WORKSPACE_SETTINGS_TIMEOUT)
+def qlab_get_saved_audio_patches(
+    workspace_id: CanonicalWorkspaceUUID,
+    patch_type: Literal["all", "input", "output"] = "all",
+    ref: CanonicalWorkspaceUUID | None = None,
+) -> dict[str, Any]:
+    """Read last-saved QLab 5.5.10 input/output patch configuration and passive CoreAudio observations.
+
+    Saved configuration may be stale when the workspace has unsaved changes; it never proves a device is
+    connected or that audio works. Use patch_type with an exact ref to select one saved patch.
+    """
+    if ref is not None and patch_type == "all":
+        raise ToolError("ref requires patch_type='input' or patch_type='output'.")
+    return _run_tool(lambda reader: read_saved_audio_patches(
+        reader, str(workspace_id), patch_type=patch_type, ref=str(ref) if ref is not None else None,
+    ), timeout=WORKSPACE_SETTINGS_TIMEOUT)
+
+
+@mcp.tool(title="Get QLab Audio Effect Catalogue", tags={"qlab", "audio", "effects", "safe-read"},
+          annotations=READ_ONLY_QLAB_TOOL, timeout=WORKSPACE_SETTINGS_TIMEOUT)
+def qlab_get_audio_effect_catalogue(
+    workspace_id: CanonicalWorkspaceUUID,
+    patch_type: Literal["all", "output"] = "all",
+    ref: CanonicalWorkspaceUUID | None = None,
+) -> dict[str, Any]:
+    """List AudioUnit identities and parameters observed in saved cue and output-patch effect instances.
+
+    This is a saved_workspace_instances catalogue, not an installed-plugin inventory; installed_plugins is
+    always unknown. patch_type/ref filter output-patch buses; cue effect instances remain workspace-wide.
+    """
+    if ref is not None and patch_type == "all":
+        raise ToolError("ref requires patch_type='output'.")
+
+    def read(reader):
+        result = read_saved_audio_patches(
+            reader, str(workspace_id), patch_type=patch_type, ref=str(ref) if ref is not None else None,
+        )
+        saved = result.get("saved") or {}
+        return {
+            "status": result.get("status"),
+            "catalogue_source": "saved_workspace_instances",
+            "installed_plugins": "unknown",
+            "workspace_id": saved.get("workspace_id", str(workspace_id)),
+            "version": saved.get("version"),
+            "build": saved.get("build"),
+            "sha256": result.get("sha256"),
+            "freshness": result.get("freshness"),
+            "document_modified": result.get("document_modified"),
+            "patch_filter": {"patch_type": patch_type, "ref": str(ref) if ref is not None else None},
+            "instances": _saved_audio_effect_instances(saved),
+            "issues": result.get("issues", []),
+        }
+
+    return _run_tool(read, timeout=WORKSPACE_SETTINGS_TIMEOUT)
 
 
 @mcp.tool(title="Search QLab Media Files", tags={"qlab", "media", "safe-read"},
@@ -2900,6 +2975,28 @@ def qlab_edit_audio_output_patch(
 ) -> WorkspaceSettingsEditResult:
     """Edit one patch property, including name, or clear mutes/solos with a single-use token."""
     return _edit_object_setting(workspace_id, "audio", {"patch_id": str(patch_id)}, operation, dry_run, confirm_token)
+
+
+@mcp.tool(title="Edit QLab Saved Audio Patches", tags={"qlab", "settings", "audio", "workspace-document", "gated-write"},
+          annotations=GATED_DESTRUCTIVE_QLAB_TOOL, timeout=120.0)
+def qlab_edit_saved_audio_patches(
+    workspace_id: CanonicalWorkspaceUUID,
+    operations: AudioPatchOperations,
+    dry_run: StrictBool = True,
+    confirm_token: StrictStr | None = None,
+) -> dict[str, Any]:
+    """Edit saved input/output audio patch collections and output buses in one guarded batch.
+
+    Supports patch rename/duplicate/delete/order, exact passive CoreAudio device assignment, cue-output
+    names, bus names, and removal/reordering/enabling of existing output-bus effects. New patches can only
+    be made by duplicating an existing patch. It does not change cue-output count, add AudioUnits, edit their
+    parameters, or edit cue Trim. Requires a clean local QLab 5.5.10/build 5510 document and a
+    reviewed single-use token; it closes, replaces and reopens the same file. No capture or audio is activated.
+    """
+    normalized = [operation.model_dump(exclude_none=True) for operation in operations]
+    return _run_tool(lambda reader: edit_saved_audio_patches(
+        reader, str(workspace_id), normalized, dry_run=dry_run, confirm_token=confirm_token,
+    ), timeout=120.0)
 
 
 def _video_batch(workspace_id, domain, operations, dry_run, confirm_token):

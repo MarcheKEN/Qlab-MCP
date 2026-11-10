@@ -368,6 +368,24 @@ def _audio_effect_reference_count(a, target):
     return count
 
 
+def _audio_effect_array_owner_count(a, target):
+    cues, _ = _reachable_cues(a, ("AudioCue", "MicCue", "VideoCue"))
+    count = 0
+    for cue, _ in cues.values():
+        kind = a.kind(cue)
+        if kind == "VideoCue":
+            owner = a.ref(cue.get("audioCue"))
+            if not isinstance(owner, dict) or a.kind(owner) != "AudioCue":
+                continue
+        elif kind in {"AudioCue", "MicCue"}:
+            owner = cue
+        else:
+            continue
+        if owner.get("effects") == target:
+            count += 1
+    return count
+
+
 def _effect_summary(a, cue):
     entries = a.array(a.mapping(cue["videoEffects"])["effectEntries"])
     if len(entries) > 50:
@@ -670,6 +688,8 @@ def plan_saved_cue_settings(source, operations, *, media=None, targets=()):
             audio_cue, effects_ref, effects, summaries = _audio_fx_chain(a, cue)
             if op.effect_index >= len(effects):
                 raise ValueError("Audio effect index is outside the saved chain.")
+            if summaries[op.effect_index].get("saved_state_write_supported") is not True:
+                raise ValueError("Unknown or unvalidated AudioUnit identity for QLab 5.5.10.")
             if isinstance(op, RemoveAudioEffect):
                 del effects[op.effect_index]
                 audio_cue["effects"] = a.add({**a.ref(effects_ref), "NS.objects": effects})
@@ -681,6 +701,9 @@ def plan_saved_cue_settings(source, operations, *, media=None, targets=()):
                     audio_cue["effects"] = a.add({**a.ref(effects_ref), "NS.objects": effects})
             else:
                 effect_ref = effects[op.effect_index]
+                if (_audio_effect_array_owner_count(a, effects_ref) != 1
+                        or _audio_effect_reference_count(a, effects_ref) != 1):
+                    raise ValueError("Shared Audio FX chains cannot be bypassed safely.")
                 if not isinstance(effect_ref, plistlib.UID):
                     raise ValueError("Audio effect reference has an unknown encoding.")
                 if _audio_effect_reference_count(a, effect_ref) != 1:

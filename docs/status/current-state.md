@@ -1,6 +1,6 @@
-# Current Project State — 2026-11-09
+# Current Project State — 2026-11-10
 
-## Audio authoring — 2026-11-09
+## Audio authoring — 2026-11-10
 
 The current source contract exposes **91 tools: 54 reads and 37 gated writes**.
 Audio settings now read saved patch routing cells, level, mute/solo, buses,
@@ -9,25 +9,38 @@ kept explicit. Guarded saved-file editors cover patch structure and limited
 existing Audio FX chain changes on Audio, Mic and Video cues. OSC `/level`
 setters remain the routing-cell write path; `/routing` is read-only.
 
-A temporary QLab 5.5.10/build 5510 workspace reopened with duplicated, renamed
-and reordered output patches, renamed cue outputs, a built-in output-bus Audio
-Unit effect and its bypassed state. A separate cue Audio FX bypass round-trip
-was read from the saved archive. The original `mcp_prueba.qlab5` hash was
-unchanged. A saved output patch changed from explicit-device to
-system-device mode in a disposable copy and reopened in QLab with the expected
-`System Output` label. The gated MCP transaction was not exercised because this
-environment has write mode and passcode unset. Explicit-device assignment and
-switching out of system mode remain blocked while passive CoreAudio inventory
-is unavailable. A cue-owned Audio Object was saved and reopened with no map;
-archive ownership gates now reject map, shared-cue, duplicate and embedded-track
-ownership. A virtual NDI device reopened with its configured channels, sample
-rate and buffer size. AU parameter changes reset on reopen, so parameter writes
-and Trim remain blocked. No cue was run and no playback, capture or physical
-output was tested.
+A QLab 5.5.10/build 5510 copy was tested through the gated MCP writer. Patch 2
+was renamed, closed/reopened, read back, and restored through a second fresh
+confirmation; the patch names and IDs matched afterward. A saved SnapTune cue
+effect was bypassed and re-enabled in separate confirmed edits. Each edit
+reopened and read back the saved value, and the QLab inspector showed the
+restored effect enabled. A Patch 2 routing-cell level/mute/solo check was also
+read back against QLab's Audio settings UI. These checks changed only the
+disposable copy; the original `mcp_prueba.qlab5` was not targeted.
 
-See the [audio authoring validation](../development/runtime-validation/2026-11-09-audio-authoring.md)
-for fixture details and limits. Automated verification: **2,496 passed, 40
-skipped, 61 subtests passed**; OSC transport tests required local loopback access.
+Earlier QLab fixture tests also reopened duplicated, renamed and reordered
+output patches, cue-output names, a built-in output-bus effect, system-device
+mode, a cue-owned Audio Object and a virtual NDI device. The system-device and
+NDI changes were also checked in archive fixtures. In a later gated MCP
+round-trip, Patch 2 switched to system-device mode and back; the explicit-device
+readback preserved the UID but showed manufacturer `Unknown` because CoreAudio
+omitted that property. A local regression fix preserves the saved manufacturer
+and model for an unchanged UID, but the connected server still runs the older
+code, so that fix awaits a live round-trip. Explicit-device assignment remains
+blocked when passive CoreAudio identity is absent.
+Audio Object setters, default/silent level actions, Fade cue audio targets,
+blank patch creation, cue-output count changes, AudioUnit insertion/parameter
+writes and Trim remain blocked or read-only pending evidence. AudioUnit
+saved-state writes require the exact SnapTune cue or AUDynamicsProcessor bus
+identity validated in QLab 5.5.10 fixtures; other identities/classes are shown
+read-only. Plugin installation is not inferred from saved identity. No Audio
+Maps were modified; no cue was run and no playback, capture or physical output
+was tested.
+
+See the [November 9 fixture report](../development/runtime-validation/2026-11-09-audio-authoring.md)
+and [November 10 MCP follow-up](../development/runtime-validation/2026-11-10-audio-mcp-followup.md).
+The follow-up's focused archive suites pass **78 tests**. CI for the previous
+PR head passed on macOS and Ubuntu; this follow-up commit still needs CI.
 
 ## Video cue diagnostics — 2026-11-01
 

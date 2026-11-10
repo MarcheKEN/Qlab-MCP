@@ -60,6 +60,12 @@ flag, freshness and explicit issues. Audio/Mic/Video-audio `audio_effects`
 include saved AudioUnit identity and any parameters present in the archive.
 They do not report which plug-ins are installed. It never saves or closes a
 document. Current OSC properties remain separate when unsaved edits exist.
+Each instance reports `identity_status` and
+`saved_state_write_supported`. Only exact SnapTune cue and Apple's
+AUDynamicsProcessor output-bus identities from QLab 5.5.10 fixtures are
+write-enabled; unknown identities and archived classes are preserved as
+read-only entries. This does not establish plug-in installation or runtime
+availability.
 
 `qlab_edit_saved_cue_settings` accepts one to 50 typed operations with exact cue
 UUIDs. Check readiness, preview with `dry_run=true`, inspect the diff, then execute
@@ -83,8 +89,9 @@ closes nor rewrites. Do not retry an uncertain execution automatically.
 Audio FX edits only reorder, remove or bypass an existing instance. They do not
 insert AudioUnits or edit plug-in parameters. Parameters are reported as
 observed saved values; an empty or missing parameter list does not establish
-that a plug-in has no parameters. Trim remains unsupported and is distinct from
-the media playback interval in `startTime`/`endTime`.
+that a plug-in has no parameters. Writes to unknown or unvalidated identities
+fail closed. Trim remains unsupported and is distinct from the media playback
+interval in `startTime`/`endTime`.
 
 Example preview, using real UUIDs obtained from discovery:
 
@@ -418,6 +425,12 @@ the output-patch buses (`patch_type` is `all` or `output`); cue effects remain
 workspace-wide. This is evidence of saved instances, not a list of AudioUnits
 installed on the Mac or available to QLab at runtime.
 
+Audio FX instances expose `identity_status` and
+`saved_state_write_supported`. Only the exact SnapTune cue and Apple's
+AUDynamicsProcessor output-bus identities observed in QLab 5.5.10 fixtures are
+write-enabled. Unknown identities/classes remain visible and read-only.
+`installed_plugins="unknown"` stays independent of saved identity.
+
 `qlab_edit_audio_output_patch` keeps its legacy one-property form and also
 accepts a `kind="batch"` operation with 1–50 typed `level`, `mute`, or `solo`
 setters for one exact output patch. One dry-run token binds the complete
@@ -430,7 +443,8 @@ form remains available. Use `qlab_edit_saved_audio_patches`
 for saved patch collection and bus operations: rename, duplicate, delete, order,
 assign a passively observed device, switch to system-device mode, set cue-output
 names, rename an output bus, and remove, reorder, or enable/disable an existing
-effect. Enabling system-device mode preserves the saved descriptor; disabling it
+effect only when its identity is validated in the saved-state fixture contract.
+Unknown AudioUnits remain read-only. Enabling system-device mode preserves the saved descriptor; disabling it
 requires an exact device in the current passive CoreAudio inventory. That
 observation does not prove device negotiation or audio signal. Cue-output count
 remains on `qlab_edit_audio_output_patch`; creating a patch is supported only by

@@ -27,6 +27,11 @@ MAX_TOTAL_EFFECTS = 1024
 MAX_TOTAL_LEVEL_CELLS = 8192
 _NAME = Annotated[StrictStr, Field(min_length=1, max_length=255)]
 _REF = Annotated[StrictStr, Field(min_length=1, max_length=64)]
+# Exact component identities observed in QLab 5.5.10 persisted AudioUnit fixtures.
+_VALIDATED_AUDIO_UNITS = {
+    ("SnapTune", "Nico Fernandez", "666d756174706e537a66634e0000000000000000"),
+    ("AUDynamicsProcessor", "Apple", "78667561706d63646c7070610200000000000000"),
+}
 
 
 class AudioPatchBase(BaseModel):
@@ -133,15 +138,35 @@ def _text(archive: Archive, value):
 
 def _audio_effect_summary(archive: Archive, effect_ref) -> dict:
     effect = archive.ref(effect_ref)
-    if _class_name(archive, effect) != "F53Effect":
-        raise ValueError("Unknown archived Audio Unit effect class.")
+    archive_class = _class_name(archive, effect)
+    identifier = _text(archive, effect.get("identifier")) if isinstance(effect, dict) else None
+    frame_identifier = _text(archive, effect.get("frameIdentifier")) if isinstance(effect, dict) else None
+    if archive_class != "F53Effect":
+        return {"type": None, "manufacturer": None, "component_id_hex": None,
+                "class": None, "identifier": identifier, "frame_identifier": frame_identifier,
+                "enabled": None, "parameters": [], "parameters_observed": False,
+                "parameters_truncated": False, "archive_class": archive_class,
+                "saved_state_write_supported": False, "identity_status": "unknown",
+                "read_only_reason": "Unrecognized archived AudioUnit effect class."}
     state_ref = effect.get("state")
-    state = archive.mapping(state_ref) if state_ref is not None else {}
-    value = lambda key: _text(archive, state[key]) if key in state else None
+    try:
+        state = archive.mapping(state_ref) if state_ref is not None else {}
+    except (KeyError, TypeError, ValueError):
+        return {"type": None, "manufacturer": None, "component_id_hex": None,
+                "class": None, "identifier": identifier, "frame_identifier": frame_identifier,
+                "enabled": None, "parameters": [], "parameters_observed": False,
+                "parameters_truncated": False, "archive_class": archive_class,
+                "saved_state_write_supported": False, "identity_status": "unknown",
+                "read_only_reason": "AudioUnit state has an unknown encoding."}
+    def value(key):
+        return _text(archive, state[key]) if key in state else None
     settings = {}
     settings_ref = state.get("settings")
     if settings_ref is not None:
-        settings = archive.mapping(settings_ref)
+        try:
+            settings = archive.mapping(settings_ref)
+        except (KeyError, TypeError, ValueError):
+            settings = {}
     parameters = []
     for key, ref in settings.items():
         item = archive.ref(ref)
@@ -156,17 +181,26 @@ def _audio_effect_summary(archive: Archive, effect_ref) -> dict:
         if type(scalar) in (bool, int, float, str) and (not isinstance(scalar, float) or math.isfinite(scalar)):
             parameters.append({"key": key, "value": scalar, "source": "saved_audio_unit_state"})
     component = archive.ref(state.get("component"))
+    effect_type = value("displayName") or value("name")
+    manufacturer = value("manufacturer")
+    component_id = component.hex() if isinstance(component, bytes) else None
+    enabled = value("enabled")
+    identity_status = "validated" if (effect_type, manufacturer, component_id) in _VALIDATED_AUDIO_UNITS else "unknown"
     return {
-        "type": value("displayName") or value("name"),
-        "manufacturer": value("manufacturer"),
-        "component_id_hex": component.hex() if isinstance(component, bytes) else None,
+        "type": effect_type,
+        "manufacturer": manufacturer,
+        "component_id_hex": component_id,
         "class": value("class"),
-        "identifier": _text(archive, effect.get("identifier")),
-        "frame_identifier": _text(archive, effect.get("frameIdentifier")),
-        "enabled": value("enabled"),
+        "identifier": identifier,
+        "frame_identifier": frame_identifier,
+        "enabled": enabled,
         "parameters": parameters[:256],
         "parameters_observed": bool(parameters),
         "parameters_truncated": len(parameters) > 256,
+        "saved_state_write_supported": identity_status == "validated",
+        "identity_status": identity_status,
+        **({"read_only_reason": "AudioUnit identity has no validated QLab 5.5.10 fixture."}
+           if identity_status != "validated" else {}),
     }
 
 
@@ -507,11 +541,18 @@ class AudioPatchArchive:
         if not required <= set(current):
             raise ValueError("Saved device descriptor does not match the validated QLab 5.5.10 schema.")
         values = dict(current)
+        saved_uid = _text(self.a, current["deviceUID"])
         replacements = {"deviceUID": device_uid, "name": device["name"],
                         "manufacturer": device.get("manufacturer") or "Unknown",
                         "deviceModelUID": device.get("model_uid") or "Unknown",
                         "inputChannels": device.get("input_channels", 0),
                         "outputChannels": device.get("output_channels", 0)}
+        if saved_uid == device_uid:
+            for observed_key, saved_key in (("manufacturer", "manufacturer"), ("model_uid", "deviceModelUID")):
+                if not device.get(observed_key):
+                    saved_value = _text(self.a, current[saved_key])
+                    if isinstance(saved_value, str) and saved_value:
+                        replacements[saved_key] = saved_value
         for key, value in replacements.items():
             values[key] = self.a.add(value)
         patch["deviceDescription"] = self.a.make_dict(values)
@@ -633,7 +674,7 @@ class AudioPatchArchive:
 
     def _effect(self, ref, bus_type, bus_index, effect_index):
         bus = self.a.ref(self._bus(ref, bus_type, bus_index))
-        effects = self.a.array(bus["effects"])
+        effects = list(self.a.array(bus["effects"]))
         if not 0 <= effect_index < len(effects):
             raise ValueError("Audio effect index is outside the bus chain.")
         return bus, effects, effect_index
@@ -654,6 +695,20 @@ class AudioPatchArchive:
                 stack.extend(value.values())
             elif isinstance(value, list):
                 stack.extend(value)
+        return count
+
+    def _effect_array_owner_count(self, target):
+        count = 0
+        for patch_ref in self.refs["output"]:
+            patch = self.a.ref(patch_ref)
+            for key in ("cueOutputEffects", "patchOutputEffects"):
+                bus_refs = self.a.ref(patch.get(key))
+                if bus_refs is None:
+                    continue
+                for bus_ref in self.a.array(patch[key]):
+                    bus = self.a.ref(bus_ref)
+                    if bus.get("effects") == target:
+                        count += 1
         return count
 
     def apply(self, op):
@@ -697,6 +752,9 @@ class AudioPatchArchive:
                 self.dirty = True
         else:
             bus, effects, index = self._effect(ref, op.bus_type, op.bus_index, op.effect_index)
+            effect_summary = _audio_effect_summary(self.a, effects[index])
+            if effect_summary.get("saved_state_write_supported") is not True:
+                raise ValueError("Unknown or unvalidated AudioUnit identity for QLab 5.5.10.")
             if op.action == "remove_bus_effect":
                 del effects[index]
             elif op.action == "move_bus_effect":
@@ -714,6 +772,9 @@ class AudioPatchArchive:
                 if type(self.a.ref(values["enabled"])) is not bool:
                     raise ValueError("Audio effect enabled state is unavailable.")
                 effect_ref = effects[index]
+                if (self._effect_array_owner_count(bus.get("effects")) != 1
+                        or self._effect_reference_count(bus.get("effects")) != 1):
+                    raise ValueError("Shared AudioUnit effect chains cannot be changed safely.")
                 if not isinstance(effect_ref, plistlib.UID) or self._effect_reference_count(effect_ref) != 1:
                     raise ValueError("Shared AudioUnit effect references cannot be changed safely.")
                 values["enabled"] = self.a.add(op.enabled)

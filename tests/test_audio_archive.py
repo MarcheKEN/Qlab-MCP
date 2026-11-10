@@ -33,7 +33,8 @@ def audio_workspace():
                               "name": name, "deviceDescription": device, "useSystemDevice": False})
         state = outer.make_dict({
             "displayName": outer.add("AUDynamicsProcessor"), "manufacturer": outer.add("Apple"),
-            "component": outer.add(b"fixture-au-component"), "class": outer.add("F53Effect"),
+            "component": outer.add(bytes.fromhex("78667561706d63646c7070610200000000000000")),
+            "class": outer.add("F53Effect"),
             "name": outer.add("AUDynamicsProcessor"), "enabled": outer.add(True),
         })
         effect = outer.add({"$class": outer.cls("F53Effect"), "identifier": outer.add(patch_id),
@@ -90,6 +91,8 @@ def test_saved_audio_patch_reader_keeps_provenance_and_effect_parameters():
     ]
     assert patch["cue_output_buses"][0]["effects"][0]["type"] == "AUDynamicsProcessor"
     assert patch["cue_output_buses"][0]["effects"][0]["enabled"] is True
+    assert patch["cue_output_buses"][0]["effects"][0]["identity_status"] == "validated"
+    assert patch["cue_output_buses"][0]["effects"][0]["saved_state_write_supported"] is True
     assert patch["device"]["source"] == "saved_archive"
 
 
@@ -210,9 +213,23 @@ def test_device_assignment_requires_current_exact_passive_device():
     plan = plan_saved_audio_patches(source, [operation], devices=devices)
     saved = inspect_saved_audio_patches(plan["output_bytes"])
     assert saved["input_patches"][0]["device"]["name"] == "Current Device"
-    assert saved["input_patches"][0]["device"]["manufacturer"] == "Unknown"
+    assert saved["input_patches"][0]["device"]["manufacturer"] == "Example"
+    assert saved["input_patches"][0]["device"]["deviceModelUID"] == "Fixture"
     with pytest.raises(ValueError, match="passive CoreAudio"):
         plan_saved_audio_patches(source, [operation])
+
+
+def test_new_device_assignment_does_not_invent_unobserved_metadata():
+    operation = {"action": "set_device", "patch_type": "output", "patch_id": OUT1,
+                 "device_uid": "new-device"}
+    device = {"uid": "new-device", "name": "New Device", "manufacturer": None,
+              "model_uid": None, "input_channels": 0, "output_channels": 2}
+
+    plan = plan_saved_audio_patches(audio_workspace(), [operation], devices={device["uid"]: device})
+    saved = inspect_saved_audio_patches(plan["output_bytes"])["output_patches"][0]["device"]
+    assert saved["deviceUID"] == "new-device"
+    assert saved["manufacturer"] == "Unknown"
+    assert saved["deviceModelUID"] == "Unknown"
 
 
 def test_system_device_toggle_preserves_saved_descriptors_for_input_and_output():
@@ -340,6 +357,102 @@ def test_output_bus_bypass_blocks_shared_effect_and_unknown_enabled_state():
     with pytest.raises(ValueError, match="enabled state"):
         plan_saved_audio_patches(source.dump(), [{"action": "set_bus_effect_enabled", "patch_type": "output",
             "patch_id": OUT1, "bus_type": "cue", "bus_index": 1, "effect_index": 0, "enabled": False}])
+
+
+@pytest.mark.parametrize("action", ["remove_bus_effect", "move_bus_effect", "set_bus_effect_enabled"])
+def test_unknown_audio_unit_identity_is_read_only_on_output_buses(action):
+    source = Archive(audio_workspace())
+    settings = source.mapping(source.mapping(source.root)["settings"])
+    audio = source.mapping(settings["Audio"])
+    patch = source.ref(source.array(audio["audioOutputPatches"])[0])
+    effect_ref = source.array(source.ref(source.array(patch["cueOutputEffects"])[0])["effects"])[0]
+    effect = source.ref(effect_ref)
+    state = source.mapping(effect["state"])
+    state["displayName"] = source.add("Unrecognized Audio Unit")
+    state["manufacturer"] = source.add("Unrecognized Vendor")
+    state["component"] = source.add(b"unrecognized-component")
+    effect["state"] = source.make_dict(state)
+
+    summary = inspect_saved_audio_patches(source.dump())["output_patches"][0]["cue_output_buses"][0]["effects"][0]
+    assert summary["type"] == "Unrecognized Audio Unit"
+    assert summary["saved_state_write_supported"] is False
+    assert summary["identity_status"] == "unknown"
+    operation = {"action": action, "patch_type": "output", "patch_id": OUT1,
+                 "bus_type": "cue", "bus_index": 1, "effect_index": 0}
+    if action == "move_bus_effect":
+        operation["new_index"] = 1
+    if action == "set_bus_effect_enabled":
+        operation["enabled"] = False
+    with pytest.raises(ValueError, match="Unknown or unvalidated AudioUnit"):
+        plan_saved_audio_patches(source.dump(), [operation])
+
+
+def test_unrecognized_archived_bus_effect_class_is_returned_read_only():
+    source = Archive(audio_workspace())
+    settings = source.mapping(source.mapping(source.root)["settings"])
+    audio = source.mapping(settings["Audio"])
+    patch = source.ref(source.array(audio["audioOutputPatches"])[0])
+    effect_ref = source.array(source.ref(source.array(patch["cueOutputEffects"])[0])["effects"])[0]
+    source.ref(effect_ref)["$class"] = source.cls("FutureAudioEffect")
+
+    summary = inspect_saved_audio_patches(source.dump())["output_patches"][0]["cue_output_buses"][0]["effects"][0]
+    assert summary["archive_class"] == "FutureAudioEffect"
+    assert summary["saved_state_write_supported"] is False
+    assert summary["identity_status"] == "unknown"
+    with pytest.raises(ValueError, match="Unknown or unvalidated AudioUnit"):
+        plan_saved_audio_patches(source.dump(), [{"action": "remove_bus_effect", "patch_type": "output",
+            "patch_id": OUT1, "bus_type": "cue", "bus_index": 1, "effect_index": 0}])
+
+
+def test_output_bus_bypass_blocks_shared_effect_array():
+    source = Archive(audio_workspace())
+    settings = source.mapping(source.mapping(source.root)["settings"])
+    audio = source.mapping(settings["Audio"])
+    patch = source.ref(source.array(audio["audioOutputPatches"])[0])
+    buses = source.array(patch["cueOutputEffects"])
+    first, second = (source.ref(ref) for ref in buses[:2])
+    second["effects"] = first["effects"]
+
+    with pytest.raises(ValueError, match="Shared AudioUnit effect chain"):
+        plan_saved_audio_patches(source.dump(), [{"action": "set_bus_effect_enabled", "patch_type": "output",
+            "patch_id": OUT1, "bus_type": "cue", "bus_index": 1, "effect_index": 0, "enabled": False}])
+
+
+def test_output_bus_bypass_blocks_unlisted_effect_array_owner():
+    source = Archive(audio_workspace())
+    settings = source.mapping(source.mapping(source.root)["settings"])
+    audio = source.mapping(settings["Audio"])
+    patch = source.ref(source.array(audio["audioOutputPatches"])[0])
+    bus = source.ref(source.array(patch["cueOutputEffects"])[0])
+    audio["unrecognizedEffectOwner"] = source.add({"effects": bus["effects"]})
+    settings["Audio"] = source.make_dict(audio)
+    source.data["$top"]["root"] = source.replacing_mapping(
+        source.data["$top"]["root"], "settings", source.make_dict(settings))
+
+    with pytest.raises(ValueError, match="Shared AudioUnit effect chain"):
+        plan_saved_audio_patches(source.dump(), [{"action": "set_bus_effect_enabled", "patch_type": "output",
+            "patch_id": OUT1, "bus_type": "cue", "bus_index": 1, "effect_index": 0, "enabled": False}])
+
+
+@pytest.mark.parametrize("action", ["remove_bus_effect", "move_bus_effect"])
+def test_output_bus_structural_fx_edit_copies_shared_effect_array(action):
+    source = Archive(audio_workspace())
+    settings = source.mapping(source.mapping(source.root)["settings"])
+    audio = source.mapping(settings["Audio"])
+    patch = source.ref(source.array(audio["audioOutputPatches"])[0])
+    buses = source.array(patch["cueOutputEffects"])
+    first, second = (source.ref(ref) for ref in buses[:2])
+    second["effects"] = first["effects"]
+    operation = {"action": action, "patch_type": "output", "patch_id": OUT1,
+                 "bus_type": "cue", "bus_index": 1, "effect_index": 0}
+    if action == "move_bus_effect":
+        operation["new_index"] = 1
+
+    plan = plan_saved_audio_patches(source.dump(), [operation])
+    cue_buses = inspect_saved_audio_patches(plan["output_bytes"])["output_patches"][0]["cue_output_buses"]
+    ids = [[effect["identifier"] for effect in bus["effects"]] for bus in cue_buses]
+    assert ids[0] == ([OUT2] if action == "remove_bus_effect" else [OUT2, OUT1])
+    assert ids[1] == [OUT1, OUT2]
 
 
 def test_output_channel_name_and_device_assignment_reject_stale_or_out_of_range_values():

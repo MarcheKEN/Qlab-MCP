@@ -1,5 +1,7 @@
 # Runtime validation records
 
+- [Audio MCP round-trip follow-up — November 10](2026-11-10-audio-mcp-followup.md)
+- [Audio archive fixtures — November 9](2026-11-09-audio-authoring.md)
 - [October 22 lighting authoring completion](2026-10-22-light-authoring-completion.md)
 
 Each report proves only its named QLab version, fixture and operation. Automated checks are separate from real playback and hardware output. JSON files with matching stems retain capture evidence.

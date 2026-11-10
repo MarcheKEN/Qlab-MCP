@@ -105,8 +105,8 @@ def video_source():
 def _add_audio_effect(a, name, identifier, *, enabled=True, parameter=0.5):
     state = a.make_dict({
         "displayName": a.add(name),
-        "manufacturer": a.add("Fixture Audio Unit"),
-        "component": a.add(b"fixture-au-component"),
+        "manufacturer": a.add("Nico Fernandez"),
+        "component": a.add(bytes.fromhex("666d756174706e537a66634e0000000000000000")),
         "class": a.add("AudioUnit"),
         "name": a.add(name),
         "enabled": a.add(enabled),
@@ -127,8 +127,8 @@ def audio_fx_source(cue_type="Audio", *, video=False):
     else:
         cue["$class"] = a.cls(f"{cue_type}Cue")
         audio = cue
-    effects = [_add_audio_effect(a, "Fixture Reverb", "fx-1", parameter=0.25),
-               _add_audio_effect(a, "Fixture Compressor", "fx-2", enabled=True, parameter=1.25)]
+    effects = [_add_audio_effect(a, "SnapTune", "fx-1", parameter=0.25),
+               _add_audio_effect(a, "SnapTune", "fx-2", enabled=True, parameter=1.25)]
     audio["effects"] = a.make_array(effects)
     carrier["NS.data"] = a.dump()
     return outer.dump()
@@ -397,8 +397,10 @@ def test_saved_audio_effects_include_identity_and_observed_parameters(cue_type, 
     saved = inspect_saved_cue(audio_fx_source(cue_type, video=video), CUE)
     effects = saved["settings"]["audio_effects"]
     assert [effect["identifier"] for effect in effects] == ["fx-1", "fx-2"]
-    assert [effect["type"] for effect in effects] == ["Fixture Reverb", "Fixture Compressor"]
+    assert [effect["type"] for effect in effects] == ["SnapTune", "SnapTune"]
     assert effects[0]["enabled"] is True
+    assert effects[0]["identity_status"] == "validated"
+    assert effects[0]["saved_state_write_supported"] is True
     assert effects[0]["parameters"] == [
         {"key": "gain", "value": 0.25, "source": "saved_audio_unit_state"}
     ]
@@ -444,6 +446,107 @@ def test_audio_effect_chain_supports_only_remove_move_and_bypass_with_exact_post
     ]
     assert _postcondition(plan["output_bytes"], plan)
     assert [effect["identifier"] for effect in inspect_saved_cue(original, CUE)["settings"]["audio_effects"]] == ["fx-1", "fx-2"]
+
+
+@pytest.mark.parametrize("action", ["remove_audio_effect", "move_audio_effect", "set_audio_effect_bypassed"])
+def test_unknown_audio_unit_identity_is_read_only_on_cues(action):
+    from qlab_mcp.saved_cue_settings import inspect_saved_cue, plan_saved_cue_settings
+    outer = Archive(audio_fx_source())
+    carrier = outer.ref(outer.mapping(outer.root)["cueLists"])
+    inner = Archive(carrier["NS.data"])
+    from qlab_mcp.light_patch.curves import _reachable_cues
+    cue = _reachable_cues(inner, ("AudioCue",))[0][CUE.upper()][0]
+    effect = inner.ref(inner.array(cue["effects"])[0])
+    state = inner.mapping(effect["state"])
+    state["displayName"] = inner.add("Unrecognized Audio Unit")
+    state["manufacturer"] = inner.add("Unrecognized Vendor")
+    state["component"] = inner.add(b"unrecognized-component")
+    effect["state"] = inner.make_dict(state)
+    carrier["NS.data"] = inner.dump()
+    original = outer.dump()
+
+    summary = inspect_saved_cue(original, CUE)["settings"]["audio_effects"][0]
+    assert summary["type"] == "Unrecognized Audio Unit"
+    assert summary["saved_state_write_supported"] is False
+    assert summary["identity_status"] == "unknown"
+    operation = dict(action=action, cue_id=CUE, effect_index=0)
+    if action == "move_audio_effect":
+        operation["new_index"] = 1
+    if action == "set_audio_effect_bypassed":
+        operation["bypassed"] = True
+    with pytest.raises(ValueError, match="Unknown or unvalidated AudioUnit"):
+        plan_saved_cue_settings(original, [operation])
+
+
+def test_unrecognized_archived_cue_effect_class_is_returned_read_only():
+    from qlab_mcp.saved_cue_settings import inspect_saved_cue, plan_saved_cue_settings
+    outer = Archive(audio_fx_source())
+    carrier = outer.ref(outer.mapping(outer.root)["cueLists"])
+    inner = Archive(carrier["NS.data"])
+    from qlab_mcp.light_patch.curves import _reachable_cues
+    cue = _reachable_cues(inner, ("AudioCue",))[0][CUE.upper()][0]
+    effect = inner.ref(inner.array(cue["effects"])[0])
+    effect["$class"] = inner.cls("FutureAudioEffect")
+    carrier["NS.data"] = inner.dump()
+    original = outer.dump()
+
+    summary = inspect_saved_cue(original, CUE)["settings"]["audio_effects"][0]
+    assert summary["archive_class"] == "FutureAudioEffect"
+    assert summary["saved_state_write_supported"] is False
+    assert summary["identity_status"] == "unknown"
+    with pytest.raises(ValueError, match="Unknown or unvalidated AudioUnit"):
+        plan_saved_cue_settings(original, [dict(action="remove_audio_effect", cue_id=CUE, effect_index=0)])
+
+
+def test_audio_fx_bypass_blocks_shared_effect_array():
+    from qlab_mcp.light_patch.curves import _reachable_cues
+    from qlab_mcp.saved_cue_settings import plan_saved_cue_settings
+    outer = Archive(audio_fx_source())
+    carrier = outer.ref(outer.mapping(outer.root)["cueLists"])
+    inner = Archive(carrier["NS.data"])
+    cues, _ = _reachable_cues(inner, ("AudioCue", "LightCue"))
+    owner, other = cues[CUE.upper()][0], cues[OTHER.upper()][0]
+    other["$class"] = inner.cls("AudioCue")
+    other["effects"] = owner["effects"]
+    carrier["NS.data"] = inner.dump()
+
+    with pytest.raises(ValueError, match="Shared Audio FX chain"):
+        plan_saved_cue_settings(outer.dump(), [dict(action="set_audio_effect_bypassed", cue_id=CUE,
+            effect_index=0, bypassed=True)])
+
+
+def test_video_audio_fx_bypass_blocks_directly_shared_audio_cue():
+    from qlab_mcp.light_patch.curves import _reachable_cues
+    from qlab_mcp.saved_cue_settings import plan_saved_cue_settings
+    outer = Archive(audio_fx_source())
+    carrier = outer.ref(outer.mapping(outer.root)["cueLists"])
+    inner = Archive(carrier["NS.data"])
+    cues, _ = _reachable_cues(inner, ("AudioCue", "LightCue"))
+    video_cue = cues[OTHER.upper()][0]
+    audio_ref = plistlib.UID(cues[CUE.upper()][1])
+    video_cue["$class"] = inner.cls("VideoCue")
+    video_cue["audioCue"] = audio_ref
+    carrier["NS.data"] = inner.dump()
+
+    with pytest.raises(ValueError, match="Shared Audio FX chain"):
+        plan_saved_cue_settings(outer.dump(), [dict(action="set_audio_effect_bypassed", cue_id=OTHER,
+            effect_index=0, bypassed=True)])
+
+
+def test_audio_fx_bypass_blocks_unlisted_effect_array_owner():
+    from qlab_mcp.light_patch.curves import _reachable_cues
+    from qlab_mcp.saved_cue_settings import plan_saved_cue_settings
+    outer = Archive(audio_fx_source())
+    carrier = outer.ref(outer.mapping(outer.root)["cueLists"])
+    inner = Archive(carrier["NS.data"])
+    cues, _ = _reachable_cues(inner, ("AudioCue", "LightCue"))
+    owner, unrecognized_owner = cues[CUE.upper()][0], cues[OTHER.upper()][0]
+    unrecognized_owner["effects"] = owner["effects"]
+    carrier["NS.data"] = inner.dump()
+
+    with pytest.raises(ValueError, match="Shared Audio FX chain"):
+        plan_saved_cue_settings(outer.dump(), [dict(action="set_audio_effect_bypassed", cue_id=CUE,
+            effect_index=0, bypassed=True)])
 
 
 def test_audio_fx_edits_preserve_video_track_selection_and_video_fx_behavior():

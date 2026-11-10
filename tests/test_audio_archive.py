@@ -4,7 +4,12 @@ from types import SimpleNamespace
 import pytest
 
 from qlab_mcp import video_settings
-from qlab_mcp.audio_archive import inspect_saved_audio_patches, plan_saved_audio_patches, read_saved_audio_patches
+from qlab_mcp.audio_archive import (
+    _verify_live,
+    inspect_saved_audio_patches,
+    plan_saved_audio_patches,
+    read_saved_audio_patches,
+)
 from qlab_mcp.light_patch.archive import Archive
 from test_light_patch_archive import workspace as light_workspace
 
@@ -353,6 +358,43 @@ def test_audio_patch_operations_are_discriminated_and_bounded():
     with pytest.raises(ValueError):
         plan_saved_audio_patches(audio_workspace(), [{"action": "set_bus_effect_enabled", "patch_type": "input",
             "patch_id": IN1, "bus_type": "cue", "bus_index": 1, "effect_index": 0, "enabled": True}])
+
+
+def test_live_audio_patch_verification_ignores_device_suffix_in_display_name():
+    reader = SimpleNamespace(get_workspace_settings=lambda *args, **kwargs: {
+        "errors": {},
+        "sections": {"audio": {
+            "output_patches": [
+                {"uniqueID": OUT1, "name": "Main - System Output - Speakers (2 Out)"},
+                {"uniqueID": OUT2, "name": "Alt - Speakers (2 Out)"},
+            ],
+            "input_patches": [
+                {"uniqueID": IN1, "name": "Mic - System Input - Microphone (1 In)"},
+            ],
+        }},
+    })
+    summary = {
+        "output_patches": [{"id": OUT1, "name": "Main"}, {"id": OUT2, "name": "Alt"}],
+        "input_patches": [{"id": IN1, "name": "Mic"}],
+    }
+
+    result = _verify_live(reader, WS, summary)
+
+    assert "IDs/order" in result["scope"]
+    assert "canonical names" in result["scope"]
+
+    reader_reordered = SimpleNamespace(get_workspace_settings=lambda *args, **kwargs: {
+        "errors": {},
+        "sections": {"audio": {
+            "output_patches": [
+                {"uniqueID": OUT2, "name": "Alt - Speakers (2 Out)"},
+                {"uniqueID": OUT1, "name": "Main - System Output - Speakers (2 Out)"},
+            ],
+            "input_patches": [{"uniqueID": IN1, "name": "Mic - System Input - Microphone (1 In)"}],
+        }},
+    })
+    with pytest.raises(ValueError, match="IDs/order"):
+        _verify_live(reader_reordered, WS, summary)
 
 
 def test_audio_device_confirmation_is_blocked_when_passive_inventory_changes(monkeypatch):

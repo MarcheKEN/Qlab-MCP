@@ -800,11 +800,11 @@ def _verify_live(reader, workspace_id, summary):
         if not isinstance(live, list):
             raise ValueError("Fresh native audio patch list is unavailable.")
         expected = summary[saved_key]
-        actual = [{"id": str(item.get("uniqueID", "")).upper(), "name": item.get("name")} for item in live]
-        expected_rows = [{"id": item["id"], "name": item["name"]} for item in expected]
-        if actual != expected_rows:
-            raise ValueError(f"Native {saved_key} IDs/order/names do not match the saved plan.")
-    return {"workspace_id": workspace_id, "scope": "Native patch IDs/order/names; matrix, bus and device configuration are verified in the saved archive."}
+        actual_ids = [str(item.get("uniqueID", "")).upper() for item in live]
+        expected_ids = [str(item["id"]).upper() for item in expected]
+        if actual_ids != expected_ids:
+            raise ValueError(f"Native {saved_key} IDs/order do not match the saved plan.")
+    return {"workspace_id": workspace_id, "scope": "Native patch IDs/order; canonical names and saved configuration are verified in the reopened archive."}
 
 
 def edit_saved_audio_patches(reader, workspace_id, operations, dry_run=True, confirm_token=None):
@@ -823,5 +823,6 @@ def edit_saved_audio_patches(reader, workspace_id, operations, dry_run=True, con
     except Exception as exc:
         result = dict(ok=False, status="blocked", planned_operations=[], executed_operations=[], error=sanitize_exception_message(exc))
     result["tool"] = "qlab_edit_saved_audio_patches"
-    result["verification_scope"] = "Saved Audio/Mic patch archive after reopen; native patch IDs/order/names. No capture, playback or output is verified."
+    result["native_patch_verification_scope"] = "Native patch IDs/order via OSC; canonical names and saved configuration via archive round-trip after reopen."
+    result["verification_scope"] = "Saved Audio/Mic patch archive after reopen; native patch IDs/order. No capture, playback or output is verified."
     return result

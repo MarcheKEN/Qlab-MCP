@@ -419,7 +419,9 @@ Save them as a separate step, then obtain a fresh preview before the edit. A
 confirmed saved-file edit persists through the write/reopen transaction.
 `qlab_edit_workspace_audio_settings` handles saved-patch
 duplication, ordering and deletion, and can edit `VolumeLimits` in a separate
-operation. Creating a blank patch is not supported. In QLab 5.5.10, native
+operation. Creating a blank patch is not supported. The public patch editor can
+name cue outputs and buses; changing a bus's
+channel count is not supported. In QLab 5.5.10, native
 validation on a temporary copy set the minimum/maximum pairs `(-80, +6)`,
 `(-180, +60)` and `(-40, -30)` dB; each was saved, closed and reopened, then
 checked through OSC. A separate round-trip used `(-80.1, +6.1)` dB; both values

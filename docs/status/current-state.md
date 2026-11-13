@@ -1,4 +1,4 @@
-# Current Project State — 2026-11-12
+# Current Project State — 2026-11-13
 
 ## Audio FX public surface retirement — 2026-11-11
 
@@ -46,6 +46,13 @@ restart, the connected MCP reported `matches_observed_fields` for output patch
 `wergergf`, whose live `name_property` and saved name match. Input patch `RICHI`
 and the workspace overview reported `not_comparable`, since an independently
 comparable live name was unavailable. No false name difference was reported.
+Additional checks on November 13 duplicated input and output patches in a
+temporary copy and renamed them, including a name with an accented character
+and a hyphen. Output names matched after reopening; input names remained
+`not_comparable` where OSC lacked an independent name. A routing level was
+changed and restored with matching readback. Separately, two patches were
+created and configured in the user's workspace at their request; the output
+patch's cue-output count, routing and bus names persisted after reopen.
 
 ### Audio limits and copied effects — 2026-11-12
 
@@ -121,9 +128,9 @@ safe 5.5.10 Trim mapping or a complete validated Fade write/readback cycle. The
 current online documentation is not specific to build 5510. No new setters or
 archive mutations are enabled on that evidence alone.
 
-## Audio authoring — 2026-11-10
+## Audio authoring — 2026-11-10 (historical)
 
-The current source contract exposes **91 tools: 54 reads and 37 gated writes**.
+At that point the source contract exposed **91 tools: 54 reads and 37 gated writes**.
 Audio settings now read saved patch routing cells, level, mute/solo, buses,
 device descriptors and AudioUnit identities/parameters with source and freshness
 kept explicit. Guarded saved-file editors cover patch structure and limited
@@ -155,17 +162,17 @@ physical output. Explicit-device assignment remains blocked when passive
 CoreAudio identity is absent.
 Audio Object setters, default/silent level actions, Fade cue audio targets,
 blank patch creation, cue-output count changes, AudioUnit insertion/parameter
-writes and Trim remain blocked or read-only pending evidence. AudioUnit
-saved-state writes require the exact SnapTune cue or AUDynamicsProcessor bus
-identity validated in QLab 5.5.10 fixtures; other identities/classes are shown
-read-only. Plugin installation is not inferred from saved identity. No Audio
-Maps were modified; no cue was run and no playback, capture or physical output
-was tested.
+writes and Trim were blocked or read-only pending evidence. At that time,
+AudioUnit saved-state writes required the exact SnapTune cue or
+AUDynamicsProcessor bus identity validated in QLab 5.5.10 fixtures; other
+identities/classes were read-only. Plugin installation was not inferred from
+saved identity. No Audio Maps were modified; no cue was run and no playback,
+capture or physical output was tested.
 
 See the [November 9 fixture report](../development/runtime-validation/2026-11-09-audio-authoring.md)
 and [November 10 MCP follow-up](../development/runtime-validation/2026-11-10-audio-mcp-followup.md).
-The follow-up's focused archive suites pass **78 tests**. CI for the previous
-PR head passed on macOS and Ubuntu; this follow-up commit still needs CI.
+The follow-up's focused archive suites passed **78 tests**. At the time of the
+follow-up, CI for that commit was still pending.
 
 ## Video cue diagnostics — 2026-11-01
 

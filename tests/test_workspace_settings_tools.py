@@ -12,16 +12,16 @@ from pydantic import ValidationError
 
 import qlab_mcp.server as server_module
 from qlab_mcp.models import (
-    AudioInputPatchDetail,
-    AudioOutputPatchDetail,
     AudioPatchLevel,
-    WorkspaceAudioSettingsOverview,
-    WorkspaceAudioSettingsResult,
     WorkspaceGeneralSettingsData,
     WorkspaceVideoSettingsResult,
 )
 from qlab_mcp.server import mcp
 from qlab_mcp.settings.summarizers import _summarize_audio_patch, _summarize_network_patch
+
+
+WORKSPACE_ID = "11111111-1111-4111-8111-111111111111"
+PATCH_ID = "22222222-2222-4222-8222-222222222222"
 
 
 @pytest.mark.parametrize("osc_failure", [False, True])
@@ -71,7 +71,7 @@ def test_workspace_settings_tools_replace_generic_surface() -> None:
     assert expected <= tool_names
     assert "qlab_get_workspace_settings" not in tool_names
     assert "qlab_get_workspace_setting_details" not in tool_names
-    assert len(tool_names) == 91
+    assert len(tool_names) == 90
 
 
 def test_network_destination_absence_is_unknown() -> None:
@@ -79,39 +79,6 @@ def test_network_destination_absence_is_unknown() -> None:
     assert _summarize_network_patch({"name": "Patch", "destination": "redacted"})["destination_present"] is True
     assert _summarize_network_patch({"name": "Patch", "uniqueID": "id"})["passcode_present"] is None
     assert _summarize_network_patch({"name": "Patch", "passcode": "redacted"})["passcode_present"] is True
-
-
-def test_audio_input_patch_details_do_not_advertise_output_patch_edits() -> None:
-    result = WorkspaceAudioSettingsResult.model_validate({
-        "ok": True,
-        "status": "ok",
-        "partial": False,
-        "workspace_id": "ws-1",
-        "view": "input_patch",
-        "data": {"detail": {"name": "Input", "uniqueID": "input-1"}},
-    })
-    assert isinstance(result.data.detail, AudioInputPatchDetail)
-    assert not hasattr(result.data.detail, "editable_operations")
-
-    output = WorkspaceAudioSettingsResult.model_validate({
-        "ok": True,
-        "status": "ok",
-        "partial": False,
-        "workspace_id": "ws-1",
-        "view": "output_patch",
-        "data": {
-            "detail": {
-                "name": "Output",
-                "uniqueID": "output-1",
-                "name_property": "Patch 1",
-                "mute_channels": [],
-                "solo_channels": [],
-                "level": None,
-            }
-        },
-    })
-    assert isinstance(output.data.detail, AudioOutputPatchDetail)
-    assert output.data.detail.editable_operations
 
 
 def test_legacy_workspace_settings_python_tools_are_removed() -> None:
@@ -127,8 +94,10 @@ def test_workspace_settings_tool_schemas_are_domain_specific() -> None:
     tools = asyncio.run(list_tools())
     expected_parameters = {
         "qlab_get_workspace_general_settings": {"workspace_id"},
-        "qlab_get_workspace_audio_settings": {
-            "workspace_id", "view", "ref", "profile", "input_channel", "output_channel",
+        "qlab_get_workspace_audio_settings": {"workspace_id", "profile", "offset", "limit"},
+        "qlab_get_audio_patch": {
+            "workspace_id", "patch_type", "patch_id", "profile", "input_channel",
+            "output_channel", "cell_offset", "cell_limit",
         },
         "qlab_get_workspace_video_settings": {"workspace_id", "section", "offset", "limit"},
         "qlab_get_video_stage": {"workspace_id", "stage_id", "profile", "offset", "limit", "expected_sha256"},
@@ -144,22 +113,29 @@ def test_workspace_settings_tool_schemas_are_domain_specific() -> None:
         assert {"mode", "sections", "requests", "kind"}.isdisjoint(parameters)
         if tool_name not in {"qlab_get_workspace_light_settings", "qlab_get_workspace_video_settings"}:
             assert "section" not in parameters
-        assert "data" in tool.outputSchema["properties"]
-        assert "domain" in tool.outputSchema["properties"]
-        assert "coverage" in tool.outputSchema["properties"]
+        if tool_name not in {"qlab_get_workspace_audio_settings", "qlab_get_audio_patch"}:
+            assert "data" in tool.outputSchema["properties"]
+            assert "domain" in tool.outputSchema["properties"]
+            assert "coverage" in tool.outputSchema["properties"]
 
-    assert tools["qlab_get_workspace_audio_settings"].inputSchema["properties"]["view"]["enum"] == [
-        "overview",
-        "output_patch",
-        "input_patch",
-    ]
-    assert "audio_maps" not in json.dumps(tools["qlab_get_workspace_audio_settings"].outputSchema)
+    audio_patch_properties = tools["qlab_get_audio_patch"].inputSchema["properties"]
+    assert audio_patch_properties["patch_type"]["enum"] == ["input", "output"]
+    assert audio_patch_properties["patch_id"]["format"] == "uuid"
+    assert {"workspace_id", "patch_type", "patch_id"} <= set(
+        tools["qlab_get_audio_patch"].inputSchema["required"]
+    )
+    assert audio_patch_properties["cell_limit"]["maximum"] == 256
+    assert tools["qlab_get_workspace_audio_settings"].inputSchema["properties"]["limit"]["maximum"] == 128
+    assert "audio_effects" not in json.dumps(tools["qlab_get_workspace_audio_settings"].outputSchema)
     for tool_name, ref_field in (("qlab_get_video_stage", "stage_id"), ("qlab_get_video_output_route", "route_id")):
         properties = tools[tool_name].inputSchema["properties"]
         assert properties[ref_field]["format"] == "uuid"
         assert properties["profile"]["enum"] == ["safe", "technical"]
         assert {"workspace_id", ref_field} <= set(tools[tool_name].inputSchema["required"])
-    for tool_name in expected_parameters.keys() - {"qlab_get_workspace_general_settings", "qlab_get_workspace_video_settings", "qlab_get_video_stage", "qlab_get_video_output_route"}:
+    for tool_name in expected_parameters.keys() - {
+        "qlab_get_workspace_general_settings", "qlab_get_workspace_video_settings",
+        "qlab_get_video_stage", "qlab_get_video_output_route",
+    }:
         assert tools[tool_name].inputSchema["properties"]["profile"]["enum"] == [
             "safe",
             "technical",
@@ -167,20 +143,20 @@ def test_workspace_settings_tool_schemas_are_domain_specific() -> None:
         ]
         assert "safe" in tools[tool_name].inputSchema["properties"]["profile"]["description"]
 
-    for tool_name in {
-        "qlab_get_workspace_audio_settings",
-        "qlab_get_workspace_network_settings",
-        "qlab_get_workspace_midi_settings",
-    }:
+    for tool_name in {"qlab_get_workspace_network_settings", "qlab_get_workspace_midi_settings"}:
         assert "name or UUID" in tools[tool_name].inputSchema["properties"]["ref"]["description"]
 
-    assert "overview" in tools["qlab_get_workspace_audio_settings"].inputSchema["properties"]["view"]["description"]
-    audio_properties = tools["qlab_get_workspace_audio_settings"].inputSchema["properties"]
-    assert audio_properties["input_channel"]["anyOf"][0] == {"maximum": 128, "minimum": 0, "type": "integer"}
-    assert audio_properties["output_channel"]["anyOf"][0] == {"minimum": 0, "type": "integer"}
+    assert audio_patch_properties["input_channel"]["anyOf"][0] == {
+        "maximum": 128, "minimum": 0, "type": "integer",
+    }
+    assert audio_patch_properties["output_channel"]["anyOf"][0] == {
+        "maximum": 128, "minimum": 0, "type": "integer",
+    }
 
 
-def test_audio_overview_is_fixed_to_audio_and_normalized(monkeypatch) -> None:
+def test_audio_overview_keeps_live_and_saved_sources_separate(monkeypatch) -> None:
+    from qlab_mcp import audio_patch_reader
+
     class FakeReader:
         def __init__(self) -> None:
             self.calls: list[dict[str, object]] = []
@@ -188,11 +164,14 @@ def test_audio_overview_is_fixed_to_audio_and_normalized(monkeypatch) -> None:
         def get_workspace_settings(self, **kwargs):
             self.calls.append(kwargs)
             return {
-                "workspace_id": "ws-1",
+                "ok": True,
+                "workspace_id": WORKSPACE_ID,
                 "profile": "safe",
                 "sections": {
                     "audio": {
-                        "output_patches": [],
+                        "output_patches": [{
+                            "name": "Main now", "uniqueID": PATCH_ID, "routing": [1, 2],
+                        }],
                         "input_patches": [],
                         "cue_output_channel_counts": {},
                         "output_channel_names": {},
@@ -205,63 +184,55 @@ def test_audio_overview_is_fixed_to_audio_and_normalized(monkeypatch) -> None:
                 "errors": None,
             }
 
+    saved_read = {
+        "status": "ready", "freshness": "possibly_stale", "document_modified": True,
+        "sha256": "saved-hash", "issues": [],
+        "saved": {
+            "workspace_id": WORKSPACE_ID,
+            "output_patches": [{
+                "id": PATCH_ID, "name": "Main when saved", "patch_type": "output",
+                "routing_matrix": {
+                    "status": "available", "cells": [{"row": 1, "column": 1}],
+                    "total_cells": 1, "truncated": False,
+                },
+                "cue_output_buses": [{"index": 1, "name": "Bus", "channels": 2}],
+            }],
+            "input_patches": [],
+        },
+    }
+    saved_calls = []
+    monkeypatch.setattr(
+        audio_patch_reader, "read_saved_audio_patches",
+        lambda reader, workspace_id, **kwargs: saved_calls.append((workspace_id, kwargs)) or saved_read,
+    )
     reader = FakeReader()
     monkeypatch.setattr(server_module, "_reader", lambda: reader)
 
-    result = server_module.qlab_get_workspace_audio_settings("ws-1")
+    result = server_module.qlab_get_workspace_audio_settings(WORKSPACE_ID, offset=0, limit=1)
 
     assert reader.calls == [
         {
-            "workspace_id": "ws-1",
+            "workspace_id": WORKSPACE_ID,
             "mode": "summary",
             "sections": ["audio"],
             "profile": "safe",
         }
     ]
-    assert result.domain == "audio"
-    assert result.coverage == "partial"
-    assert result.data is not None
-    assert result.data.overview is not None
-    assert result.data.overview.max_volume == 12.0
-    assert result.data.overview.min_volume == -120.0
-
-
-def test_audio_overview_rejects_ref_without_constructing_reader(monkeypatch) -> None:
-    def unexpected_reader():
-        raise AssertionError("invalid overview/ref combination must not construct a reader")
-
-    monkeypatch.setattr(server_module, "_reader", unexpected_reader)
-
-    result = server_module.qlab_get_workspace_audio_settings("ws-1", "overview", "missing")
-
-    assert result.ok is False
-    assert result.status == "error"
-    assert result.error_code == "validation_failed"
-    assert result.data is None
-    assert result.received == {"view": "overview", "ref": "missing", "profile": "safe"}
-
-
-def test_audio_patch_reports_unknown_device_presence() -> None:
-    overview = WorkspaceAudioSettingsOverview.model_validate(
-        {
-            "output_patches": [
-                {
-                    "name": "Main",
-                    "uniqueID": "patch-1",
-                    "routing_present": True,
-                    "routing_count": 2,
-                    "device_presence_known": False,
-                    "device_present": None,
-                }
-            ],
-            "input_patches": [],
-            "max_volume": 12,
-            "min_volume": -60,
-        }
-    )
-
-    patch = overview.output_patches[0]
-    assert patch.device_presence_known is False
+    assert saved_calls == [(WORKSPACE_ID, {"patch_type": "all"})]
+    live = result["sources"]["live_osc"]
+    saved = result["sources"]["saved_archive"]
+    assert live["status"] == "available"
+    assert live["data"]["output_patches"][0]["routing"] == [1, 2]
+    assert "routing_matrix" not in live["data"]["output_patches"][0]
+    assert saved["freshness"] == "possibly_stale"
+    assert saved["document_modified"] is True
+    saved_patch = saved["data"]["output_patches"][0]
+    assert saved_patch["routing_matrix"]["cells"] == []
+    assert saved_patch["routing_matrix"]["cells_omitted"] is True
+    assert "cue_output_buses" not in saved_patch
+    assert saved_patch["cue_output_bus_count"] == 1
+    assert result["comparison"]["status"] == "not_comparable"
+    assert result["source_status"]["atomic_snapshot"] is False
 
 
 def test_empty_audio_routing_is_unknown_without_known_device() -> None:
@@ -277,13 +248,6 @@ def test_empty_audio_routing_is_unknown_without_known_device() -> None:
 def test_general_min_go_time_rejects_invalid_numbers(value) -> None:
     with pytest.raises(ValidationError):
         WorkspaceGeneralSettingsData.model_validate({"minGoTime": value, "selectionIsPlayhead": True})
-
-
-@pytest.mark.parametrize("field", ["max_volume", "min_volume"])
-@pytest.mark.parametrize("value", ["12", True, math.nan, math.inf])
-def test_audio_volume_limits_reject_non_finite_or_coerced_values(field, value) -> None:
-    with pytest.raises(ValidationError):
-        WorkspaceAudioSettingsOverview.model_validate({field: value})
 
 
 def test_audio_patch_level_accepts_negative_infinity_marker() -> None:
@@ -326,7 +290,9 @@ def test_video_route_preserves_attention_and_guides_presence() -> None:
     assert route.attention.status == "disconnected"
 
 
-def test_audio_detail_uses_only_audio_selector(monkeypatch) -> None:
+def test_audio_patch_reads_exact_input_uuid_from_both_sources(monkeypatch) -> None:
+    from qlab_mcp import audio_patch_reader
+
     class FakeReader:
         def __init__(self) -> None:
             self.calls: list[dict[str, object]] = []
@@ -334,53 +300,70 @@ def test_audio_detail_uses_only_audio_selector(monkeypatch) -> None:
         def get_workspace_setting_details(self, **kwargs):
             self.calls.append(kwargs)
             return {
-                "workspace_id": "ws-1",
+                "ok": True,
+                "workspace_id": WORKSPACE_ID,
                 "section": "audio",
-                "kind": "output_patch",
-                "ref": "Main",
+                "kind": "input_patch",
+                "ref": PATCH_ID,
                 "profile": "safe",
-                "details": {"name": "Main", "uniqueID": "patch-1"},
+                "details": {"name": "Mic input", "uniqueID": PATCH_ID},
                 "choices": [],
                 "redactions": [],
                 "warnings": [],
                 "errors": None,
             }
 
+    saved = {
+        "status": "ready", "freshness": "possibly_stale", "document_modified": True,
+        "sha256": "saved-hash", "issues": [],
+        "saved": {
+            "input_patches": [{"id": PATCH_ID, "name": "Mic input", "patch_type": "input"}],
+            "output_patches": [],
+        },
+    }
+    saved_calls = []
+    monkeypatch.setattr(
+        audio_patch_reader, "read_saved_audio_patches",
+        lambda reader, workspace_id, **kwargs: saved_calls.append((workspace_id, kwargs)) or saved,
+    )
     reader = FakeReader()
     monkeypatch.setattr(server_module, "_reader", lambda: reader)
 
-    result = server_module.qlab_get_workspace_audio_settings("ws-1", "output_patch", "Main")
+    result = server_module.qlab_get_audio_patch(WORKSPACE_ID, "input", PATCH_ID)
 
     assert reader.calls == [
         {
-            "workspace_id": "ws-1",
+            "workspace_id": WORKSPACE_ID,
             "section": "audio",
-            "kind": "output_patch",
-            "ref": "Main",
+            "kind": "input_patch",
+            "ref": PATCH_ID,
             "profile": "safe",
         }
     ]
-    assert result.view == "output_patch"
-    assert result.data is not None
-    assert result.data.detail.name == "Main"
-    assert result.data.detail.uniqueID == "patch-1"
+    assert saved_calls == [(WORKSPACE_ID, {"patch_type": "input", "ref": PATCH_ID})]
+    assert result["sources"]["live_osc"]["data"]["uniqueID"] == PATCH_ID
+    assert result["sources"]["saved_archive"]["data"]["id"] == PATCH_ID
+    assert result["sources"]["saved_archive"]["freshness"] == "possibly_stale"
 
 
-def test_audio_output_patch_forwards_one_level_query(monkeypatch) -> None:
+def test_audio_output_patch_forwards_paired_level_query(monkeypatch) -> None:
+    from qlab_mcp import audio_patch_reader
+
     calls = []
 
     class FakeReader:
         def get_workspace_setting_details(self, **kwargs):
             calls.append(kwargs)
             return {
-                "workspace_id": "ws-1",
+                "ok": True,
+                "workspace_id": WORKSPACE_ID,
                 "section": "audio",
                 "kind": "output_patch",
-                "ref": "patch-1",
+                "ref": PATCH_ID,
                 "profile": "safe",
                 "details": {
                     "name": "Main",
-                    "uniqueID": "patch-1",
+                    "uniqueID": PATCH_ID,
                     "name_property": "Main",
                     "routing": [1, 2],
                     "cue_output_count": 2,
@@ -394,41 +377,69 @@ def test_audio_output_patch_forwards_one_level_query(monkeypatch) -> None:
                 "choices": [], "redactions": [], "warnings": [], "errors": None,
             }
 
+    saved = {
+        "status": "ready", "freshness": "last_saved", "document_modified": False,
+        "sha256": "saved-hash", "issues": [],
+        "saved": {
+            "output_patches": [{
+                "id": PATCH_ID, "name": "Main", "patch_type": "output",
+                "routing_matrix": {
+                    "status": "available",
+                    "cells": [{"row": 1, "column": 2, "initial_level": -4.0}],
+                    "total_cells": 1, "truncated": False,
+                },
+            }],
+            "input_patches": [],
+        },
+    }
+    monkeypatch.setattr(
+        audio_patch_reader, "read_saved_audio_patches", lambda *args, **kwargs: saved,
+    )
     monkeypatch.setattr(server_module, "_reader", FakeReader)
 
-    result = server_module.qlab_get_workspace_audio_settings(
-        "ws-1", "output_patch", "patch-1", "safe", 1, 2,
+    result = server_module.qlab_get_audio_patch(
+        WORKSPACE_ID, "output", PATCH_ID, "safe", 1, 2,
     )
 
     assert calls == [{
-        "workspace_id": "ws-1", "section": "audio", "kind": "output_patch",
-        "ref": "patch-1", "profile": "safe", "input_channel": 1, "output_channel": 2,
+        "workspace_id": WORKSPACE_ID, "section": "audio", "kind": "output_patch",
+        "ref": PATCH_ID, "profile": "safe", "input_channel": 1, "output_channel": 2,
     }]
-    assert result.data.detail.level.decibels == -6.0
+    assert result["cell"]["live_osc"]["data"]["decibels"] == -6.0
+    assert result["cell"]["saved_archive"]["data"] == {
+        "row": 1, "column": 2, "initial_level": -4.0,
+    }
+    assert result["sources"]["live_osc"]["data"]["routing"] == [1, 2]
+    assert "routing_matrix" not in result["sources"]["live_osc"]["data"]
 
 
 @pytest.mark.parametrize(
-    ("view", "input_channel", "output_channel"),
-    [("overview", 1, 1), ("input_patch", 1, 1), ("output_patch", 1, None), ("output_patch", None, 1)],
+    ("patch_type", "input_channel", "output_channel"),
+    [("input", 1, 1), ("output", 1, None), ("output", None, 1)],
 )
 def test_audio_channel_query_rejects_invalid_combinations_before_reader(
-    monkeypatch, view, input_channel, output_channel,
+    monkeypatch, patch_type, input_channel, output_channel,
 ) -> None:
-    def unexpected_reader():
-        raise AssertionError("invalid channel query must not construct a reader")
+    class FakeReader:
+        calls = []
 
-    monkeypatch.setattr(server_module, "_reader", unexpected_reader)
+        def get_workspace_setting_details(self, **kwargs):
+            self.calls.append(kwargs)
+            raise AssertionError("invalid query must not reach OSC")
 
-    result = server_module.qlab_get_workspace_audio_settings(
-        "ws-1", view, "patch-1", "safe", input_channel, output_channel,
-    )
+    reader = FakeReader()
+    monkeypatch.setattr(server_module, "_reader", lambda: reader)
 
-    assert result.ok is False
-    assert result.error_code == "validation_failed"
+    with pytest.raises(Exception):
+        server_module.qlab_get_audio_patch(
+            WORKSPACE_ID, patch_type, PATCH_ID, "safe", input_channel, output_channel,
+        )
+
+    assert reader.calls == []
 
 
 @pytest.mark.parametrize("field", ["input_channel", "output_channel"])
-@pytest.mark.parametrize("value", [0, -1, True, 1.5, "1"])
+@pytest.mark.parametrize("value", [-1, True, 1.5, "1", 129])
 def test_audio_channel_schema_rejects_invalid_values_before_reader(monkeypatch, field, value) -> None:
     def unexpected_reader():
         raise AssertionError("invalid channel must not construct a reader")
@@ -437,16 +448,16 @@ def test_audio_channel_schema_rejects_invalid_values_before_reader(monkeypatch, 
 
     async def rejected() -> None:
         arguments = {
-            "workspace_id": "ws-1",
-            "view": "output_patch",
-            "ref": "patch-1",
+            "workspace_id": WORKSPACE_ID,
+            "patch_type": "output",
+            "patch_id": PATCH_ID,
             "input_channel": 1,
             "output_channel": 1,
         }
         arguments[field] = value
         async with Client(mcp) as client:
             with pytest.raises(Exception):
-                await client.call_tool("qlab_get_workspace_audio_settings", arguments)
+                await client.call_tool("qlab_get_audio_patch", arguments)
 
     asyncio.run(rejected())
 

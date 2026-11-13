@@ -135,15 +135,6 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {'qlab_get_fonts': {
                                    'write-mode'],
                           'timeout': 180.0,
                           'title': 'Edit QLab Audio Cues'},
- 'qlab_edit_audio_output_patch': {'annotations': {'destructiveHint': True,
-                                                  'idempotentHint': False,
-                                                  'openWorldHint': True,
-                                                  'readOnlyHint': False},
-                                  'input_schema_hash': '01accce5909cf2dc1ef59bc0dee8508a26d33165918aef860af99505f71fe10e',
-                                  'output_schema_hash': '12573ab3c34f0974c9245594b5dbc752ac1717003946758cb6baadb4c15909b7',
-                                  'tags': ['audio', 'gated-write', 'qlab', 'settings'],
-                                  'timeout': 60.0,
-                                  'title': 'Edit QLab Audio Output Patch'},
  'qlab_edit_camera_cues': {'annotations': {'destructiveHint': True,
                                            'idempotentHint': False,
                                            'openWorldHint': True,
@@ -692,12 +683,11 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {'qlab_get_fonts': {
                                                        'idempotentHint': True,
                                                        'openWorldHint': True,
                                                        'readOnlyHint': True},
-                                       'input_schema_hash': '3174667dc67bf2a6a827e2f7e1c7da40725b55f8d72b7b5cb1a025679b25ffaf',
-                                       'output_schema_hash': '43b34ba9cabec1a16d44ba3ba2f39c5d98469850192fce6de43b8c8f5ff55ff1',
+                                       'input_schema_hash': '764549d664561b44241feddcf39d03ac60481c32b59b4038d594a9e77bff8789',
+                                       'output_schema_hash': '82ef96cebaf5fbe16269fd18b0240d78f5b9b90a4155a17eb797115b09148ecf',
                                        'tags': ['audio',
                                                 'patches',
                                                 'qlab',
-                                                'routing',
                                                 'safe-read',
                                                 'settings'],
                                        'timeout': 60.0,
@@ -894,31 +884,36 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_audio_cue_details']['output_schema_has
 EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_light_cue_details']['output_schema_hash'] = '82a500c283de8d59c340418c5ca577f370896b5cd3046ed735e64288529b85b8'
 EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_mic_cue_details']['output_schema_hash'] = '00c376d463a2c182253302438636cbf963ce93ddd23e372c97aa279aff06ae38'
 EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_video_cue_details']['output_schema_hash'] = 'a6d657d71bbf0aa042b1ae22ae32a704ec5e83826c765aa4a93913a3ec179669'
-EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_workspace_audio_settings']['output_schema_hash'] = 'ef7ae470555c5f038710d4fc325ef1b990ae715a77a53b78e5815eb06ddecc84'
-EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_saved_audio_patches'] = {
-    'title': 'Get QLab Saved Audio Patches', 'timeout': 60.0,
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_audio_patch'] = {
+    'title': 'Get QLab Audio Patch', 'timeout': 60.0,
     'annotations': {'readOnlyHint': True, 'destructiveHint': False,
                     'idempotentHint': True, 'openWorldHint': True},
     'tags': ['audio', 'patches', 'qlab', 'safe-read'],
-    'input_schema_hash': '609045f4babaf65c9781b0ac8d6f016cdd9283c9a0d7e1467e44d588207d8ca1',
+    'input_schema_hash': 'a4c14f8e8be9e20f4b48d6cf1dea8de3eedab5ea55de011cf634ae9e572efdc6',
     'output_schema_hash': '82ef96cebaf5fbe16269fd18b0240d78f5b9b90a4155a17eb797115b09148ecf',
 }
-EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_audio_effect_catalogue'] = {
-    'title': 'Get QLab Audio Effect Catalogue', 'timeout': 60.0,
-    'annotations': {'readOnlyHint': True, 'destructiveHint': False,
-                    'idempotentHint': True, 'openWorldHint': True},
-    'tags': ['audio', 'effects', 'qlab', 'safe-read'],
-    'input_schema_hash': '7c09b7113aad0abc51cc24ca25d0d9dd705dec9979b0e98cdb65bf3c0cb1ee2a',
-    'output_schema_hash': '82ef96cebaf5fbe16269fd18b0240d78f5b9b90a4155a17eb797115b09148ecf',
-}
-EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_saved_audio_patches'] = {
-    'title': 'Edit QLab Saved Audio Patches', 'timeout': 120.0,
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_audio_patch'] = {
+    'title': 'Edit QLab Audio Patch', 'timeout': 120.0,
     'annotations': {'readOnlyHint': False, 'destructiveHint': True,
                     'idempotentHint': False, 'openWorldHint': True},
-    'tags': ['audio', 'gated-write', 'qlab', 'settings', 'workspace-document'],
-    'input_schema_hash': '580a39aedcc60991e5a592870a2d0a13a3da80b2f54ab2caccfbcfdf75ad9628',
+    'tags': ['audio', 'gated-write', 'patches', 'qlab'],
+    'input_schema_hash': '77ff5a3b1ca2a9d3be5151ce3fd23f6dabe6504220b8a71967f286a0d88841d6',
     'output_schema_hash': '82ef96cebaf5fbe16269fd18b0240d78f5b9b90a4155a17eb797115b09148ecf',
 }
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_workspace_audio_settings'] = {
+    'title': 'Edit QLab Workspace Audio Settings', 'timeout': 120.0,
+    'annotations': {'readOnlyHint': False, 'destructiveHint': True,
+                    'idempotentHint': False, 'openWorldHint': True},
+    'tags': ['audio', 'gated-write', 'patches', 'qlab', 'settings'],
+    'input_schema_hash': 'c8e6e40f5ceadee9e90248dd660f34c091ba90a236f3d7390aba8ab97cfcae19',
+    'output_schema_hash': '82ef96cebaf5fbe16269fd18b0240d78f5b9b90a4155a17eb797115b09148ecf',
+}
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_workspace_audio_settings']['output_schema_hash'] = '82ef96cebaf5fbe16269fd18b0240d78f5b9b90a4155a17eb797115b09148ecf'
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_audio_cue_details']['output_schema_hash'] = 'b0fae649d6127e88be767c2d56da5c536f5b842d58e464c999b27a5d73870c72'
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_light_cue_details']['output_schema_hash'] = '69b929f08999f4b743148731b076e86a3afb7977817f75559f40cf0765888ea1'
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_mic_cue_details']['output_schema_hash'] = '1afa77537addb9eb57bdc4b00e94492c1f8d889406a13ba2d866df6f5ce1985b'
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_video_cue_details']['output_schema_hash'] = 'b5e92fd88fc0616abbc7303df8f83edc6ff05e5443c92188378c23504779cc70'
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_saved_cue_settings']['input_schema_hash'] = 'efb80ebc07b69b03c1a5568b2455da8f9fdc9b28a349f5268a2daef2a91a2903'
 ADDED_TOOL_NAMES = {
     "qlab_get_video_effect_catalogue", "qlab_get_workspace_document",
     "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace",
@@ -935,10 +930,13 @@ EXPECTED_TOOL_CONCEPTS = {
     "qlab_edit_light_definitions": ("single-use", "Light cues are never changed", "Do not retry", "5.5.10"),
     "qlab_get_fonts": ("PostScript", "TCP", "family/style"),
     "qlab_get_video_effect_catalogue": ("documented FX names", "paged static catalogue", "never grants permission"),
-    "qlab_get_saved_audio_patches": ("last-saved", "passive CoreAudio", "connected or that audio works"),
-    "qlab_get_audio_effect_catalogue": ("saved_workspace_instances", "installed_plugins", "unknown"),
-    "qlab_edit_saved_audio_patches": ("5.5.10/build 5510", "single-use token", "No capture or audio is activated",
-                                     "system-device", "New patches can only", "duplicating an existing patch", "edit cue Trim"),
+    "qlab_get_audio_patch": ("one exact patch", "live OSC", "saved archive", "source and freshness",
+                             "not a complete routing matrix"),
+    "qlab_edit_audio_patch": ("one input/output patch", "OSC or a guarded saved-file operation",
+                              "fresh", "preview token", "Audio FX", "Audio Maps"),
+    "qlab_edit_workspace_audio_settings": ("saved audio patch collections", "workspace volume limits",
+                                            "fresh token", "clean local QLab 5.5.10",
+                                            "Volume-limit edits cannot be mixed", "No playback or capture"),
     "qlab_get_workspace_document": ("local", "workspace UUID", "dirty"),
     "qlab_open_workspace": ("empty inventory", "single-use", "Do not retry"),
     "qlab_save_workspace": ("existing path", "unsaved", "single-use"),
@@ -999,7 +997,8 @@ EXPECTED_TOOL_CONCEPTS = {
     "qlab_get_workspace_overview": ("first structural read", "bounded and shallow", "qlab_query_cues"),
     "qlab_get_workspace_status": ("workspace status", "full workspace status window clone", "derived operational status"),
     "qlab_get_workspace_general_settings": ("general settings", "minimum go time", "selection/playhead"),
-    "qlab_get_workspace_audio_settings": ("audio settings overview", "exact output patch", "technical"),
+    "qlab_get_workspace_audio_settings": ("audio limits", "paginated patch inventories",
+                                           "live OSC and saved data separate", "Device observation is passive"),
     "qlab_get_workspace_video_settings": ("input patches", "uniqueIDs", "no independent device inventory"),
     "qlab_get_video_stage": ("exact Video stage", "regions", "redacted OSC payload"),
     "qlab_get_video_output_route": ("exact Video output route", "guides", "hardware metadata"),
@@ -1011,7 +1010,6 @@ EXPECTED_TOOL_CONCEPTS = {
     "qlab_check_write_readiness": ("without sending any mutating osc commands", "edit mode", "read-only preflight"),
     "qlab_create_cues": ("one verified /new per item", "without automatic rollback", "confirm:createcues:v2", "mcp sends no cue number", "do not predict it from the setting or template", "do not retry"),
     "qlab_edit_workspace_general_settings": ("minGoTime", "selectionIsPlayhead", "single-use token"),
-    "qlab_edit_audio_output_patch": ("bounded batch", "one preview token", "no setter is retried"),
     "qlab_edit_video_output_route": ("enableGuides", "output route"),
     "qlab_edit_video_stage": ("Video stage", "Rename"),
     "qlab_edit_video_region": ("OSC-coordinate", "exact indices"),
@@ -1207,7 +1205,11 @@ def test_read_tool_call_shapes_remain_explicit() -> None:
         "qlab_get_workspace_status": {"workspace_id", "profile", "include_timecode", "max_cues_scanned", "sample_limit"},
         "qlab_get_workspace_general_settings": {"workspace_id"},
         "qlab_get_workspace_audio_settings": {
-            "workspace_id", "view", "ref", "profile", "input_channel", "output_channel",
+            "workspace_id", "profile", "offset", "limit",
+        },
+        "qlab_get_audio_patch": {
+            "workspace_id", "patch_type", "patch_id", "profile", "input_channel", "output_channel",
+            "cell_offset", "cell_limit",
         },
         "qlab_get_workspace_video_settings": {"workspace_id", "section", "offset", "limit"},
         "qlab_get_video_stage": {"workspace_id", "stage_id", "profile", "offset", "limit", "expected_sha256"},
@@ -1220,6 +1222,19 @@ def test_read_tool_call_shapes_remain_explicit() -> None:
         "qlab_query_cues": {"workspace_id", "primary_filter", "primary_value", "optional_filters", "profile", "max_results", "max_cues_scanned"},
         "qlab_get_cue_details": {"workspace_id", "cue_ref", "profile"},
         "qlab_check_write_readiness": {"workspace_id"},
+    }
+    for tool_name, parameter_names in expected.items():
+        assert set(inspect.signature(getattr(server_module, tool_name)).parameters) == parameter_names
+
+
+def test_audio_write_tool_call_shapes_remain_explicit() -> None:
+    expected = {
+        "qlab_edit_audio_patch": {
+            "workspace_id", "patch_type", "patch_id", "operation", "dry_run", "confirm_token",
+        },
+        "qlab_edit_workspace_audio_settings": {
+            "workspace_id", "operations", "dry_run", "confirm_token",
+        },
     }
     for tool_name, parameter_names in expected.items():
         assert set(inspect.signature(getattr(server_module, tool_name)).parameters) == parameter_names
@@ -1297,7 +1312,7 @@ def test_fastmcp_public_inventory_excludes_control_and_raw_osc_surface() -> None
     tools = asyncio.run(list_tools())
     tool_names = {tool.name for tool in tools}
 
-    assert len(tools) == 91
+    assert len(tools) == 90
     assert tool_names == EXPECTED_TOOL_NAMES
     assert "qlab_create_cue" not in tool_names
     forbidden_surface_tokens = {"go", "stop", "panic", "raw", "osc", "playback", "live"}
@@ -1627,9 +1642,8 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
             return await client.list_tools()
 
     tools = {tool.name: tool for tool in asyncio.run(list_tools())}
-    write_tools = {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_create_cue_lists", "qlab_edit_cue_lists", "qlab_create_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch", "qlab_edit_light_definitions", "qlab_edit_light_cue_curves"}
-    write_tools |= {"qlab_edit_video_output_devices", "qlab_edit_video_input_patches", "qlab_edit_saved_cue_settings",
-                    "qlab_edit_saved_audio_patches"}
+    write_tools = {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_create_cue_lists", "qlab_edit_cue_lists", "qlab_create_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_workspace_general_settings", "qlab_edit_audio_patch", "qlab_edit_workspace_audio_settings", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_open_workspace", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch", "qlab_edit_light_definitions", "qlab_edit_light_cue_curves"}
+    write_tools |= {"qlab_edit_video_output_devices", "qlab_edit_video_input_patches", "qlab_edit_saved_cue_settings"}
     read_only_tools = EXPECTED_TOOL_NAMES - write_tools
 
     for tool_name in read_only_tools:
@@ -1640,7 +1654,7 @@ def test_fastmcp_tool_contract_keeps_safety_annotations_and_output_schemas() -> 
 
     for tool_name in write_tools:
         assert tools[tool_name].annotations.readOnlyHint is False, f"{tool_name} was marked read-only"
-        if tool_name in {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_cue_lists", "qlab_edit_workspace_general_settings", "qlab_edit_audio_output_patch", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch", "qlab_edit_light_definitions", "qlab_edit_light_cue_curves", "qlab_edit_video_output_devices", "qlab_edit_video_input_patches", "qlab_edit_saved_cue_settings", "qlab_edit_saved_audio_patches"}:
+        if tool_name in {"qlab_edit_audio_cues", "qlab_edit_mic_cues", "qlab_edit_light_cues", "qlab_edit_fade_cues", "qlab_edit_network_cues", "qlab_edit_midi_cues", "qlab_edit_midi_file_cues", "qlab_edit_timecode_cues", "qlab_edit_script_cues", "qlab_edit_video_cues", "qlab_edit_camera_cues", "qlab_edit_text_cues", "qlab_edit_devamp_cues", "qlab_edit_target_cues", "qlab_edit_control_cues", "qlab_edit_group_cues", "qlab_edit_cue_lists", "qlab_edit_workspace_general_settings", "qlab_edit_audio_patch", "qlab_edit_workspace_audio_settings", "qlab_edit_video_output_route", "qlab_edit_video_stage", "qlab_edit_video_region", "qlab_move_cues", "qlab_move_cue_lists", "qlab_delete_cues", "qlab_save_workspace", "qlab_close_workspace", "qlab_edit_light_patch", "qlab_edit_light_definitions", "qlab_edit_light_cue_curves", "qlab_edit_video_output_devices", "qlab_edit_video_input_patches", "qlab_edit_saved_cue_settings"}:
             assert tools[tool_name].annotations.destructiveHint is True
         else:
             assert tools[tool_name].annotations.destructiveHint is False, f"{tool_name} became destructive"
@@ -1859,8 +1873,7 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_analyze_audio_file",
         "qlab_search_media_files",
         "qlab_get_video_effect_catalogue",
-        "qlab_get_saved_audio_patches",
-        "qlab_get_audio_effect_catalogue",
+        "qlab_get_audio_patch",
         "qlab_get_workspace_document",
         "qlab_open_workspace",
         "qlab_save_workspace",
@@ -1871,7 +1884,6 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_edit_light_definitions",
         "qlab_edit_light_cue_curves",
         "qlab_edit_saved_cue_settings",
-        "qlab_edit_saved_audio_patches",
         "qlab_edit_audio_cues",
         "qlab_edit_mic_cues",
         "qlab_edit_light_cues",
@@ -1939,7 +1951,8 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
         "qlab_create_cue_lists",
         "qlab_edit_cue_lists",
         "qlab_edit_workspace_general_settings",
-        "qlab_edit_audio_output_patch",
+        "qlab_edit_audio_patch",
+        "qlab_edit_workspace_audio_settings",
         "qlab_edit_video_output_route",
         "qlab_edit_video_stage",
         "qlab_edit_video_region",
@@ -1974,30 +1987,44 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert overview.annotations.idempotentHint is True
     assert overview.annotations.openWorldHint is True
 
-    saved_audio = tools["qlab_get_saved_audio_patches"]
-    assert saved_audio.inputSchema["properties"]["patch_type"]["enum"] == ["all", "input", "output"]
-    assert "ref" in saved_audio.inputSchema["properties"]
-    assert saved_audio.annotations.readOnlyHint is True
+    audio_patch = tools["qlab_get_audio_patch"]
+    assert audio_patch.inputSchema["properties"]["patch_type"]["enum"] == ["input", "output"]
+    assert audio_patch.inputSchema["required"] == ["workspace_id", "patch_type", "patch_id"]
+    assert audio_patch.inputSchema["properties"]["cell_limit"]["maximum"] == 256
+    assert audio_patch.annotations.readOnlyHint is True
 
-    audio_fx = tools["qlab_get_audio_effect_catalogue"]
-    assert audio_fx.inputSchema["properties"]["patch_type"]["enum"] == ["all", "output"]
-    assert "saved_workspace_instances" in audio_fx.description
-    assert "installed_plugins" in audio_fx.description
-    assert audio_fx.annotations.readOnlyHint is True
+    assert "qlab_get_audio_effect_catalogue" not in tools
 
-    edit_audio = tools["qlab_edit_saved_audio_patches"]
-    assert {"operations", "dry_run", "confirm_token"} <= set(edit_audio.inputSchema["properties"])
+    edit_audio = tools["qlab_edit_audio_patch"]
+    assert set(edit_audio.inputSchema["properties"]) == {
+        "workspace_id", "patch_type", "patch_id", "operation", "dry_run", "confirm_token",
+    }
     assert edit_audio.inputSchema["properties"]["dry_run"]["default"] is True
     assert edit_audio.annotations.readOnlyHint is False
     assert edit_audio.annotations.destructiveHint is True
-    saved_audio_operations = json.dumps(edit_audio.inputSchema["properties"]["operations"])
-    assert "set_system_device" in saved_audio_operations and '"enabled"' in saved_audio_operations
+    audio_operation_schema = json.dumps(edit_audio.inputSchema["properties"]["operation"])
+    assert "set_system_device" in audio_operation_schema and '"enabled"' in audio_operation_schema
+    assert '"batch"' in audio_operation_schema and '"maxItems": 50' in audio_operation_schema
+    assert all(f'"{kind}"' in audio_operation_schema for kind in ("level", "mute", "solo"))
+    for removed in ("remove_bus_effect", "move_bus_effect", "set_bus_effect_enabled"):
+        assert removed not in json.dumps(edit_audio.inputSchema)
+    cue_schema = json.dumps(tools["qlab_edit_saved_cue_settings"].inputSchema)
+    for removed in ("remove_audio_effect", "move_audio_effect", "set_audio_effect_bypassed"):
+        assert removed not in cue_schema
 
-    edit_audio_patch = tools["qlab_edit_audio_output_patch"]
-    operation_schema = json.dumps(edit_audio_patch.inputSchema["properties"]["operation"])
-    assert '"batch"' in operation_schema and '"operations"' in operation_schema
-    assert '"maxItems": 50' in operation_schema
-    assert all(f'"{kind}"' in operation_schema for kind in ("level", "mute", "solo"))
+    edit_workspace_audio = tools["qlab_edit_workspace_audio_settings"]
+    assert set(edit_workspace_audio.inputSchema["properties"]) == {
+        "workspace_id", "operations", "dry_run", "confirm_token",
+    }
+    assert edit_workspace_audio.inputSchema["properties"]["dry_run"]["default"] is True
+    workspace_audio_operations = edit_workspace_audio.inputSchema["properties"]["operations"]
+    assert workspace_audio_operations["minItems"] == 1
+    assert workspace_audio_operations["maxItems"] == 50
+    workspace_audio_schema = json.dumps(workspace_audio_operations)
+    assert '"set_volume_limits"' in workspace_audio_schema
+    assert all(f'"{action}"' in workspace_audio_schema for action in ("duplicate_patch", "delete_patch", "reorder_patches"))
+    assert edit_workspace_audio.annotations.readOnlyHint is False
+    assert edit_workspace_audio.annotations.destructiveHint is True
 
     create_cues = tools["qlab_create_cues"]
     planned_count_description = create_cues.outputSchema["properties"]["planned_count"]["description"]
@@ -2043,9 +2070,12 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     for settings in settings_tools.values():
         assert settings.annotations.readOnlyHint is True
         assert settings.annotations.destructiveHint is False
-        assert "data" in settings.outputSchema["properties"]
-        assert "domain" in settings.outputSchema["properties"]
-        assert "coverage" in settings.outputSchema["properties"]
+        if settings is settings_tools["qlab_get_workspace_audio_settings"]:
+            assert settings.outputSchema == {"additionalProperties": True, "type": "object"}
+        else:
+            assert "data" in settings.outputSchema["properties"]
+            assert "domain" in settings.outputSchema["properties"]
+            assert "coverage" in settings.outputSchema["properties"]
         assert {"mode", "sections", "requests", "kind"}.isdisjoint(
             settings.inputSchema["properties"]
         )
@@ -2054,8 +2084,9 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
 
     audio_settings = settings_tools["qlab_get_workspace_audio_settings"]
     assert audio_settings.title == "Get QLab Workspace Audio Settings"
-    assert audio_settings.inputSchema["properties"]["view"]["default"] == "overview"
+    assert set(audio_settings.inputSchema["properties"]) == {"workspace_id", "profile", "offset", "limit"}
     assert audio_settings.inputSchema["properties"]["profile"]["enum"] == ["safe", "technical", "exhaustive"]
+    assert audio_settings.inputSchema["properties"]["limit"]["maximum"] == 128
 
     video_settings = settings_tools["qlab_get_workspace_video_settings"]
     assert video_settings.title == "Get QLab Workspace Video Settings"
@@ -2202,29 +2233,6 @@ def test_tool_metadata_exposes_titles_descriptions_and_read_only_annotations() -
     assert "empty Group" in delete.inputSchema["properties"]["container_id"]["description"]
     assert "confirm:deleteCues:v1:" in delete.inputSchema["properties"]["confirm_token"]["description"]
     assert "verification_failed" in delete.outputSchema["properties"]["status"]["enum"]
-
-
-def test_audio_effect_catalogue_does_not_claim_installed_plugin_availability(monkeypatch) -> None:
-    workspace_id = "11111111-1111-4111-8111-111111111111"
-    monkeypatch.setattr(server_module, "read_saved_audio_patches", lambda *args, **kwargs: {
-        "status": "ready",
-        "saved": {
-            "workspace_id": workspace_id,
-            "version": "5.5.10",
-            "build": 5510,
-            "audio_effects": [{"cue_type": "AudioCue", "cue_id": "cue-1", "index": 0,
-                               "type": "AUDynamicsProcessor", "parameters": []}],
-            "output_patches": [],
-        },
-        "issues": [],
-    })
-    monkeypatch.setattr(server_module, "_run_tool", lambda callback, timeout=None: callback(object()))
-
-    result = server_module.qlab_get_audio_effect_catalogue(workspace_id)
-
-    assert result["catalogue_source"] == "saved_workspace_instances"
-    assert result["installed_plugins"] == "unknown"
-    assert result["instances"][0]["type"] == "AUDynamicsProcessor"
 
 
 def test_workspace_settings_tool_schema_and_annotations_are_conservative() -> None:
@@ -2437,6 +2445,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
                 "qlab_get_workspace_status",
                 "qlab_get_workspace_general_settings",
                 "qlab_get_workspace_audio_settings",
+                "qlab_get_audio_patch",
                 "qlab_get_workspace_video_settings",
                 "qlab_get_workspace_light_settings",
                 "qlab_get_workspace_network_settings",
@@ -2446,6 +2455,8 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
                 "qlab_check_write_readiness",
                 "qlab_create_cues",
                 "qlab_edit_control_cues",
+                "qlab_edit_audio_patch",
+                "qlab_edit_workspace_audio_settings",
                     )
         }
 
@@ -2456,6 +2467,7 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
         "qlab_get_workspace_status": WORKSPACE_STATUS_TIMEOUT,
         "qlab_get_workspace_general_settings": WORKSPACE_SETTINGS_TIMEOUT,
         "qlab_get_workspace_audio_settings": WORKSPACE_SETTINGS_TIMEOUT,
+        "qlab_get_audio_patch": WORKSPACE_SETTINGS_TIMEOUT,
         "qlab_get_workspace_video_settings": WORKSPACE_SETTINGS_TIMEOUT,
         "qlab_get_workspace_light_settings": WORKSPACE_SETTINGS_TIMEOUT,
         "qlab_get_workspace_network_settings": WORKSPACE_SETTINGS_TIMEOUT,
@@ -2465,6 +2477,8 @@ def test_server_masks_internal_error_details_and_sets_tool_timeouts() -> None:
         "qlab_check_write_readiness": WRITE_READINESS_TIMEOUT,
         "qlab_create_cues": CREATE_CUES_TIMEOUT,
         "qlab_edit_control_cues": UPDATE_CUES_TIMEOUT,
+        "qlab_edit_audio_patch": 120.0,
+        "qlab_edit_workspace_audio_settings": 120.0,
     }
 
 
@@ -2699,7 +2713,7 @@ def test_public_read_tools_redact_internal_exception_paths(monkeypatch) -> None:
         qlab_get_workspace_overview("ws-1").model_dump(),
         qlab_get_workspace_status("ws-1").model_dump(),
         qlab_get_workspace_general_settings("ws-1").model_dump(),
-        qlab_get_workspace_audio_settings("ws-1").model_dump(),
+        qlab_get_workspace_audio_settings("11111111-1111-4111-8111-111111111111"),
         qlab_get_workspace_video_settings("ws-1").model_dump(),
         qlab_get_workspace_light_settings("ws-1").model_dump(),
         qlab_get_workspace_network_settings("ws-1").model_dump(),
@@ -2712,9 +2726,12 @@ def test_public_read_tools_redact_internal_exception_paths(monkeypatch) -> None:
         serialized = json.dumps(payload)
         assert payload["ok"] is False
         assert payload["status"] == "error"
-        assert payload["partial"] is (payload.get("domain") in {"light", "video"})
-        assert payload["error_code"] == "validation_failed"
-        assert payload["message"] == "[redacted_internal_path]"
+        assert payload["partial"] is (payload.get("domain") in {"light", "video"} or "sources" in payload)
+        if "sources" in payload:
+            assert payload["errors"]
+        else:
+            assert payload["error_code"] == "validation_failed"
+            assert payload["message"] == "[redacted_internal_path]"
         assert "/qlab-mcp-osc/" not in serialized
         assert "Traceback" not in serialized
         assert "pydantic" not in serialized.lower()
@@ -3049,7 +3066,7 @@ def test_move_delete_capture_records_full_mcp_envelopes_and_redacts_secrets(monk
     async def calls():
         async with Client(mcp) as client:
             tools = {tool.name: tool for tool in await client.list_tools()}
-            assert len(tools) == 91
+            assert len(tools) == 90
             assert tools["qlab_delete_cues"].inputSchema["properties"]["delete_container"]["default"] is False
             for name in ("qlab_move_cues", "qlab_delete_cues"):
                 assert {"pending_cue_ids", "uncertain_cue_ids"} <= tools[name].outputSchema["properties"].keys()
@@ -3208,7 +3225,7 @@ def test_light_curve_tool_delegates_typed_request(monkeypatch):
         [{"cue_id": "22222222-2222-4222-8222-222222222222", "up": {"type": "linear"}}], True, None)]
 
 
-def test_audio_patch_tool_dispatches_typed_batch(monkeypatch):
+def test_audio_patch_tool_dispatches_batch_with_safe_default_dry_run(monkeypatch):
     calls = []
     workspace_id = "11111111-1111-4111-8111-111111111111"
     patch_id = "33333333-3333-4333-8333-333333333333"
@@ -3226,14 +3243,14 @@ def test_audio_patch_tool_dispatches_typed_batch(monkeypatch):
 
     async def invoke():
         async with Client(mcp) as client:
-            return await client.call_tool("qlab_edit_audio_output_patch", {
+            return await client.call_tool("qlab_edit_audio_patch", {
                 "workspace_id": workspace_id,
+                "patch_type": "output",
                 "patch_id": patch_id,
                 "operation": {"kind": "batch", "operations": [
                     {"kind": "level", "input_channel": 1, "output_channel": 2, "value": -6},
                     {"kind": "mute", "output_channel": 2, "value": True},
                 ]},
-                "dry_run": True,
             })
 
     result = asyncio.run(invoke())
@@ -3244,4 +3261,31 @@ def test_audio_patch_tool_dispatches_typed_batch(monkeypatch):
             {"kind": "level", "input_channel": 1, "output_channel": 2, "value": -6},
             {"kind": "mute", "output_channel": 2, "value": True},
         ],
+    }, True, None)]
+
+
+def test_workspace_audio_settings_tool_defaults_to_dry_run(monkeypatch):
+    calls = []
+    workspace_id = "11111111-1111-4111-8111-111111111111"
+    patch_id = "33333333-3333-4333-8333-333333333333"
+
+    def edit(reader, workspace, operations, dry_run, confirm_token):
+        calls.append((workspace, operations[0].model_dump(exclude_none=True), dry_run, confirm_token))
+        return {"ok": True, "status": "planned"}
+
+    monkeypatch.setattr(server_module, "edit_workspace_audio_settings", edit)
+    monkeypatch.setattr(server_module, "_run_tool", lambda callback, **_: callback(object()))
+
+    async def invoke():
+        async with Client(mcp) as client:
+            return await client.call_tool("qlab_edit_workspace_audio_settings", {
+                "workspace_id": workspace_id,
+                "operations": [{"action": "delete_patch", "patch_type": "output", "patch_id": patch_id}],
+            })
+
+    result = asyncio.run(invoke())
+    assert not result.is_error
+    assert result.structured_content["status"] == "planned"
+    assert calls == [(workspace_id, {
+        "action": "delete_patch", "patch_type": "output", "patch_id": patch_id,
     }, True, None)]

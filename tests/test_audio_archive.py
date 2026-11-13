@@ -1,6 +1,7 @@
 """Audio archive tests use synthetic keyed archives, never a user workspace."""
 import plistlib
 from types import SimpleNamespace
+from uuid import UUID
 import pytest
 
 from qlab_mcp import video_settings
@@ -158,6 +159,106 @@ def test_saved_patch_read_separates_stale_archive_and_current_device_observation
     assert result["device_observations"]["default_output_id"] == 4
 
 
+def _audio_workspace_with_matrix_cells(patch_id, count, *, duplicate_id=False):
+    outer = Archive(audio_workspace())
+    settings = outer.mapping(outer.mapping(outer.root)["settings"])
+    output = outer.mapping(settings["Audio"])
+    patches = outer.array(output["audioOutputPatches"])
+    target = next(outer.ref(ref) for ref in patches if outer.ref(outer.ref(ref)["uniqueID"]) == patch_id)
+    levels = outer.ref(target["levels"])
+    cell_ref = next(iter(outer.mapping(levels["entries"]).values()))
+    levels["entries"] = outer.make_dict({index: cell_ref for index in range(count)})
+    if duplicate_id:
+        other = next(outer.ref(ref) for ref in patches if outer.ref(outer.ref(ref)["uniqueID"]) == OUT2)
+        other["uniqueID"] = OUT1
+    return outer.dump()
+
+
+def test_scoped_saved_patch_read_summarizes_only_selected_output_matrix(tmp_path, monkeypatch):
+    source = _audio_workspace_with_matrix_cells(OUT2, 8192)
+    path = tmp_path / "Show.qlab5"
+    path.write_bytes(source)
+    row = dict(workspace_id=WS, name="Show", path=str(path), modified=False,
+               edit_mode=True, show_mode=False, active_cue_ids=[])
+    reader = SimpleNamespace(client=SimpleNamespace(config=SimpleNamespace(host="127.0.0.1")))
+    monkeypatch.setattr("qlab_mcp.workspace_documents._inventory", lambda _: {"documents": [row]})
+    monkeypatch.setattr(video_settings, "_native_metadata", lambda _: {"status": "unavailable", "devices": []})
+
+    scoped = read_saved_audio_patches(reader, WS, patch_type="output", ref=OUT1)
+
+    assert scoped["status"] == "ready"
+    assert [patch["id"] for patch in scoped["saved"]["output_patches"]] == [OUT1]
+    assert scoped["saved"]["output_patches"][0]["routing_matrix"]["total_cells"] == 1
+    assert scoped["saved"]["input_patches"] == []
+    full_scope = read_saved_audio_patches(reader, WS, patch_type="output")
+    assert full_scope["status"] == "unavailable"
+    assert "8192-cell inspection limit" in full_scope["issues"][0]
+    with pytest.raises(ValueError, match="8192-cell inspection limit"):
+        inspect_saved_audio_patches(source)
+
+
+def test_input_patch_read_ignores_unrelated_8193_cell_output_matrix(tmp_path, monkeypatch):
+    path = tmp_path / "Show.qlab5"
+    path.write_bytes(_audio_workspace_with_matrix_cells(OUT2, 8193))
+    row = dict(workspace_id=WS, name="Show", path=str(path), modified=False,
+               edit_mode=True, show_mode=False, active_cue_ids=[])
+    reader = SimpleNamespace(client=SimpleNamespace(config=SimpleNamespace(host="127.0.0.1")))
+    monkeypatch.setattr("qlab_mcp.workspace_documents._inventory", lambda _: {"documents": [row]})
+    monkeypatch.setattr(video_settings, "_native_metadata", lambda _: {"status": "unavailable", "devices": []})
+
+    result = read_saved_audio_patches(reader, WS, patch_type="input", ref=IN1)
+
+    assert result["status"] == "ready"
+    assert [patch["id"] for patch in result["saved"]["input_patches"]] == [IN1]
+    assert result["saved"]["output_patches"] == []
+
+
+def test_input_patch_read_ignores_unrelated_oversized_output_inventory(tmp_path, monkeypatch):
+    outer = Archive(audio_workspace())
+    root_ref = outer.data["$top"]["root"]
+    root = outer.mapping(root_ref)
+    settings = outer.mapping(root["settings"])
+    audio = outer.mapping(settings["Audio"])
+    output_refs = outer.array(audio["audioOutputPatches"])
+    audio["audioOutputPatches"] = outer.make_array(output_refs * 65)
+    settings["Audio"] = outer.make_dict(audio)
+    outer.data["$top"]["root"] = outer.replacing_mapping(root_ref, "settings", outer.make_dict(settings))
+    path = tmp_path / "Show.qlab5"
+    path.write_bytes(outer.dump())
+    row = dict(workspace_id=WS, name="Show", path=str(path), modified=False,
+               edit_mode=True, show_mode=False, active_cue_ids=[])
+    reader = SimpleNamespace(client=SimpleNamespace(config=SimpleNamespace(host="127.0.0.1")))
+    monkeypatch.setattr("qlab_mcp.workspace_documents._inventory", lambda _: {"documents": [row]})
+    monkeypatch.setattr(video_settings, "_native_metadata", lambda _: {"status": "unavailable", "devices": []})
+
+    scoped = read_saved_audio_patches(reader, WS, patch_type="input", ref=IN1)
+
+    assert scoped["status"] == "ready"
+    assert [patch["id"] for patch in scoped["saved"]["input_patches"]] == [IN1]
+    full_scope = read_saved_audio_patches(reader, WS)
+    assert full_scope["status"] == "unavailable"
+    assert "inventory exceeds 128 entries" in full_scope["issues"][0]
+
+
+def test_scoped_saved_patch_read_rejects_missing_and_ambiguous_exact_ids(tmp_path, monkeypatch):
+    path = tmp_path / "Show.qlab5"
+    row = dict(workspace_id=WS, name="Show", path=str(path), modified=False,
+               edit_mode=True, show_mode=False, active_cue_ids=[])
+    reader = SimpleNamespace(client=SimpleNamespace(config=SimpleNamespace(host="127.0.0.1")))
+    monkeypatch.setattr("qlab_mcp.workspace_documents._inventory", lambda _: {"documents": [row]})
+    monkeypatch.setattr(video_settings, "_native_metadata", lambda _: {"status": "unavailable", "devices": []})
+
+    path.write_bytes(audio_workspace())
+    missing = read_saved_audio_patches(reader, WS, patch_type="output", ref="55555555-5555-4555-8555-555555555555")
+    assert missing["status"] == "unavailable"
+    assert "Audio patch reference must match one exact saved UUID." in missing["issues"][0]
+
+    path.write_bytes(_audio_workspace_with_matrix_cells(OUT2, 8192, duplicate_id=True))
+    ambiguous = read_saved_audio_patches(reader, WS, patch_type="output", ref=OUT1)
+    assert ambiguous["status"] == "unavailable"
+    assert "Audio patch reference must match one exact saved UUID." in ambiguous["issues"][0]
+
+
 def test_saved_patch_read_discards_results_if_document_changes(tmp_path, monkeypatch):
     path = tmp_path / "Show.qlab5"
     path.write_bytes(audio_workspace())
@@ -204,6 +305,131 @@ def test_patch_edit_batch_can_rename_reorder_add_bus_name_and_duplicate():
     assert inspect_saved_audio_patches(plan["output_bytes"]) == plan["summary"]
 
 
+def test_duplicate_patch_alone_is_deterministic_and_changes_archive():
+    source = audio_workspace()
+    operations = [{"action": "duplicate_patch", "patch_type": "output", "client_ref": "copy",
+                   "source_patch_id": OUT1, "name": "Backup"}]
+    first = plan_saved_audio_patches(source, operations, include_effects=False)
+    second = plan_saved_audio_patches(source, operations, include_effects=False)
+    assert first["changes"] and first["output_bytes"] != source
+    assert first["output_bytes"] == second["output_bytes"]
+    saved = inspect_saved_audio_patches(first["output_bytes"])
+    assert [patch["name"] for patch in saved["output_patches"]] == ["Main", "Alt", "Backup"]
+    assert saved["output_patches"][2]["cue_output_buses"][0]["effects"][0]["identifier"] != \
+        saved["output_patches"][0]["cue_output_buses"][0]["effects"][0]["identifier"]
+
+
+def test_duplicate_patch_blocks_corrupted_effect_copy(monkeypatch):
+    from qlab_mcp.audio_archive import AudioPatchArchive
+
+    refresh = AudioPatchArchive._refresh_effect_ids
+
+    def corrupt_copy(self, root_ref, label):
+        refresh(self, root_ref, label)
+        patch = self.a.ref(root_ref)
+        bus_ref = self.a.array(patch["cueOutputEffects"])[0]
+        bus = self.a.ref(bus_ref)
+        effect = self.a.ref(self.a.array(bus["effects"])[0])
+        effect["state"] = self.a.make_dict({"unexpected": self.a.add("corrupted copy")})
+
+    monkeypatch.setattr(AudioPatchArchive, "_refresh_effect_ids", corrupt_copy)
+    with pytest.raises(ValueError, match="Duplicated audio effect graph"):
+        plan_saved_audio_patches(audio_workspace(), [{
+            "action": "duplicate_patch", "patch_type": "output", "client_ref": "copy",
+            "source_patch_id": OUT1, "name": "Backup",
+        }])
+
+
+@pytest.mark.parametrize("replacement", [1, 1.0])
+def test_duplicate_patch_blocks_effect_scalar_type_change(monkeypatch, replacement):
+    from qlab_mcp.audio_archive import AudioPatchArchive
+
+    refresh = AudioPatchArchive._refresh_effect_ids
+
+    def change_scalar_type(self, root_ref, label):
+        refresh(self, root_ref, label)
+        patch = self.a.ref(root_ref)
+        bus_ref = self.a.array(patch["cueOutputEffects"])[0]
+        effect = self.a.ref(self.a.array(self.a.ref(bus_ref)["effects"])[0])
+        state = self.a.ref(effect["state"])
+        keys = [self.a.ref(key) for key in state["NS.keys"]]
+        state["NS.objects"][keys.index("enabled")] = self.a.add(replacement)
+
+    monkeypatch.setattr(AudioPatchArchive, "_refresh_effect_ids", change_scalar_type)
+    with pytest.raises(ValueError, match="Duplicated audio effect graph"):
+        plan_saved_audio_patches(audio_workspace(), [{
+            "action": "duplicate_patch", "patch_type": "output", "client_ref": "copy",
+            "source_patch_id": OUT1, "name": "Backup",
+        }])
+
+
+def test_duplicate_patch_preserves_unknown_effect_class_and_shared_aliases():
+    source = Archive(audio_workspace())
+    settings = source.mapping(source.mapping(source.root)["settings"])
+    patch = source.ref(source.array(source.mapping(settings["Audio"])["audioOutputPatches"])[0])
+    buses = source.array(patch["cueOutputEffects"])
+    first_bus, second_bus = (source.ref(ref) for ref in buses[:2])
+    first_bus["effects"] = source.make_array([source.add({
+        "$class": source.cls("FutureAudioEffect"), "identifier": source.add("opaque-id"),
+        "opaqueState": source.make_dict({"vendorField": source.add(b"opaque")}),
+    })])
+    second_bus["effects"] = first_bus["effects"]
+
+    plan = plan_saved_audio_patches(source.dump(), [{
+        "action": "duplicate_patch", "patch_type": "output", "client_ref": "copy",
+        "source_patch_id": OUT1, "name": "Backup",
+    }])
+    copied = Archive(plan["output_bytes"])
+    output = copied.mapping(copied.mapping(copied.root)["settings"])["Audio"]
+    original_ref, copy_ref = copied.array(copied.mapping(output)["audioOutputPatches"])[0], \
+        copied.array(copied.mapping(output)["audioOutputPatches"])[2]
+    original = copied.ref(original_ref)
+    duplicate = copied.ref(copy_ref)
+    original_buses = copied.array(original["cueOutputEffects"])
+    duplicate_buses = copied.array(duplicate["cueOutputEffects"])
+    original_first, original_second = (copied.ref(ref) for ref in original_buses[:2])
+    duplicate_first, duplicate_second = (copied.ref(ref) for ref in duplicate_buses[:2])
+
+    assert duplicate_first["effects"] == duplicate_second["effects"]
+    assert duplicate_first["effects"] != original_first["effects"]
+    copied_effect_ref = copied.array(duplicate_first["effects"])[0]
+    original_effect_ref = copied.array(original_first["effects"])[0]
+    assert copied.kind(copied_effect_ref) == "FutureAudioEffect"
+    assert copied.ref(copied.ref(copied_effect_ref)["identifier"]) == copied.ref(
+        copied.ref(original_effect_ref)["identifier"]
+    )
+    copied_opaque = copied.mapping(copied.ref(copied_effect_ref)["opaqueState"])
+    original_opaque = copied.mapping(copied.ref(original_effect_ref)["opaqueState"])
+    assert copied.ref(copied_opaque["vendorField"]) == copied.ref(original_opaque["vendorField"]) == b"opaque"
+
+
+def test_duplicate_patch_regenerates_every_recognized_effect_id():
+    plan = plan_saved_audio_patches(audio_workspace(), [{
+        "action": "duplicate_patch", "patch_type": "output", "client_ref": "copy",
+        "source_patch_id": OUT1, "name": "Backup",
+    }])
+    saved = inspect_saved_audio_patches(plan["output_bytes"])
+    original = saved["output_patches"][0]["cue_output_buses"][0]["effects"]
+    duplicate = saved["output_patches"][2]["cue_output_buses"][0]["effects"]
+    original_ids = {item["identifier"] for item in original}
+    duplicate_ids = [item["identifier"] for item in duplicate]
+
+    assert len(duplicate_ids) == len(set(duplicate_ids)) == len(original_ids)
+    assert original_ids.isdisjoint(duplicate_ids)
+    assert all(UUID(value) for value in duplicate_ids)
+
+
+@pytest.mark.parametrize("operation,expected", [
+    ({"action": "reorder_patches", "patch_type": "output", "patch_ids": [OUT2, OUT1]}, ["Alt", "Main"]),
+    ({"action": "delete_patch", "patch_type": "output", "patch_id": OUT2}, ["Main"]),
+])
+def test_structural_patch_operation_alone_is_not_a_noop(operation, expected):
+    source = audio_workspace()
+    plan = plan_saved_audio_patches(source, [operation], include_effects=False)
+    assert plan["changes"] and plan["output_bytes"] != source
+    assert [patch["name"] for patch in inspect_saved_audio_patches(plan["output_bytes"])["output_patches"]] == expected
+
+
 def test_device_assignment_requires_current_exact_passive_device():
     source = audio_workspace()
     operation = {"action": "set_device", "patch_type": "input", "patch_id": IN1,
@@ -230,6 +456,91 @@ def test_new_device_assignment_does_not_invent_unobserved_metadata():
     assert saved["deviceUID"] == "new-device"
     assert saved["manufacturer"] == "Unknown"
     assert saved["deviceModelUID"] == "Unknown"
+
+
+def test_patch_rename_preserves_existing_audio_effects():
+    source = audio_workspace()
+    before = inspect_saved_audio_patches(source)["output_patches"][0]["cue_output_buses"][0]["effects"]
+    plan = plan_saved_audio_patches(source, [{"action": "rename_patch", "patch_type": "output",
+                                             "patch_id": OUT1, "name": "Renamed"}])
+    after = inspect_saved_audio_patches(plan["output_bytes"])["output_patches"][0]["cue_output_buses"][0]["effects"]
+    assert after == before
+
+
+def test_public_patch_planner_preserves_unrecognized_effect_chain():
+    source = Archive(audio_workspace())
+    settings = source.mapping(source.mapping(source.root)["settings"])
+    patch = source.ref(source.array(source.mapping(settings["Audio"])["audioOutputPatches"])[0])
+    bus = source.ref(source.array(patch["cueOutputEffects"])[0])
+    bus["effects"] = source.add({"future_effect_format": "opaque"})
+    before = source.dump()
+    plan = plan_saved_audio_patches(before, [{"action": "rename_patch", "patch_type": "output",
+                                              "patch_id": OUT1, "name": "Renamed"}], include_effects=False)
+    after = Archive(plan["output_bytes"])
+    after_settings = after.mapping(after.mapping(after.root)["settings"])
+    after_patch = after.ref(after.array(after.mapping(after_settings["Audio"])["audioOutputPatches"])[0])
+    after_bus = after.ref(after.array(after_patch["cueOutputEffects"])[0])
+    assert after.ref(after_bus["effects"]) == {"future_effect_format": "opaque"}
+
+
+def test_patch_postcondition_detects_changed_effect_state_and_shared_reference():
+    from qlab_mcp.audio_archive import _postcondition
+    original = Archive(audio_workspace())
+    settings = original.mapping(original.mapping(original.root)["settings"])
+    patch = original.ref(original.array(original.mapping(settings["Audio"])["audioOutputPatches"])[0])
+    buses = original.array(patch["cueOutputEffects"])
+    original.ref(buses[1])["effects"] = original.ref(buses[0])["effects"]
+    plan = plan_saved_audio_patches(original.dump(), [{"action": "rename_patch", "patch_type": "output",
+                                                       "patch_id": OUT1, "name": "Renamed"}], include_effects=False)
+    assert _postcondition(plan["output_bytes"], plan)
+    changed = Archive(plan["output_bytes"])
+    settings = changed.mapping(changed.mapping(changed.root)["settings"])
+    patch = changed.ref(changed.array(changed.mapping(settings["Audio"])["audioOutputPatches"])[0])
+    buses = changed.array(patch["cueOutputEffects"])
+    changed.ref(buses[1])["effects"] = changed.make_array([])
+    assert not _postcondition(changed.dump(), plan)
+    changed = Archive(plan["output_bytes"])
+    settings = changed.mapping(changed.mapping(changed.root)["settings"])
+    patch = changed.ref(changed.array(changed.mapping(settings["Audio"])["audioOutputPatches"])[0])
+    patch["cueOutputEffects"] = changed.make_array([])
+    assert not _postcondition(changed.dump(), plan)
+    changed = Archive(plan["output_bytes"])
+    settings = changed.mapping(changed.mapping(changed.root)["settings"])
+    patch = changed.ref(changed.array(changed.mapping(settings["Audio"])["audioOutputPatches"])[0])
+    bus = changed.ref(changed.array(patch["cueOutputEffects"])[0])
+    effect = changed.ref(changed.array(bus["effects"])[0])
+    effect["state"] = changed.make_dict({"unexpected": changed.add("changed")})
+    assert not _postcondition(changed.dump(), plan)
+
+
+def test_public_patch_edit_rejects_unreadable_effect_reference():
+    original = Archive(audio_workspace())
+    settings = original.mapping(original.mapping(original.root)["settings"])
+    patch = original.ref(original.array(original.mapping(settings["Audio"])["audioOutputPatches"])[0])
+    bus = original.ref(original.array(patch["cueOutputEffects"])[0])
+    bus["effects"] = plistlib.UID(len(original.objects) + 10)
+    with pytest.raises((IndexError, ValueError)):
+        plan_saved_audio_patches(original.dump(), [{"action": "rename_patch", "patch_type": "output",
+                                                    "patch_id": OUT1, "name": "Renamed"}], include_effects=False)
+
+
+def test_public_audio_patch_schema_rejects_effect_operations():
+    from pydantic import TypeAdapter, ValidationError
+    from qlab_mcp.audio_archive import PublicAudioPatchOperations
+    with pytest.raises(ValidationError):
+        TypeAdapter(PublicAudioPatchOperations).validate_python([{
+            "action": "remove_bus_effect", "patch_type": "output", "patch_id": OUT1,
+            "bus_type": "cue", "bus_index": 1, "effect_index": 0,
+        }])
+
+
+def test_patch_edit_entrypoint_rejects_audio_effect_operations():
+    from qlab_mcp.audio_archive import edit_saved_audio_patches
+    result = edit_saved_audio_patches(SimpleNamespace(), WS, [{
+        "action": "remove_bus_effect", "patch_type": "output", "patch_id": OUT1,
+        "bus_type": "cue", "bus_index": 1, "effect_index": 0,
+    }])
+    assert result["status"] == "blocked" and result["executed_operations"] == []
 
 
 def test_system_device_toggle_preserves_saved_descriptors_for_input_and_output():

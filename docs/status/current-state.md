@@ -1,4 +1,125 @@
-# Current Project State — 2026-11-10
+# Current Project State — 2026-11-12
+
+## Audio FX public surface retirement — 2026-11-11
+
+The public AudioUnit catalogue and cue/bus Audio FX editing operations have
+been removed. Saved effects remain part of the archived workspace and are
+preserved by unrelated edits. Audio Maps, Trim writes, unverified bulk levels,
+audio-object setters and Fade audio-target edits remain blocked pending the
+specific evidence documented below. This is a breaking public API change.
+The November 10 section is a historical record of the earlier public contract.
+
+## Audio patch contract split — 2026-11-12
+
+The three legacy audio patch tools are replaced by `qlab_get_audio_patch`,
+`qlab_edit_audio_patch` and `qlab_edit_workspace_audio_settings`;
+`qlab_get_workspace_audio_settings` remains available. The patch reader keeps
+the current OSC view and saved archive view distinct, with freshness on the
+saved view when it may be stale. Reads do not return `needs_save`. The overview
+exposes live `min_volume` and `max_volume` in `sources.live_osc.data`;
+`qlab_get_audio_patch` does not return these limits.
+
+`qlab_edit_audio_patch` covers current OSC output controls and saved input/output
+patch fields in separate operations. OSC changes affect the open workspace and
+are not saved automatically. Before a saved-file edit, `needs_save` signals
+prior unsaved changes; save the workspace separately and obtain a fresh preview.
+The confirmed archive edit is persisted by the write/reopen transaction.
+`qlab_edit_workspace_audio_settings` covers saved patch duplication, ordering,
+deletion and editing `VolumeLimits` in its own operation. Empty patch creation
+is not supported. Audio FX remain preserved but not exposed; Audio Maps are
+outside the read/write contract.
+
+On November 12, the four tools were checked against QLab 5.5.10/build 5510.
+In a temporary copy, an OSC patch level was changed and restored; an input
+patch was renamed and restored; volume limits were changed and restored; and
+a temporary input patch was duplicated, reordered and deleted. Saved-file
+operations reported verified after closing and reopening the copy. These
+checks do not establish playback or physical output. The original workspace
+remained clean and its saved-file hash unchanged.
+
+The connected MCP still returned false `comparison.status="differs"` results
+for patch names by comparing QLab's decorated display name with the saved name.
+The local reader compares `name_property` when available and treats an
+unverifiable decorated name as not comparable; 12 reader tests passed. The
+connected instance initially retained the old behavior. On November 13, after
+restart, the connected MCP reported `matches_observed_fields` for output patch
+`wergergf`, whose live `name_property` and saved name match. Input patch `RICHI`
+and the workspace overview reported `not_comparable`, since an independently
+comparable live name was unavailable. No false name difference was reported.
+
+### Audio limits and copied effects — 2026-11-12
+
+Numeric Audio/Mic/Video/Camera and output-patch levels require readable current
+workspace limits and must be greater than the minimum and no greater than the
+maximum. Explicit `-inf` remains supported. Limits are bound to the confirmation
+and rechecked before mutation. QLab 5.5.10 displayed that values at or below
+the minimum are `-inf`; a temporary copy with limits -60/0 dB rejected -90,
+-60 and +6 dB without a token and accepted -3 dB in a patch dry run.
+The `VolumeLimits` setting itself was also written with
+`qlab_edit_workspace_audio_settings` in a temporary QLab 5.5.10 copy. The
+minimum/maximum pairs tested
+were `(-80, +6)`, `(-180, +60)` and `(-40, -30)` dB. Each pair was saved, the
+workspace was closed and reopened, and OSC readback confirmed the configuration.
+An additional round-trip set `(-80.1, +6.1)` dB; both OSC readbacks matched
+within 0.0001 dB.
+This validates editing the limits; it does not establish playback or physical
+output.
+The -3 dB patch level was then written, saved, closed and reopened in the copy;
+OSC readback was -2.999948 dB, within the existing floating-point tolerance.
+
+In that copy a patch containing a native Apple AUDynamicsProcessor was duplicated
+through the guarded writer. QLab reopened it, the saved-archive postcondition
+passed, and the original and duplicate retained the effect with distinct IDs.
+These checks do not establish audio playback, plug-in processing or physical output.
+
+Public saved-patch and saved-cue reads and edits no longer interpret audio
+effect chains. Synthetic archive tests confirm that an unrecognized chain is
+retained when renaming a patch or selecting a Video audio track. Those tests do
+not establish plug-in operation.
+
+### Audio authoring safety and batch reads — 2026-11-11
+
+The specialized Fade editor rejects unvalidated audio target and level writes
+before issuing a confirmation token; validated visual Fade edits remain
+available. The public saved-cue and saved-patch editors compare opaque effect
+graphs and their owner links before writing and on saved-file readback. A
+comparison that cannot be established blocks the write. This protects stored
+data, not plug-in operation or physical audio output.
+
+Routing batches read shared patch metadata and volume limits once per phase,
+while each addressed cell, the activity gate and each write readback remain
+individually checked. Saved cue batches parse the archive once per phase, with
+no cache across calls. Standalone patch duplication, deletion and ordering are
+included in change detection; duplicate effect IDs are stable between preview
+and execution.
+
+In the mocked OSC preflight, batches of 1, 10 and 50 level cells make 4, 13 and
+53 counted requests respectively (previously 5, 32 and 152). On a small synthetic
+archive, ten planning runs had median times of 2.26 ms for one cue and 2.32 ms
+for two; these local fixture timings are not QLab latency measurements.
+
+A separate local synthetic query without network or cache took 2.9, 26.3 and
+263.2 ms for 50, 500 and 5,000 cues, with 52, 502 and 5,002 counted calls.
+These measurements do not predict QLab latency. The readiness capabilities
+payload measured 24,652 bytes. FX filtering on the fixture had a median of
+0.017 ms across 100 iterations; the safety filter was retained, with no public
+contract change.
+
+In QLab 5.5.10/build 5510, the updated writer renamed and restored Patch 2 in a
+disposable copy in two separate confirmed transactions. Each closed and reopened
+the copy and verified saved effect graphs. A second native check duplicated Patch
+2 and deleted the duplicate, again with a close and reopen per transaction. The
+copy contained two saved cue effects. The original workspace file remained
+unchanged. Unknown plug-ins and shared graph variants are covered by synthetic
+fixtures, not these native checks.
+
+The official [OSC dictionary](https://qlab.app/docs/v5/scripting/osc-dictionary-v5/)
+documents level and Fade setters, while the [Audio Cues manual](https://qlab.app/docs/v5/audio/audio-cues/)
+states that Trim is not automatable. The QLab-REA investigation describes
+archived `trimLevel` fields and Fade level structures, but does not establish a
+safe 5.5.10 Trim mapping or a complete validated Fade write/readback cycle. The
+current online documentation is not specific to build 5510. No new setters or
+archive mutations are enabled on that evidence alone.
 
 ## Audio authoring — 2026-11-10
 
@@ -24,10 +145,14 @@ mode, a cue-owned Audio Object and a virtual NDI device. The system-device and
 NDI changes were also checked in archive fixtures. In a later gated MCP
 round-trip, Patch 2 switched to system-device mode and back; the explicit-device
 readback preserved the UID but showed manufacturer `Unknown` because CoreAudio
-omitted that property. A local regression fix preserves the saved manufacturer
-and model for an unchanged UID, but the connected server still runs the older
-code, so that fix awaits a live round-trip. Explicit-device assignment remains
-blocked when passive CoreAudio identity is absent.
+omitted that property. A subsequent fix preserves the saved manufacturer and
+model for an unchanged UID. On November 11, a fresh gated MCP round-trip switched Patch 2 to system
+mode and back on a clean disposable workspace. After each reopen, the saved
+descriptor retained `BuiltInSpeakerDevice` and `Apple Inc.`; the final explicit
+device mode was restored. CoreAudio still reported manufacturer unavailable, so
+this verifies preservation of saved metadata rather than device negotiation or
+physical output. Explicit-device assignment remains blocked when passive
+CoreAudio identity is absent.
 Audio Object setters, default/silent level actions, Fade cue audio targets,
 blank patch creation, cue-output count changes, AudioUnit insertion/parameter
 writes and Trim remain blocked or read-only pending evidence. AudioUnit

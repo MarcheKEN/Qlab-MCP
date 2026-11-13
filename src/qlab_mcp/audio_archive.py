@@ -9,7 +9,7 @@ import struct
 from functools import partial
 from pathlib import Path
 from typing import Annotated, Literal
-from uuid import UUID, uuid5, NAMESPACE_URL, uuid4
+from uuid import UUID, uuid5, NAMESPACE_URL
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, TypeAdapter
 
@@ -117,6 +117,11 @@ AudioPatchOperation = Annotated[
     Field(discriminator="action"),
 ]
 AudioPatchOperations = Annotated[list[AudioPatchOperation], Field(min_length=1, max_length=50)]
+PublicAudioPatchOperation = Annotated[
+    RenamePatch | DeletePatch | DuplicatePatch | ReorderPatches | SetAudioDevice | SetSystemDevice |
+    SetCueOutputName | SetAudioBusName, Field(discriminator="action")
+]
+PublicAudioPatchOperations = Annotated[list[PublicAudioPatchOperation], Field(min_length=1, max_length=50)]
 
 
 def _class_name(archive: Archive, value) -> str | None:
@@ -244,6 +249,18 @@ def _audio_patches(archive: Archive, domain: str) -> list:
     return values
 
 
+def _patch_id(archive: Archive, patch_ref, domain: str) -> str:
+    patch = archive.ref(patch_ref)
+    expected = "AudioOutputPatch" if domain == "output" else "AudioInputPatch"
+    if _class_name(archive, patch) != expected:
+        raise ValueError(f"Unknown saved {domain} audio patch class.")
+    patch_id = _text(archive, patch.get("uniqueID"))
+    try:
+        return str(UUID(str(patch_id))).upper()
+    except ValueError as exc:
+        raise ValueError("Saved audio patch has an invalid uniqueID.") from exc
+
+
 def _device_settings(archive: Archive, patch) -> dict:
     description = archive.ref(patch.get("deviceDescription"))
     if not isinstance(description, dict) or "NS.keys" not in description:
@@ -256,16 +273,18 @@ def _device_settings(archive: Archive, patch) -> dict:
     return result
 
 
-def _bus_summary(archive: Archive, patch, key: str) -> list[dict]:
+def _bus_summary(archive: Archive, patch, key: str, *, include_effects=True) -> list[dict]:
     refs = archive.array(patch[key]) if archive.ref(patch.get(key)) is not None else []
     if len(refs) > MAX_BUSES:
         raise ValueError("Audio patch bus inventory exceeds 128.")
     result = []
     for index, ref in enumerate(refs, 1):
         bus = archive.ref(ref)
-        effects = _effect_chain(archive, bus.get("effects"))
-        result.append({"index": index, "name": _text(archive, bus.get("name")),
-                       "channels": archive.ref(bus.get("channels")), "effects": effects})
+        summary = {"index": index, "name": _text(archive, bus.get("name")),
+                   "channels": archive.ref(bus.get("channels"))}
+        if include_effects:
+            summary["effects"] = _effect_chain(archive, bus.get("effects"))
+        result.append(summary)
     return result
 
 
@@ -290,16 +309,9 @@ def _matrix_summary(archive: Archive, patch) -> dict:
             "invalid_cells": invalid_cells, "status": "partial" if invalid_cells else "available"}
 
 
-def _patch_summary(archive: Archive, patch_ref, domain: str) -> dict:
+def _patch_summary(archive: Archive, patch_ref, domain: str, *, include_effects=True) -> dict:
     patch = archive.ref(patch_ref)
-    expected = "AudioOutputPatch" if domain == "output" else "AudioInputPatch"
-    if _class_name(archive, patch) != expected:
-        raise ValueError(f"Unknown saved {domain} audio patch class.")
-    patch_id = _text(archive, patch.get("uniqueID"))
-    try:
-        patch_id = str(UUID(str(patch_id))).upper()
-    except ValueError as exc:
-        raise ValueError("Saved audio patch has an invalid uniqueID.") from exc
+    patch_id = _patch_id(archive, patch_ref, domain)
     result = {"id": patch_id, "name": _text(archive, patch.get("name")),
               "device": _device_settings(archive, patch), "patch_type": domain}
     if domain == "input":
@@ -311,8 +323,8 @@ def _patch_summary(archive: Archive, patch_ref, domain: str) -> dict:
     result.update(cue_output_channels=count,
                   cue_output_names={str(key): _text(archive, value) for key, value in names.items()},
                   routing_matrix=_matrix_summary(archive, patch),
-                  cue_output_buses=_bus_summary(archive, patch, "cueOutputEffects"),
-                  device_output_buses=_bus_summary(archive, patch, "patchOutputEffects"))
+                  cue_output_buses=_bus_summary(archive, patch, "cueOutputEffects", include_effects=include_effects),
+                  device_output_buses=_bus_summary(archive, patch, "patchOutputEffects", include_effects=include_effects))
     return result
 
 
@@ -361,20 +373,41 @@ def _walk_audio_effects(archive: Archive) -> tuple[list[dict], list[str]]:
     return result, issues
 
 
-def inspect_saved_audio_patches(source: bytes) -> dict:
+def _inspect_saved_audio_patch_scope(source: bytes, *, include_effects=True,
+                                     patch_type="all", ref=None) -> dict:
     archive = Archive(source)
     meta = archive.mapping(archive.root)
     version, build = archive.ref(meta.get("QLabShortVersionString")), archive.ref(meta.get("QLabBuildNumber"))
     if (version, build) != ("5.5.10", 5510):
         raise ValueError("Saved audio patch inspection supports QLab 5.5.10/build 5510.")
     workspace_id = str(UUID(str(archive.ref(meta["uniqueID"])))).upper()
+    if patch_type not in {"all", "input", "output"}:
+        raise ValueError("patch_type must be all, input or output.")
+    if ref is not None and patch_type == "all":
+        raise ValueError("ref requires patch_type='input' or 'output'.")
+
+    # Count only inventories in scope. Full inspection still bounds both;
+    # scoped reads do not parse or reject unrelated inventory data.
+    output_refs = _audio_patches(archive, "output") if patch_type in {"all", "output"} else []
+    input_refs = _audio_patches(archive, "input") if patch_type in {"all", "input"} else []
+    if ref is not None:
+        refs = output_refs if patch_type == "output" else input_refs
+        matches = [patch_ref for patch_ref in refs
+                   if _patch_id(archive, patch_ref, patch_type).casefold() == str(ref).casefold()]
+        if len(matches) != 1:
+            raise ValueError("Audio patch reference must match one exact saved UUID.")
+        if patch_type == "output":
+            output_refs = matches
+        else:
+            input_refs = matches
+
     output_patches = []
     total_buses = total_effects = total_level_cells = 0
-    for ref in _audio_patches(archive, "output"):
-        patch = _patch_summary(archive, ref, "output")
+    for patch_ref in output_refs:
+        patch = _patch_summary(archive, patch_ref, "output", include_effects=include_effects)
         buses = patch["cue_output_buses"] + patch["device_output_buses"]
         total_buses += len(buses)
-        total_effects += sum(len(bus["effects"]) for bus in buses)
+        total_effects += sum(len(bus.get("effects", [])) for bus in buses)
         total_level_cells += patch["routing_matrix"]["total_cells"]
         if total_buses > MAX_TOTAL_BUSES:
             raise ValueError("Saved audio patch buses exceed the 8192-entry inspection limit.")
@@ -383,15 +416,19 @@ def inspect_saved_audio_patches(source: bytes) -> dict:
         if total_level_cells > MAX_TOTAL_LEVEL_CELLS:
             raise ValueError("Saved audio routing matrices exceed the 8192-cell inspection limit.")
         output_patches.append(patch)
-    audio_effects, audio_effects_issues = _walk_audio_effects(archive)
+    audio_effects, audio_effects_issues = _walk_audio_effects(archive) if include_effects else ([], [])
     if total_effects + len(audio_effects) > MAX_TOTAL_EFFECTS:
         raise ValueError("Saved Audio FX inventory exceeds 1024 instances.")
     return {"workspace_id": workspace_id, "version": version, "build": build,
             "output_patches": output_patches,
-            "input_patches": [_patch_summary(archive, ref, "input") for ref in _audio_patches(archive, "input")],
+            "input_patches": [_patch_summary(archive, patch_ref, "input") for patch_ref in input_refs],
             "audio_effects": audio_effects,
             "audio_effects_issues": audio_effects_issues,
             "coverage": "Saved archive configuration only; current device observations are separate."}
+
+
+def inspect_saved_audio_patches(source: bytes, *, include_effects=True) -> dict:
+    return _inspect_saved_audio_patch_scope(source, include_effects=include_effects)
 
 
 def read_saved_audio_patches(reader, workspace_id: str, *, patch_type="all", ref=None) -> dict:
@@ -407,17 +444,10 @@ def read_saved_audio_patches(reader, workspace_id: str, *, patch_type="all", ref
         with docs._LOCK:
             before = docs._document(docs._inventory(reader), workspace_id)
             source, identity = _read_file(Path(before["path"]))
-            saved = inspect_saved_audio_patches(source)
+            saved = _inspect_saved_audio_patch_scope(
+                source, include_effects=False, patch_type=patch_type, ref=ref)
             if saved["workspace_id"] != workspace_id:
                 raise ValueError("Saved workspace UUID does not match the request.")
-            if patch_type != "all":
-                key = "output_patches" if patch_type == "output" else "input_patches"
-                if ref is not None:
-                    matches = [item for item in saved[key] if item["id"].casefold() == str(ref).casefold()]
-                    if len(matches) != 1:
-                        raise ValueError("Audio patch reference must match one exact saved UUID.")
-                    saved[key] = matches
-                saved["input_patches" if patch_type == "output" else "output_patches"] = []
             after = docs._document(docs._inventory(reader), workspace_id)
             current, current_identity = _read_file(Path(before["path"]))
             if before != after or (source, identity) != (current, current_identity):
@@ -453,8 +483,9 @@ def read_saved_audio_patches(reader, workspace_id: str, *, patch_type="all", ref
 
 
 class AudioPatchArchive:
-    def __init__(self, source: bytes, devices: dict | None = None):
+    def __init__(self, source: bytes, devices: dict | None = None, *, include_effects=True):
         self.source = source
+        self.include_effects = include_effects
         self.hash = hashlib.sha256(source).hexdigest()
         self.a = Archive(source)
         self.meta = self.a.mapping(self.a.root)
@@ -469,6 +500,7 @@ class AudioPatchArchive:
         self.refs = {domain: list(self.a.array(self.sections[domain][key])) for domain, key in self.keys.items()}
         self.devices = devices or {}
         self.created: dict[str, str] = {}
+        self.effect_duplicates = []
         self.dirty = False
         self._unique_ids()
         self._check_cue_references()
@@ -603,8 +635,11 @@ class AudioPatchArchive:
         return value
 
     def duplicate(self, op):
+        from .audio_effect_integrity import capture_patch_effect_graph, verify_duplicate_effect_graph
+
         domain = op.patch_type
         source_ref = self.target(domain, op.source_patch_id)
+        source_effect_graph = capture_patch_effect_graph(self.a, source_ref)
         if any(_text(self.a, self.a.ref(ref).get("name")) == op.name for ref in self.refs[domain]):
             raise ValueError("Audio patch names must be unique within their type.")
         label = op.client_ref
@@ -615,15 +650,20 @@ class AudioPatchArchive:
         new_id = str(uuid5(NAMESPACE_URL, self.hash + ":audio:" + domain + ":" + label)).upper()
         clone["uniqueID"] = self.a.add(new_id) if isinstance(clone.get("uniqueID"), plistlib.UID) else new_id
         clone["name"] = self.a.add(op.name) if isinstance(clone.get("name"), plistlib.UID) else op.name
-        self._refresh_effect_ids(clone_ref)
+        self._refresh_effect_ids(clone_ref, label)
+        copy_effect_graph = capture_patch_effect_graph(self.a, clone_ref)
+        verify_duplicate_effect_graph(source_effect_graph, copy_effect_graph)
         self.refs[domain].append(clone_ref)
         self.created[label] = new_id
+        self.effect_duplicates.append({"domain": domain, "patch_id": new_id,
+                                       "source_ids": source_effect_graph["identifiers"]})
         self._write_array(domain)
 
-    def _refresh_effect_ids(self, root_ref):
+    def _refresh_effect_ids(self, root_ref, label):
         root_index = root_ref.data if isinstance(root_ref, plistlib.UID) else None
         stack = [root_ref]
         visited = set()
+        effect_index = 0
         while stack:
             value = stack.pop()
             if isinstance(value, plistlib.UID):
@@ -633,7 +673,9 @@ class AudioPatchArchive:
                 value = self.a.ref(value)
             if isinstance(value, dict):
                 if _class_name(self.a, value) == "F53Effect":
-                    value["identifier"] = self.a.add(str(uuid4())) if isinstance(value.get("identifier"), plistlib.UID) else str(uuid4())
+                    identifier = str(uuid5(NAMESPACE_URL, f"{self.hash}:audio:effect:{label}:{effect_index}")).upper()
+                    effect_index += 1
+                    value["identifier"] = self.a.add(identifier) if isinstance(value.get("identifier"), plistlib.UID) else identifier
                 stack.extend(value.values())
             elif isinstance(value, list):
                 stack.extend(value)
@@ -783,7 +825,7 @@ class AudioPatchArchive:
             self.dirty = True
 
     def snapshot(self):
-        return inspect_saved_audio_patches(self.a.dump())
+        return inspect_saved_audio_patches(self.a.dump(), include_effects=self.include_effects)
 
     def output(self):
         root_ref = self.a.data["$top"]["root"]
@@ -796,26 +838,50 @@ class AudioPatchArchive:
         return self.a.dump()
 
 
-def plan_saved_audio_patches(source, operations, *, devices=None):
+def plan_saved_audio_patches(source, operations, *, devices=None, include_effects=True):
     ops = TypeAdapter(AudioPatchOperations).validate_python(operations) if operations else []
-    editor = AudioPatchArchive(source, devices=devices)
+    editor = AudioPatchArchive(source, devices=devices, include_effects=include_effects)
+    from .audio_effect_integrity import capture_effects, effects_match
+    effect_snapshot = capture_effects(editor.a, editor.cues) if ops and not include_effects else None
     before = editor.snapshot()
     for op in ops:
         editor.apply(op)
-    after = editor.snapshot()
+    from .audio_effect_integrity import capture_patch_effect_graph, verify_serialized_duplicate_effect_graph
+    duplicate_checks = []
+    for duplicate in editor.effect_duplicates:
+        patch_ref = editor.target(duplicate["domain"], duplicate["patch_id"])
+        duplicate_checks.append({**duplicate, "expected": capture_patch_effect_graph(editor.a, patch_ref)})
+    candidate = editor.output() if editor.dirty else source
+    after = inspect_saved_audio_patches(candidate, include_effects=include_effects)
     changes = [] if before == after else [{"action": op.action, **op.model_dump(exclude_none=True)} for op in ops]
-    output = editor.output() if changes else source
+    output = candidate if changes else source
     if len(output) > MAX_BYTES:
         raise ValueError("Edited workspace exceeds 64 MiB.")
-    after = inspect_saved_audio_patches(output)
+    if effect_snapshot is not None and not effects_match(output, effect_snapshot):
+        raise ValueError("Existing audio effect data could not be preserved.")
+    if duplicate_checks:
+        archived = Archive(output)
+        for duplicate in duplicate_checks:
+            matches = [ref for ref in _audio_patches(archived, duplicate["domain"])
+                       if _text(archived, archived.ref(ref).get("uniqueID")) == duplicate["patch_id"]]
+            if len(matches) != 1:
+                raise ValueError("Duplicated audio effect graph could not be verified.")
+            actual = capture_patch_effect_graph(archived, matches[0])
+            verify_serialized_duplicate_effect_graph(
+                duplicate["expected"], actual, duplicate["source_ids"])
+    if not changes:
+        after = before
     return {"output_bytes": output, "workspace_id": before["workspace_id"],
             "summary": after, "changes": changes, "affected_cues": [],
             "warnings": ["Saved audio patch configuration is checked after reopen; devices are observed passively and no audio is activated."],
-            "created_refs": editor.created}
+            "created_refs": editor.created, "include_effects": include_effects, "effect_snapshot": effect_snapshot}
 
 
 def _postcondition(source, plan):
-    return inspect_saved_audio_patches(source) == plan["summary"]
+    from .audio_effect_integrity import effects_match
+    snapshot = plan.get("effect_snapshot")
+    return (inspect_saved_audio_patches(source, include_effects=plan.get("include_effects", True)) == plan["summary"]
+            and (snapshot is None or effects_match(source, snapshot)))
 
 
 def _device_dependencies(reader, workspace_id, operations):
@@ -872,13 +938,13 @@ def edit_saved_audio_patches(reader, workspace_id, operations, dry_run=True, con
     from .workspace_archive import edit_archive
     try:
         workspace_id = docs._uuid(workspace_id)
-        ops = [op.model_dump(exclude_none=True) for op in TypeAdapter(AudioPatchOperations).validate_python(operations)]
+        ops = [op.model_dump(exclude_none=True) for op in TypeAdapter(PublicAudioPatchOperations).validate_python(operations)]
         context = _device_dependencies(reader, workspace_id, ops)
         def check():
             if _device_dependencies(reader, workspace_id, ops) != context:
                 raise ValueError("CoreAudio device inventory changed since preview.")
         result = edit_archive(reader, workspace_id, ops, dry_run, confirm_token,
-            planner=partial(plan_saved_audio_patches, devices=context.get("devices", {})),
+            planner=partial(plan_saved_audio_patches, devices=context.get("devices", {}), include_effects=False),
             token_family="savedAudioPatches", dependencies=context, dependency_check=check,
             postcondition=_postcondition, live_verifier=_verify_live)
     except Exception as exc:

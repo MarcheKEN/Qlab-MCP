@@ -67,7 +67,6 @@ class CueFileSettings(BaseModel):
     wall_clock: WallClockSettings | None = None
     video_audio: SavedVideoAudio | None = None
     video_effects: list[dict[str, JsonValue]] = Field(default_factory=list)
-    audio_effects: list[dict[str, JsonValue]] | None = None
 
 
 class SavedCueSettings(BaseModel):
@@ -196,6 +195,10 @@ def _point_budget(operations):
 
 SavedCueOperations = Annotated[list[SavedCueOperation], Field(min_length=1, max_length=50), AfterValidator(_point_budget)]
 
+PublicSavedCueOperation = Annotated[SetHotkey | SetHotkeyEnabled | SetDays | SetEnvelope | InsertEffect | SelectTrack,
+                                    Field(discriminator="action")]
+PublicSavedCueOperations = Annotated[list[PublicSavedCueOperation], Field(min_length=1, max_length=50), AfterValidator(_point_budget)]
+
 
 def _archive(source):
     outer = Archive(source)
@@ -225,7 +228,7 @@ def _hotkey(a, cue):
                 enabled=a.ref(cue.get("useHotKey")))
 
 
-def _settings(a, cue):
+def _settings(a, cue, *, include_audio_effects=True):
     result, issues = {}, []
     cue_kind = a.kind(cue)
     if cue_kind in {"LightCue", "VideoCue"}:
@@ -248,10 +251,11 @@ def _settings(a, cue):
             audio = a.ref(cue["audioCue"])
             if a.kind(audio) != "AudioCue":
                 raise ValueError("Embedded AudioCue is unavailable.")
-            try:
-                result["audio_effects"] = _audio_effect_summary(a, audio)
-            except (ValueError, KeyError, TypeError) as exc:
-                issues.append("Audio FX: " + str(exc))
+            if include_audio_effects:
+                try:
+                    result["audio_effects"] = _audio_effect_summary(a, audio)
+                except (ValueError, KeyError, TypeError) as exc:
+                    issues.append("Audio FX: " + str(exc))
             track = a.ref(audio.get("track"))
             result["video_audio"] = dict(track=track if type(track) is int else None,
                 input_channel_names=[], gangs=[], integrated_fade={})
@@ -298,7 +302,7 @@ def _settings(a, cue):
                 channel_metadata_truncated=truncated)
         except (ValueError, KeyError, TypeError, AttributeError) as exc:
             issues.append("Embedded audio: " + str(exc))
-    elif cue_kind in {"AudioCue", "MicCue"}:
+    elif include_audio_effects and cue_kind in {"AudioCue", "MicCue"}:
         try:
             result["audio_effects"] = _audio_effect_summary(a, cue)
         except (ValueError, KeyError, TypeError, AttributeError) as exc:
@@ -419,14 +423,18 @@ def _effect_template(target, name):
     return clone(source.data["$top"]["root"])
 
 
-def inspect_saved_cue(source, cue_id):
-    outer, meta, _, a, cues, _ = _archive(source)
+def _inspect_cue(outer, meta, a, cues, cue_id, *, include_audio_effects=True):
     found = cues.get(str(cue_id).upper())
     if found is None:
         raise ValueError("No active supported cue has this exact UUID.")
-    settings, issues = _settings(a, found[0])
+    settings, issues = _settings(a, found[0], include_audio_effects=include_audio_effects)
     return dict(status="partial" if issues else "ready", workspace_id=str(outer.ref(meta["uniqueID"])).upper(),
                 cue_type=a.kind(found[0]).removesuffix("Cue"), version="5.5.10", build=5510, settings=settings, issues=issues)
+
+
+def inspect_saved_cue(source, cue_id, *, include_audio_effects=True):
+    outer, meta, _, a, cues, _ = _archive(source)
+    return _inspect_cue(outer, meta, a, cues, cue_id, include_audio_effects=include_audio_effects)
 
 
 def inspect_saved_cue_object_ownership(source, cue_id, object_ids):
@@ -555,7 +563,7 @@ def read_saved_cue_settings(reader, workspace_id, cue_id):
         with docs._LOCK:
             before = docs._document(docs._inventory(reader), workspace_id)
             data, identity = _read_file(Path(before["path"]))
-            result.update(inspect_saved_cue(data, cue_id))
+            result.update(inspect_saved_cue(data, cue_id, include_audio_effects=False))
             if result.pop("workspace_id") != workspace_id:
                 raise ValueError("Saved workspace UUID does not match the request.")
             after = docs._document(docs._inventory(reader), workspace_id)
@@ -570,16 +578,18 @@ def read_saved_cue_settings(reader, workspace_id, cue_id):
         return dict(status="unavailable", settings={}, issues=[sanitize_exception_message(exc)])
 
 
-def plan_saved_cue_settings(source, operations, *, media=None, targets=()):
+def plan_saved_cue_settings(source, operations, *, media=None, targets=(), include_audio_effects=True):
     ops = TypeAdapter(SavedCueOperations).validate_python(operations) if operations else []
     if {str(op.cue_id) for op in ops if isinstance(op, SetHotkey)} & {str(op.cue_id) for op in ops if isinstance(op, SetHotkeyEnabled)}:
         raise ValueError("Configure and activate Hotkey in separate confirmed calls.")
     patch = Patch(source)
     outer, meta, carrier, a, cues, incoming = _archive(source)
+    from .audio_effect_integrity import capture_effects, effects_match
+    effect_snapshot = capture_effects(outer, a) if ops and not include_audio_effects else None
     target_ids = set(targets) | {str(op.cue_id).upper() for op in ops}
     if not target_ids <= cues.keys():
         raise ValueError("An active unique Light, Audio, Mic, or Video cue is required.")
-    original_settings = {uid: _settings(a, cues[uid][0])[0] for uid in target_ids}
+    original_settings = {uid: _settings(a, cues[uid][0], include_audio_effects=include_audio_effects)[0] for uid in target_ids}
     changes = []
     for op in ops:
         uid = str(op.cue_id).upper()
@@ -593,7 +603,7 @@ def plan_saved_cue_settings(source, operations, *, media=None, targets=()):
             raise ValueError("Audio track, integrated fade and Video FX operations require a Video cue.")
         if isinstance(op, (RemoveAudioEffect, MoveAudioEffect, SetAudioEffectBypassed)) and cue_kind not in {"AudioCue", "MicCue", "VideoCue"}:
             raise ValueError("Audio FX edits require an Audio, Mic, or Video cue.")
-        before = _settings(a, cue)[0]
+        before = _settings(a, cue, include_audio_effects=include_audio_effects)[0]
         if isinstance(op, SetHotkey):
             if a.ref(cue.get("useHotKey")) is not False:
                 raise ValueError("Hotkey must be disabled before assignment.")
@@ -721,7 +731,7 @@ def plan_saved_cue_settings(source, operations, *, media=None, targets=()):
                 if enabled != requested_enabled:
                     state["enabled"] = a.add(requested_enabled) if isinstance(enabled_ref, plistlib.UID) else requested_enabled
                     effect["state"] = a.make_dict(state)
-        after = _settings(a, cue)[0]
+        after = _settings(a, cue, include_audio_effects=include_audio_effects)[0]
         if after != before:
             field = ("hotkey" if isinstance(op, (SetHotkey,SetHotkeyEnabled)) else "wall_clock" if isinstance(op, SetDays)
                      else "video_effects" if isinstance(op, InsertEffect) else "audio_effects" if isinstance(op, (RemoveAudioEffect, MoveAudioEffect, SetAudioEffectBypassed))
@@ -732,7 +742,7 @@ def plan_saved_cue_settings(source, operations, *, media=None, targets=()):
                 old_value, new_value = old_value[subfield], new_value[subfield]
                 field += "." + subfield
             changes.append(dict(cue_id=uid, action=op.action, field=field, before=old_value, after=new_value))
-    if all(value == _settings(a, cues[uid][0])[0] for uid, value in original_settings.items()):
+    if all(value == _settings(a, cues[uid][0], include_audio_effects=include_audio_effects)[0] for uid, value in original_settings.items()):
         changes = []
     output = source
     if changes:
@@ -741,15 +751,30 @@ def plan_saved_cue_settings(source, operations, *, media=None, targets=()):
         output = outer.dump()
         if len(output) > MAX_BYTES:
             raise ValueError("Edited workspace exceeds 64 MiB.")
-    snapshots = {uid:inspect_saved_cue(output, uid) for uid in target_ids}
+    if effect_snapshot is not None and not effects_match(output, effect_snapshot):
+        raise ValueError("Existing audio effect data could not be preserved.")
+    snapshots = {}
+    if target_ids:
+        snapshot_outer, snapshot_meta, _, snapshot_archive, snapshot_cues, _ = _archive(output)
+        snapshots = {uid:_inspect_cue(snapshot_outer, snapshot_meta, snapshot_archive, snapshot_cues, uid,
+                                      include_audio_effects=include_audio_effects) for uid in target_ids}
     return dict(output_bytes=output, workspace_id=patch.workspace_id, summary=dict(cues=snapshots, media=media or {}),
         changes=changes, warnings=["Saved cue properties are checked after reopen; no playback is verified."],
         affected_cues=[change["cue_id"] for change in changes],
-        cue_settings_summary=snapshots)
+        cue_settings_summary=snapshots, include_audio_effects=include_audio_effects, effect_snapshot=effect_snapshot)
 
 
 def _postcondition(source, plan):
-    return all(inspect_saved_cue(source, uid) == expected for uid,expected in plan["cue_settings_summary"].items())
+    from .audio_effect_integrity import effects_match
+    effect_snapshot = plan.get("effect_snapshot")
+    if effect_snapshot is not None and not effects_match(source, effect_snapshot):
+        return False
+    snapshots = plan["cue_settings_summary"]
+    if not snapshots:
+        return True
+    outer, meta, _, a, cues, _ = _archive(source)
+    return all(_inspect_cue(outer, meta, a, cues, uid, include_audio_effects=plan.get("include_audio_effects", True)) == expected
+               for uid, expected in snapshots.items())
 
 
 def edit_saved_cue_settings(reader, workspace_id, operations, dry_run=True, confirm_token=None):
@@ -757,7 +782,7 @@ def edit_saved_cue_settings(reader, workspace_id, operations, dry_run=True, conf
     from .workspace_documents import _uuid
     try:
         workspace_id = _uuid(workspace_id)
-        ops = TypeAdapter(SavedCueOperations).validate_python(operations)
+        ops = TypeAdapter(PublicSavedCueOperations).validate_python(operations)
         targets = {str(op.cue_id).upper() for op in ops}
         media_targets = {str(op.cue_id).upper() for op in ops if isinstance(op, SelectTrack)}
         media = _media_dependencies(reader, workspace_id, media_targets)
@@ -765,7 +790,7 @@ def edit_saved_cue_settings(reader, workspace_id, operations, dry_run=True, conf
             if _media_dependencies(reader, workspace_id, media_targets) != media:
                 raise ValueError("Media changed since preview.")
         result = edit_archive(reader, workspace_id, operations, dry_run, confirm_token,
-            planner=partial(plan_saved_cue_settings, media=media, targets=targets), token_family="savedCueSettings",
+            planner=partial(plan_saved_cue_settings, media=media, targets=targets, include_audio_effects=False), token_family="savedCueSettings",
             dependencies=media, dependency_check=check, postcondition=_postcondition, live_verifier=_verify_live)
     except Exception as exc:
         result = dict(ok=False, status="blocked", planned_operations=[], executed_operations=[], error=sanitize_exception_message(exc))
@@ -775,7 +800,7 @@ def edit_saved_cue_settings(reader, workspace_id, operations, dry_run=True, conf
         result["summary"] = dict(cue_ids=sorted(summary.get("cues", {})))
     result["native_cue_verified"] = result.pop("native_patch_verified", False)
     result.pop("native_patch_verification_scope", None)
-    result["verification_scope"] = "Saved cue settings after reopen; native cue UUID/type, audio track, fade flags and Video FX count. Audio FX chain identity, order, bypass state and observed parameters are checked against the saved archive only. No cue execution or physical output is verified."
+    result["verification_scope"] = "Saved cue settings after reopen; native cue UUID/type, audio track, fade flags and Video FX count. No cue execution or physical output is verified."
     return result
 
 
@@ -841,10 +866,6 @@ def enrich_cue_details(reader, result, max_bytes=None):
         operations.extend(["set_hotkey", "set_hotkey_enabled", "set_wall_clock_days"])
     if cue_type == "Video":
         operations.extend(["select_audio_track", "set_integrated_audio_fade", "insert_video_effect"])
-    if cue_type in {"Audio", "Mic", "Video"}:
-        operations.extend(["remove_audio_effect", "move_audio_effect", "set_audio_effect_bypassed"])
-        result.edit_capabilities["saved_settings"]["audio_fx_write_scope"] = (
-            "Existing AudioUnit effects only; saved archive verification; no parameter editing or insertion.")
     result.edit_capabilities["saved_settings"]["operations"] = operations
     from .cues.limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES
     from .cues.limits import serialized_payload_bytes

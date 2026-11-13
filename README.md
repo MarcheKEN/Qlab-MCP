@@ -11,7 +11,7 @@ saved local archive under a guarded close, replace and reopen workflow.
 **Developed and tested with QLab 5.5.10 on macOS.** Other QLab versions may
 behave differently and have not been validated by this project.
 
-The server provides **91 tools: 54 read-only and 37 gated writes**.
+The server provides **90 tools: 53 read-only and 37 gated writes**.
 Writes are disabled by default and require a reviewed preview and confirmation.
 
 [Capabilities](#capabilities) · [Installation](#installation) ·
@@ -313,7 +313,7 @@ saved state and do not execute cues.
 | `qlab_get_light_cue_details` | Read saved Light commands and cue settings. |
 | `qlab_edit_light_cues` | Edit supported Light commands and cue settings. |
 | `qlab_edit_light_cue_curves` | Edit ascending/descending Light curves through a confirmed saved-file transaction; reopen and verify the saved archive. |
-| `qlab_edit_saved_cue_settings` | Edit saved Hotkeys, Wall Clock weekdays, Video audio-track settings, Video FX insertion and existing Audio FX chains in Audio/Mic/Video cues. |
+| `qlab_edit_saved_cue_settings` | Edit saved Hotkeys, Wall Clock weekdays, Video audio-track settings, and Video FX insertion. |
 | `qlab_get_group_cues` | List Groups within one Cue List. |
 | `qlab_get_group_cue_details` | Read Group mode, Playlist settings and bounded children. |
 | `qlab_edit_group_cues` | Edit Group properties, mode and supported Playlist settings. |
@@ -371,9 +371,10 @@ saved state and do not execute cues.
 | Tool | What it does |
 | --- | --- |
 | `qlab_get_workspace_general_settings` | Read minimum GO time and selection/playhead lock. |
-| `qlab_get_workspace_audio_settings` | Read Audio patch routing and an optional selected matrix level. |
-| `qlab_get_saved_audio_patches` | Read saved input/output patch configuration and passive CoreAudio observations. |
-| `qlab_edit_saved_audio_patches` | Manage saved input/output patches and existing output-bus effects with a guarded file edit. |
+| `qlab_get_workspace_audio_settings` | Read Audio patch inventories and live `min_volume`/`max_volume`, with saved data and passive device observations separate. |
+| `qlab_get_audio_patch` | Read current and saved patch data, an optional live cell, paginated saved matrix, buses and freshness; limits are in the workspace overview. |
+| `qlab_edit_audio_patch` | Edit current OSC output values or saved input/output patch settings in separate operations. |
+| `qlab_edit_workspace_audio_settings` | Duplicate, reorder or delete saved patches, or edit `VolumeLimits` separately; blank patch creation is unsupported. |
 | `qlab_get_workspace_video_settings` | Read live OSC inventory and saved stages, meshes, masks, routes, input patches and configured destinations, with source status and pagination. |
 | `qlab_get_workspace_light_settings` | Read current OSC data plus saved local patch addresses, outputs, groups and workspace definitions; large results expose follow-up pages. |
 | `qlab_edit_light_patch` | Preview or apply a batch to the saved local Light Patch; close, replace and reopen the same workspace. |
@@ -387,7 +388,6 @@ saved state and do not execute cues.
 | `qlab_get_video_input_patches` | Read patches, saved modes, camera formats and bounded local Syphon server metadata. |
 | `qlab_get_video_region` | Read one region and an optional control point. |
 | `qlab_edit_workspace_general_settings` | Edit minimum GO time or selection/playhead lock. |
-| `qlab_edit_audio_output_patch` | Edit patch name, cue outputs, levels or mute/solo settings. |
 | `qlab_edit_video_stage` | Create, edit, reorder and delete stages; manage regions, masks, resize and warping in a guarded batch. |
 | `qlab_edit_video_output_route` | Create, edit, reorder and delete routes; configure devices, dimensions, rotation, scaling and partial output. |
 | `qlab_edit_video_output_devices` | Manage configured NDI/Syphon devices and associated routes, including five NDI audio sample rates. |
@@ -397,7 +397,7 @@ saved state and do not execute cues.
 </details>
 
 <details>
-<summary><strong>Media, fonts and effect metadata</strong> — 5 tools</summary>
+<summary><strong>Media, fonts and effect metadata</strong> — 4 tools</summary>
 
 | Tool | What it does |
 | --- | --- |
@@ -405,7 +405,6 @@ saved state and do not execute cues.
 | `qlab_analyze_audio_file` | Measure audio levels, bands and estimated beats; no playback. |
 | `qlab_get_fonts` | List QLab application font names and families/styles. |
 | `qlab_get_video_effect_catalogue` | Browse documented Video FX metadata in pages of up to 10. |
-| `qlab_get_audio_effect_catalogue` | Read AudioUnit identities and parameters observed in saved cue and output-patch instances. |
 
 </details>
 

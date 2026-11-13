@@ -35,6 +35,42 @@ def test_hotkey_copy_on_write_preserves_other_cue():
     assert plan["summary"]
 
 
+def test_batch_reads_archive_once_per_snapshot_and_postcondition(monkeypatch):
+    from qlab_mcp import saved_cue_settings as saved
+    original = source()
+    calls = []
+    archive = saved._archive
+    def counted(data):
+        calls.append(1)
+        return archive(data)
+    monkeypatch.setattr(saved, "_archive", counted)
+    plan = saved.plan_saved_cue_settings(original, [
+        dict(action="set_wall_clock_days", cue_id=CUE, days=["monday"]),
+        dict(action="set_wall_clock_days", cue_id=OTHER, days=["tuesday"]),
+    ])
+    assert len(calls) == 2
+    calls.clear()
+    assert saved._postcondition(plan["output_bytes"], plan)
+    assert len(calls) == 1
+
+
+def test_public_cue_schema_rejects_audio_effect_operations():
+    from pydantic import TypeAdapter, ValidationError
+    from qlab_mcp.saved_cue_settings import PublicSavedCueOperations
+    with pytest.raises(ValidationError):
+        TypeAdapter(PublicSavedCueOperations).validate_python([
+            {"action": "remove_audio_effect", "cue_id": CUE, "effect_index": 0}
+        ])
+
+
+def test_cue_edit_entrypoint_rejects_audio_effect_operations():
+    from qlab_mcp.saved_cue_settings import edit_saved_cue_settings
+    result = edit_saved_cue_settings(None, "11111111-1111-4111-8111-111111111111", [
+        {"action": "remove_audio_effect", "cue_id": CUE, "effect_index": 0}
+    ])
+    assert result["status"] == "blocked" and result["executed_operations"] == []
+
+
 def test_weekdays_are_an_explicit_replacement_and_repeat_is_no_op():
     from qlab_mcp.saved_cue_settings import inspect_saved_cue, plan_saved_cue_settings
     op = dict(action="set_wall_clock_days", cue_id=CUE, days=["monday", "friday"])
@@ -297,6 +333,35 @@ def test_audio_track_selection_requires_exact_media_dependency():
         plan_saved_cue_settings(original, [{**op, "track_id": 4}], media=context)
 
 
+def test_video_track_edit_preserves_unrecognized_audio_effect_chain():
+    from qlab_mcp.light_patch.curves import _reachable_cues
+    from qlab_mcp.saved_cue_settings import _postcondition, inspect_saved_cue, plan_saved_cue_settings
+    outer = Archive(video_source())
+    carrier = outer.ref(outer.mapping(outer.root)["cueLists"])
+    inner = Archive(carrier["NS.data"])
+    cue = _reachable_cues(inner, ("VideoCue",))[0][CUE.upper()][0]
+    inner.ref(cue["audioCue"])["effects"] = inner.add({"future_effect_format": "opaque"})
+    carrier["NS.data"] = inner.dump()
+    original = outer.dump()
+    context = {CUE.upper(): {"track_ids": [3], "path": "/fixture.mov"}}
+    plan = plan_saved_cue_settings(original, [dict(action="select_audio_track", cue_id=CUE, track_id=3)],
+                                   media=context, include_audio_effects=False)
+    assert inspect_saved_cue(plan["output_bytes"], CUE, include_audio_effects=False)["settings"]["video_audio"]["track"] == 3
+    result = Archive(plan["output_bytes"])
+    inner = Archive(result.ref(result.mapping(result.root)["cueLists"])["NS.data"])
+    cue = _reachable_cues(inner, ("VideoCue",))[0][CUE.upper()][0]
+    assert inner.ref(inner.ref(cue["audioCue"])["effects"]) == {"future_effect_format": "opaque"}
+    assert _postcondition(plan["output_bytes"], plan)
+    original_effects = inner.ref(cue["audioCue"])["effects"]
+    inner.ref(cue["audioCue"])["effects"] = inner.add({"other": "chain"})
+    result.ref(result.mapping(result.root)["cueLists"])["NS.data"] = inner.dump()
+    assert not _postcondition(result.dump(), plan)
+    inner.ref(cue["audioCue"])["effects"] = original_effects
+    inner.ref(inner.ref(cue["audioCue"])["effects"])["future_effect_format"] = "changed"
+    result.ref(result.mapping(result.root)["cueLists"])["NS.data"] = inner.dump()
+    assert not _postcondition(result.dump(), plan)
+
+
 def test_sparse_channel_metadata_decodes_names_and_gang_member_coordinates():
     from qlab_mcp.saved_cue_settings import inspect_saved_cue
     from qlab_mcp.light_patch.curves import _reachable_cues
@@ -423,10 +488,10 @@ def test_audio_and_mic_details_enrich_saved_audio_fx(monkeypatch, cue_type):
             identity=MicCueSummary(uniqueID=CUE, type="Mic"))
     enriched = enrich_cue_details(_reader(monkeypatch, audio_fx_source(cue_type)), result)
     assert enriched.saved_settings.status == "ready"
-    assert enriched.saved_settings.settings.audio_effects[0]["identifier"] == "fx-1"
+    assert "audio_effects" not in enriched.saved_settings.settings.model_dump()
     operations = enriched.edit_capabilities["saved_settings"]["operations"]
-    assert "remove_audio_effect" in operations
-    assert "set_audio_effect_bypassed" in operations
+    assert "remove_audio_effect" not in operations
+    assert "set_audio_effect_bypassed" not in operations
 
 
 def test_audio_effect_chain_supports_only_remove_move_and_bypass_with_exact_postcondition():

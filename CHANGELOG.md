@@ -2,6 +2,21 @@
 
 ## 0.4.0 (Unreleased)
 
+- Retire the AudioUnit catalogue and saved cue/bus Audio FX editing operations;
+  saved effect chains remain preserved but are not exposed. Reject unvalidated
+  Fade audio-target and level writes. The current surface is **90 tools: 53 reads
+  and 37 gated writes**.
+- Replace the three legacy audio patch tools with `qlab_get_audio_patch`,
+  `qlab_edit_audio_patch` and `qlab_edit_workspace_audio_settings`; retain
+  `qlab_get_workspace_audio_settings`. Current OSC and saved archive views stay
+  distinct. Before a file edit, `needs_save` signals prior unsaved changes:
+  save separately and get a fresh preview. A confirmed archive edit is persisted
+  on reopen. `VolumeLimits` edits are available as a
+  separate operation; QLab 5.5.10 native round-trip validation on a temporary
+  copy checked `(-80, +6)`, `(-180, +60)` and `(-40, -30)` dB after save,
+  close/reopen and OSC readback. A separate `(-80.1, +6.1)` dB round-trip
+  matched OSC readback within 0.0001 dB. Blank patch creation, Audio FX and
+  Audio Maps stay outside the surface.
 - Add bounded Video configuration observations from existing reads, correct
   assigned-target health guidance, and distinguish blocked OSC effect creation
   from guarded Video LinearKey/DropShadow archive insertion.
@@ -11,9 +26,9 @@
 
 - Add `qlab_edit_saved_cue_settings` for confirmed saved Hotkey configuration and
   activation, Wall Clock weekdays, Video audio-track selection, integrated audio
-  envelopes and native LinearKey/DropShadow insertion. Current surface: **88 tools,
-  52 reads and 36 gated writes**. Objects, Audio Maps and Audio FX remain excluded;
-  Trim is investigated without a public writer.
+  envelopes and native LinearKey/DropShadow insertion. That earlier increment
+  reached **88 tools, 52 reads and 36 gated writes**. Objects and Audio Maps were
+  excluded; Trim has no public writer.
 - Enrich Light/Video detail with typed saved settings and freshness; expose Video
   track identifiers/formats and sparse channel-name/gang metadata.
 - Read Fade & Stop Others integer scopes and missing slices through fixed native

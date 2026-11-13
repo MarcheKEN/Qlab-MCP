@@ -8,6 +8,7 @@ import time
 from typing import Any
 from uuid import UUID
 
+from ..audio_limits import validate_audio_level_limits
 from ..errors import OscPreparationError, OscTimeoutError, QLabReplyError
 from ..models import (
     AudioOutputPatchBatchOperation,
@@ -120,7 +121,13 @@ class ObjectSettingsWriteMixin:
             # Read-only retry; a timed-out setter is never resent.
             return self._request(address, workspace_id=workspace).data
 
-    def _object_preflight(self, workspace: str, family: str, ids: dict[str, str], op: Any) -> None:
+    def _audio_level_limits(self, workspace: str, values: list[Any]) -> tuple[int | float, int | float]:
+        minimum = self._settings_raw(workspace, "audio/minVolume")
+        maximum = self._settings_raw(workspace, "audio/maxVolume")
+        return validate_audio_level_limits(minimum, maximum, values)
+
+    def _object_preflight(self, workspace: str, family: str, ids: dict[str, str], op: Any,
+                          *, audio_cue_output_count: int | None = None) -> None:
         if family == "general":
             return
         path = (
@@ -137,7 +144,8 @@ class ObjectSettingsWriteMixin:
             # Routing lists currently audible outputs; -inf can remove a valid output.
             # The exact crosspoint/mute/solo read validates that the output exists.
             if op.kind == "level":
-                count = self._settings_raw(workspace, path + "/cueOutputChannels")
+                count = (audio_cue_output_count if audio_cue_output_count is not None
+                         else self._settings_raw(workspace, path + "/cueOutputChannels"))
                 if not isinstance(count, int) or isinstance(count, bool) or not (0 <= op.input_channel <= count and 1 <= count <= 128):
                     raise ValueError("Input channel is outside known cue outputs")
         if family == "region":
@@ -191,6 +199,8 @@ class ObjectSettingsWriteMixin:
         planned = [{"operation": kind, "address": address, "args": args}]
         baseline: Any = None
         floor: int | float | None = None
+        minimum: int | float | None = None
+        maximum: int | float | None = None
         readiness: dict[str, Any] | None = None
         activity: dict[str, Any] | None = None
 
@@ -219,10 +229,10 @@ class ObjectSettingsWriteMixin:
             if not readiness.get("ok"):
                 return result("dry_run_preflight_failed" if dry else "preflight_failed", error=readiness.get("message"))
             self._object_preflight(workspace, family, ids, op)
+            if family == "audio" and kind == "level":
+                minimum, maximum = self._audio_level_limits(workspace, [wanted])
             if kind == "level" and wanted == "-inf":
-                floor = self._settings_raw(workspace, "audio/minVolume")
-                if isinstance(floor, bool) or not isinstance(floor, (int, float)) or not math.isfinite(floor):
-                    raise ValueError("Audio minimum volume cannot be verified")
+                floor = minimum
             baseline = read()
             activity = _activity_snapshot(self, workspace)
             if activity["active_count"]:
@@ -234,7 +244,8 @@ class ObjectSettingsWriteMixin:
         if _same(baseline, wanted, kind):
             return result("unchanged", readback=baseline)
         binding = {"workspace_id": workspace, "family": family, "ids": ids, "operation": op.model_dump(),
-                   "path": path, "baseline": baseline, "wanted": wanted, "audio_minimum": floor}
+                   "path": path, "baseline": baseline, "wanted": wanted, "audio_minimum": floor,
+                   "audio_limit_minimum": minimum, "audio_maximum": maximum}
         if dry:
             binding.update(expires_at=int(time.time()) + SETTINGS_TOKEN_TTL_SECONDS, nonce=secrets.token_urlsafe(12))
             return result("dry_run", token=encode_confirm_token(
@@ -251,8 +262,8 @@ class ObjectSettingsWriteMixin:
             ensure_write_ready(self, workspace)
             self._resolve_settings_workspace_uuid(workspace)
             self._object_preflight(workspace, family, ids, op)
-            if floor is not None and self._settings_raw(workspace, "audio/minVolume") != floor:
-                return result("preflight_failed", error="Audio minimum volume changed before mutation")
+            if minimum is not None and self._audio_level_limits(workspace, [wanted]) != (minimum, maximum):
+                return result("preflight_failed", error="Audio volume limits changed before mutation")
             fresh = read()
             if not _same(fresh, baseline, kind):
                 return result("preflight_failed", error="confirm_token baseline is stale")
@@ -317,6 +328,9 @@ class ObjectSettingsWriteMixin:
 
         baseline = []
         patch_dimensions = None
+        minimum = None
+        maximum = None
+        floor = None
         planned = [{"operation": entry["kind"], "address": entry["address"], "args": entry["args"]}
                    for entry in entries]
         readbacks = []
@@ -374,12 +388,17 @@ class ObjectSettingsWriteMixin:
                         or not 1 <= cue_output_count <= 128):
                     raise ValueError("Audio patch cue-output count is unavailable or invalid")
                 patch_dimensions = {"cue_output_channels": cue_output_count}
+                minimum, maximum = self._audio_level_limits(
+                    workspace, [entry["wanted"] for entry in entries if entry["kind"] == "level"]
+                )
+            self._object_preflight(workspace, "audio", ids, entries[0]["op"],
+                                   audio_cue_output_count=(patch_dimensions or {}).get("cue_output_channels"))
+            if any(entry["kind"] == "level" and entry["wanted"] == "-inf" for entry in entries):
+                floor = minimum
             for entry in entries:
-                self._object_preflight(workspace, "audio", ids, entry["op"])
+                if entry["kind"] == "level" and entry["op"].input_channel > patch_dimensions["cue_output_channels"]:
+                    raise ValueError("Input channel is outside known cue outputs")
                 if entry["kind"] == "level" and entry["wanted"] == "-inf":
-                    floor = self._settings_raw(workspace, "audio/minVolume")
-                    if isinstance(floor, bool) or not isinstance(floor, (int, float)) or not math.isfinite(floor):
-                        raise ValueError("Audio minimum volume cannot be verified")
                     entry["floor"] = floor
                 value = read(entry)
                 baseline.append({
@@ -401,7 +420,7 @@ class ObjectSettingsWriteMixin:
         binding = {
             "workspace_id": workspace, "family": "audio", "ids": ids,
             "operation": {"kind": "batch", "operations": operations}, "baseline": baseline,
-            "patch_dimensions": patch_dimensions,
+            "patch_dimensions": patch_dimensions, "audio_limit_minimum": minimum, "audio_maximum": maximum,
         }
         if dry:
             binding.update(expires_at=int(time.time()) + SETTINGS_TOKEN_TTL_SECONDS, nonce=secrets.token_urlsafe(12))
@@ -426,11 +445,14 @@ class ObjectSettingsWriteMixin:
                 )
                 if fresh_cue_output_count != patch_dimensions["cue_output_channels"]:
                     return result("preflight_failed", error="Audio patch dimensions changed before mutation")
+            if minimum is not None and self._audio_level_limits(
+                workspace, [entry["wanted"] for entry in entries if entry["kind"] == "level"]
+            ) != (minimum, maximum):
+                return result("preflight_failed", error="Audio volume limits changed before mutation")
+            self._object_preflight(workspace, "audio", ids, entries[0]["op"],
+                                   audio_cue_output_count=(patch_dimensions or {}).get("cue_output_channels"))
             fresh_baseline = []
             for entry in entries:
-                self._object_preflight(workspace, "audio", ids, entry["op"])
-                if "floor" in entry and self._settings_raw(workspace, "audio/minVolume") != entry["floor"]:
-                    return result("preflight_failed", error="Audio minimum volume changed before mutation")
                 fresh_baseline.append({
                     "operation": entry["kind"], "address": entry["address"], "value": read(entry),
                     **({"audio_minimum": entry["floor"]} if "floor" in entry else {}),

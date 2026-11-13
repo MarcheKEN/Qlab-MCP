@@ -364,6 +364,9 @@ _BLOCKED = {"setDefaultLevels": "Template default state cannot be read reliably.
             "parameterValue": "Device Definition parameter type/range metadata is unavailable.",
             "parameterFadeEnabled": "Device Definition fade capability metadata is unavailable."}
 
+_FADE_AUDIO_PENDING = {"patchTargetID", "levelsMode", "level", "sliderLevel", "doLevel",
+                       "inputChannelName", "gang", "doObjectIDLevel"}
+
 def capabilities(family, triggers=None, result=None):
     model = control._FAMILIES[family][1]
     max_operations = next((m.max_length for m in FAMILIES[family].model_fields['operations'].metadata
@@ -372,6 +375,8 @@ def capabilities(family, triggers=None, result=None):
     blocked = {key: reason for key, reason in _BLOCKED.items() if key in names}
     if family in {"audio", "mic"}:
         blocked.update({key: "Documented for Fade cues only." for key in names & {"doLevel", "doObjectIDLevel"}})
+    if family == "fade":
+        blocked.update({key: "Fade audio editing awaits QLab 5.5.10 reopen validation." for key in names & _FADE_AUDIO_PENDING})
     if triggers is None or type(triggers.fadeAndStopOthers) is not int:
         blocked["fadeAndStopOthers"] = "Scope readback must be an integer, not boolean."
     if family == 'midi':
@@ -384,14 +389,22 @@ def capabilities(family, triggers=None, result=None):
                    *(['Script source editing'] if family == 'script' else [])]
     conditional = ({key: "Requires a clean local workspace and exact input-device identity/capacity from passive CoreAudio metadata." for key in {"channels", "channelOffset"}}
                    if family == 'mic' else {})
+    property_capabilities = {
+        **{key: {"state": "pending_validation" if key in pending else "blocked" if key in blocked else "gated",
+                 "reason": blocked.get(key, "Signed confirmation, readable baseline and verified family dependencies required.")}
+           for key in sorted(names)},
+        **{key: {"state": "unavailable_via_osc", "reason": "No documented saved setter in this OSC phase."} for key in unavailable},
+    }
+    if family == "fade":
+        property_capabilities["targetMode"]["values"] = {
+            "0": {"state": "gated", "reason": "Cue-target mode remains available for validated visual targets."},
+            "1": {"state": "blocked", "reason": "Patch-target mode awaits Fade audio validation."},
+        }
     return control.control_applescript.trigger_capabilities({"tool": f"qlab_edit_{family}_cues", "allowed_properties": sorted(names - blocked.keys()),
             "blocked_properties": blocked, "requires_fresh_preflight": True,
             "conditional_properties": conditional,
             "gated_or_planned_properties": {key: "Requires signed dry run, readable baseline and family dependencies." for key in names - blocked.keys()},
-            "property_capabilities": {
-                **{key: {"state": "pending_validation" if key in pending else "blocked" if key in blocked else "gated",
-                          "reason": blocked.get(key, "Signed confirmation, readable baseline and verified family dependencies required.")} for key in sorted(names)},
-                **{key: {"state": "unavailable_via_osc", "reason": "No documented saved setter in this OSC phase."} for key in unavailable}},
+            "property_capabilities": property_capabilities,
             "max_cues": 50, "max_indexed_operations_per_cue": max_operations,
             "notes": ["All writes require signed five-minute single-use confirmations.",
                       "Basics, Triggers and supported family settings can share a sequential non-atomic batch.",
@@ -404,6 +417,9 @@ def normalize_item(item, family):
     props = item.properties.model_dump(by_alias=True, exclude_unset=True) if item.properties is not None else {}
     specs = {p.name: p for p in UPDATE_PROFILES[family + "_basic"].properties}
     requests = list(props.items()) + [(o.property, o.args.model_dump()) for o in item.operations]
+    if family == "fade" and any(key in _FADE_AUDIO_PENDING or (key == "targetMode" and value == 1)
+                                for key, value in requests):
+        raise ValueError("Fade audio editing awaits QLab 5.5.10 reopen validation.")
     normalized = []
     for key, value in requests:
         if key in TRIGGERS:

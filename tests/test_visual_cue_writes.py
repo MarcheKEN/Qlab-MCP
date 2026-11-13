@@ -349,6 +349,10 @@ def test_audio_crosspoint_quantization_and_bounds(reader):
     def request_osc(address,*args,**kwargs):
         if '/settings/audio/patchID/' in address:
             return SimpleNamespace(data={'uniqueID':patch,'cueOutputChannels':2})
+        if address.endswith('/settings/audio/minVolume'):
+            return SimpleNamespace(data=-60)
+        if address.endswith('/settings/audio/maxVolume'):
+            return SimpleNamespace(data=12)
         if address.endswith('/level/1/1') and args:
             reader.setters.append((START,'level/1/1',args))
             reader.values[START]['level/1/1']=args[0]+0.000048
@@ -359,6 +363,89 @@ def test_audio_crosspoint_quantization_and_bounds(reader):
     assert result['ok'] and len(reader.setters)==1
     bad=visual.edit_video_cues(reader,WS,[request(START,level={'inChannel':3,'outChannel':1,'decibel':0})],True)
     assert not bad['ok'] and len(reader.setters)==1
+
+
+@pytest.mark.parametrize("fn,uid", [(visual.edit_video_cues, START), (visual.edit_camera_cues, WAIT)])
+@pytest.mark.parametrize("value,minimum,maximum", [(-60, -60, 12), (-61, -60, 12), (1, -60, 0)])
+def test_video_audio_levels_respect_workspace_limits(reader, fn, uid, value, minimum, maximum):
+    from types import SimpleNamespace
+
+    patch = str(UUID(int=40)).upper()
+    reader.values[uid].update(numChannelsIn=2, audioOutputPatchID=patch, **{"level/1/1": 0})
+    reader.audio_limits = {"minimum": minimum, "maximum": maximum}
+    original = reader._request
+
+    def request_osc(address, *args, **kwargs):
+        if "/settings/audio/patchID/" in address:
+            return SimpleNamespace(data={"uniqueID": patch, "cueOutputChannels": 2})
+        if address.endswith("/settings/audio/minVolume"):
+            return SimpleNamespace(data=reader.audio_limits["minimum"])
+        if address.endswith("/settings/audio/maxVolume"):
+            return SimpleNamespace(data=reader.audio_limits["maximum"])
+        return original(address, *args, **kwargs)
+
+    reader._request = request_osc
+    result = fn(reader, WS, [request(uid, level={
+        "inChannel": 1, "outChannel": 1, "decibel": value,
+    })], True)
+    assert not result["ok"] and not reader.setters
+
+
+@pytest.mark.parametrize("fn,uid", [(visual.edit_video_cues, START), (visual.edit_camera_cues, WAIT)])
+@pytest.mark.parametrize("limit", ["minimum", "maximum"])
+def test_video_audio_limit_change_invalidates_confirmation(reader, fn, uid, limit):
+    from types import SimpleNamespace
+
+    patch = str(UUID(int=40)).upper()
+    reader.values[uid].update(numChannelsIn=2, audioOutputPatchID=patch, **{"level/1/1": 0})
+    reader.audio_limits = {"minimum": -60, "maximum": 12}
+    original = reader._request
+
+    def request_osc(address, *args, **kwargs):
+        if "/settings/audio/patchID/" in address:
+            return SimpleNamespace(data={"uniqueID": patch, "cueOutputChannels": 2})
+        if address.endswith("/settings/audio/minVolume"):
+            return SimpleNamespace(data=reader.audio_limits["minimum"])
+        if address.endswith("/settings/audio/maxVolume"):
+            return SimpleNamespace(data=reader.audio_limits["maximum"])
+        return original(address, *args, **kwargs)
+
+    reader._request = request_osc
+    item = request(uid, level={"inChannel": 1, "outChannel": 1, "decibel": -3})
+    plan = fn(reader, WS, [item], True)
+    assert plan["ok"] and not reader.setters
+    item["confirm_gates"] = [op["confirm_token"] for op in plan["results"][0]["planned_operations"]]
+    reader.audio_limits[limit] += 1
+    result = fn(reader, WS, [item], False)
+    assert not result["ok"] and not reader.setters
+
+
+def test_video_silence_readback_uses_verified_workspace_minimum(reader):
+    dependencies = {"audio_limits": {"minimum": -60, "maximum": 12}}
+    assert visual.matches("level", {"decibel": -60}, {"decibel": "-inf"}, dependencies, reader, WS, START)
+
+
+def test_indexed_visual_audio_level_uses_workspace_limits(reader):
+    from types import SimpleNamespace
+
+    patch = str(UUID(int=40)).upper()
+    reader.values[START].update(numChannelsIn=2, audioOutputPatchID=patch, **{"sliderLevel/1": 0})
+    original = reader._request
+
+    def request_osc(address, *args, **kwargs):
+        if "/settings/audio/patchID/" in address:
+            return SimpleNamespace(data={"uniqueID": patch, "cueOutputChannels": 2})
+        if address.endswith("/settings/audio/minVolume"):
+            return SimpleNamespace(data=-60)
+        if address.endswith("/settings/audio/maxVolume"):
+            return SimpleNamespace(data=0)
+        return original(address, *args, **kwargs)
+
+    reader._request = request_osc
+    result = visual.edit_video_cues(reader, WS, [{"cue_id": START, "operations": [
+        {"property": "sliderLevel", "args": {"channel": 1, "decibel": 1}}
+    ]}], True)
+    assert not result["ok"] and not reader.setters
 
 
 def test_content_verifies_inherited_format(reader):

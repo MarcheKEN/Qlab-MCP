@@ -455,16 +455,18 @@ def test_supported_containers(audio_backend, tmp_path, extension, codec):
     source = write_wave(tmp_path / "input.wav", 0.5 * np.sin(2 * np.pi * 1000 * np.arange(48000) / 48000))
     target = tmp_path / f"output.{extension}"
     extra_args = []
+    expected_channels = 1
     if codec == "libvorbis":
         encoders = subprocess.run([shutil.which("ffmpeg"), "-hide_banner", "-encoders"],
                                   capture_output=True, text=True, check=True).stdout
         if "libvorbis" not in encoders:
             codec = "vorbis"
-            extra_args = ["-strict", "experimental"]
+            extra_args = ["-strict", "experimental", "-ac", "2"]
+            expected_channels = 2
     subprocess.run([shutil.which("ffmpeg"), "-nostdin", "-v", "error", "-i", str(source),
                     "-c:a", codec, *extra_args, str(target)], check=True)
     result = analyze(audio_backend, target)
-    assert result.source.channels == 1
+    assert result.source.channels == expected_channels
     assert result.timeline.rows[5][5] > 0.95
 
 

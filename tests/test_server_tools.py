@@ -881,6 +881,8 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_edit_saved_cue_settings'] = {'title': 'Edi
  'input_schema_hash': '010b1d41eb8dfc676df3d46cc9bf504b44a0ba6dbc1a76beebde38f830aeed76',
  'output_schema_hash': '428675286213e7e62e173a0d31d7a7bcf57736a18337d096de203a17c18ee6f3'}
 EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_audio_cue_details']['output_schema_hash'] = '9d5015c0b75458a2f670fccc256764277f73cd29ba3e456e5365af968986e2d1'
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_fade_cue_details']['output_schema_hash'] = '50d33039ed93e76550cefb10acf89635fe1a15d6097968e61cf334e8ab5f8adc'
+EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_group_cue_details']['output_schema_hash'] = '11ef8e848a4de756cdb2f31e2dfaf0d5649b16a6d8355674bbad25b3d905577a'
 EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_light_cue_details']['output_schema_hash'] = '82a500c283de8d59c340418c5ca577f370896b5cd3046ed735e64288529b85b8'
 EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_mic_cue_details']['output_schema_hash'] = '00c376d463a2c182253302438636cbf963ce93ddd23e372c97aa279aff06ae38'
 EXPECTED_FASTMCP_TOOL_CONTRACTS['qlab_get_video_cue_details']['output_schema_hash'] = 'a6d657d71bbf0aa042b1ae22ae32a704ec5e83826c765aa4a93913a3ec179669'

@@ -380,6 +380,10 @@ def _reachable_cues(archive: Archive, kinds=("LightCue",)) -> tuple[dict[str, tu
             if "cues" not in value:
                 raise ValueError("Active Group cue has no supported child inventory.")
             pending.extend(archive.array(value["cues"]))
+            if kind in kinds:
+                cue_id = archive.ref(value.get("uniqueID"))
+                if isinstance(cue_id, str):
+                    matches.setdefault(cue_id.upper(), []).append((value, uid))
         elif kind in kinds:
             cue_id = archive.ref(value.get("uniqueID"))
             if isinstance(cue_id, str):

@@ -14,7 +14,7 @@ annotations, and result models.
 | `qlab_get_control_cues` | Scoped inventory of twelve control/organization types, optionally filtered by type | Carts, whole workspace or executing controls | [Control cues](agent-workflows.md#control-and-organization-cues) |
 | `qlab_get_control_cue_details` | Common OSC fields, Triggers, capabilities, targets and local AppleScript Load Time/Target assigned number | Executing actions, Audio Maps or patch expansion | [Control cues](agent-workflows.md#control-and-organization-cues) |
 | `qlab_get_fade_cues` | Scoped Fade inventory | Cue Carts or target expansion | [Remaining cues](agent-workflows.md#fade-network-midi-timecode-and-script-cues) |
-| `qlab_get_fade_cue_details` | Exact Fade target, mode and documented levels/geometry | Actions or unverified inherited fields | [Remaining cues](agent-workflows.md#fade-network-midi-timecode-and-script-cues) |
+| `qlab_get_fade_cue_details` | Exact Fade target, mode, documented levels/geometry and last-saved curve shapes | Curve edits, actions or unverified inherited fields | [Remaining cues](agent-workflows.md#fade-network-midi-timecode-and-script-cues) |
 | `qlab_get_network_cues` | Scoped Network inventory | Cue Carts or patch expansion | [Remaining cues](agent-workflows.md#fade-network-midi-timecode-and-script-cues) |
 | `qlab_get_network_cue_details` | Network patch, fade and parameter configuration | Sending messages; message text and errors require technical | [Remaining cues](agent-workflows.md#fade-network-midi-timecode-and-script-cues) |
 | `qlab_get_midi_cues` | Scoped MIDI and MIDI File inventory with type filter | Cue Carts | [Remaining cues](agent-workflows.md#fade-network-midi-timecode-and-script-cues) |
@@ -26,7 +26,7 @@ annotations, and result models.
 | `qlab_get_light_cues` | Scoped Light inventory | Carts or patch expansion | [Light/Group](agent-workflows.md#light-and-group-cues) |
 | `qlab_get_light_cue_details` | Command text, collate, subcontroller, state, timing and separately labelled saved curves/points | Executing commands or computing DMX | [Light/Group](agent-workflows.md#light-and-group-cues) |
 | `qlab_get_group_cues` | Scoped Group inventory | Lists/carts as Groups | [Light/Group](agent-workflows.md#light-and-group-cues) |
-| `qlab_get_group_cue_details` | Mode, Playlist and bounded children | Full descendant details | [Light/Group](agent-workflows.md#light-and-group-cues) |
+| `qlab_get_group_cue_details` | Mode, Playlist, last-saved Playlist curves and bounded children | Curve edits or full descendant details | [Light/Group](agent-workflows.md#light-and-group-cues) |
 | `qlab_get_video_cues` | Compact Video inventory within a required Cue List UUID | Carts, other lists or deep properties | [Visual cues](agent-workflows.md#video-text-and-camera-cues) |
 | `qlab_get_video_cue_details` | Exact Video cue geometry, timing, loops, audio and optional indexed FX selectors | Stage/patch expansion, live metrics or automatic FX scans | [Visual cues](agent-workflows.md#video-text-and-camera-cues) |
 | `qlab_get_text_cues` | Compact Text inventory within a required Cue List UUID | Carts, other lists or deep properties | [Visual cues](agent-workflows.md#video-text-and-camera-cues) |

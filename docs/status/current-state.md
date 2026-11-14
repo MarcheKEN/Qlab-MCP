@@ -708,6 +708,14 @@ updated schemas and executor.
 
 ## Group cue editing — validated in QLab 5.5.10
 
+Group and Fade detail reads include saved curve shapes with explicit freshness;
+the Fade trajectory selector is separate from shape type. On build 5510,
+S-Curve shapes were observed in a saved temporary workspace for a Fade and
+both Playlist sides. Synthetic tests cover the known shape codes, unknown codes,
+points, and Group containment; they do not establish native write safety.
+Playlist and Fade curve writes, Fade audio target/levels and Fade Video FX
+remain blocked or unavailable pending their own reopen and readback evidence.
+
 `qlab_edit_group_cues` reuses the existing guarded Group writer for typed Basics
 and single-property mode/Playlist edits. Group details expose mode-dependent
 capabilities. Automated tests cover strict mode values, schema and capabilities;

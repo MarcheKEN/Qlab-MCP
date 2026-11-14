@@ -1854,7 +1854,7 @@ def qlab_get_fade_cue_details(
 ) -> FadeCueDetailsResult:
     """Read one exact Fade cue. Inspect coverage and partial errors.
 
-    Returns target references and documented fade settings. Audio target matrices and Video target opacity are supported; other inherited properties remain unverified.
+    Returns target references and documented fade settings. Saved curve shapes are read-only and can be stale if the document is modified. Audio target matrices and Video target opacity are supported; other inherited properties remain unverified.
     References do not expand Workspace Settings. Optional inspections read requested scalar/indexed endpoints; no live or automatic indexed scans.
     Set include_native_triggers=true for fixed local Trigger reads; unavailable values block editing.
     """
@@ -2721,7 +2721,9 @@ def qlab_edit_fade_cues(
     updates: Annotated[list[FadeCueEditInput], Field(min_length=1, max_length=50)],
     dry_run: bool | None = None,
 ) -> UpdateCuesResult:
-    """Edit 1–50 exact Fade cue UUIDs: Basics, Triggers and exact cue target, completion behavior, geometry and Levels.
+    """Edit 1–50 exact Fade cue UUIDs: Basics, Triggers and supported target, completion and visual geometry settings.
+
+    Fade audio target and Levels writes remain blocked pending QLab reopen validation.
 
     Combine supported Basics, Triggers and saved settings. Optional typed operations
     select up to 50 indexed destinations per cue. Review the dry run and supply

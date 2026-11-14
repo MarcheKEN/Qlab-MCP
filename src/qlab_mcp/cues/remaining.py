@@ -11,6 +11,7 @@ from .family import ControlTriggers, Level, _fail
 from .list_models import CueListReadResult, FiniteNumber
 from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES, serialized_payload_bytes
 from ..sanitizer import sanitize_exception_message
+from ..saved_cue_settings import CurveSavedCueSettings, enrich_cue_details
 
 Byte = Annotated[StrictInt, Field(ge=0, le=127)]
 WideByte = Annotated[StrictInt, Field(ge=0, le=16383)]
@@ -115,6 +116,7 @@ class FadeCueDetailsResult(RemainingDetails):
     audio: FadeLevels | None = None
     geometry: FadeOpacity | None = None
     path: PathSize | None = None
+    saved_settings: CurveSavedCueSettings | None = None
 
 
 class NetworkSettings(BaseModel):
@@ -381,8 +383,9 @@ class RemainingCuesMixin:
         return MidiCueDetailsResult.model_validate(result.model_dump(mode="python")) if internal_model is _MidiIntermediateResult else result
 
     def get_fade_cue_details(self, workspace_id, cue_id, profile="safe", include_native_triggers=False):
-        return self._remaining_details(workspace_id, cue_id, profile, FadeCueDetailsResult, FadeCueSummary,
+        result = self._remaining_details(workspace_id, cue_id, profile, FadeCueDetailsResult, FadeCueSummary,
             {**COMMON, "fade": FadeSettings, "target": ControlTarget}, include_native_triggers=include_native_triggers)
+        return enrich_cue_details(self, result)
 
     def get_network_cue_details(self, workspace_id, cue_id, profile="safe", include_native_triggers=False):
         return self._remaining_details(workspace_id, cue_id, profile, NetworkCueDetailsResult, NetworkCueSummary,

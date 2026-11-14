@@ -18,6 +18,12 @@ and the [selection table](#tool-selection) below cover specialized choices.
 
 ## Light and Group cues
 
+Group details also expose the last-saved Playlist in/out curve shapes; Fade
+details expose the last-saved Fade shapes and trajectory type separately.
+`saved_settings.freshness` says whether unsaved workspace changes can make
+these values stale. Unknown curve fields or types produce partial results.
+These Group and Fade curve reads do not enable curve writes.
+
 See also [Control and organization cues](#control-and-organization-cues).
 
 Resolve workspace and Cue List UUIDs, then call `qlab_get_light_cues` or

@@ -69,6 +69,11 @@ class CueFileSettings(BaseModel):
     video_effects: list[dict[str, JsonValue]] = Field(default_factory=list)
 
 
+class CurveCueFileSettings(CueFileSettings):
+    fade_curve: dict[str, JsonValue] | None = None
+    playlist_curves: dict[str, JsonValue] | None = None
+
+
 class SavedCueSettings(BaseModel):
     status: Literal["ready", "partial", "unavailable", "changed_during_read", "unsupported_version", "cue_not_found"]
     source: Literal["saved_archive"] = "saved_archive"
@@ -80,6 +85,10 @@ class SavedCueSettings(BaseModel):
     settings: CueFileSettings = Field(default_factory=CueFileSettings)
     issues: list[StrictStr] = Field(default_factory=list)
     coverage: StrictStr = "Saved configuration only; no playback or physical output is verified."
+
+
+class CurveSavedCueSettings(SavedCueSettings):
+    settings: CurveCueFileSettings = Field(default_factory=CurveCueFileSettings)
 
 
 class SavedCueEditResult(BaseModel):
@@ -200,14 +209,15 @@ PublicSavedCueOperation = Annotated[SetHotkey | SetHotkeyEnabled | SetDays | Set
 PublicSavedCueOperations = Annotated[list[PublicSavedCueOperation], Field(min_length=1, max_length=50), AfterValidator(_point_budget)]
 
 
-def _archive(source):
+def _archive(source, *, include_fade=False):
     outer = Archive(source)
     meta = outer.mapping(outer.root)
     if outer.ref(meta.get("QLabShortVersionString")) != "5.5.10" or outer.ref(meta.get("QLabBuildNumber")) != 5510:
         raise ValueError("Saved cue settings require QLab 5.5.10/build 5510.")
     carrier = outer.ref(meta["cueLists"])
     inner = Archive(carrier["NS.data"])
-    cues, incoming = _reachable_cues(inner, ("LightCue", "VideoCue", "AudioCue", "MicCue"))
+    kinds = ("LightCue", "VideoCue", "AudioCue", "MicCue") + (("FadeCue", "GroupCue") if include_fade else ())
+    cues, incoming = _reachable_cues(inner, kinds)
     return outer, meta, carrier, inner, cues, incoming
 
 
@@ -228,9 +238,36 @@ def _hotkey(a, cue):
                 enabled=a.ref(cue.get("useHotKey")))
 
 
+def _saved_fade_curve(a, ref, issues, label):
+    try:
+        fade = a.ref(ref)
+        if a.kind(fade) != "Fade":
+            raise ValueError("Unknown Fade structure.")
+        shapes = a.ref(fade["shapes"])
+        if a.kind(shapes) != "FadeShapesFunction":
+            raise ValueError("Unknown Fade shape structure.")
+        trajectory = a.ref(fade.get("fadeType"))
+        curves = {side: _readable_curve_side(a, shapes, side) for side in ("up", "down")}
+        for side, curve in curves.items():
+            curve["status"] = "partial" if curve["issues"] else "available"
+            issues.extend(f"{label} {side} curve: {issue}" for issue in curve["issues"])
+        if type(trajectory) is not int or trajectory not in (1, 2):
+            issues.append(label + ": trajectory type is unavailable or unknown.")
+            trajectory = None
+        return dict(trajectory_type=trajectory, **curves)
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+        issues.append(label + ": " + str(exc))
+        return None
+
+
 def _settings(a, cue, *, include_audio_effects=True):
     result, issues = {}, []
     cue_kind = a.kind(cue)
+    if cue_kind == "FadeCue":
+        result["fade_curve"] = _saved_fade_curve(a, cue.get("fade"), issues, "Fade curve")
+    elif cue_kind == "GroupCue":
+        result["playlist_curves"] = {side: _saved_fade_curve(a, cue.get(key), issues, "Playlist " + side)
+                                     for side, key in (("in", "playlistInFade"), ("out", "playlistOutFade"))}
     if cue_kind in {"LightCue", "VideoCue"}:
         try:
             result["hotkey"] = _hotkey(a, cue)
@@ -433,7 +470,7 @@ def _inspect_cue(outer, meta, a, cues, cue_id, *, include_audio_effects=True):
 
 
 def inspect_saved_cue(source, cue_id, *, include_audio_effects=True):
-    outer, meta, _, a, cues, _ = _archive(source)
+    outer, meta, _, a, cues, _ = _archive(source, include_fade=True)
     return _inspect_cue(outer, meta, a, cues, cue_id, include_audio_effects=include_audio_effects)
 
 
@@ -573,7 +610,8 @@ def read_saved_cue_settings(reader, workspace_id, cue_id):
                           freshness="possibly_stale" if before["modified"] else "last_saved")
             if len(json.dumps(result, allow_nan=False).encode()) > 2*1024*1024:
                 raise ValueError("Saved cue settings exceed the 2 MiB limit.")
-        return SavedCueSettings.model_validate(result).model_dump(mode="json")
+        model = CurveSavedCueSettings if result.get("cue_type") in {"Fade", "Group"} else SavedCueSettings
+        return model.model_validate(result).model_dump(mode="json")
     except Exception as exc:
         return dict(status="unavailable", settings={}, issues=[sanitize_exception_message(exc)])
 
@@ -855,7 +893,8 @@ def _verify_live(reader, ws, summary):
 def enrich_cue_details(reader, result, max_bytes=None):
     if not result.identity:
         return result
-    result.saved_settings = SavedCueSettings.model_validate(read_saved_cue_settings(reader, result.workspace_id, result.cue_id))
+    model = CurveSavedCueSettings if result.identity.type in {"Fade", "Group"} else SavedCueSettings
+    result.saved_settings = model.model_validate(read_saved_cue_settings(reader, result.workspace_id, result.cue_id))
     result.edit_capabilities["saved_settings"] = dict(tool="qlab_edit_saved_cue_settings",
         requires_clean_document=True,
         **({"insert_video_effect_types": list(get_args(InsertEffect.model_fields["effect_type"].annotation))} if result.identity.type == "Video" else {}),

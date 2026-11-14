@@ -717,7 +717,12 @@ Playlist and Fade curve writes, Fade audio target/levels and Fade Video FX
 remain blocked or unavailable pending their own reopen and readback evidence.
 
 `qlab_edit_group_cues` reuses the existing guarded Group writer for typed Basics
-and single-property mode/Playlist edits. Group details expose mode-dependent
+and single-property mode/Playlist edits. Playlist crossfade duration uses a
+separate saved-archive transaction: QLab 5.5.10 OSC readback can match the
+requested duration while the saved curves and offset remain unchanged. A
+temporary copy with a custom curve, installed and missing plug-ins passed the
+archive transaction and reopen checks; unsupported structures remain blocked.
+Group details expose mode-dependent
 capabilities. Automated tests cover strict mode values, schema and capabilities;
 live MCP tests verified Flagged, Timeline→Playlist→Timeline and Playlist Loop
 off→on against Computer Use. All values and the original list/selection were

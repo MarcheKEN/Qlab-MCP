@@ -2491,6 +2491,10 @@ def qlab_edit_group_cues(
     snapshot, and are consumed once. Writes are sequential and non-atomic, with fresh readback,
     no rollback and no cue execution. Playhead navigation, current-cue selection,
     deprecated Playlist aliases and Cart cell movement remain excluded.
+
+    Playlist crossfade duration uses a separate saved-archive transaction. The
+    workspace must be saved and inactive; it is closed and reopened. Inspect
+    debug.archive_transaction for recovery details and obtain a fresh confirmation.
     """
     return _run_tool(lambda reader: UpdateCuesResult.model_validate(
         edit_group_cues(reader, str(workspace_id), updates, dry_run)))

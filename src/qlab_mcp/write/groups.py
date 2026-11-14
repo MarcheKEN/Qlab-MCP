@@ -118,6 +118,8 @@ def group_preflight(
 ) -> tuple[dict[str, str], list[str]]:
     operation = group_operation(item)
     property_name = operation.get("property") if operation else "group"
+    if property_name == "playlist/crossfade/duration":
+        return ({property_name: "Blocked: OSC does not reliably update crossfade curves; full curve verification is pending."}, [])
     if operation is None or not isinstance(before, dict):
         return ({property_name: "Group preflight is incomplete."}, [])
     source_error = _source_error(before, item)

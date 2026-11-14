@@ -1123,6 +1123,16 @@ single-use. Writes are sequential, non-atomic, freshly read back, and never
 rolled back automatically. No cue is executed. Playhead/current-cue navigation,
 deprecated Playlist aliases and Cart cell movement remain outside this tool.
 
+`playlist/crossfade/duration` uses a separate saved-archive transaction rather
+than OSC: QLab 5.5.10 can otherwise update the duration without adjusting its
+curves. The workspace must be saved, inactive, and in Edit Mode; the transaction
+closes and reopens it. Review a fresh dry run and pass its single confirmation
+token. It scales both fade durations and the offset proportionally, preserves
+curve data, and checks the archive plus native Group and children after reopen.
+Unknown curve structures, invalid timing, stale state, active cues and unsafe
+child durations are blocked. `debug.archive_transaction` reports recovery details;
+an inconclusive result is not a successful edit. Playback is not verified.
+
 ## Edit control cues
 
 Use `qlab_edit_control_cues(workspace_id, updates, dry_run)` for 1–50 mixed

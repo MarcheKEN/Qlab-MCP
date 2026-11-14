@@ -33,6 +33,35 @@ def test_group_action_requires_playlist(reader):
     result=edit_group_cues(reader,WS,[{'cue_id':START,'properties':{'secondTriggerAction':6}}],True)
     assert not result['ok'] and not reader.setters
 
+@pytest.mark.parametrize('dry_run', [True, False])
+def test_crossfade_duration_rejected_without_setter(reader, dry_run):
+    items = [{'cue_id': START, 'properties': {'playlist/crossfade/duration': 1.0},
+              'confirm_gates': ['confirm:controlCue:invalid']}]
+    result = edit_group_cues(reader, WS, items, dry_run)
+    assert not result['ok'] and not reader.setters
+
+def test_crossfade_duration_rejects_token_issued_before_block(reader, monkeypatch):
+    from qlab_mcp.write import groups
+    old_preflight = groups.group_preflight
+    def prior_preflight(reader, ws, item, before):
+        operation = item['operations'][0]
+        property_name, args = operation['property'], operation['args']
+        operation['property'], operation['args'] = 'playlist/doCrossfade', [True]
+        try:
+            return old_preflight(reader, ws, item, before)
+        finally:
+            operation['property'], operation['args'] = property_name, args
+    monkeypatch.setattr(groups, 'group_preflight', prior_preflight)
+    items = [{'cue_id': START, 'properties': {'playlist/crossfade/duration': 1.0}}]
+    from qlab_mcp.write.group import GroupCueEditInput
+    edit_group_cues(reader, WS, [{'cue_id': START, 'properties': {'mode': 3}}], True)
+    planned = control.edit_control_cues(reader, WS, [GroupCueEditInput.model_validate(items[0])], True, _family='group')
+    assert planned['ok'], planned
+    items[0]['confirm_gates'] = [op['confirm_token'] for op in planned['results'][0]['planned_operations']]
+    monkeypatch.setattr(groups, 'group_preflight', old_preflight)
+    result = edit_group_cues(reader, WS, items, False)
+    assert not result['ok'] and not reader.setters
+
 @pytest.mark.parametrize('profile,properties', [('script_basic',{'scriptSource':'bad'}),
     ('audio_basic',{'audioMapID':'map'}),('group_basic',{'playheadID':'x'})])
 def test_generic_token_cannot_enable_excluded_operation(profile,properties):

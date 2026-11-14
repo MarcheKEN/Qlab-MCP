@@ -18,6 +18,12 @@ and the [selection table](#tool-selection) below cover specialized choices.
 
 ## Light and Group cues
 
+Group details also expose the last-saved Playlist in/out curve shapes; Fade
+details expose the last-saved Fade shapes and trajectory type separately.
+`saved_settings.freshness` says whether unsaved workspace changes can make
+these values stale. Unknown curve fields or types produce partial results.
+These Group and Fade curve reads do not enable curve writes.
+
 See also [Control and organization cues](#control-and-organization-cues).
 
 Resolve workspace and Cue List UUIDs, then call `qlab_get_light_cues` or
@@ -50,14 +56,17 @@ Group reads Playlist only in Playlist mode. max_depth=2 (0..5) and max_cues=1000
 (1..5000) bound child summaries; depth zero reads no children. Inspect partial
 errors and contents.truncated; use each child's family tool for its full detail.
 
-## Saved Light and Video cue settings
+## Saved cue settings for Light, Video, Audio and Mic
 
 Batches accept up to 50 operations and 8192 replacement envelope points in total.
 
-Read `qlab_get_light_cue_details` or `qlab_get_video_cue_details` first. Their
-`saved_settings` section describes the last saved archive, with a hash, dirty flag,
-freshness and explicit issues. It never saves or closes a document. Current OSC
-properties remain separate when unsaved edits exist.
+Read the matching Light, Video, Audio or Mic cue details first. Their
+`saved_settings` section describes the last saved archive, with a hash, dirty
+flag, freshness and explicit issues. Current OSC properties remain separate
+when unsaved edits exist. Audio effects are preserved but are not exposed.
+Saved edits compare the existing effect data and references without interpreting
+plug-ins. An inconclusive comparison blocks the edit; saved-file verification
+does not establish that a plug-in or audio output works.
 
 `qlab_edit_saved_cue_settings` accepts one to 50 typed operations with exact cue
 UUIDs. Check readiness, preview with `dry_run=true`, inspect the diff, then execute
@@ -74,6 +83,8 @@ closes nor rewrites. Do not retry an uncertain execution automatically.
 | `select_audio_track` | Video `cue_id`, exact `track_id` returned in `audio.tracks`; `-1` selects automatically. Binds the current media identity and available tracks. |
 | `set_integrated_audio_fade` | Video `cue_id`, `type` (`custom` or `linear`), complete `points` list. Normalized `t` and `v` are 0–1; times strictly increase from 0 to 1. Endpoint levels may differ. Preserves `doFade` and `lockFadeToCue`. |
 | `insert_video_effect` | Video `cue_id`, `effect_type` (`LinearKey` or `DropShadow`), zero-based insertion `index`. Existing instances retain their order and settings. |
+
+Trim remains unsupported and is distinct from the media playback interval in `startTime`/`endTime`.
 
 Example preview, using real UUIDs obtained from discovery:
 
@@ -108,7 +119,7 @@ The ordinary Video editor accepts the special `audioOutputPatchID="ndi-output"`
 only with a clean saved stage/route/device dependency matched to current QLab.
 Save and obtain a new preview before further NDI channel edits. It checks the
 configured NDI audio channel count; it does not start playback or verify a signal.
-Objects, Audio Maps and Audio FX are outside this increment. Trim has no writer.
+Objects and Audio Maps are outside this increment. Trim has no writer.
 
 Light command compound values use the native parameter type and home-value
 prototype: RGB, CMY, HSI and Pan/Tilt identifiers, arity and 0–100 components must
@@ -232,7 +243,8 @@ Load and Target cue properties. Local imported OSC copy:
 | Map cue lists, groups, carts, and bounded structure | `qlab_get_workspace_overview` | Deep properties or operational status |
 | Read derived cue warnings, known Video Settings problems, and timecode context | `qlab_get_workspace_status` | A complete QLab Workspace Status clone |
 | Read documented General settings | `qlab_get_workspace_general_settings` | The complete General panel |
-| Read Audio settings or one exact output/input patch | `qlab_get_workspace_audio_settings` | Audio Maps or patch mutation |
+| Read workspace Audio settings and live volume limits | `qlab_get_workspace_audio_settings` | Audio Maps or patch mutation |
+| Read a patch with an optional live cell and paginated saved matrix/buses | `qlab_get_audio_patch` | Audio Maps, FX inspection, or proof a device is active |
 | Read Video inputs, stages, output routes, and saved configuration | `qlab_get_workspace_video_settings` | Detected-device inventory, capture, or proof of physical output |
 | Inspect one stage and its regions by UUID | `qlab_get_video_stage` | Name selection or mutation |
 | Inspect one output route and destination by UUID | `qlab_get_video_output_route` | Independent device inventory or mutation |
@@ -249,7 +261,9 @@ Load and Target cue properties. Local imported OSC copy:
 | Check write-mode preconditions without mutating | `qlab_check_write_readiness` | Confirmation or authorization by itself |
 | Create one to 100 ordered cues from templates | `qlab_create_cues` | Initial setters, playback, GO, or automatic rollback |
 | Edit saved properties and typed operations | Family-specific cue editors | Create, Move, Delete, playback, or raw OSC |
-| Edit one Workspace Settings property | `qlab_edit_workspace_general_settings`, `qlab_edit_audio_output_patch`, `qlab_edit_video_output_route`, `qlab_edit_video_stage`, `qlab_edit_video_region` | Audio Maps, `/live`, GO, or raw OSC |
+| Edit current Audio output values or saved input/output patch fields | `qlab_edit_audio_patch` | Audio Maps, FX, or routing-topology writes |
+| Duplicate, reorder or delete saved Audio patches, or edit `VolumeLimits` separately | `qlab_edit_workspace_audio_settings` | Blank patch creation, Audio Maps or FX |
+| Edit other Workspace Settings | `qlab_edit_workspace_general_settings`, `qlab_edit_video_output_route`, `qlab_edit_video_stage`, `qlab_edit_video_region` | `/live`, GO, or raw OSC |
 | Move existing cues structurally | `qlab_move_cues` | Playback or Cart writes not runtime-proven |
 | Delete leaves, empty a container, or explicitly remove a Group and descendants | `qlab_delete_cues` | Cue List/Cue Cart root deletion or automatic rollback |
 
@@ -357,7 +371,10 @@ For a crosspoint, supply both `input_channel` (0–24) and `output_channel`
 `coverage`; malformed secondary values produce partial results. Optional
 `inspections` read up to 50 requested scalar or indexed fields, including
 cue-owned Audio Objects. Audio Maps, live metrics and indexed effect exploration
-remain excluded. Generic discovery and detail reads remain available.
+remain excluded. Before an Audio Object write, the clean saved archive must
+confirm direct membership in that Audio or Mic cue and no Audio Map, duplicate
+cue or embedded-track owner; the OSC inventory and fresh property readback are
+checked separately. Generic discovery and detail reads remain available.
 
 ## Mic cues
 
@@ -373,7 +390,56 @@ not file metadata or Audio-only looping properties. Missing values stay unknown;
 malformed secondary fields produce partial results. Optional `inspections` read
 up to 50 requested fields, including cue-owned Audio Objects. Audio Maps, live
 metrics and indexed effects remain excluded. Full patch configuration belongs
-to `qlab_get_workspace_audio_settings`, not cue details.
+to `qlab_get_audio_patch`, not cue details.
+
+## Audio patches and effects
+
+`qlab_get_workspace_audio_settings` remains the workspace-level reader. Its
+`sources.live_osc.data` includes `min_volume` and `max_volume`.
+`qlab_get_audio_patch` returns current and saved patch data, including an
+optional live cell, paginated saved matrix, buses and freshness. It does not
+return `VolumeLimits`. If the workspace has unsaved changes, its saved view can
+be marked stale. Reads do not return
+`needs_save`; current values describe the open workspace and saved values may
+lag behind it.
+
+Compare the patch IDs and the actual names in the two sources. Some running
+MCP instances have reported `comparison.status="differs"` because QLab's
+display name includes the device and channel count while the saved name does
+not. For exact output-patch reads, `sources.live_osc.data.name_property` is the
+name to compare with the saved `name` when available. If an exact live name is
+unavailable, a decorated display name alone cannot establish a difference.
+The current reader implements this distinction. The corrected comparison was
+verified on the connected server after restart on November 13: an exact output
+name matched, while an input name without independent live evidence was marked
+`not_comparable`.
+
+`qlab_edit_audio_patch` covers two separate edit paths: current OSC-visible
+output controls, and saved input/output patch fields. Treat them as separate
+operations; one does not make the other atomic. Current OSC edits affect the
+open workspace and are not saved automatically. Call `qlab_save_workspace`
+separately when those changes should persist.
+
+Before a saved-file edit, `needs_save` signals prior unsaved workspace changes.
+Save them as a separate step, then obtain a fresh preview before the edit. A
+confirmed saved-file edit persists through the write/reopen transaction.
+`qlab_edit_workspace_audio_settings` handles saved-patch
+duplication, ordering and deletion, and can edit `VolumeLimits` in a separate
+operation. Creating a blank patch is not supported. The public patch editor can
+name cue outputs and buses; changing a bus's
+channel count is not supported. In QLab 5.5.10, native
+validation on a temporary copy set the minimum/maximum pairs `(-80, +6)`,
+`(-180, +60)` and `(-40, -30)` dB; each was saved, closed and reopened, then
+checked through OSC. A separate round-trip used `(-80.1, +6.1)` dB; both values
+matched OSC readback within 0.0001 dB.
+
+Numeric level edits use readable current workspace limits; explicit `-inf`
+remains available for silence. Edit `VolumeLimits` separately from those level
+changes, using `qlab_edit_workspace_audio_settings`. Audio FX chains remain
+opaque and preserved, but are not exposed for inspection or editing.
+Audio Maps are outside the read and write contract. None of these configuration
+operations proves playback, effect processing, device activation, or physical
+output.
 
 ## Video, Text and Camera cues
 
@@ -613,11 +679,11 @@ Consult each detail tool's edit capabilities and reasons before planning.
 
 ## Edit workspace settings
 
-Choose the Edit tool for the object: General settings, Audio output patch,
-Video output route, stage, or region. First read the current value with the
-matching Get. Supply exact workspace and object UUIDs, one typed operation,
-and `dry_run=true`. Review the current value and planned OSC setter, then
-submit the returned `confirm:workspaceSettings:v1:` token once.
+For General settings, Video output route, stage, or region, choose its
+matching Edit tool. Audio patch controls and saved-patch structure use the
+separate workflow above. First read the current value with the matching Get.
+For supported OSC edits, review the current value and planned setter, then
+submit the returned confirmation once.
 
 Each edit reads the exact OSC property and object identity, checks write
 readiness and `runningOrPausedCues`, and binds the token to the UUID, previous
@@ -635,24 +701,16 @@ coordinates: the QLab interface can show a different origin. Use
 there is no automatic matrix or point scan. Audio Maps, `/live`, undo/redo,
 and UI-only controls are excluded.
 
-For an Audio patch level, supply both channel selectors: `(0,0)` is Main,
-`(input,0)` is an input gain, `(0,output)` is an output gain, and positive
-indices select a crosspoint. Cue-output rows are 0–128; existing positive rows
-must fit the patch's current cue-output count. An exact readable cell is required
-before editing. Mute and solo still use positive device-output channels.
-A nonnumeric level must be the literal `-inf`.
-QLab 5.5.10 returns the configured minimum volume (`-60 dB` in the test
-workspace) after that setter; the result exposes the raw readback and warns
-that OSC cannot distinguish `-inf` from the same numeric floor. The token
-also binds the observed minimum volume.
-A numeric floor therefore does not skip a requested `-inf` setter; only an
-explicit `-inf` baseline proves that no change is needed. Region bounds
-readbacks must contain int32 coordinates. Control-point readings may contain
-finite decimals, preserved without rounding; requested point coordinates remain
-int32 integers within the OSC output area. Malformed values block token issuance
-or execution, and malformed post-write values are inconclusive.
-For patch renaming, use `detail.name_property` from the Audio Get as the exact
-OSC baseline; `detail.name` can include device information in QLab's display.
+For Audio edits, read the exact patch with `qlab_get_audio_patch` and keep the
+current OSC and saved archive values separate. Current OSC changes affect the
+open workspace; use `qlab_save_workspace` separately to persist them. Before a
+saved-file edit, `needs_save` signals prior unsaved changes; save them and get a
+fresh preview. A confirmed file edit persists after reopen. Edit `VolumeLimits` separately with
+`qlab_edit_workspace_audio_settings`; QLab 5.5.10 native round-trip validation
+is recorded in the Audio patches workflow above.
+Do not treat saved configuration as proof of physical routing, effect
+processing, or device availability. Audio Maps and Audio FX remain outside the
+supported surface.
 
 Good shape:
 
@@ -1287,9 +1345,13 @@ is metadata-only and does not start capture. System Input patches use the
 current macOS default input; explicit patches must match the CoreAudio device
 UID. If the workspace is dirty, the device is absent, or identity/capacity is
 ambiguous, the dry run stays blocked until the issue is resolved and a new plan
-is created. Typed FX operations require native index/type
+is created. Typed Video FX operations require native index/type
 proof and a complete fresh stack. Text formatting limits are described below.
-Audio FX and default/silent bulk levels remain pending. Stage/region edits use
+Audio effects are preserved but are not exposed by the MCP. Default/silent bulk levels remain pending. Trim remains unsupported:
+QLab reports it as non-automatable, and the 5.5.10 fixture contains `trimLevel`
+data that does not match the Trim control value, so no safe write mapping is
+verified. Audio cue `startTime`/`endTime` remain the media playback interval;
+they are not substitutes for Trim. Stage/region edits use
 Workspace Settings tools. Supported MIDI/Wall Clock configuration and guarded
 MIDI/Wall Clock/Timecode activation follow the separate
 [native Trigger workflow](#native-cue-triggers). Hotkey assignment/enabling,
@@ -1379,10 +1441,10 @@ returned −59.01564 for a Fade slider request of −59: the tool reported faile
 verification, retained the observed value and sent no retry. It was restored with
 a fresh confirmation. This low-level boundary is not declared exact/verified.
 
-For these family editors, Audio Maps, `/live`, playback, external signals, capture,
-Hotkey assignment/enabling, Trim, Audio FX and undocumented curves remain out
-of scope. Saved Hotkeys and weekdays have a separate guarded
-[`qlab_edit_saved_cue_settings`](#saved-light-and-video-cue-settings) workflow. Supported incoming
+For these family editors, Audio Maps, `/live`, playback, external signals,
+capture, Trim, AudioUnit insertion/parameter editing and undocumented curves
+remain out of scope. Saved Hotkeys and weekdays have a separate guarded
+[`qlab_edit_saved_cue_settings`](#saved-cue-settings-for-light-video-audio-and-mic) workflow. Supported incoming
 MIDI/Wall Clock configuration and guarded activation use the
 [native Trigger workflow](#native-cue-triggers); they do not send signals or run
 cues. The generic editor has been removed. See the

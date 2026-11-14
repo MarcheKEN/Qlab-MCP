@@ -8,8 +8,12 @@ import time
 from typing import Any
 from uuid import UUID
 
+from ..audio_limits import validate_audio_level_limits
 from ..errors import OscPreparationError, OscTimeoutError, QLabReplyError
-from ..models import WorkspaceSettingsEditResult
+from ..models import (
+    AudioOutputPatchBatchOperation,
+    WorkspaceSettingsEditResult,
+)
 from ..osc.addressing import _workspace_address
 from ..write.safety import check_write_readiness, ensure_write_ready, resolve_dry_run
 from ..write.timeouts import setter_reply_timeout
@@ -117,7 +121,13 @@ class ObjectSettingsWriteMixin:
             # Read-only retry; a timed-out setter is never resent.
             return self._request(address, workspace_id=workspace).data
 
-    def _object_preflight(self, workspace: str, family: str, ids: dict[str, str], op: Any) -> None:
+    def _audio_level_limits(self, workspace: str, values: list[Any]) -> tuple[int | float, int | float]:
+        minimum = self._settings_raw(workspace, "audio/minVolume")
+        maximum = self._settings_raw(workspace, "audio/maxVolume")
+        return validate_audio_level_limits(minimum, maximum, values)
+
+    def _object_preflight(self, workspace: str, family: str, ids: dict[str, str], op: Any,
+                          *, audio_cue_output_count: int | None = None) -> None:
         if family == "general":
             return
         path = (
@@ -134,7 +144,8 @@ class ObjectSettingsWriteMixin:
             # Routing lists currently audible outputs; -inf can remove a valid output.
             # The exact crosspoint/mute/solo read validates that the output exists.
             if op.kind == "level":
-                count = self._settings_raw(workspace, path + "/cueOutputChannels")
+                count = (audio_cue_output_count if audio_cue_output_count is not None
+                         else self._settings_raw(workspace, path + "/cueOutputChannels"))
                 if not isinstance(count, int) or isinstance(count, bool) or not (0 <= op.input_channel <= count and 1 <= count <= 128):
                     raise ValueError("Input channel is outside known cue outputs")
         if family == "region":
@@ -188,6 +199,8 @@ class ObjectSettingsWriteMixin:
         planned = [{"operation": kind, "address": address, "args": args}]
         baseline: Any = None
         floor: int | float | None = None
+        minimum: int | float | None = None
+        maximum: int | float | None = None
         readiness: dict[str, Any] | None = None
         activity: dict[str, Any] | None = None
 
@@ -216,10 +229,10 @@ class ObjectSettingsWriteMixin:
             if not readiness.get("ok"):
                 return result("dry_run_preflight_failed" if dry else "preflight_failed", error=readiness.get("message"))
             self._object_preflight(workspace, family, ids, op)
+            if family == "audio" and kind == "level":
+                minimum, maximum = self._audio_level_limits(workspace, [wanted])
             if kind == "level" and wanted == "-inf":
-                floor = self._settings_raw(workspace, "audio/minVolume")
-                if isinstance(floor, bool) or not isinstance(floor, (int, float)) or not math.isfinite(floor):
-                    raise ValueError("Audio minimum volume cannot be verified")
+                floor = minimum
             baseline = read()
             activity = _activity_snapshot(self, workspace)
             if activity["active_count"]:
@@ -231,7 +244,8 @@ class ObjectSettingsWriteMixin:
         if _same(baseline, wanted, kind):
             return result("unchanged", readback=baseline)
         binding = {"workspace_id": workspace, "family": family, "ids": ids, "operation": op.model_dump(),
-                   "path": path, "baseline": baseline, "wanted": wanted, "audio_minimum": floor}
+                   "path": path, "baseline": baseline, "wanted": wanted, "audio_minimum": floor,
+                   "audio_limit_minimum": minimum, "audio_maximum": maximum}
         if dry:
             binding.update(expires_at=int(time.time()) + SETTINGS_TOKEN_TTL_SECONDS, nonce=secrets.token_urlsafe(12))
             return result("dry_run", token=encode_confirm_token(
@@ -248,8 +262,8 @@ class ObjectSettingsWriteMixin:
             ensure_write_ready(self, workspace)
             self._resolve_settings_workspace_uuid(workspace)
             self._object_preflight(workspace, family, ids, op)
-            if floor is not None and self._settings_raw(workspace, "audio/minVolume") != floor:
-                return result("preflight_failed", error="Audio minimum volume changed before mutation")
+            if minimum is not None and self._audio_level_limits(workspace, [wanted]) != (minimum, maximum):
+                return result("preflight_failed", error="Audio volume limits changed before mutation")
             fresh = read()
             if not _same(fresh, baseline, kind):
                 return result("preflight_failed", error="confirm_token baseline is stale")
@@ -292,3 +306,216 @@ class ObjectSettingsWriteMixin:
                           executed=executed, retry_unsafe=timeout)
         return result("verification_failed", readback=observed, executed=executed,
                       error=f"Fresh readback differs; setter: {setter_error}", retry_unsafe=True)
+
+    def edit_audio_patch_batch(
+        self, workspace_id: str, patch_id: str, batch: AudioOutputPatchBatchOperation,
+        dry_run: bool | None, confirm_token: str | None,
+    ) -> WorkspaceSettingsEditResult:
+        workspace = str(workspace_id)
+        ids = {"patch_id": _uuid(patch_id)}
+        dry = resolve_dry_run(self, dry_run)
+        operations = [op.model_dump(exclude_none=True) for op in batch.operations]
+        entries = []
+        for op in batch.operations:
+            kind, path, args, wanted = _operation("audio", ids, op)
+            if kind not in {"level", "mute", "solo"}:
+                raise ValueError("Audio patch batches accept only level, mute, and solo operations.")
+            entries.append({
+                "op": op, "kind": kind, "path": path,
+                "address": _workspace_address(workspace, "settings/" + path),
+                "args": args, "wanted": wanted,
+            })
+
+        baseline = []
+        patch_dimensions = None
+        minimum = None
+        maximum = None
+        floor = None
+        planned = [{"operation": entry["kind"], "address": entry["address"], "args": entry["args"]}
+                   for entry in entries]
+        readbacks = []
+        executed = []
+        readiness: dict[str, Any] | None = None
+        activity: dict[str, Any] | None = None
+        timed_out = False
+
+        def result(status: str, *, token: str | None = None, error: str | None = None,
+                   retry_unsafe: bool = False) -> WorkspaceSettingsEditResult:
+            readback_complete = len(readbacks) == len(entries)
+            observed_match = all(
+                _same(value["value"], entries[index]["wanted"], entries[index]["kind"], entries[index].get("floor"))
+                for index, value in enumerate(readbacks)
+            )
+            matched = False if not observed_match else True if readback_complete else None
+            return WorkspaceSettingsEditResult(
+                ok=status in {"dry_run", "unchanged", "updated", "updated_with_confirmed_timeouts"},
+                status=status, workspace_id=workspace, operation="batch", dry_run=dry,
+                requested_value=operations, baseline=baseline, readback=readbacks,
+                planned_operations=planned, executed_operations=executed, confirm_token=token,
+                readiness=readiness, activity=activity,
+                verification={"matched": matched,
+                              "readback_available": readback_complete} if readbacks else None,
+                retry_unsafe=retry_unsafe, errors={"write": error} if error else None,
+                warnings=(
+                    ["QLab reads -inf as the configured audio minimum; the OSC value cannot distinguish both states."]
+                    if any(entry["kind"] == "level" and entry["wanted"] == "-inf" for entry in entries) else []
+                ),
+                message=status,
+            )
+
+        def read(entry: dict[str, Any]) -> Any:
+            return _value(self._settings_raw(workspace, entry["path"]), entry["kind"])
+
+        def unchanged(value: Any, entry: dict[str, Any]) -> bool:
+            if entry["kind"] == "level" and entry["wanted"] == "-inf":
+                # A numeric floor readback cannot establish that QLab stored -inf.
+                return value == "-inf"
+            return _same(value, entry["wanted"], entry["kind"], entry.get("floor"))
+
+        try:
+            workspace = self._resolve_settings_workspace_uuid(workspace)
+            for entry, planned_entry in zip(entries, planned, strict=True):
+                entry["address"] = _workspace_address(workspace, "settings/" + entry["path"])
+                planned_entry["address"] = entry["address"]
+            readiness = check_write_readiness(self, workspace)
+            if not readiness.get("ok"):
+                return result("dry_run_preflight_failed" if dry else "preflight_failed", error=readiness.get("message"))
+            if any(entry["kind"] == "level" for entry in entries):
+                cue_output_count = self._settings_raw(
+                    workspace, f"audio/patchID/{ids['patch_id']}/cueOutputChannels",
+                )
+                if (not isinstance(cue_output_count, int) or isinstance(cue_output_count, bool)
+                        or not 1 <= cue_output_count <= 128):
+                    raise ValueError("Audio patch cue-output count is unavailable or invalid")
+                patch_dimensions = {"cue_output_channels": cue_output_count}
+                minimum, maximum = self._audio_level_limits(
+                    workspace, [entry["wanted"] for entry in entries if entry["kind"] == "level"]
+                )
+            self._object_preflight(workspace, "audio", ids, entries[0]["op"],
+                                   audio_cue_output_count=(patch_dimensions or {}).get("cue_output_channels"))
+            if any(entry["kind"] == "level" and entry["wanted"] == "-inf" for entry in entries):
+                floor = minimum
+            for entry in entries:
+                if entry["kind"] == "level" and entry["op"].input_channel > patch_dimensions["cue_output_channels"]:
+                    raise ValueError("Input channel is outside known cue outputs")
+                if entry["kind"] == "level" and entry["wanted"] == "-inf":
+                    entry["floor"] = floor
+                value = read(entry)
+                baseline.append({
+                    "operation": entry["kind"], "address": entry["address"], "value": value,
+                    **({"audio_minimum": entry["floor"]} if "floor" in entry else {}),
+                })
+            activity = _activity_snapshot(self, workspace)
+            if activity["active_count"]:
+                raise ValueError("Workspace has running or paused cues")
+        except Exception as exc:
+            return result("dry_run_preflight_failed" if dry else "preflight_failed", error=str(exc))
+
+        if all(unchanged(base["value"], entry)
+               for base, entry in zip(baseline, entries, strict=True)):
+            readbacks.extend({"operation": base["operation"], "address": base["address"], "value": base["value"]}
+                             for base in baseline)
+            return result("unchanged")
+
+        binding = {
+            "workspace_id": workspace, "family": "audio", "ids": ids,
+            "operation": {"kind": "batch", "operations": operations}, "baseline": baseline,
+            "patch_dimensions": patch_dimensions, "audio_limit_minimum": minimum, "audio_maximum": maximum,
+        }
+        if dry:
+            binding.update(expires_at=int(time.time()) + SETTINGS_TOKEN_TTL_SECONDS, nonce=secrets.token_urlsafe(12))
+            return result("dry_run", token=encode_confirm_token(
+                SETTINGS_TOKEN_FAMILY, SETTINGS_TOKEN_VERSION, binding, _SETTINGS_TOKEN_SECRET,
+            ))
+
+        payload, error = decode_confirm_token(
+            confirm_token or "", SETTINGS_TOKEN_FAMILY, SETTINGS_TOKEN_VERSION, _SETTINGS_TOKEN_SECRET,
+        )
+        if error or not isinstance(payload, dict) or payload.get("expires_at", 0) < int(time.time()) or any(
+            payload.get(key) != value for key, value in binding.items()
+        ):
+            return result("preflight_failed", error="confirm_token invalid, expired, or bound to another value")
+
+        try:
+            ensure_write_ready(self, workspace)
+            self._resolve_settings_workspace_uuid(workspace)
+            if patch_dimensions is not None:
+                fresh_cue_output_count = self._settings_raw(
+                    workspace, f"audio/patchID/{ids['patch_id']}/cueOutputChannels",
+                )
+                if fresh_cue_output_count != patch_dimensions["cue_output_channels"]:
+                    return result("preflight_failed", error="Audio patch dimensions changed before mutation")
+            if minimum is not None and self._audio_level_limits(
+                workspace, [entry["wanted"] for entry in entries if entry["kind"] == "level"]
+            ) != (minimum, maximum):
+                return result("preflight_failed", error="Audio volume limits changed before mutation")
+            self._object_preflight(workspace, "audio", ids, entries[0]["op"],
+                                   audio_cue_output_count=(patch_dimensions or {}).get("cue_output_channels"))
+            fresh_baseline = []
+            for entry in entries:
+                fresh_baseline.append({
+                    "operation": entry["kind"], "address": entry["address"], "value": read(entry),
+                    **({"audio_minimum": entry["floor"]} if "floor" in entry else {}),
+                })
+            if fresh_baseline != baseline:
+                return result("preflight_failed", error="confirm_token baseline is stale")
+            activity = _activity_snapshot(self, workspace)
+            if activity["active_count"]:
+                return result("preflight_failed", error="Workspace activity changed before mutation")
+            replay = _consume_settings_token(confirm_token or "", payload)
+            if replay:
+                return result("preflight_failed", error=replay)
+        except Exception as exc:
+            return result("preflight_failed", error=str(exc))
+
+        for entry, base in zip(entries, baseline, strict=True):
+            if unchanged(base["value"], entry):
+                executed.append({"operation": entry["kind"], "address": entry["address"], "args": entry["args"],
+                                 "status": "unchanged"})
+                readbacks.append({"operation": entry["kind"], "address": entry["address"], "value": base["value"]})
+                continue
+            item = {"operation": entry["kind"], "address": entry["address"], "args": entry["args"]}
+            executed.append(item)
+            setter_error = None
+            timeout = False
+            try:
+                reply = self._request(entry["address"], *entry["args"], workspace_id=workspace,
+                                      request_timeout=setter_reply_timeout(self, 1),
+                                      ensure_always_reply=True, allow_empty_data=True)
+                if getattr(reply, "status", "ok") != "ok":
+                    raise QLabReplyError(reply.status, reply.data, entry["address"])
+                item["status"] = "ok"
+            except OscPreparationError as exc:
+                item["status"] = "preparation_failed"
+                partial = any(
+                    item.get("status") in {"ok", "confirmed_after_timeout", "confirmed_after_error"}
+                    for item in executed[:-1]
+                )
+                return result("verification_failed" if partial else "preflight_failed",
+                              retry_unsafe=partial, error=str(exc))
+            except OscTimeoutError as exc:
+                timeout = timed_out = True
+                setter_error = str(exc)
+                item["status"] = "timeout_pending_verification"
+            except Exception as exc:
+                setter_error = str(exc)
+                item["status"] = "error_pending_verification"
+            if hasattr(self, "_read_cache"):
+                self._read_cache.clear()
+            try:
+                observed = read(entry)
+            except Exception as exc:
+                return result("verification_inconclusive", retry_unsafe=True,
+                              error=f"Fresh readback unavailable: {exc}; setter: {setter_error}")
+            readbacks.append({"operation": entry["kind"], "address": entry["address"], "value": observed})
+            if not _same(observed, entry["wanted"], entry["kind"], entry.get("floor")):
+                item["status"] = "verification_failed"
+                return result("verification_failed", retry_unsafe=True,
+                              error=f"Fresh readback differs; setter: {setter_error}")
+            if timeout:
+                item["status"] = "confirmed_after_timeout"
+            elif setter_error:
+                item["status"] = "confirmed_after_error"
+
+        status = "updated_with_confirmed_timeouts" if timed_out else "updated"
+        return result(status, retry_unsafe=timed_out)

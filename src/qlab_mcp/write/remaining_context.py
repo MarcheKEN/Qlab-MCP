@@ -6,6 +6,7 @@ import os
 import re
 import struct
 
+from ..audio_limits import validate_audio_level_limits
 from . import control
 from .remaining import COMMON, _depend, _finite, _fingerprint, _raw, _reference, _time_seconds, _scalar, read
 
@@ -190,6 +191,17 @@ def validate(reader, ws, uid, family, operations, before):
         if type(channels) is not int or channels < 0 or type(outputs) is not int or outputs < 1:
             raise ValueError('Audio channel bounds are unavailable.')
         deps['routes'][detail_route] = {k: detail[k] for k in detail}  # exact patch snapshot
+        value_ops = [o for o in level_ops if o['property'] in {'level', 'sliderLevel', 'objectIDLevel', 'setSilentLevels'}]
+        if value_ops:
+            requested_levels = [o.get('arg_values', {}).get('decibel') for o in value_ops
+                                if o['property'] in {'level', 'sliderLevel', 'objectIDLevel'}]
+            minimum = _raw(reader, ws, 'settings/audio/minVolume')
+            maximum = _raw(reader, ws, 'settings/audio/maxVolume')
+            validate_audio_level_limits(minimum, maximum, requested_levels)
+            deps['routes']['settings/audio/minVolume'] = minimum
+            deps['routes']['settings/audio/maxVolume'] = maximum
+            deps['audio_minimum'] = minimum
+            deps['audio_maximum'] = maximum
         for op in level_ops:
             args = op.get('arg_values', {})
             row = args.get('inChannel', args.get('row', args.get('number', 0)))
@@ -210,17 +222,7 @@ def validate(reader, ws, uid, family, operations, before):
                 matrix = op['baseline']
                 if not isinstance(matrix, list) or len(matrix) != channels + 1 or not matrix or not isinstance(matrix[0], list) or not outputs + 1 <= len(matrix[0]) <= 129 or any(not isinstance(row, list) or len(row) != len(matrix[0]) or not all(_finite(v) for v in row) for row in matrix):
                     raise ValueError('Complete Levels snapshot unavailable.')
-                minimum = _raw(reader, ws, 'settings/audio/minVolume')
-                if not _finite(minimum):
-                    raise ValueError('Workspace audio minimum is unavailable.')
-                deps['routes']['settings/audio/minVolume'] = minimum
                 op['requested'] = [[minimum for _ in row] for row in matrix]
-        if any(o['requested'] == '-inf' for o in level_ops):
-            minimum = _raw(reader, ws, 'settings/audio/minVolume')
-            if not _finite(minimum):
-                raise ValueError('Workspace audio minimum is unavailable.')
-            deps['routes']['settings/audio/minVolume'] = minimum
-            deps['audio_minimum'] = minimum
         if names & {'mute/clear', 'solo/clear', 'mute/channel/clear', 'solo/channel/clear', 'setSilentLevels'} and len(level_ops) > 1:
             raise ValueError('Separate bulk cleanups from individual Levels operations.')
     objects = [o for o in operations if 'objectID' in o.get('arg_values', {})]
@@ -242,6 +244,8 @@ def validate(reader, ws, uid, family, operations, before):
         for object_id in object_ids:
             if not isinstance(object_id, str) or not any(str(x.get('uniqueID', x.get('id', ''))).casefold() == object_id.casefold() for x in entries):
                 raise ValueError('Object UUID is absent from the cue-owned inventory.')
+        from ..saved_cue_settings import read_saved_cue_object_ownership
+        deps['saved_object_ownership'] = read_saved_cue_object_ownership(reader, ws, uid, object_ids)
         # The inventory can contain fields being edited. Store only identity/ownership.
         deps['routes'].pop(f'cue_id/{uid}/objects')
         deps['object_ids'] = sorted(str(x.get('uniqueID', x.get('id', ''))).upper() for x in entries)
@@ -341,6 +345,8 @@ def _fade(reader, ws, uid, changes, deps, operations):
             if cue.upper() == uid:
                 raise ValueError('A Fade cannot target itself.')
             _fade_cue_target(reader, ws, uid, cue, deps)
+        elif target['cueTargetID']:
+            _fade_cue_target(reader, ws, uid, target['cueTargetID'], deps)
         if target['targetMode'] != 0:
             raise ValueError('Set targetMode=0 separately before assigning a cue target.')
     if 'patchTargetID' in names:
@@ -395,6 +401,8 @@ def _fade(reader, ws, uid, changes, deps, operations):
     context = _depend(reader, ws, destination, ['type', 'isBroken', 'isWarning', 'isRunning', 'isPaused'], deps)
     if any(context[k] is not False for k in ('isBroken', 'isWarning', 'isRunning', 'isPaused')):
         raise ValueError('Fade target health/inactivity is unavailable.')
+    if context['type'] == 'Audio' and fields & {'rate', 'doRate'}:
+        raise ValueError('Fade rate controls on Audio targets await QLab 5.5.10 reopen validation.')
     geometry = {'geoMode', 'fadeType', 'pathHeight', 'pathWidth', 'rotation', 'rotationType', 'doOpacity', 'doRotation', 'doScale', 'doTranslation', 'opacity', 'translation/x', 'translation/y', 'scale/x', 'scale/y', 'quaternion'}
     if fields & geometry and context['type'] not in {'Video', 'Camera', 'Text'}:
         raise ValueError('Fade geometry requires a visual target.')
@@ -453,6 +461,8 @@ def _fade_cue_target(reader, ws, uid, destination, deps):
     if destination.upper() == uid:
         raise ValueError('A Fade cannot target itself.')
     context = _depend(reader, ws, destination.upper(), ['type', 'isRunning', 'isPaused', 'isBroken', 'isWarning'], deps)
+    if context['type'] in {'Audio', 'Mic'}:
+        raise ValueError('Fade audio targets await QLab 5.5.10 reopen validation.')
     if any(context[k] is not False for k in ('isRunning', 'isPaused', 'isBroken', 'isWarning')):
         raise ValueError('New Fade target must be healthy and inactive.')
     active = _depend(reader, ws, uid, ['doOpacity', 'doRate', 'doRotation', 'doScale', 'doTranslation', 'doLevel'], deps)
@@ -465,8 +475,8 @@ def _fade_cue_target(reader, ws, uid, destination, deps):
     matrix = active['doLevel']
     if not isinstance(matrix, list) or any(not isinstance(row, list) or any(type(v) is not bool for v in row) for row in matrix):
         raise ValueError('Fade activation matrix is unavailable.')
-    if any(value is True for row in matrix for value in row) and context['type'] not in {'Audio', 'Mic', 'Video', 'Camera'}:
-        raise ValueError('Active Fade Levels require an audio-capable target.')
+    if any(value is True for row in matrix for value in row):
+        raise ValueError('Changing a Fade target with active audio levels awaits QLab 5.5.10 reopen validation.')
 
 
 def _midi(reader, ws, uid, changes, deps):

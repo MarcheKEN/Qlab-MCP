@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, AfterValidator, StrictBool, StrictInt, StrictStr, model_validator, create_model
 
+from ..audio_limits import validate_audio_level_limits
 from . import control
 from . import video_fx
 from .text_format import TextFormatOperation
@@ -602,7 +603,8 @@ def preflight(reader, ws, item, family):
         dependencies["trim"] = {"startTime": control._scalar(reader, ws, uid, "startTime"), "endTime": control._scalar(reader, ws, uid, "endTime")}
 
     audio_keys = {"level", "sliderLevel", "mute/channel", "solo/channel", "mute/channel/clear", "solo/channel/clear", "inputChannelName", "gang"}
-    if audio_keys & changes.keys():
+    audio_level_ops = [op for op in operations if op["path"].startswith(("level/", "sliderLevel/"))]
+    if audio_keys & changes.keys() or audio_level_ops:
         channels = control._scalar(reader, ws, uid, "numChannelsIn")
         patch_id = changes.get("audioOutputPatchID", control._scalar(reader, ws, uid, "audioOutputPatchID"))
         if type(channels) is not int or channels < 1 or not patch_id:
@@ -617,6 +619,10 @@ def preflight(reader, ws, item, family):
         outputs = patch.get("cueOutputChannels")
         if type(outputs) is not int or outputs < 1:
             raise ValueError("Audio output channel bounds are unavailable.")
+        for op in audio_level_ops:
+            selected = op["arg_values"]
+            if selected["inChannel"] > channels or selected["outChannel"] > outputs:
+                raise ValueError("Audio channel is outside the cue/patch bounds.")
         for key in audio_keys & changes.keys():
             selected = changes[key] if isinstance(changes[key], dict) else {}
             if selected.get("number", 0) > channels:
@@ -624,6 +630,16 @@ def preflight(reader, ws, item, family):
             if selected.get("inChannel", 0) > channels or selected.get("outChannel", selected.get("channel", selected.get("output", 0))) > outputs:
                 raise ValueError("Audio channel is outside the cue/patch bounds.")
         dependencies["audio_bounds"] = {"numChannelsIn": channels, "patch_id": patch_id, "outputs": outputs}
+        if audio_level_ops:
+            limits = dependencies.get("audio_limits")
+            if not isinstance(limits, dict):
+                limits = {
+                    "minimum": reader._request(_workspace_address(ws, "settings/audio/minVolume"), workspace_id=ws).data,
+                    "maximum": reader._request(_workspace_address(ws, "settings/audio/maxVolume"), workspace_id=ws).data,
+                }
+            minimum, maximum = limits["minimum"], limits["maximum"]
+            validate_audio_level_limits(minimum, maximum, [op["arg_values"].get("decibel") for op in audio_level_ops])
+            dependencies["audio_limits"] = limits
     if family == "camera" and {"channels", "channelOffset"} & changes.keys():
         if "audioInputPatchID" in changes:
             raise ValueError("Assign the input patch first, then preview channel settings.")
@@ -692,6 +708,11 @@ def check_dependencies(reader, ws, uid, dependencies):
                 patch = reader._request(_workspace_address(ws, f"settings/audio/patchID/{expected['patch_id']}"), workspace_id=ws).data
             if control._scalar(reader, ws, uid, "audioOutputPatchID") != expected["patch_id"] or control._scalar(reader, ws, uid, "numChannelsIn") != expected["numChannelsIn"] or not isinstance(patch, dict) or str(patch.get("uniqueID", "")).casefold() != expected["patch_id"].casefold() or patch.get("cueOutputChannels") != expected["outputs"]:
                 raise ValueError("Audio channel bounds changed before setter.")
+        elif route == "audio_limits":
+            minimum = reader._request(_workspace_address(ws, "settings/audio/minVolume"), workspace_id=ws).data
+            maximum = reader._request(_workspace_address(ws, "settings/audio/maxVolume"), workspace_id=ws).data
+            if (minimum, maximum) != (expected["minimum"], expected["maximum"]):
+                raise ValueError("Workspace audio volume limits changed before setter.")
         elif route == "input_channel_capacity":
             from .input_channels import snapshot as input_channel_snapshot
             if (control._scalar(reader, ws, uid, "audioInputPatchID") != expected["patch_id"]
@@ -788,6 +809,10 @@ def matches(key, observed, requested, dependencies, reader=None, ws=None, uid=No
     if key in {"level", "sliderLevel"}:
         import math
         actual, wanted = observed.get("decibel"), requested["decibel"]
+        if wanted == "-inf" and type(actual) in (int, float):
+            minimum = dependencies.get("audio_limits", {}).get("minimum")
+            return (type(minimum) in (int, float) and math.isfinite(actual)
+                    and math.isclose(actual, minimum, abs_tol=1e-3))
         if type(actual) in (int, float) and type(wanted) in (int, float):
             return math.isfinite(actual) and math.isclose(actual, wanted, abs_tol=1e-3)
     matched = control._same(observed, requested)

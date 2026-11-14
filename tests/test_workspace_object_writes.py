@@ -5,11 +5,12 @@ from types import SimpleNamespace
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from qlab_mcp.errors import OscTimeoutError
+from qlab_mcp.errors import OscPreparationError, OscTimeoutError
 from qlab_mcp.models import (
-    AudioLevelOperation, VideoBoundsOperation, VideoComponentOperation,
+    AudioBoolOperation, AudioLevelOperation, VideoBoundsOperation, VideoComponentOperation,
     VideoRouteGuidesOperation, SettingNameOperation,
-    AudioOutputPatchOperation, VideoRegionOperation, VideoRouteOperation,
+    AudioOutputPatchBatchOperation, AudioOutputPatchOperation,
+    VideoRegionOperation, VideoRouteOperation,
 )
 from qlab_mcp.settings import object_writes
 from qlab_mcp.settings.object_writes import ObjectSettingsWriteMixin
@@ -28,7 +29,9 @@ class Reader(WorkspaceSettingsWriteMixin, ObjectSettingsWriteMixin):
     def __init__(self) -> None:
         self.client = SimpleNamespace(config=SimpleNamespace(write_dry_run_default=True))
         self._read_cache = SimpleNamespace(clear=lambda: None)
-        self.data = {PATH: {"uniqueID": ROUTE}, PATH + "/enableGuides": False}
+        self.data = {PATH: {"uniqueID": ROUTE}, PATH + "/enableGuides": False,
+                     f"/workspace/{WS}/settings/audio/maxVolume": 12,
+                     f"/workspace/{WS}/settings/audio/minVolume": -60}
         self.setters: list[tuple[str, tuple[object, ...]]] = []
         self.active = False
         self.timeout = False
@@ -114,6 +117,246 @@ def test_patch_main_and_marginal_gain_timeout_single_setter(channels):
     done = reader.edit_object_setting(WS, "audio", {"patch_id": patch}, op, False, plan.confirm_token)
     assert done.status == "updated_with_confirmed_timeouts" and done.readback == -3
     assert reader.setters == [(path + suffix, (-3,))]
+
+
+def _audio_patch_reader():
+    reader = Reader()
+    patch = "33333333-3333-4333-8333-333333333333"
+    path = f"/workspace/{WS}/settings/audio/patchID/{patch}"
+    reader.data.update({
+        path: {"uniqueID": patch},
+        path + "/cueOutputChannels": 2,
+        path + "/level/1/1": 0,
+        path + "/level/2/1": 0,
+        path + "/mute/1": False,
+        path + "/solo/1": False,
+    })
+    return reader, patch, path
+
+
+def _audio_patch_batch(*operations):
+    return AudioOutputPatchBatchOperation(kind="batch", operations=list(operations))
+
+
+@pytest.mark.parametrize("count", [1, 10, 50])
+def test_audio_patch_batch_reads_common_metadata_once_per_phase(count):
+    reader, patch, path = _audio_patch_reader()
+    reader.data[path + "/cueOutputChannels"] = 25
+    calls = []
+    original = reader._request
+    def request(address, *args, **kwargs):
+        calls.append(address)
+        return original(address, *args, **kwargs)
+    reader._request = request
+    ops = []
+    for index in range(count):
+        row, column = index // 2 + 1, index % 2 + 1
+        reader.data[f"{path}/level/{row}/{column}"] = 0
+        ops.append(AudioLevelOperation(kind="level", input_channel=row, output_channel=column, value=-3))
+    plan = reader.edit_audio_patch_batch(WS, patch, _audio_patch_batch(*ops), True, None)
+    assert plan.status == "dry_run"
+    assert len(calls) == count + 4
+    assert calls.count(path) == 1
+    assert calls.count(path + "/cueOutputChannels") == 1
+
+
+@pytest.mark.parametrize("batched", [False, True])
+def test_audio_patch_respects_current_workspace_maximum(batched):
+    reader, patch, _ = _audio_patch_reader()
+    def preview(value):
+        op = AudioLevelOperation(kind="level", input_channel=1, output_channel=1, value=value)
+        return (reader.edit_audio_patch_batch(WS, patch, _audio_patch_batch(op), True, None) if batched
+                else reader.edit_object_setting(WS, "audio", {"patch_id": patch}, op, True, None))
+    assert preview(12).status == "dry_run"
+    rejected = preview(1000)
+    assert rejected.status == "dry_run_preflight_failed"
+    assert "maximum" in rejected.errors["write"]
+    assert not reader.setters
+    del reader.data[f"/workspace/{WS}/settings/audio/maxVolume"]
+    assert preview(-3).status == "dry_run_preflight_failed"
+    assert not reader.setters
+
+
+@pytest.mark.parametrize("batched", [False, True])
+@pytest.mark.parametrize("value", [-60, -61])
+def test_audio_patch_blocks_numeric_levels_at_or_below_minimum(batched, value):
+    reader, patch, _ = _audio_patch_reader()
+    reader.data[f"/workspace/{WS}/settings/audio/minVolume"] = -60
+    op = AudioLevelOperation(kind="level", input_channel=1, output_channel=1, value=value)
+    result = (reader.edit_audio_patch_batch(WS, patch, _audio_patch_batch(op), True, None) if batched
+              else reader.edit_object_setting(WS, "audio", {"patch_id": patch}, op, True, None))
+    assert result.status == "dry_run_preflight_failed"
+    assert "minimum" in result.errors["write"]
+    assert not reader.setters
+
+
+@pytest.mark.parametrize("batched", [False, True])
+@pytest.mark.parametrize("new_maximum", [3, 24])
+def test_audio_patch_maximum_change_invalidates_confirmation(batched, new_maximum):
+    reader, patch, _ = _audio_patch_reader()
+    op = AudioLevelOperation(kind="level", input_channel=1, output_channel=1, value=6)
+    def run(dry, token=None):
+        return (reader.edit_audio_patch_batch(WS, patch, _audio_patch_batch(op), dry, token) if batched
+                else reader.edit_object_setting(WS, "audio", {"patch_id": patch}, op, dry, token))
+    plan = run(True)
+    reader.data[f"/workspace/{WS}/settings/audio/maxVolume"] = new_maximum
+    assert run(False, plan.confirm_token).status == "preflight_failed"
+    assert not reader.setters
+
+
+@pytest.mark.parametrize("batched", [False, True])
+def test_audio_patch_minimum_change_invalidates_confirmation(batched):
+    reader, patch, _ = _audio_patch_reader()
+    op = AudioLevelOperation(kind="level", input_channel=1, output_channel=1, value=-3)
+    run = lambda dry, token=None: (
+        reader.edit_audio_patch_batch(WS, patch, _audio_patch_batch(op), dry, token) if batched
+        else reader.edit_object_setting(WS, "audio", {"patch_id": patch}, op, dry, token)
+    )
+    plan = run(True)
+    reader.data[f"/workspace/{WS}/settings/audio/minVolume"] = -80
+    assert run(False, plan.confirm_token).status == "preflight_failed"
+    assert not reader.setters
+
+
+@pytest.mark.parametrize("maximum", [None, True, float("nan"), float("inf")])
+def test_audio_patch_rejects_unverifiable_maximum(maximum):
+    reader, patch, _ = _audio_patch_reader()
+    reader.data[f"/workspace/{WS}/settings/audio/maxVolume"] = maximum
+    op = AudioLevelOperation(kind="level", input_channel=1, output_channel=1, value=-3)
+    result = reader.edit_object_setting(WS, "audio", {"patch_id": patch}, op, True, None)
+    assert result.status == "dry_run_preflight_failed"
+    assert not reader.setters
+
+
+@pytest.mark.parametrize("minimum", [None, True, float("nan"), float("-inf")])
+def test_audio_patch_rejects_unverifiable_minimum(minimum):
+    reader, patch, _ = _audio_patch_reader()
+    reader.data[f"/workspace/{WS}/settings/audio/minVolume"] = minimum
+    op = AudioLevelOperation(kind="level", input_channel=1, output_channel=1, value=-3)
+    result = reader.edit_object_setting(WS, "audio", {"patch_id": patch}, op, True, None)
+    assert result.status == "dry_run_preflight_failed"
+    assert not reader.setters
+
+
+def test_audio_patch_batch_uses_one_token_and_verifies_each_setter():
+    reader, patch, path = _audio_patch_reader()
+    batch = _audio_patch_batch(
+        AudioLevelOperation(kind="level", input_channel=1, output_channel=1, value=-3),
+        AudioLevelOperation(kind="level", input_channel=2, output_channel=1, value=-6),
+        AudioBoolOperation(kind="mute", output_channel=1, value=True),
+        AudioBoolOperation(kind="solo", output_channel=1, value=True),
+    )
+    plan = reader.edit_audio_patch_batch(WS, patch, batch, dry_run=True, confirm_token=None)
+    assert plan.status == "dry_run" and len(plan.planned_operations) == 4
+    assert not reader.setters
+
+    done = reader.edit_audio_patch_batch(WS, patch, batch, dry_run=False, confirm_token=plan.confirm_token)
+    assert done.status == "updated"
+    assert done.verification["matched"]
+    assert [entry["status"] for entry in done.executed_operations] == ["ok", "ok", "ok", "ok"]
+    assert [entry["value"] for entry in done.readback] == [-3, -6, True, True]
+    assert reader.setters == [
+        (path + "/level/1/1", (-3,)),
+        (path + "/level/2/1", (-6,)),
+        (path + "/mute/1", (True,)),
+        (path + "/solo/1", (True,)),
+    ]
+
+
+def test_audio_patch_batch_rejects_duplicate_targets_before_setters():
+    level = {"kind": "level", "input_channel": 1, "output_channel": 1, "value": -3}
+    with pytest.raises(ValidationError, match="duplicate"):
+        AudioOutputPatchBatchOperation.model_validate({
+            "kind": "batch", "operations": [level, {**level, "value": -6}],
+        })
+
+
+def test_audio_patch_batch_checks_all_targets_and_stale_baselines():
+    reader, patch, path = _audio_patch_reader()
+    invalid = _audio_patch_batch(
+        AudioLevelOperation(kind="level", input_channel=3, output_channel=1, value=-3),
+        AudioBoolOperation(kind="mute", output_channel=1, value=True),
+    )
+    blocked = reader.edit_audio_patch_batch(WS, patch, invalid, dry_run=True, confirm_token=None)
+    assert blocked.status == "dry_run_preflight_failed" and not reader.setters
+
+    batch = _audio_patch_batch(
+        AudioLevelOperation(kind="level", input_channel=1, output_channel=1, value=-3),
+        AudioBoolOperation(kind="mute", output_channel=1, value=True),
+    )
+    plan = reader.edit_audio_patch_batch(WS, patch, batch, dry_run=True, confirm_token=None)
+    reader.data[path + "/level/1/1"] = -1
+    stale = reader.edit_audio_patch_batch(WS, patch, batch, dry_run=False, confirm_token=plan.confirm_token)
+    assert stale.status == "preflight_failed" and not reader.setters
+
+    reader, patch, path = _audio_patch_reader()
+    plan = reader.edit_audio_patch_batch(WS, patch, batch, dry_run=True, confirm_token=None)
+    reader.data[path + "/cueOutputChannels"] = 3
+    stale_dimensions = reader.edit_audio_patch_batch(
+        WS, patch, batch, dry_run=False, confirm_token=plan.confirm_token,
+    )
+    assert stale_dimensions.status == "preflight_failed" and not reader.setters
+
+
+def test_audio_patch_batch_stops_after_uncertain_readback():
+    reader, patch, path = _audio_patch_reader()
+    batch = _audio_patch_batch(
+        AudioLevelOperation(kind="level", input_channel=1, output_channel=1, value=-3),
+        AudioBoolOperation(kind="mute", output_channel=1, value=True),
+    )
+    plan = reader.edit_audio_patch_batch(WS, patch, batch, dry_run=True, confirm_token=None)
+    reader.fail_readback = True
+    result = reader.edit_audio_patch_batch(WS, patch, batch, dry_run=False, confirm_token=plan.confirm_token)
+    assert result.status == "verification_inconclusive" and result.retry_unsafe
+    assert reader.setters == [(path + "/level/1/1", (-3,))]
+    assert [entry["status"] for entry in result.executed_operations] == ["ok"]
+
+
+def test_audio_patch_batch_reports_partial_write_if_later_setter_cannot_be_prepared():
+    reader, patch, path = _audio_patch_reader()
+    batch = _audio_patch_batch(
+        AudioLevelOperation(kind="level", input_channel=1, output_channel=1, value=-3),
+        AudioBoolOperation(kind="mute", output_channel=1, value=True),
+        AudioBoolOperation(kind="solo", output_channel=1, value=True),
+    )
+    plan = reader.edit_audio_patch_batch(WS, patch, batch, dry_run=True, confirm_token=None)
+    request = reader._request
+
+    def reject_mute(address, *args, **kwargs):
+        if address.endswith("/mute/1") and args:
+            raise OscPreparationError("fixture setter preparation failed")
+        return request(address, *args, **kwargs)
+
+    reader._request = reject_mute
+    result = reader.edit_audio_patch_batch(WS, patch, batch, dry_run=False, confirm_token=plan.confirm_token)
+    assert result.status == "verification_failed" and result.retry_unsafe
+    assert reader.setters == [(path + "/level/1/1", (-3,))]
+    assert [entry["status"] for entry in result.executed_operations] == ["ok", "preparation_failed"]
+
+
+def test_audio_patch_batch_sends_negative_infinity_when_baseline_is_numeric_floor():
+    reader, patch, path = _audio_patch_reader()
+    reader.data[path + "/level/1/1"] = -60
+    reader.data[f"/workspace/{WS}/settings/audio/minVolume"] = -60
+    request = reader._request
+
+    def floor_readback(address, *args, **kwargs):
+        try:
+            return request(address, *args, **kwargs)
+        finally:
+            if args:
+                reader.data[address] = -60
+
+    reader._request = floor_readback
+    batch = _audio_patch_batch(AudioLevelOperation(
+        kind="level", input_channel=1, output_channel=1, value="-inf",
+    ))
+    plan = reader.edit_audio_patch_batch(WS, patch, batch, dry_run=True, confirm_token=None)
+    assert plan.status == "dry_run" and plan.confirm_token
+    done = reader.edit_audio_patch_batch(WS, patch, batch, dry_run=False, confirm_token=plan.confirm_token)
+    assert done.status == "updated" and done.verification["matched"]
+    assert done.readback[0]["value"] == -60
+    assert reader.setters == [(path + "/level/1/1", ("-inf",))]
 
 
 def test_expired_token_and_unavailable_readback():

@@ -10,6 +10,22 @@ def reader(monkeypatch):
     monkeypatch.setattr(control, 'check_write_readiness', lambda *a: {'ok': True})
     monkeypatch.setattr(control, 'ensure_write_ready', lambda *a: None)
     r = Reader()
+    r.archive_digest = 'fixture-archive'
+    r.audio_limits = {'minimum': -60, 'maximum': 12}
+
+    def saved_owner(reader, workspace_id, cue_id, object_ids):
+        row = reader.values[cue_id]
+        map_id = row.get('audioMap/uniqueID', '')
+        owned = {str(item.get('uniqueID', item.get('id', ''))).upper() for item in row.get('objects', [])}
+        if map_id not in ('', None) or not set(object_ids) <= owned:
+            raise ValueError('Fixture archive does not prove direct cue ownership.')
+        return {'source': 'saved_archive', 'workspace_id': workspace_id, 'cue_id': cue_id,
+                'cue_type': row.get('type', 'Audio'), 'audio_map_id': '',
+                'object_ids': sorted(object_ids), 'ownership': 'direct_cue_collection',
+                'sha256': reader.archive_digest, 'freshness': 'last_saved'}
+
+    from qlab_mcp import saved_cue_settings
+    monkeypatch.setattr(saved_cue_settings, 'read_saved_cue_object_ownership', saved_owner)
     original = r._request
     patch = str(UUID(int=100)).upper()
     def request(address, *args, **kwargs):
@@ -17,6 +33,10 @@ def reader(monkeypatch):
             return SimpleNamespace(data=[{"uniqueID": patch}])
         if address.endswith("settings/audio/patchID/" + patch):
             return SimpleNamespace(data={"uniqueID": patch, "cueOutputChannels": 2})
+        if address.endswith("settings/audio/minVolume"):
+            return SimpleNamespace(data=r.audio_limits['minimum'])
+        if address.endswith("settings/audio/maxVolume"):
+            return SimpleNamespace(data=r.audio_limits['maximum'])
         return original(address, *args, **kwargs)
     r._request = request
     for uid in (START, MEMO):
@@ -44,6 +64,34 @@ def test_multiple_indexed_only(reader):
     items[0]['confirm_gates']=[x['confirm_token'] for x in p['results'][0]['planned_operations']]
     assert remaining.edit_remaining_cues(reader,WS,items,False,family='audio')['ok']
     assert len(reader.setters)==2
+
+
+@pytest.mark.parametrize('value,minimum,maximum', [(-60, -60, 12), (-61, -60, 12), (-1, -60, -3)])
+def test_audio_cue_level_outside_workspace_limits_is_blocked(reader, value, minimum, maximum):
+    reader.audio_limits.update(minimum=minimum, maximum=maximum)
+    item = {'cue_id': START, 'operations': [
+        {'property': 'level', 'args': {'inChannel': 1, 'outChannel': 1, 'decibel': value}}
+    ]}
+    result = remaining.edit_remaining_cues(reader, WS, [item], True, family='audio')
+    assert not result['ok'] and not reader.setters
+
+
+def test_audio_cue_limit_change_invalidates_confirmation(reader):
+    items = confirmed(reader, [{'cue_id': START, 'operations': [
+        {'property': 'level', 'args': {'inChannel': 1, 'outChannel': 1, 'decibel': -3}}
+    ]}])
+    reader.audio_limits['minimum'] = -80
+    result = remaining.edit_remaining_cues(reader, WS, items, False, family='audio')
+    assert not result['ok'] and not reader.setters
+
+
+def test_audio_cue_silence_uses_verified_numeric_floor(reader):
+    item = {'cue_id': START, 'operations': [
+        {'property': 'level', 'args': {'inChannel': 1, 'outChannel': 1, 'decibel': '-inf'}}
+    ]}
+    result = remaining.edit_remaining_cues(reader, WS, [item], True, family='audio')
+    assert result['ok'] and not reader.setters
+    assert result['results'][0]['planned_operations'][0]['confirm_token']
 
 def confirmed(reader, items, family='audio'):
     plan = remaining.edit_remaining_cues(reader, WS, items, True, family=family)
@@ -170,6 +218,29 @@ def test_fade_invalid_geometry_modes_block(reader,property_name,value):
     assert not result['ok'] and not reader.setters
 
 
+@pytest.mark.parametrize('property_name,value', [('rate', 2), ('doRate', False)])
+def test_fade_rate_controls_for_existing_audio_target_are_blocked(reader, property_name, value):
+    from test_control_cue_writes import TARGET
+    reader.values[START].update(type='Fade', cueTargetID=TARGET, patchTargetID='', targetMode=0,
+        geoMode=0, doOpacity=True, doRate=True, doRotation=False, doScale=False, doTranslation=False,
+        rotationType=1, levelsMode=0, rate=1)
+    reader.values[TARGET].update(type='Audio', isBroken=False, isWarning=False, isRunning=False, isPaused=False)
+    result = remaining.edit_remaining_cues(reader, WS, [{'cue_id': START,
+        'properties': {property_name: value}}], True, family='fade')
+    assert not result['ok'] and not reader.setters
+
+
+def test_fade_rate_remains_available_for_video_target(reader):
+    from test_control_cue_writes import TARGET
+    reader.values[START].update(type='Fade', cueTargetID=TARGET, patchTargetID='', targetMode=0,
+        geoMode=0, doOpacity=False, doRate=True, doRotation=False, doScale=False, doTranslation=False,
+        rotationType=1, levelsMode=0, rate=1)
+    reader.values[TARGET].update(type='Video', isBroken=False, isWarning=False, isRunning=False, isPaused=False)
+    result = remaining.edit_remaining_cues(reader, WS, [{'cue_id': START,
+        'properties': {'rate': 2}}], True, family='fade')
+    assert result['ok'] and not reader.setters
+
+
 def test_level_readback_accepts_qlab_quantization():
     assert remaining.matches('level/1/1', -2.999948263168335, -3, {}, None, WS, START)
     assert not remaining.matches('level/1/1', -2.99, -3, {}, None, WS, START)
@@ -256,6 +327,15 @@ def test_owned_object_confirmation_rejects_changed_identity_or_ownership(reader,
         reader.values[START]['uniqueID'] = MEMO
     else:
         items[0]['operations'][0]['args']['objectID'] = other
+    result = remaining.edit_remaining_cues(reader, WS, items, False, family='audio')
+    assert not result['ok'] and not reader.setters
+
+
+def test_owned_object_confirmation_rejects_changed_saved_archive(reader):
+    obj = owned_object(reader)
+    items = confirmed(reader, [{'cue_id': START, 'operations': [
+        {'property': 'objectID/name', 'args': {'objectID': obj, 'name': 'new'}}]}])
+    reader.archive_digest = 'changed-archive'
     result = remaining.edit_remaining_cues(reader, WS, items, False, family='audio')
     assert not result['ok'] and not reader.setters
 
@@ -350,11 +430,45 @@ def test_patch_fade_relative_silence_blocks(reader):
     def request(address, *args, **kwargs):
         if address.endswith('settings/audio/minVolume'):
             return SimpleNamespace(data=-60)
+        if address.endswith('settings/audio/maxVolume'):
+            return SimpleNamespace(data=12)
         return original(address, *args, **kwargs)
     reader._request = request
-    result = remaining.edit_remaining_cues(reader, WS, [{'cue_id': START,
-        'operations': [{'property': 'sliderLevel', 'args': {'channel': 1, 'decibel': '-inf'}}]}], True, family='fade')
-    assert not result['ok'] and not reader.setters
+    with pytest.raises(ValueError, match='awaits QLab'):
+        remaining.edit_remaining_cues(reader, WS, [{'cue_id': START,
+            'operations': [{'property': 'sliderLevel', 'args': {'channel': 1, 'decibel': '-inf'}}]}], True, family='fade')
+    assert not reader.setters
+
+
+def test_fade_audio_activation_cannot_obtain_confirmation(reader):
+    with pytest.raises(ValueError, match='awaits QLab'):
+        remaining.edit_remaining_cues(reader, WS, [{'cue_id': START, 'operations': [
+            {'property': 'doLevel', 'args': {'row': 1, 'column': 1, 'value': True}}
+        ]}], True, family='fade')
+    assert not reader.setters
+
+
+@pytest.mark.parametrize('properties', [
+    {'levelsMode': 0},
+    {'targetMode': 1},
+    {'patchTargetID': str(UUID(int=100))},
+])
+def test_fade_audio_properties_cannot_obtain_confirmation(reader, properties):
+    with pytest.raises(ValueError, match='awaits QLab'):
+        remaining.edit_remaining_cues(reader, WS, [{'cue_id': START, 'properties': properties}], True, family='fade')
+    assert not reader.setters
+
+
+def test_fade_target_with_active_audio_is_blocked(monkeypatch):
+    from qlab_mcp.write import remaining_context
+    def depend(reader, ws, uid, fields, deps):
+        if 'type' in fields:
+            return dict(type='Video', isRunning=False, isPaused=False, isBroken=False, isWarning=False)
+        return dict(doOpacity=False, doRate=False, doRotation=False, doScale=False,
+                    doTranslation=False, doLevel=[[True]])
+    monkeypatch.setattr(remaining_context, '_depend', depend)
+    with pytest.raises(ValueError, match='active audio levels'):
+        remaining_context._fade_cue_target(None, WS, START, MEMO, {})
 
 def test_indexed_operation_limit_is_strict():
     from pydantic import ValidationError
@@ -369,6 +483,20 @@ def test_pending_capabilities_do_not_advertise_writes():
     assert caps['property_capabilities']['Trim']['state'] == 'unavailable_via_osc'
     assert caps['max_indexed_operations_per_cue'] == 50
     assert remaining.capabilities('script')['max_indexed_operations_per_cue'] == 0
+
+
+def test_fade_target_mode_capability_marks_patch_target_blocked_only():
+    caps = remaining.capabilities('fade')
+    assert 'targetMode' in caps['allowed_properties']
+    assert 'targetMode' not in caps['blocked_properties']
+    values = caps['property_capabilities']['targetMode']['values']
+    assert values['0']['state'] == 'gated'
+    assert values['1']['state'] == 'blocked'
+    visual_mode = remaining.FAMILIES['fade'].model_validate({'cue_id': START, 'properties': {'targetMode': 0}})
+    assert remaining.normalize_item(visual_mode, 'fade')
+    patch_mode = remaining.FAMILIES['fade'].model_validate({'cue_id': START, 'properties': {'targetMode': 1}})
+    with pytest.raises(ValueError, match='Fade audio editing'):
+        remaining.normalize_item(patch_mode, 'fade')
 
 def test_read_checks_uuid_and_type_again_after_scalar_queries(reader):
     original = reader._request
@@ -388,6 +516,8 @@ def test_bulk_snapshot_retains_reserved_output_columns(reader):
     def request(address, *args, **kwargs):
         if address.endswith('settings/audio/minVolume'):
             return SimpleNamespace(data=-60)
+        if address.endswith('settings/audio/maxVolume'):
+            return SimpleNamespace(data=12)
         return original(address, *args, **kwargs)
     reader._request = request
     op = {'property': 'setSilentLevels', 'key': 'setSilentLevels', 'baseline': reader.values[START]['levels'], 'requested': [], 'arg_values': {}}

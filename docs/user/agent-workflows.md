@@ -1451,6 +1451,18 @@ returned −59.01564 for a Fade slider request of −59: the tool reported faile
 verification, retained the observed value and sent no retry. It was restored with
 a fresh confirmation. This low-level boundary is not declared exact/verified.
 
+Audio level edits use the current workspace minimum and maximum as well as the
+schema's conservative -120 to +12 dB range. Finite values must be above the
+workspace minimum; its maximum is inclusive. Missing or changed limits block the
+write. Assigning a patch device requires a complete passive inventory in the
+patch's direction and a selected device with complete identity and channel counts;
+no capture is started.
+
+On a temporary QLab 5.5.10 build 5510 workspace with limits -180/+60 dB,
+a Mic crosspoint at -130 dB persisted after reopening. Audio crosspoint writes
+of +20 and -130 dB, and a Mic crosspoint write of +15 dB, did not match their
+fresh readbacks. Wider cue-level writes remain blocked pending investigation.
+
 For these family editors, Audio Maps, `/live`, playback, external signals,
 capture, Trim, AudioUnit insertion/parameter editing and undocumented curves
 remain out of scope. Saved Hotkeys and weekdays have a separate guarded

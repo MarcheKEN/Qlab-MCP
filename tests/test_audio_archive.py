@@ -826,9 +826,9 @@ def test_audio_device_confirmation_is_blocked_when_passive_inventory_changes(mon
     from qlab_mcp.audio_archive import edit_saved_audio_patches
 
     snapshots = [
-        {"status": "ready", "devices": [{"id": 4, "uid": "fixture-device", "name": "Speaker",
+        {"status": "ready", "output_status": "ready", "devices": [{"id": 4, "uid": "fixture-device", "name": "Speaker",
             "manufacturer": "Example", "model_uid": "Fixture", "input_channels": 0, "output_channels": 2}]},
-        {"status": "ready", "devices": [{"id": 4, "uid": "fixture-device", "name": "Changed Speaker",
+        {"status": "ready", "output_status": "ready", "devices": [{"id": 4, "uid": "fixture-device", "name": "Changed Speaker",
             "manufacturer": "Example", "model_uid": "Fixture", "input_channels": 0, "output_channels": 2}]},
     ]
     monkeypatch.setattr(video_settings, "_native_metadata", lambda _: snapshots.pop(0))
@@ -851,7 +851,7 @@ def test_device_assignment_blocks_duplicate_passive_uids(monkeypatch):
 
     row = {"id": 4, "uid": "fixture-device", "name": "Speaker", "manufacturer": "Example",
         "model_uid": "Fixture", "input_channels": 0, "output_channels": 2}
-    monkeypatch.setattr(video_settings, "_native_metadata", lambda _: {"status": "ready", "devices": [row, dict(row, id=5)]})
+    monkeypatch.setattr(video_settings, "_native_metadata", lambda _: {"status": "ready", "output_status": "ready", "devices": [row, dict(row, id=5)]})
     result = edit_saved_audio_patches(SimpleNamespace(), WS, [{
         "action": "set_device", "patch_type": "output", "patch_id": OUT1,
         "device_uid": "fixture-device",
@@ -859,6 +859,62 @@ def test_device_assignment_blocks_duplicate_passive_uids(monkeypatch):
 
     assert result["status"] == "blocked"
     assert "duplicate device UIDs" in result["error"]
+
+
+@pytest.mark.parametrize('patch_type,status,output_status', [
+    ('input', 'ready', 'partial'), ('output', 'partial', 'ready'),
+])
+def test_device_inventory_is_checked_by_patch_direction(monkeypatch, patch_type, status, output_status):
+    from qlab_mcp.audio_archive import _device_dependencies
+    row = {'id': 4, 'uid': 'fixture-device', 'name': 'Device',
+           'input_channels': 2 if status == 'ready' else None,
+           'output_channels': 2 if output_status == 'ready' else None}
+    monkeypatch.setattr(video_settings, '_native_metadata', lambda _: {
+        'status': status, 'output_status': output_status, 'devices': [row]})
+    result = _device_dependencies(None, WS, [{'action': 'set_device', 'patch_type': patch_type,
+                                              'device_uid': 'fixture-device'}])
+    assert 'fixture-device' in result['devices']
+
+
+@pytest.mark.parametrize('patch_type,status,output_status', [
+    ('input', 'partial', 'ready'), ('output', 'ready', 'partial'),
+])
+def test_device_inventory_blocks_incomplete_required_direction(monkeypatch, patch_type, status, output_status):
+    from qlab_mcp.audio_archive import _device_dependencies
+    monkeypatch.setattr(video_settings, '_native_metadata', lambda _: {
+        'status': status, 'output_status': output_status, 'devices': []})
+    with pytest.raises(ValueError, match='inventory is unavailable'):
+        _device_dependencies(None, WS, [{'action': 'set_device', 'patch_type': patch_type,
+                                         'device_uid': 'fixture-device'}])
+
+
+@pytest.mark.parametrize('patch_type,patch_id,status,output_status', [
+    ('input', IN1, 'ready', 'partial'), ('output', OUT1, 'partial', 'ready'),
+])
+def test_device_assignment_plans_when_other_device_has_incomplete_opposite_direction(
+        monkeypatch, patch_type, patch_id, status, output_status):
+    from qlab_mcp.audio_archive import _device_dependencies
+    selected = {'id': 4, 'uid': 'fixture-device', 'name': 'Device',
+                'input_channels': 2, 'output_channels': 2}
+    other = {'id': 5, 'uid': 'other-device', 'name': 'Other',
+             'input_channels': 2 if status == 'ready' else None,
+             'output_channels': 2 if output_status == 'ready' else None}
+    monkeypatch.setattr(video_settings, '_native_metadata', lambda _: {
+        'status': status, 'output_status': output_status, 'devices': [selected, other]})
+    operation = {'action': 'set_device', 'patch_type': patch_type, 'patch_id': patch_id,
+                 'device_uid': 'fixture-device'}
+    context = _device_dependencies(None, WS, [operation])
+    plan = plan_saved_audio_patches(audio_workspace(), [operation], devices=context['devices'])
+    assert plan['output_bytes']
+
+
+def test_device_assignment_blocks_when_selected_device_has_incomplete_descriptor():
+    operation = {'action': 'set_device', 'patch_type': 'output', 'patch_id': OUT1,
+                 'device_uid': 'fixture-device'}
+    device = {'uid': 'fixture-device', 'name': 'Device',
+              'input_channels': None, 'output_channels': 2}
+    with pytest.raises(ValueError, match='identity or channel counts are incomplete'):
+        plan_saved_audio_patches(audio_workspace(), [operation], devices={'fixture-device': device})
 
 
 def test_device_assignment_blocks_empty_coreaudio_inventory(monkeypatch):
@@ -881,9 +937,9 @@ def test_system_device_disable_confirmation_binds_to_passive_inventory(monkeypat
     from qlab_mcp.audio_archive import edit_saved_audio_patches
 
     snapshots = [
-        {"status": "ready", "devices": [{"id": 4, "uid": "fixture-device", "name": "Speaker",
+        {"status": "ready", "output_status": "ready", "devices": [{"id": 4, "uid": "fixture-device", "name": "Speaker",
             "manufacturer": "Example", "model_uid": "Fixture", "input_channels": 0, "output_channels": 2}]},
-        {"status": "ready", "devices": [{"id": 4, "uid": "fixture-device", "name": "Changed Speaker",
+        {"status": "ready", "output_status": "ready", "devices": [{"id": 4, "uid": "fixture-device", "name": "Changed Speaker",
             "manufacturer": "Example", "model_uid": "Fixture", "input_channels": 0, "output_channels": 2}]},
     ]
     monkeypatch.setattr(video_settings, "_native_metadata", lambda _: snapshots.pop(0))

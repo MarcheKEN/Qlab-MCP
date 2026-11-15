@@ -894,7 +894,10 @@ def _device_dependencies(reader, workspace_id, operations):
         return {}
     from .video_settings import _native_metadata
     native = _native_metadata("audio")
-    if native.get("status") != "ready":
+    required = {op.get("patch_type") for op in operations if op.get("action") == "set_device"
+                or (op.get("action") == "set_system_device" and op.get("enabled") is False)}
+    if any(native.get("output_status" if direction == "output" else "status") != "ready"
+           for direction in required):
         # Disabling system mode will still fail closed in the archive planner when
         # the current descriptor needs an explicit device; a no-op remains a no-op.
         if not any(op.get("action") == "set_device" for op in operations):

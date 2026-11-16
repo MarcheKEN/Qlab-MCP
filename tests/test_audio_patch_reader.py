@@ -1,3 +1,5 @@
+import pytest
+
 from qlab_mcp import audio_patch_reader
 
 
@@ -24,6 +26,14 @@ class FakeReader:
         if self.error:
             raise ValueError(self.error)
         return self.overview
+
+
+@pytest.mark.parametrize("selectors", [{"input_channel": 1}, {"output_channel": 1}])
+def test_patch_read_requires_paired_channel_selectors(selectors):
+    reader = FakeReader()
+    with pytest.raises(ValueError, match="provided together"):
+        audio_patch_reader.read_audio_patch(reader, WS, "output", PATCH, **selectors)
+    assert not reader.detail_calls and not reader.overview_calls
 
 
 def _saved(status="ready", patch=None, **extra):

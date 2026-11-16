@@ -1,5 +1,6 @@
 # Runtime validation records
 
+- [Playlist crossfade archive transaction — November 14](2026-11-14-playlist-crossfade.md)
 - [Audio MCP round-trip follow-up — November 10](2026-11-10-audio-mcp-followup.md)
 - [Audio archive fixtures — November 9](2026-11-09-audio-authoring.md)
 - [October 22 lighting authoring completion](2026-10-22-light-authoring-completion.md)

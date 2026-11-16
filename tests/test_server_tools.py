@@ -923,7 +923,7 @@ ADDED_TOOL_NAMES = {
 EXPECTED_TOOL_NAMES = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) | ADDED_TOOL_NAMES
 
 EXPECTED_TOOL_CONCEPTS = {
-    "qlab_edit_saved_cue_settings": ("Audio, Mic, Light and Video", "five-minute", "recovery", "Hotkey", "5.5.10"),
+    "qlab_edit_saved_cue_settings": ("Light and Video", "five-minute", "recovery", "Hotkey", "5.5.10"),
     "qlab_edit_video_output_devices": ("one-use", "NDI", "Syphon"),
     "qlab_edit_video_input_patches": ("one-use", "auto", "capture"),
     "qlab_get_video_output_devices": ("passive", "CoreGraphics", "not the complete", "pagination"),

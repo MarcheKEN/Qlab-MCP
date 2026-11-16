@@ -5,8 +5,9 @@
 QLab MCP **0.4.0** connects an MCP-compatible agent to QLab 5, primarily through
 OSC. It can organize cues, configure supported properties and inspect workspace
 settings. Selected local functions use fixed AppleScript bridges on macOS.
-Light Patch/Definition, Light curve and Video Settings batches also edit the
-saved local archive under a guarded close, replace and reopen workflow.
+Selected Light, Video and Audio settings, saved cue settings, and Playlist
+crossfade duration also use the saved local archive under a guarded close,
+replace and reopen workflow.
 
 **Developed and tested with QLab 5.5.10 on macOS.** Other QLab versions may
 behave differently and have not been validated by this project.

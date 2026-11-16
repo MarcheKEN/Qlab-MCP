@@ -69,7 +69,10 @@ plug-ins. An inconclusive comparison blocks the edit; saved-file verification
 does not establish that a plug-in or audio output works.
 
 `qlab_edit_saved_cue_settings` accepts one to 50 typed operations with exact cue
-UUIDs. Check readiness, preview with `dry_run=true`, inspect the diff, then execute
+UUIDs. Hotkey and weekday edits require Light or Video cues; track, envelope and
+Video FX edits require Video cues. Audio and Mic cue details can be read here,
+but their saved settings are not edited by this tool. Check readiness, preview
+with `dry_run=true`, inspect the diff, then execute
 the same request with its five-minute single-use `confirm_token`. It closes,
 edits and reopens the same local document with recovery, on QLab 5.5.10/build 5510.
 `needs_save` requires a separate confirmed Save and a new preview. `no_op` neither

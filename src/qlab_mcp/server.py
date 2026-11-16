@@ -471,7 +471,7 @@ def qlab_edit_light_cue_curves(
 def qlab_edit_saved_cue_settings(workspace_id: CanonicalWorkspaceUUID,
         operations: PublicSavedCueOperations, dry_run: StrictBool = True,
         confirm_token: StrictStr | None = None) -> SavedCueEditResult:
-    """Edit saved Audio, Mic, Light and Video cue properties in a guarded 1–50-operation batch.
+    """Edit saved Light and Video cue properties in a guarded 1–50-operation batch.
 
     Read cue details and saved_settings first. Requires a clean inactive local
     QLab 5.5.10/build 5510 document. Preview returns a five-minute one-use token;

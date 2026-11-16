@@ -293,8 +293,8 @@ def _timecode(reader, ws, before, changes):
     return {"list_id": parent, "format": fmt, "timecode_baseline": deepcopy(aggregate)}
 
 
-def _preflight(reader, ws, item, family="control", *, _core=False):
-    before, changes, operations, dependencies = _family_preflight(reader, ws, item, family, _core=_core)
+def _preflight(reader, ws, item, family="control", *, _core=False, phase_limits=None):
+    before, changes, operations, dependencies = _family_preflight(reader, ws, item, family, _core=_core, phase_limits=phase_limits)
     if not _core and control_applescript.TRIGGER_KEYS & changes.keys():
         snapshot = control_applescript.trigger_snapshot(reader, ws, str(item.cue_id).upper(), before["type"])
         control_applescript.trigger_preflight(snapshot, changes)
@@ -306,13 +306,13 @@ def _preflight(reader, ws, item, family="control", *, _core=False):
     return before, changes, operations, dependencies
 
 
-def _family_preflight(reader, ws, item, family="control", *, _core=False):
+def _family_preflight(reader, ws, item, family="control", *, _core=False, phase_limits=None):
     if not _core and family in {"audio", "mic", "light", "fade", "network", "midi", "midi_file", "timecode", "script"}:
         from .remaining import preflight
-        return preflight(reader, ws, item, family)
+        return preflight(reader, ws, item, family, phase_limits=phase_limits)
     if family in {"video", "camera", "text"}:
         from .visual import preflight
-        return preflight(reader, ws, item, family)
+        return preflight(reader, ws, item, family, phase_limits=phase_limits)
     if family == "group" and not _core:
         from .group import preflight
         return preflight(reader, ws, item)
@@ -480,11 +480,17 @@ def edit_control_cues(reader, workspace_id, updates, dry_run=None, *, _family="c
     except Exception as exc:
         results[0].update(status="preflight_failed", errors={"preflight": str(exc)})
         return finish("preflight_failed")
+    def batch_preflight(item, phase_limits):
+        if _family in {"audio", "mic", "fade", "video", "camera", "text"}:
+            return _preflight(reader, ws, item, _family, phase_limits=phase_limits)
+        return _preflight(reader, ws, item, _family)
+
+    phase_limits = {}
     for item, result in zip(items, results, strict=True):
         try:
             if time.monotonic() >= deadline:
                 raise ValueError("Batch time budget exhausted before planning.")
-            before, changes, operations, dependencies = _preflight(reader, ws, item, _family)
+            before, changes, operations, dependencies = batch_preflight(item, phase_limits)
             result.update(before=before, properties=changes, operations=operations,
                           diff={key: {"before": before[key], "requested": value} for key, value in changes.items()})
             binding = {"tool": tool, "workspace_id": ws, "cue_id": result["cue_id"], "before": before,
@@ -540,8 +546,9 @@ def edit_control_cues(reader, workspace_id, updates, dry_run=None, *, _family="c
         ensure_write_ready(reader, ws)
         if _activity_snapshot(reader, ws)["active_count"]:
             raise ValueError("Workspace activity changed before mutation.")
+        phase_limits = {}
         for item, binding in zip(items, bindings, strict=True):
-            before, changes, _, dependencies = _preflight(reader, ws, item, _family)
+            before, changes, _, dependencies = batch_preflight(item, phase_limits)
             if before != binding["before"] or changes != binding["properties"] or dependencies != binding["dependencies"]:
                 raise ValueError("Fresh baseline or target dependencies changed; run a new dry run.")
         with _LOCK:

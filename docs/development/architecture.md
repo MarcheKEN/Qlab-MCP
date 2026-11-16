@@ -18,6 +18,9 @@ traffic.
 Light and Group reuse the family executor; Group also reuses bounded container
 traversal. Playlist reads are mode-dependent and followed by fresh identity/mode
 verification. The completed response is size-checked without patch expansion.
+Playlist crossfade duration uses `write/playlist_archive.py` for a guarded
+saved-archive transaction that preserves curves and offset; unsupported curve
+structures remain blocked.
 
 Control/organization cues use the same family executor with an accepted-type
 set and type-selected models. Filtering precedes pagination; detail reads
@@ -39,8 +42,8 @@ message, output, fade, or target mode, then rechecks identity and selector.
 Failures in secondary reads preserve confirmed identity as partial data.
 Sensitive Network text and Script source require the technical profile.
 
-`src/qlab_mcp/server.py` owns the FastMCP instance, the 88 decorated tools
-(52 read-only and 36 gated writes),
+`src/qlab_mcp/server.py` owns the FastMCP instance, the 90 decorated tools
+(53 read-only and 37 gated writes),
 their schemas, annotations, timeouts, and result models. QLab-backed calls
 create a fresh `QLabReader` and close it after the operation; local media tools
 do not use that reader. `qlab-mcp` maps to
@@ -51,6 +54,13 @@ do not use that reader. `qlab-mcp` maps to
 another public start command.
 
 ## Read path
+
+Audio settings and patch reads use `audio_patch_reader.py` and `audio_archive.py`
+to keep live OSC, last-saved archive data and passive device observations
+separate, with freshness and bounded pages. `audio_patch_writes.py` dispatches
+OSC output operations separately from guarded saved-archive transactions;
+`audio_volume_limits.py` handles workspace volume limits. Neither proves signal
+or playback.
 
 The public Light settings tool supplements its OSC result through
 `light_patch/reader.py`. It resolves only the requested local document, reads

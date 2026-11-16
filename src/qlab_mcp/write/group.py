@@ -46,6 +46,7 @@ class GroupCueEditInput(BaseModel):
 
 def group_edit_capabilities(mode: int | None = None, triggers=None) -> dict:
     common = [field.alias or name for name, field in CueEditCommonProperties.model_fields.items()] + ["duration"]
+    crossfade_duration = "playlist/crossfade/duration"
     playlist = sorted(GROUP_PROPERTIES - {"mode"})
     blocked = {}
     allowed = [*common, "mode"]
@@ -56,7 +57,7 @@ def group_edit_capabilities(mode: int | None = None, triggers=None) -> dict:
         allowed.extend(playlist)
     else:
         blocked.update({key: "Requires a fresh mode=6 Playlist baseline." for key in playlist})
-    return trigger_capabilities({
+    result = trigger_capabilities({
         "tool": "qlab_edit_group_cues",
         "allowed_properties": sorted(allowed),
         "blocked_properties": blocked,
@@ -69,6 +70,12 @@ def group_edit_capabilities(mode: int | None = None, triggers=None) -> dict:
             "Cue Cart cell movement",
         ],
     }, triggers)
+    result.setdefault("property_transports", {})[crossfade_duration] = "saved_archive"
+    result["playlist_crossfade_requirements"] = [
+        "Saved clean workspace; the archive transaction closes and reopens it.",
+        "QLab 5.5.10/build 5510 and validated Playlist curves are required.",
+    ]
+    return result
 
 
 def edit_group_cues(reader, workspace_id, updates, dry_run=None):
@@ -86,6 +93,9 @@ def edit_group_cues(reader, workspace_id, updates, dry_run=None):
         len(items) != 1 or len(changes[0]) != 1
     ):
         raise ValueError("Group mode and Playlist setters require one cue and one property per call.")
+    if "playlist/crossfade/duration" in changes[0]:
+        from .playlist_archive import edit_playlist_crossfade
+        return edit_playlist_crossfade(reader, workspace_id, items[0], dry_run)
     _FAMILIES["group"] = (GroupCueEditInput, GroupCueEditProperties, ("Group",), "group_basic", "qlab_edit_group_cues")
     return edit_control_cues(reader, workspace_id, items, dry_run, _family="group")
 

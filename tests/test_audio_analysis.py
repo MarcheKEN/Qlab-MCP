@@ -454,10 +454,19 @@ def test_supported_containers(audio_backend, tmp_path, extension, codec):
     import numpy as np
     source = write_wave(tmp_path / "input.wav", 0.5 * np.sin(2 * np.pi * 1000 * np.arange(48000) / 48000))
     target = tmp_path / f"output.{extension}"
+    extra_args = []
+    expected_channels = 1
+    if codec == "libvorbis":
+        encoders = subprocess.run([shutil.which("ffmpeg"), "-hide_banner", "-encoders"],
+                                  capture_output=True, text=True, check=True).stdout
+        if "libvorbis" not in encoders:
+            codec = "vorbis"
+            extra_args = ["-strict", "experimental", "-ac", "2"]
+            expected_channels = 2
     subprocess.run([shutil.which("ffmpeg"), "-nostdin", "-v", "error", "-i", str(source),
-                    "-c:a", codec, str(target)], check=True)
+                    "-c:a", codec, *extra_args, str(target)], check=True)
     result = analyze(audio_backend, target)
-    assert result.source.channels == 1
+    assert result.source.channels == expected_channels
     assert result.timeline.rows[5][5] > 0.95
 
 
@@ -538,13 +547,21 @@ def test_one_attack_crossing_canonical_boundary_is_not_duplicated(audio_backend,
     assert first.events.onsets + second.events.onsets == result.events.onsets
 
 
-def test_complete_mp3_loudness_scope_uses_real_coverage(audio_backend, tmp_path):
+def test_complete_mp3_loudness_scope_uses_real_coverage(audio_backend, tmp_path, monkeypatch):
     import numpy as np
     import subprocess
     source = write_wave(tmp_path / "second.wav", 0.5 * np.sin(2 * np.pi * 1000 * np.arange(48000) / 48000))
     compressed = tmp_path / "second.mp3"
     subprocess.run([shutil.which("ffmpeg"), "-nostdin", "-v", "error", "-i", str(source),
                     "-c:a", "libmp3lame", str(compressed)], check=True)
+    probe = audio_backend._probe
+
+    def padded_duration(*args):
+        metadata, version = probe(*args)
+        metadata.duration_reported_s = 1.024
+        return metadata, version
+
+    monkeypatch.setattr(audio_backend, "_probe", padded_duration)
     result = analyze(audio_backend, compressed)
     assert result.source.duration_reported_s > result.source.duration_decoded_s
     assert result.loudness_regions[0].scope == "source_file"

@@ -11,7 +11,7 @@ from .family import ControlTriggers, _fail, _section
 from .lists import _contents, _finish
 from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES, serialized_payload_bytes
 from ..sanitizer import sanitize_exception_message
-from ..saved_cue_settings import SavedCueSettings, enrich_cue_details
+from ..saved_cue_settings import CurveSavedCueSettings, SavedCueSettings, enrich_cue_details
 
 
 class LightCueSummary(AudioCueSummary):
@@ -118,6 +118,7 @@ class GroupCueDetailsResult(CueListReadResult):
     mode_label: str | None = None
     playlist: PlaylistSettings | None = None
     contents: CueListContents | None = None
+    saved_settings: CurveSavedCueSettings | None = None
     edit_capabilities: dict[str, JsonValue] = Field(default_factory=dict)
     technical_payload: JsonValue = None
     redactions: list[dict[str, str]] = Field(default_factory=list)
@@ -221,4 +222,4 @@ class LightGroupCuesMixin:
             result.identity = result.group = result.playlist = result.contents = result.triggers = None
             result.technical_payload = None
             return _fail(result, "cue_payload_too_large", "Group detail exceeds the response byte budget")
-        return _finish(result)
+        return enrich_cue_details(self, _finish(result), MAX_SENSITIVE_CUE_RESPONSE_BYTES)

@@ -85,3 +85,30 @@ def test_group_capabilities_show_playlist_mode_requirement():
     assert "playlist/doLoop" not in mode_three["allowed_properties"]
     assert "mode=6" in mode_three["blocked_properties"]["playlist/doLoop"]
     assert "playlist/doLoop" in group_edit_capabilities(6)["allowed_properties"]
+
+
+def test_crossfade_duration_uses_archive_and_osc_stays_blocked():
+    from qlab_mcp.write.groups import group_preflight
+
+    key = "playlist/crossfade/duration"
+    capability = group_edit_capabilities(6)
+    assert key in capability["allowed_properties"]
+    assert capability["property_transports"][key] == "saved_archive"
+    item = {"profile": "group_basic", "cue_ref": GROUP, "operations": [{"property": key, "args": [0.75]}]}
+    errors, _ = group_preflight(Reader(), WORKSPACE, item, {})
+    assert "curve" in errors[key].lower()
+
+
+def test_crossfade_duration_uses_saved_transaction(monkeypatch):
+    from qlab_mcp.write import playlist_archive
+
+    calls = []
+    monkeypatch.setattr(playlist_archive, "edit_playlist_crossfade",
+        lambda *args: calls.append(args) or {"status": "dry_run"})
+    reader = Reader()
+    result = edit_group_cues(reader, WORKSPACE, [{"cue_id": GROUP,
+        "properties": {"playlist/crossfade/duration": 4.5}}], True)
+    assert result == {"status": "dry_run"}
+    assert calls[0][0] is reader and calls[0][1] == WORKSPACE
+    assert calls[0][2].properties.playlist_crossfade_duration == 4.5
+    assert calls[0][3] is True

@@ -139,13 +139,14 @@ def displays():
 
 
 def audio_inputs():
-    """Read CoreAudio input identities and channel counts without opening capture."""
+    """Read CoreAudio device identities and channel counts without opening capture."""
     core = C.CDLL('/System/Library/Frameworks/CoreAudio.framework/CoreAudio')
     cf = C.CDLL('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation')
     size_fn = _function(core, 'AudioObjectGetPropertyDataSize', C.c_int32, C.c_uint32,
                         C.c_void_p, C.c_uint32, C.c_void_p, C.POINTER(C.c_uint32))
     get_fn = _function(core, 'AudioObjectGetPropertyData', C.c_int32, C.c_uint32,
                        C.c_void_p, C.c_uint32, C.c_void_p, C.POINTER(C.c_uint32), C.c_void_p)
+    has_fn = _function(core, 'AudioObjectHasProperty', C.c_bool, C.c_uint32, C.c_void_p)
     get_string = _function(cf, 'CFStringGetCString', C.c_bool, C.c_void_p, C.c_char_p,
                            C.c_long, C.c_uint32)
     code = lambda value: int.from_bytes(value.encode('ascii'), 'big')
@@ -185,34 +186,72 @@ def audio_inputs():
             raise ValueError(f'CoreAudio string property {selector!r} is not UTF-8 readable.')
         return text.value.decode('utf-8')
 
+    def default_device(selector):
+        try:
+            data, size = property_data(1, selector)
+            if size != C.sizeof(C.c_uint32):
+                return None
+            return C.cast(data, C.POINTER(C.c_uint32)).contents.value
+        except (OSError, ValueError, AttributeError, OverflowError):
+            return None
+
+    def channels(object_id, scope):
+        address = Address(code('slay'), code(scope), 0)
+        if not has_fn(object_id, C.byref(address)):
+            return 0
+        data, size = property_data(object_id, 'slay', scope, allow_empty=True)
+        if not size:
+            return 0
+        if size < BufferListHeader.buffers.offset:
+            raise ValueError('CoreAudio stream configuration has an invalid size.')
+        header = C.cast(data, C.POINTER(BufferListHeader)).contents
+        needed = BufferListHeader.buffers.offset + header.count * C.sizeof(AudioBuffer)
+        if header.count > 128 or needed > size:
+            raise ValueError('CoreAudio stream configuration exceeds its bounds.')
+        return sum(AudioBuffer.from_buffer(data, BufferListHeader.buffers.offset + index * C.sizeof(AudioBuffer)).channels
+                   for index in range(header.count))
+
     devices_data, devices_size = property_data(1, 'dev#', allow_empty=True)
     if devices_size % C.sizeof(C.c_uint32):
         raise ValueError('CoreAudio device inventory has an invalid size.')
     device_ids = list(C.cast(devices_data, C.POINTER(C.c_uint32 * (devices_size // 4))).contents)
     if len(device_ids) > LIMIT:
         raise ValueError('CoreAudio device inventory exceeds its limit.')
-    default_data, default_size = property_data(1, 'dIn ')
-    if default_size != C.sizeof(C.c_uint32):
-        raise ValueError('CoreAudio default input identity has an invalid size.')
-    default_id = C.cast(default_data, C.POINTER(C.c_uint32)).contents.value
+    default_id = default_device('dIn ')
+    default_output_id = default_device('dOut')
     rows = []
     for device_id in device_ids:
-        data, size = property_data(device_id, 'slay', 'inpt')
-        if size < BufferListHeader.buffers.offset:
-            raise ValueError('CoreAudio input stream configuration has an invalid size.')
-        header = C.cast(data, C.POINTER(BufferListHeader)).contents
-        needed = BufferListHeader.buffers.offset + header.count * C.sizeof(AudioBuffer)
-        if header.count > 128 or needed > size:
-            raise ValueError('CoreAudio input stream configuration exceeds its bounds.')
-        channels = sum(AudioBuffer.from_buffer(data, BufferListHeader.buffers.offset + index * C.sizeof(AudioBuffer)).channels
-                       for index in range(header.count))
-        rows.append(dict(id=device_id, uid=string_property(device_id, 'uid '),
-                         name=string_property(device_id, 'lnam'),
-                         model_uid=string_property(device_id, 'muid'),
-                         input_channels=channels, source='macos_coreaudio'))
-    return dict(status='ready', devices=rows, formats=[], device_count=len(rows),
-                default_input_id=default_id, identity_scope='current_macos_audio_session',
+        errors = {}
+        row = dict(id=device_id, input_channels=None, output_channels=None,
+                   source='macos_coreaudio', metadata_errors=errors)
+        for field, selector in (('uid', 'uid '), ('name', 'lnam'),
+                                ('model_uid', 'muid'), ('manufacturer', 'mauf')):
+            try:
+                row[field] = string_property(device_id, selector)
+            except (OSError, ValueError, AttributeError, OverflowError) as exc:
+                errors[field] = str(exc)[:512]
+        for field, scope in (('input_channels', 'inpt'), ('output_channels', 'outp')):
+            try:
+                row[field] = channels(device_id, scope)
+            except (OSError, ValueError, AttributeError, OverflowError) as exc:
+                errors[field] = str(exc)[:512]
+        rows.append(row)
+    identity_complete = all(
+        isinstance(row.get('uid'), str) and bool(row['uid'])
+        and isinstance(row.get('name'), str) and bool(row['name'])
+        for row in rows
+    )
+    input_complete = bool(rows) and identity_complete and all(type(row.get('input_channels')) is int for row in rows)
+    output_complete = bool(rows) and identity_complete and all(type(row.get('output_channels')) is int for row in rows)
+    status = 'ready' if input_complete else 'partial' if rows else 'unavailable'
+    output_status = 'ready' if output_complete else 'partial' if rows else 'unavailable'
+    result = dict(status=status, devices=rows, formats=[], device_count=len(rows),
+                default_input_id=default_id, default_output_id=default_output_id,
+                identity_scope='current_macos_audio_session', output_status=output_status,
                 capture_started=False)
+    if status != 'ready' or output_status != 'ready':
+        result['message'] = 'CoreAudio device inventory is empty or incomplete for one or both channel directions.'
+    return result
 
 
 def inputs(include_syphon=False):

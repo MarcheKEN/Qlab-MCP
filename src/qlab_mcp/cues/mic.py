@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field, StrictBool, StrictInt, StrictStr
 
 from .audio import AudioCueSummary, AudioCuesResult, AudioCueDetailsResult, Channel, Level
 from .list_models import CueListState, CueTimecodeComponents, FiniteNumber
+from .limits import MAX_SENSITIVE_CUE_RESPONSE_BYTES
+from ..saved_cue_settings import enrich_cue_details
 
 
 class MicCueSummary(AudioCueSummary):
@@ -67,5 +69,8 @@ class MicCuesMixin:
                                           MicCuesResult, MicCueSummary)
 
     def get_mic_cue_details(self, workspace_id, cue_id, profile="safe", input_channel=None, output_channel=None, include_native_triggers=False):
-        return self._get_family_details(workspace_id, cue_id, profile, input_channel, output_channel,
-                                             MicCueDetailsResult, MicCueSummary, DETAIL_MODELS, include_native_triggers=include_native_triggers)
+        result = self._get_family_details(workspace_id, cue_id, profile, input_channel, output_channel,
+                                          MicCueDetailsResult, MicCueSummary, DETAIL_MODELS,
+                                          max_bytes=MAX_SENSITIVE_CUE_RESPONSE_BYTES,
+                                          include_native_triggers=include_native_triggers)
+        return enrich_cue_details(self, result)

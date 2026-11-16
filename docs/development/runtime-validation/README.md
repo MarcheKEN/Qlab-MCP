@@ -1,5 +1,9 @@
 # Runtime validation records
 
+- [Audio batch and archive performance — November 16](2026-11-16-audio-batch-performance.md)
+- [Playlist crossfade archive transaction — November 14](2026-11-14-playlist-crossfade.md)
+- [Audio MCP round-trip follow-up — November 10](2026-11-10-audio-mcp-followup.md)
+- [Audio archive fixtures — November 9](2026-11-09-audio-authoring.md)
 - [October 22 lighting authoring completion](2026-10-22-light-authoring-completion.md)
 
 Each report proves only its named QLab version, fixture and operation. Automated checks are separate from real playback and hardware output. JSON files with matching stems retain capture evidence.

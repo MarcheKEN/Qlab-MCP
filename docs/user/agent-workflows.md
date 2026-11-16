@@ -1457,7 +1457,9 @@ a fresh confirmation. This low-level boundary is not declared exact/verified.
 Audio level edits use the current workspace minimum and maximum as well as the
 schema's conservative -120 to +12 dB range. Finite values must be above the
 workspace minimum; its maximum is inclusive. Missing or changed limits block the
-write. Assigning a patch device requires a complete passive inventory in the
+write. A batch shares those limit reads within each preflight phase and checks
+them again immediately before each setter; it does not cache them across calls.
+Assigning a patch device requires a complete passive inventory in the
 patch's direction and a selected device with complete identity and channel counts;
 no capture is started.
 

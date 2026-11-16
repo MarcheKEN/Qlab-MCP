@@ -122,7 +122,7 @@ def _light_cue_pull_context(reader, ws, cue_uid, command_text, deps):
     return resolved_by_number
 
 
-def validate(reader, ws, uid, family, operations, before):
+def validate(reader, ws, uid, family, operations, before, *, phase_limits=None):
     deps = {'routes': {}, 'cues': {}, 'files': {}}
     changes = {o['property']: o['requested'] for o in operations}
     names = set(changes)
@@ -195,8 +195,13 @@ def validate(reader, ws, uid, family, operations, before):
         if value_ops:
             requested_levels = [o.get('arg_values', {}).get('decibel') for o in value_ops
                                 if o['property'] in {'level', 'sliderLevel', 'objectIDLevel'}]
-            minimum = _raw(reader, ws, 'settings/audio/minVolume')
-            maximum = _raw(reader, ws, 'settings/audio/maxVolume')
+            if phase_limits is not None and 'values' in phase_limits:
+                minimum, maximum = phase_limits['values']
+            else:
+                minimum = _raw(reader, ws, 'settings/audio/minVolume')
+                maximum = _raw(reader, ws, 'settings/audio/maxVolume')
+                if phase_limits is not None:
+                    phase_limits['values'] = (minimum, maximum)
             validate_audio_level_limits(minimum, maximum, requested_levels)
             deps['routes']['settings/audio/minVolume'] = minimum
             deps['routes']['settings/audio/maxVolume'] = maximum

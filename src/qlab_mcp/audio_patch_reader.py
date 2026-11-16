@@ -129,7 +129,7 @@ def _saved_source(reader, workspace_id: str, patch_type: str, patch_id: str) -> 
         "freshness": read.get("freshness", "unavailable"),
         "document_modified": read.get("document_modified"), "sha256": read.get("sha256"),
         "device_observations": _device_observations(read.get("device_observations")),
-        "data": deepcopy(data), "issues": issues,
+        "data": data, "issues": issues,
     }
 
 
@@ -255,13 +255,14 @@ def _paged_matrix(patch: dict[str, Any] | None, offset: int, limit: int) -> tupl
     }
     if not isinstance(patch, dict):
         return None, empty_page
-    result = deepcopy(patch)
-    matrix = result.get("routing_matrix")
+    matrix = patch.get("routing_matrix")
     if not isinstance(matrix, dict) or not isinstance(matrix.get("cells"), list):
-        return result, empty_page
+        return deepcopy(patch), empty_page
     all_cells = matrix["cells"]
     total = matrix.get("total_cells")
-    page = all_cells[offset:offset + limit]
+    page = deepcopy(all_cells[offset:offset + limit])
+    result = deepcopy({key: value for key, value in patch.items() if key != "routing_matrix"})
+    result["routing_matrix"] = deepcopy({key: value for key, value in matrix.items() if key != "cells"})
     has_observed_more = offset + len(page) < len(all_cells)
     source_truncated = matrix.get("truncated") is True
     source_incomplete = source_truncated or matrix.get("status") == "partial"
@@ -385,21 +386,34 @@ def read_audio_patch(
 
 def _patch_page(values: Any, offset: int, limit: int, *, strip_matrix: bool) -> tuple[list[Any], dict[str, Any]]:
     items = values if isinstance(values, list) else []
-    page = deepcopy(items[offset:offset + limit])
+    selected = items[offset:offset + limit]
     if strip_matrix:
-        for item in page:
-            if isinstance(item, dict) and isinstance(item.get("routing_matrix"), dict):
-                item["routing_matrix"]["cells"] = []
+        page = []
+        for item in selected:
+            if not isinstance(item, dict):
+                page.append(deepcopy(item))
+                continue
+            projected = {key: value for key, value in item.items()
+                         if key not in {"cue_output_buses", "device_output_buses", "routing_matrix"}}
+            matrix = item.get("routing_matrix")
+            if isinstance(matrix, dict):
+                projected["routing_matrix"] = {key: value for key, value in matrix.items() if key != "cells"}
+                projected["routing_matrix"]["cells"] = []
+            elif "routing_matrix" in item:
+                projected["routing_matrix"] = matrix
+            for key in ("cue_output_buses", "device_output_buses"):
+                buses = item.get(key)
+                if isinstance(buses, list):
+                    projected[key.removesuffix("_buses") + "_bus_count"] = len(buses)
+                    projected["bus_details_omitted"] = True
+            page.append(deepcopy(projected))
+    else:
+        page = deepcopy(selected)
     truncated = offset + len(page) < len(items)
     if strip_matrix:
         for item in page:
             if not isinstance(item, dict):
                 continue
-            for key in ("cue_output_buses", "device_output_buses"):
-                buses = item.pop(key, None)
-                if isinstance(buses, list):
-                    item[key.removesuffix("_buses") + "_bus_count"] = len(buses)
-                    item["bus_details_omitted"] = True
             matrix = item.get("routing_matrix")
             if isinstance(matrix, dict):
                 matrix["cells_omitted"] = bool(matrix.get("cells")) or (
@@ -466,11 +480,23 @@ def read_audio_overview(
         "freshness": saved_result.get("freshness", "unavailable"),
         "document_modified": saved_result.get("document_modified"),
         "sha256": saved_result.get("sha256"),
-        "data": deepcopy(saved_raw) if archive_status != "unavailable" else None,
+        "data": saved_raw if archive_status != "unavailable" else None,
         "issues": deepcopy(saved_result.get("issues") or []),
     }
     def build_page(page_limit: int) -> tuple[dict[str, Any], dict[str, Any]]:
-        sources = deepcopy({"live_osc": live_source, "saved_archive": saved_source})
+        sources = {}
+        for name, original in (("live_osc", live_source), ("saved_archive", saved_source)):
+            raw = original.get("data")
+            source = deepcopy({key: value for key, value in original.items() if key != "data"})
+            if isinstance(raw, dict):
+                source["data"] = deepcopy({key: value for key, value in raw.items()
+                                           if key not in {"output_patches", "input_patches"}})
+                for key in ("output_patches", "input_patches"):
+                    if key in raw:
+                        source["data"][key] = raw[key] if isinstance(raw[key], list) else deepcopy(raw[key])
+            else:
+                source["data"] = deepcopy(raw)
+            sources[name] = source
         page_counts = {}
         for source_name, source in sources.items():
             source_pages = {}

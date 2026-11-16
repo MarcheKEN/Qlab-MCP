@@ -1,6 +1,7 @@
 """Regressions for signed, indexed family editing."""
 from types import SimpleNamespace
 from uuid import UUID
+from copy import deepcopy
 import pytest
 from qlab_mcp.write import remaining, control
 from test_control_cue_writes import Reader, WS, START, MEMO
@@ -83,6 +84,64 @@ def test_audio_cue_limit_change_invalidates_confirmation(reader):
     reader.audio_limits['minimum'] = -80
     result = remaining.edit_remaining_cues(reader, WS, items, False, family='audio')
     assert not result['ok'] and not reader.setters
+
+
+@pytest.mark.parametrize('count', [1, 10, 50])
+def test_cue_batch_reads_volume_limits_once_per_preflight_phase(reader, count):
+    template = deepcopy(reader.values[START])
+    ids = [str(UUID(int=1000 + i)).upper() for i in range(count)]
+    for i, uid in enumerate(ids):
+        reader.values[uid] = dict(deepcopy(template), uniqueID=uid, number=str(1000 + i))
+    original = reader._request
+    calls = []
+    def counted(address, *args, **kwargs):
+        if address.endswith(('settings/audio/minVolume', 'settings/audio/maxVolume')):
+            calls.append(address)
+        return original(address, *args, **kwargs)
+    reader._request = counted
+    items = [{'cue_id': uid, 'properties': {'level': {
+        'inChannel': 1, 'outChannel': 1, 'decibel': -3}}} for uid in ids]
+    plan = remaining.edit_remaining_cues(reader, WS, items, True, family='audio')
+    assert plan['ok'] and len(calls) == 2
+    for item, result in zip(items, plan['results'], strict=True):
+        item['confirm_gates'] = [op['confirm_token'] for op in result['planned_operations']]
+    calls.clear()
+    result = remaining.edit_remaining_cues(reader, WS, items, False, family='audio')
+    assert result['ok'] and len(calls) == 4 + 2 * count
+
+
+def test_cue_batch_rechecks_limits_before_execution(reader):
+    items = confirmed(reader, [{'cue_id': START, 'properties': {'level': {
+        'inChannel': 1, 'outChannel': 1, 'decibel': -3}}}])
+    original = reader._request
+    reads = []
+    def changed(address, *args, **kwargs):
+        if address.endswith('settings/audio/minVolume'):
+            reads.append(address)
+            if len(reads) == 2:
+                reader.audio_limits['minimum'] = -80
+        return original(address, *args, **kwargs)
+    reader._request = changed
+    result = remaining.edit_remaining_cues(reader, WS, items, False, family='audio')
+    assert not result['ok'] and not reader.setters
+
+
+def test_cue_batch_rechecks_limits_before_each_setter(reader):
+    items = confirmed(reader, [
+        {'cue_id': uid, 'properties': {'level': {
+            'inChannel': 1, 'outChannel': 1, 'decibel': -3}}}
+        for uid in (START, MEMO)
+    ])
+    original = reader._request
+    def changed(address, *args, **kwargs):
+        result = original(address, *args, **kwargs)
+        if args and address.endswith('/level/1/1'):
+            reader.audio_limits['minimum'] = -80
+        return result
+    reader._request = changed
+    result = remaining.edit_remaining_cues(reader, WS, items, False, family='audio')
+    assert not result['ok'] and len(reader.setters) == 1
+    assert result['results'][1]['executed_operations'] == []
 
 
 def test_audio_cue_silence_uses_verified_numeric_floor(reader):

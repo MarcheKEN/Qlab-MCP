@@ -43,6 +43,35 @@ def _effect_snapshot(source: bytes) -> dict:
     return capture_effects(outer, Archive(carrier["NS.data"]))
 
 
+def test_baseline_skips_effect_snapshot_but_operations_still_capture_it(monkeypatch):
+    import qlab_mcp.audio_volume_limits as limits
+
+    source = audio_workspace()
+    original_capture = limits.capture_effects
+    calls = []
+
+    def capture(*args):
+        calls.append(args)
+        return original_capture(*args)
+
+    monkeypatch.setattr(limits, "capture_effects", capture)
+    baseline = plan_audio_volume_limits(source, [])
+    assert baseline["output_bytes"] == source
+    assert baseline["effect_snapshot"] is None
+    assert calls == []
+
+    noop = plan_audio_volume_limits(source, [{"action": "set_volume_limits", "min_volume": -60}])
+    assert noop["output_bytes"] == source
+    assert noop["changes"] == []
+    assert noop["effect_snapshot"] is not None
+    assert len(calls) == 1
+
+    edited = plan_audio_volume_limits(source, [{"action": "set_volume_limits", "min_volume": -80}])
+    assert edited["changes"]
+    assert edited["effect_snapshot"] is not None
+    assert len(calls) == 2
+
+
 def test_plan_updates_only_limits_and_preserves_audio_and_effect_graphs():
     source = Archive(audio_workspace())
     meta = source.mapping(source.root)

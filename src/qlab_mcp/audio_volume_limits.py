@@ -147,7 +147,9 @@ def plan_audio_volume_limits(source: bytes, operations: list[dict]) -> dict:
         raise ValueError("Exactly one set_volume_limits operation is supported.")
     parsed = TypeAdapter(SetAudioVolumeLimits).validate_python(operations[0]) if operations else None
     outer, workspace_id, audio_object, keys, current_min, current_max = _audio_data(source)
-    effects = capture_effects(outer, _cue_archive(outer))
+    # The archive transaction calls planner(source, []) only for a baseline.
+    # Skip cue-graph traversal there; actual operations still snapshot effects.
+    effects = capture_effects(outer, _cue_archive(outer)) if operations else None
     audio_other_fields = {
         key: audio_object["NS.objects"][index]
         for index, key in enumerate(keys)

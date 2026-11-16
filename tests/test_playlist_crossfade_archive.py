@@ -70,6 +70,39 @@ def test_saved_crossfade_noop_keeps_original_bytes():
     assert plan["changes"] == []
 
 
+def test_baseline_skips_effect_snapshot_but_operations_still_capture_it(monkeypatch):
+    from qlab_mcp.write import playlist_archive
+
+    source = playlist_workspace()
+    original_capture = playlist_archive.capture_effects
+    calls = []
+
+    def capture(*args):
+        calls.append(args)
+        return original_capture(*args)
+
+    monkeypatch.setattr(playlist_archive, "capture_effects", capture)
+    baseline = playlist_archive.plan_playlist_crossfade(source, [], cue_id=CUE)
+    assert baseline["output_bytes"] == source
+    assert baseline["effect_snapshot"] is None
+    assert calls == []
+
+    noop = playlist_archive.plan_playlist_crossfade(
+        source, [{"cue_id": CUE, "duration": 3.0}], cue_id=CUE,
+    )
+    assert noop["output_bytes"] == source
+    assert noop["changes"] == []
+    assert noop["effect_snapshot"] is not None
+    assert len(calls) == 1
+
+    edited = playlist_archive.plan_playlist_crossfade(
+        source, [{"cue_id": CUE, "duration": 4.0}], cue_id=CUE,
+    )
+    assert edited["changes"]
+    assert edited["effect_snapshot"] is not None
+    assert len(calls) == 2
+
+
 def test_saved_crossfade_does_not_parse_unrelated_light_patch():
     from qlab_mcp.write.playlist_archive import plan_playlist_crossfade
 

@@ -421,7 +421,7 @@ def _ndi_context(reader, ws, uid):
                 outputs=min(d["device"]["fields"]["audioChannels"] for d in destinations))
 
 
-def preflight(reader, ws, item, family):
+def preflight(reader, ws, item, family, *, phase_limits=None):
     uid = str(item.cue_id).upper()
     changes = item.properties.model_dump(by_alias=True, exclude_unset=True) if item.properties is not None else {}
     supplied = [op.model_dump(exclude_unset=True) for op in item.operations]
@@ -633,10 +633,14 @@ def preflight(reader, ws, item, family):
         if audio_level_ops:
             limits = dependencies.get("audio_limits")
             if not isinstance(limits, dict):
-                limits = {
-                    "minimum": reader._request(_workspace_address(ws, "settings/audio/minVolume"), workspace_id=ws).data,
-                    "maximum": reader._request(_workspace_address(ws, "settings/audio/maxVolume"), workspace_id=ws).data,
-                }
+                if phase_limits is not None and 'values' in phase_limits:
+                    minimum, maximum = phase_limits['values']
+                else:
+                    minimum = reader._request(_workspace_address(ws, "settings/audio/minVolume"), workspace_id=ws).data
+                    maximum = reader._request(_workspace_address(ws, "settings/audio/maxVolume"), workspace_id=ws).data
+                    if phase_limits is not None:
+                        phase_limits['values'] = (minimum, maximum)
+                limits = {"minimum": minimum, "maximum": maximum}
             minimum, maximum = limits["minimum"], limits["maximum"]
             validate_audio_level_limits(minimum, maximum, [op["arg_values"].get("decibel") for op in audio_level_ops])
             dependencies["audio_limits"] = limits

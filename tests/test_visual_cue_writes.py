@@ -1,5 +1,6 @@
 """Specialized visual batches retain the shared confirmation and no-retry protocol."""
 from uuid import UUID
+from copy import deepcopy
 
 import pytest
 from pydantic import ValidationError
@@ -389,6 +390,30 @@ def test_video_audio_levels_respect_workspace_limits(reader, fn, uid, value, min
         "inChannel": 1, "outChannel": 1, "decibel": value,
     })], True)
     assert not result["ok"] and not reader.setters
+
+
+@pytest.mark.parametrize("fn,uid", [(visual.edit_video_cues, START), (visual.edit_camera_cues, WAIT)])
+def test_visual_batch_shares_limits_within_each_preflight(reader, fn, uid):
+    from types import SimpleNamespace
+
+    patch = str(UUID(int=40)).upper()
+    reader.values[uid].update(numChannelsIn=2, audioOutputPatchID=patch, **{"level/1/1": 0})
+    second = str(UUID(int=99)).upper()
+    reader.values[second] = dict(deepcopy(reader.values[uid]), uniqueID=second, number="99")
+    original = reader._request
+    calls = []
+    def request_osc(address, *args, **kwargs):
+        if "/settings/audio/patchID/" in address:
+            return SimpleNamespace(data={"uniqueID": patch, "cueOutputChannels": 2})
+        if address.endswith(("/settings/audio/minVolume", "/settings/audio/maxVolume")):
+            calls.append(address)
+            return SimpleNamespace(data=-60 if address.endswith("minVolume") else 12)
+        return original(address, *args, **kwargs)
+    reader._request = request_osc
+    items = [request(item, level={"inChannel": 1, "outChannel": 1, "decibel": -3})
+             for item in (uid, second)]
+    result = fn(reader, WS, items, True)
+    assert result['ok'] and len(calls) == 2
 
 
 @pytest.mark.parametrize("fn,uid", [(visual.edit_video_cues, START), (visual.edit_camera_cues, WAIT)])

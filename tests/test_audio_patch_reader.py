@@ -36,6 +36,24 @@ def test_patch_read_requires_paired_channel_selectors(selectors):
     assert not reader.detail_calls and not reader.overview_calls
 
 
+def test_pagination_does_not_copy_discarded_matrix_cells():
+    class Discarded:
+        def __deepcopy__(self, memo):
+            raise AssertionError('discarded cell was copied')
+    patch = {'name': 'Patch', 'routing_matrix': {'cells': [{'row': 1}, Discarded()],
+             'total_cells': 2, 'status': 'available'}}
+    page, metadata = audio_patch_reader._paged_matrix(patch, 0, 1)
+    assert page['routing_matrix']['cells'] == [{'row': 1}]
+    assert metadata['next_offset'] == 1
+    page['routing_matrix']['cells'][0]['row'] = 2
+    assert patch['routing_matrix']['cells'][0]['row'] == 1
+    patch['cue_output_buses'] = [Discarded()]
+    overview, _ = audio_patch_reader._patch_page([patch], 0, 1, strip_matrix=True)
+    assert overview[0]['routing_matrix']['cells'] == []
+    assert overview[0]['routing_matrix']['cells_omitted'] is True
+    assert overview[0]['cue_output_bus_count'] == 1
+
+
 def _saved(status="ready", patch=None, **extra):
     return {
         "status": status,

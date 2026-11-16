@@ -577,7 +577,7 @@ def _validate_scalar_baseline(op):
         raise ValueError(f"{op['property']}: invalid scalar readback.")
 
 
-def preflight(reader, ws, item, family):
+def preflight(reader, ws, item, family, *, phase_limits=None):
     from types import SimpleNamespace
     from .remaining_context import validate
     uid = str(item.cue_id).upper()
@@ -608,7 +608,7 @@ def preflight(reader, ws, item, family):
             if not isinstance(op['baseline'], list) or len(op['baseline']) != 2 or not all(_finite(x) for x in op['baseline']):
                 raise ValueError('Object position must be a finite OSC coordinate pair.')
         _validate_scalar_baseline(op)
-    deps.update(validate(reader, ws, uid, family, operations, before))
+    deps.update(validate(reader, ws, uid, family, operations, before, phase_limits=phase_limits))
     channel_ops = {op['key'] for op in operations} & {'channels', 'channelOffset'}
     if family == 'mic' and channel_ops:
         if 'audioInputPatchID' in {op['key'] for op in operations}:

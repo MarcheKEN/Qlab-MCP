@@ -57,7 +57,9 @@ def plan_playlist_crossfade(source, operations, *, cue_id):
         raise ValueError("An active uniquely owned Group cue is required.")
     cue = cues[cue_id][0]
     before = _snapshot(archive, cue)
-    effects = capture_effects(outer, archive)
+    # The archive transaction calls planner(source, []) only for a baseline.
+    # Skip cue-graph traversal there; actual operations still snapshot effects.
+    effects = capture_effects(outer, archive) if operations else None
     if len(operations) > 1:
         raise ValueError("One Playlist crossfade edit is required.")
     changes = []

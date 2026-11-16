@@ -20,7 +20,8 @@ exposes live `min_volume` and `max_volume` in `sources.live_osc.data`;
 `qlab_get_audio_patch` does not return these limits.
 
 `qlab_edit_audio_patch` covers current OSC output controls and saved input/output
-patch fields in separate operations. OSC changes affect the open workspace and
+patch fields in separate operations. Cue-output count is editable through OSC.
+OSC changes affect the open workspace and
 are not saved automatically. Before a saved-file edit, `needs_save` signals
 prior unsaved changes; save the workspace separately and obtain a fresh preview.
 The confirmed archive edit is persisted by the write/reopen transaction.
@@ -161,7 +162,7 @@ this verifies preservation of saved metadata rather than device negotiation or
 physical output. Explicit-device assignment remains blocked when passive
 CoreAudio identity is absent.
 Audio Object setters, default/silent level actions, Fade cue audio targets,
-blank patch creation, cue-output count changes, AudioUnit insertion/parameter
+blank patch creation, saved-file cue-output count changes, AudioUnit insertion/parameter
 writes and Trim were blocked or read-only pending evidence. At that time,
 AudioUnit saved-state writes required the exact SnapTune cue or
 AUDynamicsProcessor bus identity validated in QLab 5.5.10 fixtures; other

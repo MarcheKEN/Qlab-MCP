@@ -29,6 +29,7 @@ from .saved_cue_settings import PublicSavedCueOperations, SavedCueEditResult, ed
 from .light_patch.transaction import edit_light_patch
 from .light_patch.reader import enrich_light_settings
 from .video_settings import enrich_video_settings, enrich_video_detail, enrich_video_inventory
+from .show_control_settings import enrich_saved_show_control_settings
 from .video_editing import edit_video
 from .video_models import RouteOperations, StageOperations, DeviceOperations, InputOperations, VideoArchiveEditResult
 from .audio_analysis_models import AudioAnalysisRequest, AudioAnalysisResult, Resolution
@@ -1453,7 +1454,9 @@ def qlab_get_workspace_network_settings(
 ) -> WorkspaceNetworkSettingsResult:
     """Return the Network Patch inventory or one exact Network Patch by name or UUID.
 
-    QLab OSC exposes patch names and UUIDs, not the complete Network settings panel.
+    Current OSC observations and bounded last-saved patch configuration are separate.
+    Saved freshness is reported; passcodes and opaque plugin data are never returned.
+    OSC exposes patch names and UUIDs, not the complete Network settings panel.
     """
     detail_kind = None if ref is None and profile == "safe" else "network_patch" if ref is not None else "all"
     return _run_workspace_settings_domain(
@@ -1465,6 +1468,9 @@ def qlab_get_workspace_network_settings(
         detail_kind=detail_kind,
         result_model=WorkspaceNetworkSettingsResult,
         allowed={"profile": ["safe", "technical", "exhaustive"]},
+        result_transform=lambda reader, result: enrich_saved_show_control_settings(
+            reader, str(workspace_id), "network", ref, result,
+        ),
     )
 
 
@@ -1481,7 +1487,9 @@ def qlab_get_workspace_midi_settings(
 ) -> WorkspaceMidiSettingsResult:
     """Return the MIDI Patch inventory or one exact MIDI Patch by name or UUID.
 
-    QLab OSC exposes patch names and UUIDs, not the complete MIDI settings panel.
+    Current OSC observations and bounded last-saved patch/MSC configuration are separate.
+    Saved freshness is reported; numeric CoreMIDI IDs are not returned. OSC exposes
+    patch names and UUIDs, not the complete MIDI settings panel.
     """
     detail_kind = None if ref is None and profile == "safe" else "midi_patch" if ref is not None else "all"
     return _run_workspace_settings_domain(
@@ -1493,6 +1501,9 @@ def qlab_get_workspace_midi_settings(
         detail_kind=detail_kind,
         result_model=WorkspaceMidiSettingsResult,
         allowed={"profile": ["safe", "technical", "exhaustive"]},
+        result_transform=lambda reader, result: enrich_saved_show_control_settings(
+            reader, str(workspace_id), "midi", ref, result,
+        ),
     )
 
 

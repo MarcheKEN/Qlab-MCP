@@ -719,7 +719,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {'qlab_get_fonts': {
                                                       'openWorldHint': True,
                                                       'readOnlyHint': True},
                                       'input_schema_hash': 'eaaf315895e69c71d1110546fa037ae8bea54384d8eac79583a07207a2c9b86f',
-                                      'output_schema_hash': 'a1246ab669e39937ba01a4f2865289a72a1354c022a1536f1aec11652dd08f9e',
+                                      'output_schema_hash': '23bdd7851d468c91c60bfdc02a0a31999be342918d9e4a7d3bfdb5e4750b3134',
                                       'tags': ['midi', 'patches', 'qlab', 'safe-read', 'settings'],
                                       'timeout': 60.0,
                                       'title': 'Get QLab Workspace MIDI Settings'},
@@ -728,7 +728,7 @@ EXPECTED_FASTMCP_TOOL_CONTRACTS = {'qlab_get_fonts': {
                                                          'openWorldHint': True,
                                                          'readOnlyHint': True},
                                          'input_schema_hash': 'eaaf315895e69c71d1110546fa037ae8bea54384d8eac79583a07207a2c9b86f',
-                                         'output_schema_hash': '048f6d873b4a6a4c5ba97f5e076e1a0d431250d04448fc90934c31cb5aff745f',
+                                         'output_schema_hash': '27350d948c2d6151c431cb6ff62182117af05778b4a73c4e871c3e8a3adb611b',
                                          'tags': ['network',
                                                   'patches',
                                                   'qlab',
@@ -1104,7 +1104,7 @@ def test_fastmcp_initialization_reports_project_version_and_universal_guidance()
             return client.initialize_result
 
     initialize_result = asyncio.run(initialize())
-    assert initialize_result.serverInfo.version == "0.4.0"
+    assert initialize_result.serverInfo.version == "0.5.0"
     instructions = initialize_result.instructions
     assert instructions
     for phrase in (

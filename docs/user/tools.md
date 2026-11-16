@@ -1,6 +1,6 @@
 # Public MCP Tools
 
-QLab MCP exposes exactly 90 tools on the current development branch: 53 reads and 37 gated writes. This page is a compact human
+QLab MCP 0.5.0 exposes exactly 90 tools on the current development branch: 53 reads and 37 gated writes. This page is a compact human
 catalogue; decorated functions, generated schemas, and
 `tests/test_server_tools.py` remain the source of truth for exact parameters,
 annotations, and result models.
@@ -53,8 +53,8 @@ annotations, and result models.
 | `qlab_get_light_definitions` | Paged bundled/personal/workspace catalogue and exact native parameter details | Global library writes or physical fixture detection | [Definitions](agent-workflows.md#light-definitions) |
 | `qlab_edit_light_definitions` | Import or manage workspace definitions, 1–100 operations | Dashboard, global library writes, unsupported native variants | [Definitions](agent-workflows.md#light-definitions) |
 | `qlab_edit_light_patch` | One signed batch of 1–100 instrument and group operations, with same-path close/edit/reopen | Cue repair, global Library, Dashboard MIDI, USB device discovery/hardware proof or unvalidated parameter creation | [Light Patch](agent-workflows.md#edit-the-light-patch) |
-| `qlab_get_workspace_network_settings` | Network Patch inventory or exact patch | The complete Network panel | [Read](agent-workflows.md#read-sequence) |
-| `qlab_get_workspace_midi_settings` | MIDI Patch inventory or exact patch | The complete MIDI panel | [Read](agent-workflows.md#read-sequence) |
+| `qlab_get_workspace_network_settings` | Current OSC inventory plus separate last-saved Network patch details and freshness | Passcodes, opaque plugin data or patch editing | [Network and MIDI settings](agent-workflows.md#network-and-midi-workspace-settings) |
+| `qlab_get_workspace_midi_settings` | Current OSC inventory plus saved MIDI patch and MSC Broadcast details | Numeric CoreMIDI IDs, endpoint proof or patch editing | [Network and MIDI settings](agent-workflows.md#network-and-midi-workspace-settings) |
 | `qlab_query_cues` | Bounded filtered cue discovery | Full Inspector payloads | [Read](agent-workflows.md#read-sequence) |
 | `qlab_get_cue_lists` | Compact combined Cue List / Cue Cart inventory and current container | Child or deep container details | [Read](agent-workflows.md#cue-lists) |
 | `qlab_get_cue_list_details` | Exact list identity, state, playhead, incoming timecode and bounded tree | AppleScript-only timecode source settings | [Read](agent-workflows.md#cue-lists) |

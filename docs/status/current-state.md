@@ -1,5 +1,24 @@
 # Current Project State — 2026-11-16
 
+## Network and MIDI authoring — 0.5.0 scope
+
+`qlab_get_workspace_network_settings` and `qlab_get_workspace_midi_settings`
+keep current OSC observations separate from a read-only projection of the last
+saved `.qlab5` configuration. The projection reports source, build, freshness
+and file hash. It omits Network passcodes, opaque plugin data and numeric
+CoreMIDI identifiers. MIDI settings also report saved MSC Broadcast configuration,
+separately from incoming MIDI Controls and OSC Access.
+
+Existing Network, MIDI and MIDI File cue editors remain. Network/MIDI cue patch
+assignment, Network fade writes and SysEx payload writes are blocked pending
+targeted QLab 5.5.10 validation. Network/MIDI patch CRUD, device assignment,
+MSC Broadcast editing and OSC Access editing are not implemented. No cues,
+messages, endpoints or physical outputs are activated. Source investigation:
+the QLab-REA November 16 Network/MIDI crosswalk and companion internals report,
+the supplied QClass Day 2 transcript, and the QLab 5 Reference Manual (Workspace
+Settings pp. 105–109; Network/MIDI/MIDI File cues pp. 411–429). These sources do
+not substitute for native save/reopen validation.
+
 ## Audio FX public surface retirement — 2026-11-11
 
 The public AudioUnit catalogue and cue/bus Audio FX editing operations have

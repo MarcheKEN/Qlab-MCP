@@ -1,6 +1,18 @@
 # Changelog
 
-## 0.4.0 (Unreleased)
+## 0.5.0 (Unreleased)
+
+- Add last-saved, read-only Network/MIDI patch configuration to their existing
+  workspace settings tools, separate from current OSC observations. Include
+  freshness and source metadata; omit passcodes, opaque plugin data and numeric
+  CoreMIDI IDs. Expose saved MSC Broadcast configuration through the MIDI tool.
+- Keep existing Network, MIDI and MIDI File cue editors. Block unvalidated
+  Network patch/fade writes, MIDI/MIDI File patch assignment and SysEx payload
+  writes. Network/MIDI patch CRUD, device assignment, MSC editing and OSC Access
+  remain out of scope. No new MCP tools; the surface remains **90 tools: 53 reads
+  and 37 gated writes**.
+
+## 0.4.0 (2026-11-16)
 
 - Read saved Group Playlist and Fade curves with source and freshness. Change a
   Playlist crossfade duration through a guarded archive transaction that

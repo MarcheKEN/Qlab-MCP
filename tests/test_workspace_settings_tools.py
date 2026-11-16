@@ -51,6 +51,34 @@ def test_light_public_tool_keeps_typed_saved_patch_when_osc_fails(monkeypatch, o
     assert result.data.pagination.byte_limit == 2 * 1024 * 1024
 
 
+def test_network_workspace_tool_separates_saved_and_current_configuration(monkeypatch):
+    from qlab_mcp import show_control_settings
+
+    class FakeReader:
+        def get_workspace_settings(self, **kwargs):
+            assert kwargs["sections"] == ["network"]
+            return {
+                "ok": True, "status": "ok", "partial": False,
+                "workspace_id": WORKSPACE_ID, "profile": "safe",
+                "sections": {"network": {"patches": [{"name": "Show OSC", "uniqueID": PATCH_ID}]}},
+            }
+
+    saved_patch = {"id": PATCH_ID, "name": "Show OSC", "destinations": [], "destination_count": 0}
+    monkeypatch.setattr(server_module, "_reader", FakeReader)
+    monkeypatch.setattr(show_control_settings, "read_saved_show_control_settings", lambda *_: {
+        "status": "ready", "freshness": "last_saved", "document_modified": False,
+        "version": "5.5.10", "build": 5510, "network_patches": [saved_patch],
+        "midi_patches": [], "msc_broadcast": {"enabled": None, "destinations": []},
+        "diagnostics": [],
+    })
+
+    result = server_module.qlab_get_workspace_network_settings(WORKSPACE_ID)
+
+    assert result.data.overview.patches[0].name == "Show OSC"
+    assert result.data.saved_configuration["freshness"] == "last_saved"
+    assert result.data.saved_configuration["patches"][0]["id"] == PATCH_ID
+
+
 def test_workspace_settings_tools_replace_generic_surface() -> None:
     async def list_tool_names() -> set[str]:
         async with Client(mcp) as client:

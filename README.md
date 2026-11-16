@@ -2,12 +2,13 @@
 
 **Give AI agents tools to inspect, create and edit QLab workspaces.**
 
-QLab MCP **0.4.0** connects an MCP-compatible agent to QLab 5, primarily through
+QLab MCP **0.5.0** connects an MCP-compatible agent to QLab 5, primarily through
 OSC. It can organize cues, configure supported properties and inspect workspace
 settings. Selected local functions use fixed AppleScript bridges on macOS.
 Selected Light, Video and Audio settings, saved cue settings, and Playlist
 crossfade duration also use the saved local archive under a guarded close,
-replace and reopen workflow.
+replace and reopen workflow. Network and MIDI settings include a separate,
+read-only view of last-saved patch configuration.
 
 **Developed and tested with QLab 5.5.10 on macOS.** Other QLab versions may
 behave differently and have not been validated by this project.
@@ -55,6 +56,8 @@ for recovery and readback limits.
 - Reproduce all Settings UI controls: Light Dashboard/global-library writes,
   USB device discovery, Blackmagic/new network input assignment, the full QLab
   device registry and the unlicensed “Video output for all cues” selector are outside scope.
+- Edit Network/MIDI patch structure, write Network fades or SysEx payloads, or
+  send OSC, MSC or MIDI messages.
 - Delete root Cue Lists/Carts or execute Cart cell moves.
 - Guarantee playback or physical output from a successful configuration change.
 

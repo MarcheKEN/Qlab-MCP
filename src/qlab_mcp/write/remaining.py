@@ -364,6 +364,21 @@ _BLOCKED = {"setDefaultLevels": "Template default state cannot be read reliably.
             "parameterValue": "Device Definition parameter type/range metadata is unavailable.",
             "parameterFadeEnabled": "Device Definition fade capability metadata is unavailable."}
 
+_SHOW_CONTROL_PENDING = {
+    "network": {
+        "networkPatchID": "Patch assignment requires a validated descriptor-specific destination readback.",
+        **{key: "Network cue fades await QLab 5.5.10 save/reopen and live readback validation."
+           for key in ("fadeEntries", "fadeFrom", "fadeTo", "fadeNumberType", "fadeType", "fps", "pathHeight", "pathWidth")},
+    },
+    "midi": {
+        "midiPatchID": "MIDI patch assignment awaits a populated patch and verified endpoint readback.",
+        "rawString": "SysEx payload writing awaits a saved-payload round-trip in QLab 5.5.10.",
+    },
+    "midi_file": {
+        "midiPatchID": "MIDI File patch assignment awaits a populated patch and verified endpoint readback.",
+    },
+}
+
 _FADE_AUDIO_PENDING = {"patchTargetID", "levelsMode", "level", "sliderLevel", "doLevel",
                        "inputChannelName", "gang", "doObjectIDLevel"}
 
@@ -373,6 +388,7 @@ def capabilities(family, triggers=None, result=None):
                            if hasattr(m, 'max_length')), 0)
     names = {field.alias or key for key, field in model.model_fields.items()}
     blocked = {key: reason for key, reason in _BLOCKED.items() if key in names}
+    blocked.update({key: reason for key, reason in _SHOW_CONTROL_PENDING.get(family, {}).items() if key in names})
     if family in {"audio", "mic"}:
         blocked.update({key: "Documented for Fade cues only." for key in names & {"doLevel", "doObjectIDLevel"}})
     if family == "fade":

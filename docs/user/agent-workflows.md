@@ -292,7 +292,20 @@ solo. To read one matrix value, provide both `input_channel` (0–128) and
 the complete matrix. `(0, 0)` reads Main; `(input, 0)` reads input gain,
 `(0, output)` reads output gain, and two positive channels read a crosspoint.
 Known patch capacity further constrains channels.
-Network and MIDI accept an optional exact `ref`.
+### Network and MIDI Workspace Settings
+
+`qlab_get_workspace_network_settings` and `qlab_get_workspace_midi_settings`
+return the current OSC inventory plus `data.saved_configuration`, a separate
+projection of the last-saved local `.qlab5` archive. It reports QLab build,
+file hash and freshness (`last_saved`, `possibly_stale`, or `unavailable`). A
+dirty open workspace can differ from this saved snapshot; save it and query
+again when you need current saved values. With `ref`, the tool also returns one
+saved patch matched by exact name or UUID. Network output omits passcodes and
+opaque plugin data; MIDI omits numeric CoreMIDI IDs. MIDI settings include the
+saved MSC Broadcast toggle and destinations. These tools do not edit settings,
+change incoming OSC Access/MIDI Controls, contact devices or send messages.
+
+Network and MIDI accept an optional exact `ref` for the live OSC detail.
 For Video, call `qlab_get_workspace_video_settings(workspace_id)` first. Its
 default `section="all"` response combines the current OSC overview with
 `saved_video`, the last-saved local `.qlab5` configuration. The saved view
@@ -1436,9 +1449,9 @@ multiple play-count edits verify the full cumulative slice inventory.
 | Mic | Exact input/output patch selection, Levels and cue-owned Objects. `channels`/`channelOffset` are conditional on a clean local saved patch and an exact CoreAudio device/capacity match. |
 | Light | Commands must resolve completely against the current workspace Light patch. Collate/Subcontroller/duration use the same confirmations; no light execution. |
 | Fade | Cue/patch targets must resolve in the workspace. Values and activation flags must fit the target; relative silence and removing the last active parameter are rejected. Capture from target stays excluded without a complete expected snapshot. |
-| Network | `customString` is opaque saved text. Patch UUID membership is required, not a guessed patch-name protocol. Fades need readable mode/bounds; Device Definition parameters stay pending and blocked without metadata. |
-| MIDI | Saved Voice/MSC/SysEx only. Byte aliases/status, 7/14-bit ranges and compatible fade commands are checked. MSC command-dependent fields stay blocked without activation metadata. SysEx uses 7-bit hexadecimal payload without F0/F7. |
-| MIDI File | Existing absolute file path, MIDI Type 0/1 header, healthy readable timing. Type 2 is rejected. |
+| Network | `customString` is opaque saved text. Network patch assignment and all Network fade fields are blocked pending descriptor-specific destination checks and a 5.5.10 save/reopen/readback. Device Definition parameters stay blocked without metadata. |
+| MIDI | Saved Voice/MSC/SysEx only. Byte aliases/status and 7/14-bit ranges are checked. MIDI patch assignment and SysEx payload writes are blocked pending populated-patch and payload round-trip evidence. MSC command-dependent fields stay blocked without activation metadata. |
+| MIDI File | Existing absolute file path, MIDI Type 0/1 header, healthy readable timing. Patch assignment stays blocked pending endpoint validation; Type 2 is rejected. |
 | Timecode | `startTime` and `endTime` are SMPTE strings such as `"01:00:01:00"`, not numeric seconds. The current cue format validates SMPTE/drop-frame. Positive LTC channels require a known patch output bound; observed channel zero is not writable. QLab may normalize end time on frame-rate change while preserving duration. |
 | Script | Basics and supported OSC/native Triggers. Source remains read-only; no compilation. |
 

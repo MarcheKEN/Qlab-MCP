@@ -209,7 +209,7 @@ def test_fifty_cues_and_budget(reader,monkeypatch):
 @pytest.mark.parametrize('properties,mode,status,ok',[
     ({'note':61,'velocity':50},1,1,True),({'pitchBend':8192},1,1,False),
     ({'endValue':200},1,3,False),({'byteCombo':8192},1,6,True),
-    ({'rawString':'43 10 7f'},3,1,True),({'rawString':'F0 43 F7'},3,1,False),
+    ({'rawString':'43 10 7f'},3,1,False),({'rawString':'F0 43 F7'},3,1,False),
     ({'command':1},2,1,True),({'command':127},2,1,False),
     ({'controlValue':2},2,1,False)])
 def test_midi_modes(reader,properties,mode,status,ok):
@@ -542,6 +542,37 @@ def test_pending_capabilities_do_not_advertise_writes():
     assert caps['property_capabilities']['Trim']['state'] == 'unavailable_via_osc'
     assert caps['max_indexed_operations_per_cue'] == 50
     assert remaining.capabilities('script')['max_indexed_operations_per_cue'] == 0
+
+def test_unvalidated_network_and_midi_routes_stay_blocked():
+    expected = {
+        'network': {'networkPatchID', 'fadeEntries', 'fadeFrom', 'fadeTo', 'fadeNumberType', 'fadeType', 'fps', 'pathHeight', 'pathWidth'},
+        'midi': {'midiPatchID', 'rawString'},
+        'midi_file': {'midiPatchID'},
+    }
+    for family, properties in expected.items():
+        caps = remaining.capabilities(family)
+        assert properties <= caps['blocked_properties'].keys()
+        assert not properties.intersection(caps['allowed_properties'])
+
+@pytest.mark.parametrize(('family', 'property_name', 'value', 'cue_type', 'reason'), [
+    ('network', 'networkPatchID', '22222222-2222-4222-8222-222222222222', 'Network', 'descriptor-specific'),
+    ('network', 'fadeType', 1, 'Network', 'Network cue fades'),
+    ('midi', 'midiPatchID', '22222222-2222-4222-8222-222222222222', 'MIDI', 'populated patch'),
+    ('midi', 'rawString', '43 10 01', 'MIDI', 'SysEx payload'),
+    ('midi_file', 'midiPatchID', '22222222-2222-4222-8222-222222222222', 'MIDI File', 'populated patch'),
+])
+def test_unvalidated_show_control_write_is_blocked_before_setter(
+    monkeypatch, family, property_name, value, cue_type, reason,
+):
+    monkeypatch.setattr(remaining, 'read', lambda reader, ws, uid, keys, changes=None: {
+        'uniqueID': uid, 'type': cue_type, 'isRunning': False, 'isPaused': False,
+        'isAuditioning': False, 'isBroken': False, 'isWarning': False,
+    })
+    item = remaining.FAMILIES[family].model_validate({
+        'cue_id': START, 'properties': {property_name: value},
+    })
+    with pytest.raises(ValueError, match=reason):
+        remaining.preflight(None, WS, item, family)
 
 
 def test_fade_target_mode_capability_marks_patch_target_blocked_only():

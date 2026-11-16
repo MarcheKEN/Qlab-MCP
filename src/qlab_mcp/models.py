@@ -850,6 +850,7 @@ class WorkspaceNetworkSettingsData(BaseModel):
     overview: WorkspaceNetworkSettingsOverview | None = None
     detail: NetworkPatchSummary | SettingsInventoryEmpty | None = None
     technical_payload: JsonValue | None = None
+    saved_configuration: JsonValue | None = None
 
 
 class MidiPatchSummary(SettingsItemIdentity):
@@ -864,6 +865,7 @@ class WorkspaceMidiSettingsData(BaseModel):
     overview: WorkspaceMidiSettingsOverview | None = None
     detail: MidiPatchSummary | SettingsInventoryEmpty | None = None
     technical_payload: JsonValue | None = None
+    saved_configuration: JsonValue | None = None
 
 
 class WorkspaceGeneralSettingsResult(WorkspaceDomainSettingsResult):

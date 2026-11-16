@@ -1,11 +1,11 @@
-# Current Project State — 2026-11-13
+# Current Project State — 2026-11-16
 
 ## Audio FX public surface retirement — 2026-11-11
 
 The public AudioUnit catalogue and cue/bus Audio FX editing operations have
 been removed. Saved effects remain part of the archived workspace and are
 preserved by unrelated edits. Audio Maps, Trim writes, unverified bulk levels,
-audio-object setters and Fade audio-target edits remain blocked pending the
+audio-object setters without proven cue ownership and Fade audio-target edits remain blocked pending the
 specific evidence documented below. This is a breaking public API change.
 The November 10 section is a historical record of the earlier public contract.
 

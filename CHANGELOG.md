@@ -2,6 +2,9 @@
 
 ## 0.4.0 (Unreleased)
 
+- Read saved Group Playlist and Fade curves with source and freshness. Change a
+  Playlist crossfade duration through a guarded archive transaction that
+  preserves its curves; editing curve shapes and Fade audio levels stays blocked.
 - Retire the AudioUnit catalogue and saved cue/bus Audio FX editing operations;
   saved effect chains remain preserved but are not exposed. Reject unvalidated
   Fade audio-target and level writes. The current surface is **90 tools: 53 reads

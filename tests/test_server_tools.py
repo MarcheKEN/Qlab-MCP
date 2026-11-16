@@ -923,7 +923,7 @@ ADDED_TOOL_NAMES = {
 EXPECTED_TOOL_NAMES = set(EXPECTED_FASTMCP_TOOL_CONTRACTS) | ADDED_TOOL_NAMES
 
 EXPECTED_TOOL_CONCEPTS = {
-    "qlab_edit_saved_cue_settings": ("five-minute", "recovery", "Hotkey", "5.5.10"),
+    "qlab_edit_saved_cue_settings": ("Audio, Mic, Light and Video", "five-minute", "recovery", "Hotkey", "5.5.10"),
     "qlab_edit_video_output_devices": ("one-use", "NDI", "Syphon"),
     "qlab_edit_video_input_patches": ("one-use", "auto", "capture"),
     "qlab_get_video_output_devices": ("passive", "CoreGraphics", "not the complete", "pagination"),
@@ -934,7 +934,7 @@ EXPECTED_TOOL_CONCEPTS = {
     "qlab_get_video_effect_catalogue": ("documented FX names", "paged static catalogue", "never grants permission"),
     "qlab_get_audio_patch": ("one exact patch", "live OSC", "saved archive", "source and freshness",
                              "not a complete routing matrix"),
-    "qlab_edit_audio_patch": ("one input/output patch", "OSC or a guarded saved-file operation",
+    "qlab_edit_audio_patch": ("one input/output patch", "OSC supports outputs", "saved-file operations support both",
                               "fresh", "preview token", "Audio FX", "Audio Maps"),
     "qlab_edit_workspace_audio_settings": ("saved audio patch collections", "workspace volume limits",
                                             "fresh token", "clean local QLab 5.5.10",
